@@ -1,9 +1,9 @@
 # VolvoxGrid Makefile
-# Pixel-rendering grid engine as a Synurang FFI plugin
+# Pixel-rendering grid native library exposed through Synurang FFI
 #
 # Usage:
-#   make              — build engine + host plugin
-#   make run          — build & run smoke test (Rust host loads host plugin, creates grid)
+#   make              — build engine + host library
+#   make run          — build & run smoke test (Rust host loads host library, creates grid)
 #   make dotnet-tui-run — build & run .NET 8 terminal example
 #   make test_pixel   — run engine pixel regression tests
 #   make wasm         — build WASM crate
@@ -20,8 +20,8 @@
 # =============================================================================
 SYNURANG_MODULE ?= github.com/ivere27/synurang
 SYNURANG_VERSION ?= v0.5.12
-PROTOC_PLUGIN ?= $(shell gobin=$$(go env GOBIN 2>/dev/null); if [ -n "$$gobin" ]; then printf '%s/protoc-gen-synurang-ffi' "$$gobin"; else printf '%s/bin/protoc-gen-synurang-ffi' "$$(go env GOPATH 2>/dev/null)"; fi)
-PROTOC_PLUGIN_FLAG = --plugin=protoc-gen-synurang-ffi=$(PROTOC_PLUGIN)
+PROTOC_GEN_SYNURANG_FFI ?= $(shell gobin=$$(go env GOBIN 2>/dev/null); if [ -n "$$gobin" ]; then printf '%s/protoc-gen-synurang-ffi' "$$gobin"; else printf '%s/bin/protoc-gen-synurang-ffi' "$$(go env GOPATH 2>/dev/null)"; fi)
+PROTOC_GEN_SYNURANG_FFI_FLAG = --plugin=protoc-gen-synurang-ffi=$(PROTOC_GEN_SYNURANG_FFI)
 ANDROID_PROJECT_DIR := android
 ANDROID_GRADLEW := $(ANDROID_PROJECT_DIR)/gradlew
 SHARED_GRADLEW := ../example/java/android/gradlew
@@ -29,10 +29,10 @@ ANDROID_GRADLE_TASK := :volvoxgrid-android:assembleDebug
 ANDROID_INSTALL_TASK := :example:installDebug
 ANDROID_EXAMPLE_PACKAGE := io.github.ivere27.volvoxgrid.example
 ANDROID_EXAMPLE_ACTIVITY := .MainActivity
-ANDROID_PLUGIN_OUTPUT_DIR := $(abspath android/volvoxgrid-android/src/main/jniLibs)
-ANDROID_APP_PLUGIN_DIR := $(abspath android/example/src/main/jniLibs)
-FLUTTER_ANDROID_PLUGIN_OUTPUT_DIR := $(abspath flutter/android/src/main/jniLibs)
-VOLVOXGRID_PLUGIN_DEBUG_DIR := $(abspath target/debug)
+ANDROID_LIBRARY_OUTPUT_DIR := $(abspath android/volvoxgrid-android/src/main/jniLibs)
+ANDROID_APP_LIBRARY_DIR := $(abspath android/example/src/main/jniLibs)
+FLUTTER_ANDROID_LIBRARY_OUTPUT_DIR := $(abspath flutter/android/src/main/jniLibs)
+VOLVOXGRID_LIBRARY_DEBUG_DIR := $(abspath target/debug)
 FLUTTER_EXAMPLE_DIR := flutter/example
 FLUTTER_EXAMPLE_PACKAGE := com.example.volvoxgrid_example
 DOOM_BUNDLE_URL := https://v8.js-dos.com/bundles/doom.jsdos
@@ -63,14 +63,14 @@ GRADLE_MAX_WORKERS ?= $(BUILD_JOBS)
 CARGO_JOBS_FLAG := -j $(CARGO_BUILD_JOBS)
 GRADLE_JOBS_FLAG := --max-workers=$(GRADLE_MAX_WORKERS)
 ifeq ($(OS),Windows_NT)
-JAVA_DESKTOP_PLUGIN_BASENAME := volvoxgrid_plugin.dll
+JAVA_DESKTOP_LIBRARY_BASENAME := volvoxgrid.dll
 else ifeq ($(UNAME_S),Darwin)
-JAVA_DESKTOP_PLUGIN_BASENAME := libvolvoxgrid_plugin.dylib
+JAVA_DESKTOP_LIBRARY_BASENAME := libvolvoxgrid.dylib
 else
-JAVA_DESKTOP_PLUGIN_BASENAME := libvolvoxgrid_plugin.so
+JAVA_DESKTOP_LIBRARY_BASENAME := libvolvoxgrid.so
 endif
-JAVA_DESKTOP_PLUGIN ?= $(abspath target/debug/$(JAVA_DESKTOP_PLUGIN_BASENAME))
-JAVA_DESKTOP_PLUGIN_RELEASE ?= $(abspath target/release/$(JAVA_DESKTOP_PLUGIN_BASENAME))
+JAVA_DESKTOP_LIBRARY ?= $(abspath target/debug/$(JAVA_DESKTOP_LIBRARY_BASENAME))
+JAVA_DESKTOP_LIBRARY_RELEASE ?= $(abspath target/release/$(JAVA_DESKTOP_LIBRARY_BASENAME))
 VERSION_FILE ?= $(ROOT_DIR)/VERSION
 VERSION_FILE_VALUE := $(strip $(shell [ -f "$(VERSION_FILE)" ] && cat "$(VERSION_FILE)" 2>/dev/null))
 VOLVOXGRID_VERSION ?= $(VERSION_FILE_VALUE)
@@ -160,8 +160,8 @@ MAVEN_REPO_URL ?= https://central.sonatype.com/api/v1/publisher/upload
 MAVEN_LOCAL_REPO ?= $(HOME)/.m2/repository
 
 # iOS SPM publishing
-IOS_XCFRAMEWORK_DIR := dist/ios/VolvoxGridPlugin.xcframework
-IOS_XCFRAMEWORK_ZIP := dist/ios/VolvoxGridPlugin.xcframework.zip
+IOS_XCFRAMEWORK_DIR := dist/ios/VolvoxGrid.xcframework
+IOS_XCFRAMEWORK_ZIP := dist/ios/VolvoxGrid.xcframework.zip
 IOS_GITHUB_REPO ?= ivere27/volvoxgrid
 WEB_BUNDLE_DIR := dist/web
 WEB_BUNDLE_ZIP := $(WEB_BUNDLE_DIR)/volvoxgrid-web-$(VOLVOXGRID_VERSION).zip
@@ -172,16 +172,16 @@ ifeq ($(VOLVOXGRID_SOURCE_RESOLVED),maven)
 ANDROID_INSTALL_PREREQ :=
 ANDROID_INSTALL_RELEASE_PREREQ :=
 else
-ANDROID_INSTALL_PREREQ := android-plugin
-ANDROID_INSTALL_RELEASE_PREREQ := android-plugin-release
+ANDROID_INSTALL_PREREQ := android-library
+ANDROID_INSTALL_RELEASE_PREREQ := android-library-release
 endif
 
 ifeq ($(VOLVOXGRID_SOURCE_RESOLVED),maven)
 FLUTTER_RUN_PREREQ := flutter-setup
 FLUTTER_RUN_RELEASE_PREREQ := flutter-setup
 else
-FLUTTER_RUN_PREREQ := flutter-setup android-plugin
-FLUTTER_RUN_RELEASE_PREREQ := flutter-setup android-plugin-release
+FLUTTER_RUN_PREREQ := flutter-setup android-library
+FLUTTER_RUN_RELEASE_PREREQ := flutter-setup android-library-release
 endif
 
 ifeq ($(VOLVOXGRID_SOURCE_RESOLVED),maven)
@@ -189,22 +189,22 @@ JAVA_DESKTOP_RUN_PREREQ :=
 JAVA_DESKTOP_RUN_RELEASE_PREREQ :=
 JAVA_DESKTOP_RUN_SIMPLE_PREREQ :=
 JAVA_DESKTOP_SMOKE_PREREQ :=
-JAVA_DESKTOP_PLUGIN_ARG :=
-JAVA_DESKTOP_PLUGIN_RELEASE_ARG :=
+JAVA_DESKTOP_LIBRARY_ARG :=
+JAVA_DESKTOP_LIBRARY_RELEASE_ARG :=
 else
-JAVA_DESKTOP_RUN_PREREQ := java-host-plugin
-JAVA_DESKTOP_RUN_RELEASE_PREREQ := java-host-plugin-release
-JAVA_DESKTOP_RUN_SIMPLE_PREREQ := java-host-plugin
-JAVA_DESKTOP_SMOKE_PREREQ := java-host-plugin
-JAVA_DESKTOP_PLUGIN_ARG := --args="$(JAVA_DESKTOP_PLUGIN)"
-JAVA_DESKTOP_PLUGIN_RELEASE_ARG := --args="$(JAVA_DESKTOP_PLUGIN_RELEASE)"
+JAVA_DESKTOP_RUN_PREREQ := java-host-library
+JAVA_DESKTOP_RUN_RELEASE_PREREQ := java-host-library-release
+JAVA_DESKTOP_RUN_SIMPLE_PREREQ := java-host-library
+JAVA_DESKTOP_SMOKE_PREREQ := java-host-library
+JAVA_DESKTOP_LIBRARY_ARG := --args="$(JAVA_DESKTOP_LIBRARY)"
+JAVA_DESKTOP_LIBRARY_RELEASE_ARG := --args="$(JAVA_DESKTOP_LIBRARY_RELEASE)"
 endif
 
-.PHONY: all build engine host-plugin java-host-plugin plugin engine-release host-plugin-release java-host-plugin-release release \
-                build_plugin run run-release test test_pixel wasm wasm-lite wasm-threaded web-js-build web web-lite doom-deps \
+.PHONY: all build engine library host-library java-host-library engine-release host-library-release java-host-library-release release \
+                build_codegen_tool run run-release test test_pixel wasm wasm-lite wasm-threaded web-js-build web web-lite doom-deps \
         codegen \
         android android-build \
-        android-plugin android-plugin-release android-install android-install-release android-run android-run-release flutter flutter-setup \
+        android-library android-library-release android-install android-install-release android-run android-run-release flutter flutter-setup \
         flutter-run flutter-run-release flutter-linux \
         java-desktop-run java-desktop-run-release java-desktop-run-simple java-desktop-smoke \
         java-tui-run java-tui-run-release java-tui-smoke java-tui-smoke-release \
@@ -231,13 +231,13 @@ all: build
 help:
 	@echo "VolvoxGrid Makefile targets:"
 	@echo ""
-	@echo "  build_plugin   Install protoc-gen-synurang-ffi from GitHub ($(SYNURANG_VERSION))"
-	@echo "  build          Build engine + host-plugin (debug)"
-	@echo "  release        Build engine + host-plugin (release, optimized)"
-	@echo "  host-plugin    Build host (desktop) plugin crate (debug)"
-	@echo "  host-plugin-release  Build host (desktop) plugin crate (release)"
-	@echo "  java-host-plugin  Build host plugin for Java desktop flows (debug)"
-	@echo "  java-host-plugin-release  Build host plugin for Java desktop flows (release)"
+	@echo "  build_codegen_tool   Install protoc-gen-synurang-ffi from GitHub ($(SYNURANG_VERSION))"
+	@echo "  build          Build engine + host-library (debug)"
+	@echo "  release        Build engine + host-library (release, optimized)"
+	@echo "  host-library    Build host (desktop) native library (debug)"
+	@echo "  host-library-release  Build host (desktop) native library (release)"
+	@echo "  java-host-library  Build host library for Java desktop flows (debug)"
+	@echo "  java-host-library-release  Build host library for Java desktop flows (release)"
 	@echo "  run            Build & run smoke test (debug)"
 	@echo "  run-release    Build & run smoke test (release)"
 	@echo "  test           Run engine unit tests"
@@ -258,28 +258,28 @@ help:
 	@echo "    activex-run option: ACTIVEX_ARCH=i686|x86_64"
 	@echo "  android        Build AAR, install example app, and launch on device"
 	@echo "  android-build  Build Android AAR only (requires Android SDK)"
-	@echo "  android-plugin Build debug Android plugin .so for Flutter jniLibs and package debug fat AAR"
-	@echo "  android-plugin-release Build release plugin .so and package release fat AAR"
+	@echo "  android-library Build debug Android library .so for Flutter jniLibs and package debug fat AAR"
+	@echo "  android-library-release Build release library .so and package release fat AAR"
 	@echo "  android-run    Install and launch Android example app on device"
-	@echo "  android-run-release  Build release plugin, install debug app, and launch on device"
+	@echo "  android-run-release  Build release library, install debug app, and launch on device"
 	@echo "  flutter        Build Flutter example (requires Flutter SDK)"
 	@echo "  flutter-run    Run Flutter example on connected Android device"
 	@echo "  flutter-run-release  Run Flutter example (release mode) on connected Android device"
 	@echo "  flutter-linux  Run Flutter example on Linux desktop"
 	@echo "  java-desktop-run    Run Java desktop Android-style example"
-	@echo "  java-desktop-run-release  Run Java desktop Android-style example with release plugin"
+	@echo "  java-desktop-run-release  Run Java desktop Android-style example with release library"
 	@echo "  java-desktop-run-simple  Run Java desktop minimal demo"
 	@echo "  java-desktop-smoke  Run headless Java desktop smoke test"
 	@echo "  java-tui-run    Run Java terminal TUI sample"
-	@echo "  java-tui-run-release  Run Java terminal TUI sample with release plugin"
+	@echo "  java-tui-run-release  Run Java terminal TUI sample with release library"
 	@echo "  java-tui-smoke  Run Java terminal TUI smoke checks"
-	@echo "  java-tui-smoke-release  Run Java terminal TUI smoke checks with release plugin"
+	@echo "  java-tui-smoke-release  Run Java terminal TUI smoke checks with release library"
 	@echo "  go-tui-build  Build Go terminal TUI sample (debug binary)"
 	@echo "  go-tui-build-release  Build Go terminal TUI sample (release-style binary)"
-	@echo "  go-tui-run  Run Go terminal TUI sample (debug plugin)"
-	@echo "  go-tui-run-release  Run Go terminal TUI sample (release plugin)"
-	@echo "  go-tui-smoke  Run Go terminal TUI smoke checks (debug plugin)"
-	@echo "  go-tui-smoke-release  Run Go terminal TUI smoke checks (release plugin)"
+	@echo "  go-tui-run  Run Go terminal TUI sample (debug library)"
+	@echo "  go-tui-run-release  Run Go terminal TUI sample (release library)"
+	@echo "  go-tui-smoke  Run Go terminal TUI smoke checks (debug library)"
+	@echo "  go-tui-smoke-release  Run Go terminal TUI smoke checks (release library)"
 	@echo "  dotnet-build  Build VolvoxGrid .NET wrapper + sample (debug)"
 	@echo "  dotnet-build-release  Build VolvoxGrid .NET wrapper + sample (release)"
 	@echo "  dotnet-run    Run .NET sample (debug)"
@@ -299,8 +299,8 @@ help:
 	@echo "  sheet-lite     Build WASM lite + start Sheet adapter Vite dev server"
 	@echo "  sheet-build    Build Sheet adapter npm package only"
 	@echo "  doom-deps      Download GPL-2.0 DOOM assets for web mode (not part of Apache-2.0 source)"
-	@echo "  gtk-test       Build & launch GTK4 plugin-host visual test (debug; requires GTK4 dev libs)"
-	@echo "  gtk-test-release  Build & launch GTK4 plugin-host visual test (release)"
+	@echo "  gtk-test       Build & launch GTK4 library-host visual test (debug; requires GTK4 dev libs)"
+	@echo "  gtk-test-release  Build & launch GTK4 library-host visual test (release)"
 	@echo "  gtk-bench      Build and run GTK4 benchmark matrix (release; real GPU surface for GPU cases, sudo with desktop session env)"
 	@echo "    gtk bench options: GTK_BENCH_RUNS=<n>, GTK_BENCH_ARGS='<extra headless_bench args>'"
 	@echo ""
@@ -322,10 +322,10 @@ help:
 	@echo "  publish_npm               Publish volvoxgrid + adapter npm packages from dist/web zip"
 	@echo ""
 	@echo "Example dependency source flags (default is local):"
-	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.8.4"
-	@echo "  make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.8.4"
-	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.8.4"
-	@echo "  (maven mode skips local plugin build for the example targets)"
+	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.8.5"
+	@echo "  make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.8.5"
+	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.8.5"
+	@echo "  (maven mode skips local native library build for the example targets)"
 	@echo "  Flutter defaults to maven when VOLVOXGRID_SOURCE is omitted."
 	@echo "  VOLVOXGRID_SOURCE=local builds from source."
 	@echo "  Android variant: set VOLVOXGRID_VARIANT=lite for lite; any other value uses normal"
@@ -336,20 +336,22 @@ help:
 	@echo "  clean-all      Remove all artifacts including WASM/node_modules"
 
 # =============================================================================
-# Build synurang FFI plugin
+# Build the VolvoxGrid native library
 # =============================================================================
-build_plugin:
+build_codegen_tool:
 	@echo "Installing protoc-gen-synurang-ffi from $(SYNURANG_MODULE)@$(SYNURANG_VERSION)..."
 	@go install $(SYNURANG_MODULE)/cmd/protoc-gen-synurang-ffi@$(SYNURANG_VERSION)
-	@test -x "$(PROTOC_PLUGIN)" || { echo "Error: protoc-gen-synurang-ffi not found at $(PROTOC_PLUGIN)"; exit 1; }
-	@echo "Using plugin binary: $(PROTOC_PLUGIN)"
+	@test -x "$(PROTOC_GEN_SYNURANG_FFI)" || { echo "Error: protoc-gen-synurang-ffi not found at $(PROTOC_GEN_SYNURANG_FFI)"; exit 1; }
+	@echo "Using protoc generator binary: $(PROTOC_GEN_SYNURANG_FFI)"
 
 # =============================================================================
 # Build
 # =============================================================================
-build: engine host-plugin
+build: engine host-library
 
-release: engine-release host-plugin-release
+release: engine-release host-library-release
+
+library: host-library
 
 engine:
 	@echo "Building engine crate (debug)..."
@@ -361,19 +363,19 @@ engine-release:
 	cd engine && cargo build $(CARGO_JOBS_FLAG) --release --features gpu
 	@echo "Engine release build complete."
 
-host-plugin: engine
-	@echo "Building plugin crate (debug)..."
-	cd plugin && cargo build $(CARGO_JOBS_FLAG) --features gpu
-	@echo "Plugin build complete: target/debug/libvolvoxgrid_plugin.so"
+host-library: engine
+	@echo "Building native library (debug)..."
+	cd runtime && cargo build $(CARGO_JOBS_FLAG) --features gpu
+	@echo "Native library build complete: target/debug/libvolvoxgrid.so"
 
-host-plugin-release: engine-release
-	@echo "Building plugin crate (release)..."
-	cd plugin && cargo build $(CARGO_JOBS_FLAG) --release --features gpu
-	@echo "Plugin release build complete: target/release/libvolvoxgrid_plugin.so"
+host-library-release: engine-release
+	@echo "Building native library (release)..."
+	cd runtime && cargo build $(CARGO_JOBS_FLAG) --release --features gpu
+	@echo "Native library release build complete: target/release/libvolvoxgrid.so"
 
-java-host-plugin: host-plugin
+java-host-library: host-library
 
-java-host-plugin-release: host-plugin-release
+java-host-library-release: host-library-release
 
 # =============================================================================
 # Test
@@ -389,66 +391,66 @@ test_pixel:
 	@echo "Pixel regression tests complete."
 
 # =============================================================================
-# Smoke Test — Load plugin via Rust host, exercise basic RPCs
+# Smoke Test — Load library via Rust host, exercise basic RPCs
 # =============================================================================
-run: host-plugin
+run: host-library
 	@echo "Building smoke test..."
 	cd smoke-test && cargo build $(CARGO_JOBS_FLAG) --features gpu
 	@echo "Running smoke test..."
 	./target/debug/volvoxgrid-smoke
 	@echo ""
 
-run-release: host-plugin-release
+run-release: host-library-release
 	@echo "Building smoke test (release)..."
 	cd smoke-test && cargo build $(CARGO_JOBS_FLAG) --release --features gpu
 	@echo "Running smoke test..."
-	./target/release/volvoxgrid-smoke target/release/libvolvoxgrid_plugin.so
+	./target/release/volvoxgrid-smoke target/release/libvolvoxgrid.so
 	@echo ""
 
 java-desktop-run: $(JAVA_DESKTOP_RUN_PREREQ)
 	@echo "Running Java desktop Android-style example..."
-	./android/gradlew -p "$(JAVA_DESKTOP_PROJECT_DIR)" $(JAVA_DESKTOP_GRADLE_PROPS) --no-daemon $(GRADLE_JOBS_FLAG) run $(JAVA_DESKTOP_PLUGIN_ARG)
+	./android/gradlew -p "$(JAVA_DESKTOP_PROJECT_DIR)" $(JAVA_DESKTOP_GRADLE_PROPS) --no-daemon $(GRADLE_JOBS_FLAG) run $(JAVA_DESKTOP_LIBRARY_ARG)
 	@echo ""
 
 java-desktop-run-release: $(JAVA_DESKTOP_RUN_RELEASE_PREREQ)
-	@echo "Running Java desktop Android-style example (release plugin)..."
-	./android/gradlew -p "$(JAVA_DESKTOP_PROJECT_DIR)" $(JAVA_DESKTOP_GRADLE_PROPS) --no-daemon $(GRADLE_JOBS_FLAG) run $(JAVA_DESKTOP_PLUGIN_RELEASE_ARG)
+	@echo "Running Java desktop Android-style example (release library)..."
+	./android/gradlew -p "$(JAVA_DESKTOP_PROJECT_DIR)" $(JAVA_DESKTOP_GRADLE_PROPS) --no-daemon $(GRADLE_JOBS_FLAG) run $(JAVA_DESKTOP_LIBRARY_RELEASE_ARG)
 	@echo ""
 
 java-desktop-run-simple: $(JAVA_DESKTOP_RUN_SIMPLE_PREREQ)
 	@echo "Running Java desktop minimal demo..."
-	./android/gradlew -p "$(JAVA_DESKTOP_PROJECT_DIR)" $(JAVA_DESKTOP_GRADLE_PROPS) --no-daemon $(GRADLE_JOBS_FLAG) runSimpleDemo $(JAVA_DESKTOP_PLUGIN_ARG)
+	./android/gradlew -p "$(JAVA_DESKTOP_PROJECT_DIR)" $(JAVA_DESKTOP_GRADLE_PROPS) --no-daemon $(GRADLE_JOBS_FLAG) runSimpleDemo $(JAVA_DESKTOP_LIBRARY_ARG)
 	@echo ""
 
 java-desktop-smoke: $(JAVA_DESKTOP_SMOKE_PREREQ)
 	@echo "Running Java desktop smoke test..."
-	./android/gradlew -p "$(JAVA_DESKTOP_PROJECT_DIR)" $(JAVA_DESKTOP_GRADLE_PROPS) --no-daemon $(GRADLE_JOBS_FLAG) runSmoke $(JAVA_DESKTOP_PLUGIN_ARG)
+	./android/gradlew -p "$(JAVA_DESKTOP_PROJECT_DIR)" $(JAVA_DESKTOP_GRADLE_PROPS) --no-daemon $(GRADLE_JOBS_FLAG) runSmoke $(JAVA_DESKTOP_LIBRARY_ARG)
 	@echo ""
 
 java-tui-run: $(JAVA_DESKTOP_RUN_PREREQ)
 	@echo "Running Java terminal TUI sample..."
 	./android/gradlew -p "$(JAVA_DESKTOP_PROJECT_DIR)" $(JAVA_DESKTOP_GRADLE_PROPS) --no-daemon $(GRADLE_JOBS_FLAG) installTuiDist
-	"$(JAVA_DESKTOP_PROJECT_DIR)/build/install/volvoxgrid-desktop-tui/bin/volvoxgrid-desktop-tui" "$(JAVA_DESKTOP_PLUGIN)"
+	"$(JAVA_DESKTOP_PROJECT_DIR)/build/install/volvoxgrid-desktop-tui/bin/volvoxgrid-desktop-tui" "$(JAVA_DESKTOP_LIBRARY)"
 	@echo ""
 
 java-tui-run-release: $(JAVA_DESKTOP_RUN_RELEASE_PREREQ)
-	@echo "Running Java terminal TUI sample (release plugin)..."
+	@echo "Running Java terminal TUI sample (release library)..."
 	./android/gradlew -p "$(JAVA_DESKTOP_PROJECT_DIR)" $(JAVA_DESKTOP_GRADLE_PROPS) --no-daemon $(GRADLE_JOBS_FLAG) installTuiDist
-	"$(JAVA_DESKTOP_PROJECT_DIR)/build/install/volvoxgrid-desktop-tui/bin/volvoxgrid-desktop-tui" "$(JAVA_DESKTOP_PLUGIN_RELEASE)"
+	"$(JAVA_DESKTOP_PROJECT_DIR)/build/install/volvoxgrid-desktop-tui/bin/volvoxgrid-desktop-tui" "$(JAVA_DESKTOP_LIBRARY_RELEASE)"
 	@echo ""
 
 java-tui-smoke: $(JAVA_DESKTOP_SMOKE_PREREQ)
 	@echo "Running Java terminal TUI smoke test..."
 	./android/gradlew -p "$(JAVA_DESKTOP_PROJECT_DIR)" $(JAVA_DESKTOP_GRADLE_PROPS) --no-daemon $(GRADLE_JOBS_FLAG) installTuiDist
 	VOLVOXGRID_DESKTOP_TUI_OPTS='-Dvolvoxgrid.tui.smoke=true' \
-		"$(JAVA_DESKTOP_PROJECT_DIR)/build/install/volvoxgrid-desktop-tui/bin/volvoxgrid-desktop-tui" "$(JAVA_DESKTOP_PLUGIN)"
+		"$(JAVA_DESKTOP_PROJECT_DIR)/build/install/volvoxgrid-desktop-tui/bin/volvoxgrid-desktop-tui" "$(JAVA_DESKTOP_LIBRARY)"
 	@echo ""
 
 java-tui-smoke-release: $(JAVA_DESKTOP_RUN_RELEASE_PREREQ)
-	@echo "Running Java terminal TUI smoke test (release plugin)..."
+	@echo "Running Java terminal TUI smoke test (release library)..."
 	./android/gradlew -p "$(JAVA_DESKTOP_PROJECT_DIR)" $(JAVA_DESKTOP_GRADLE_PROPS) --no-daemon $(GRADLE_JOBS_FLAG) installTuiDist
 	VOLVOXGRID_DESKTOP_TUI_OPTS='-Dvolvoxgrid.tui.smoke=true' \
-		"$(JAVA_DESKTOP_PROJECT_DIR)/build/install/volvoxgrid-desktop-tui/bin/volvoxgrid-desktop-tui" "$(JAVA_DESKTOP_PLUGIN_RELEASE)"
+		"$(JAVA_DESKTOP_PROJECT_DIR)/build/install/volvoxgrid-desktop-tui/bin/volvoxgrid-desktop-tui" "$(JAVA_DESKTOP_LIBRARY_RELEASE)"
 	@echo ""
 
 GO_TUI_BINARY := $(abspath target/go/volvoxgrid-go-tui)
@@ -467,24 +469,24 @@ go-tui-build-release:
 	cd "$(GO_PROJECT_DIR)" && $(GO_TUI_BUILD_ENV) go build -trimpath -ldflags='-s -w' -o "$(GO_TUI_BINARY_RELEASE)" ./examples/tui
 	@echo ""
 
-go-tui-run: host-plugin go-tui-build
-	@echo "Running Go terminal TUI sample (debug plugin)..."
-	"$(GO_TUI_BINARY)" "$(JAVA_DESKTOP_PLUGIN)"
+go-tui-run: host-library go-tui-build
+	@echo "Running Go terminal TUI sample (debug library)..."
+	"$(GO_TUI_BINARY)" "$(JAVA_DESKTOP_LIBRARY)"
 	@echo ""
 
-go-tui-run-release: host-plugin-release go-tui-build-release
-	@echo "Running Go terminal TUI sample (release plugin)..."
-	"$(GO_TUI_BINARY_RELEASE)" "$(JAVA_DESKTOP_PLUGIN_RELEASE)"
+go-tui-run-release: host-library-release go-tui-build-release
+	@echo "Running Go terminal TUI sample (release library)..."
+	"$(GO_TUI_BINARY_RELEASE)" "$(JAVA_DESKTOP_LIBRARY_RELEASE)"
 	@echo ""
 
-go-tui-smoke: host-plugin go-tui-build
-	@echo "Running Go terminal TUI smoke test (debug plugin)..."
-	VOLVOXGRID_GO_TUI_SMOKE_MODE=1 "$(GO_TUI_BINARY)" "$(JAVA_DESKTOP_PLUGIN)"
+go-tui-smoke: host-library go-tui-build
+	@echo "Running Go terminal TUI smoke test (debug library)..."
+	VOLVOXGRID_GO_TUI_SMOKE_MODE=1 "$(GO_TUI_BINARY)" "$(JAVA_DESKTOP_LIBRARY)"
 	@echo ""
 
-go-tui-smoke-release: host-plugin-release go-tui-build-release
-	@echo "Running Go terminal TUI smoke test (release plugin)..."
-	VOLVOXGRID_GO_TUI_SMOKE_MODE=1 "$(GO_TUI_BINARY_RELEASE)" "$(JAVA_DESKTOP_PLUGIN_RELEASE)"
+go-tui-smoke-release: host-library-release go-tui-build-release
+	@echo "Running Go terminal TUI smoke test (release library)..."
+	VOLVOXGRID_GO_TUI_SMOKE_MODE=1 "$(GO_TUI_BINARY_RELEASE)" "$(JAVA_DESKTOP_LIBRARY_RELEASE)"
 	@echo ""
 
 dotnet-build:
@@ -566,19 +568,19 @@ WASM_OUTPUT_MAIN := $(WASM_OUTPUT_DIR)/volvoxgrid_wasm_bg.wasm
 wasm:
 	@command -v wasm-pack >/dev/null 2>&1 || { echo "Error: wasm-pack not found. Install with: cargo install wasm-pack"; exit 1; }
 	@echo "Building WASM crate..."
-	cd web/crate && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" rustup run nightly wasm-pack build . --target web --out-dir ../example/wasm --features gpu
+	cd runtime && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" rustup run nightly wasm-pack build . --target web --out-dir ../web/example/wasm --out-name volvoxgrid_wasm --no-default-features --features wasm-default,gpu
 	@echo "WASM build complete: web/example/wasm/"
 
 wasm-lite:
 	@command -v wasm-pack >/dev/null 2>&1 || { echo "Error: wasm-pack not found. Install with: cargo install wasm-pack"; exit 1; }
 	@echo "Building WASM crate (lite)..."
-	cd web/crate && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" rustup run nightly wasm-pack build . --target web --out-dir ../example/wasm --no-default-features
+	cd runtime && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" rustup run nightly wasm-pack build . --target web --out-dir ../web/example/wasm --out-name volvoxgrid_wasm --no-default-features
 	@echo "WASM lite build complete: web/example/wasm/"
 
 wasm-threaded:
 	@command -v wasm-pack >/dev/null 2>&1 || { echo "Error: wasm-pack not found. Install with: cargo install wasm-pack"; exit 1; }
 	@echo "Building WASM crate (threaded)..."
-	cd web/crate && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" RUSTFLAGS='-C target-feature=+atomics,+bulk-memory,+mutable-globals' rustup run nightly wasm-pack build . --target web --out-dir ../example/wasm --features wasm-threads,gpu -Z build-std=std,panic_abort
+	cd runtime && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" RUSTFLAGS='-C target-feature=+atomics,+bulk-memory,+mutable-globals' rustup run nightly wasm-pack build . --target web --out-dir ../web/example/wasm --out-name volvoxgrid_wasm --no-default-features --features wasm-default,wasm-threads,gpu -Z build-std=std,panic_abort
 	@echo "WASM threaded build complete: web/example/wasm/"
 
 wasm-ready:
@@ -687,8 +689,8 @@ WEB_TS_CODEGEN_DIR := web/js/src/generated
 PROTO_INCLUDES := -Iproto -I$(VSFLEXGRID_DIR)/proto
 PROTO3_OPT := --experimental_allow_proto3_optional
 
-codegen: build_plugin
-	@test -x "$(PROTOC_PLUGIN)" || { echo "Error: protoc-gen-synurang-ffi not found at $(PROTOC_PLUGIN)"; exit 1; }
+codegen: build_codegen_tool
+	@test -x "$(PROTOC_GEN_SYNURANG_FFI)" || { echo "Error: protoc-gen-synurang-ffi not found at $(PROTOC_GEN_SYNURANG_FFI)"; exit 1; }
 	@command -v protoc-gen-dart >/dev/null 2>&1 || { echo "Error: protoc-gen-dart not found in PATH."; exit 1; }
 	@command -v protoc-gen-go >/dev/null 2>&1 || { echo "Error: protoc-gen-go not found in PATH."; exit 1; }
 	@command -v protoc-gen-go-grpc >/dev/null 2>&1 || { echo "Error: protoc-gen-go-grpc not found in PATH."; exit 1; }
@@ -702,11 +704,11 @@ codegen: build_plugin
 		--go-grpc_out=$(GO_PROJECT_DIR) --go-grpc_opt=module=github.com/ivere27/volvoxgrid \
 		proto/volvoxgrid.proto
 	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
-		$(PROTOC_PLUGIN_FLAG) \
+		$(PROTOC_GEN_SYNURANG_FFI_FLAG) \
 		--synurang-ffi_out=codegen --synurang-ffi_opt=lang=java \
 		proto/volvoxgrid.proto
 	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
-		$(PROTOC_PLUGIN_FLAG) \
+		$(PROTOC_GEN_SYNURANG_FFI_FLAG) \
 		--synurang-ffi_out=codegen --synurang-ffi_opt=lang=dart \
 		proto/volvoxgrid.proto
 	# Flutter protobuf messages
@@ -715,61 +717,71 @@ codegen: build_plugin
 		proto/volvoxgrid.proto
 	@cp codegen/volvoxgrid_ffi.pb.dart flutter/lib/src/generated/volvoxgrid_ffi.pb.dart
 	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
-		$(PROTOC_PLUGIN_FLAG) \
+		$(PROTOC_GEN_SYNURANG_FFI_FLAG) \
 		--synurang-ffi_out=codegen --synurang-ffi_opt=lang=cpp \
 		proto/volvoxgrid.proto
 	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
-		$(PROTOC_PLUGIN_FLAG) \
+		$(PROTOC_GEN_SYNURANG_FFI_FLAG) \
 		--synurang-ffi_out=codegen --synurang-ffi_opt=lang=rust \
 		proto/volvoxgrid.proto
 	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
-		$(PROTOC_PLUGIN_FLAG) \
+		$(PROTOC_GEN_SYNURANG_FFI_FLAG) \
 		--synurang-ffi_out=$(WEB_TS_CODEGEN_DIR) --synurang-ffi_opt=lang=typescript \
 		proto/volvoxgrid.proto
 	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
-		$(PROTOC_PLUGIN_FLAG) \
+		$(PROTOC_GEN_SYNURANG_FFI_FLAG) \
 		--synurang-ffi_out=$(WEB_TS_CODEGEN_DIR) --synurang-ffi_opt=lang=typescript,mode=lite \
 		proto/volvoxgrid.proto
 	# .NET lite protobuf + FFI stubs (shared)
 	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
-		$(PROTOC_PLUGIN_FLAG) \
+		$(PROTOC_GEN_SYNURANG_FFI_FLAG) \
 		--synurang-ffi_out=$(DOTNET_COMMON_CODEGEN_DIR) --synurang-ffi_opt=lang=csharp,mode=lite \
 		proto/volvoxgrid.proto
-	# Plugin server trait + dispatcher
+	# Synurang server trait + dispatcher
 	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
-		$(PROTOC_PLUGIN_FLAG) \
-		--synurang-ffi_out=plugin/src --synurang-ffi_opt=lang=rust,mode=plugin_server \
+		$(PROTOC_GEN_SYNURANG_FFI_FLAG) \
+		--synurang-ffi_out=runtime/src --synurang-ffi_opt=lang=rust,mode=plugin_server \
 		proto/volvoxgrid.proto proto/volvoxtree.proto
-	@$(SED_I) '/^#!\[allow(dead_code)\]/a use super::*;' plugin/src/volvoxgrid_ffi_plugin.rs
-	@$(SED_I) 's/PLUGIN_VOLVOX_GRID_SERVICE\.get()\.map(|p| p\.as_ref())/Some(PLUGIN_VOLVOX_GRID_SERVICE.get_or_init(super::create_plugin).as_ref())/' plugin/src/volvoxgrid_ffi_plugin.rs
-	@$(SED_I) '/^#!\[allow(dead_code)\]/a use volvoxgrid_engine::proto::volvoxgrid::v1::*;' plugin/src/volvoxtree_ffi_plugin.rs
-	@$(SED_I) 's/PLUGIN_VOLVOX_TREE_SERVICE\.get()\.map(|p| p\.as_ref())/Some(PLUGIN_VOLVOX_TREE_SERVICE.get_or_init(super::create_tree_plugin).as_ref())/' plugin/src/volvoxtree_ffi_plugin.rs
+	@set -eu; \
+	for name in volvoxgrid volvoxtree; do \
+		src="$$(find runtime/src -maxdepth 1 -type f -name "$${name}_ffi_*.rs" ! -name "$${name}_ffi_runtime.rs" -print)"; \
+		count="$$(printf '%s\n' "$$src" | sed '/^$$/d' | wc -l)"; \
+		test "$$count" = "1" || { echo "Error: expected one generated runtime source for $$name, found $$count"; exit 1; }; \
+		mv "$$src" "runtime/src/$${name}_ffi_runtime.rs"; \
+	done
+	@perl -0pi -e 's/VolvoxGridServicePlugin/VolvoxGridServiceRuntime/g; s/VolvoxTreeServicePlugin/VolvoxTreeServiceRuntime/g; s/register_volvox_grid_service_plugin/register_volvox_grid_service_runtime/g; s/register_volvox_tree_service_plugin/register_volvox_tree_service_runtime/g; s/get_volvox_grid_service_plugin/get_volvox_grid_service_runtime/g; s/get_volvox_tree_service_plugin/get_volvox_tree_service_runtime/g; s/PLUGIN_VOLVOX_GRID_SERVICE/RUNTIME_VOLVOX_GRID_SERVICE/g; s/PLUGIN_VOLVOX_TREE_SERVICE/RUNTIME_VOLVOX_TREE_SERVICE/g; s/send_to_plugin/send_to_runtime/g; s/recv_from_plugin/recv_from_runtime/g; s/PluginStream/RuntimeStream/g; s/plugin not registered/runtime not registered/g; s/Plugin Server/Runtime Server/g; s/Plugin Trait/Runtime Trait/g; s/\bplugin\b/runtime/g; s/\bPlugin\b/Runtime/g' runtime/src/volvoxgrid_ffi_runtime.rs runtime/src/volvoxtree_ffi_runtime.rs
+	@$(SED_I) '/^#!\[allow(dead_code)\]/a use super::*;' runtime/src/volvoxgrid_ffi_runtime.rs
+	@$(SED_I) 's/RUNTIME_VOLVOX_GRID_SERVICE\.get()\.map(|p| p\.as_ref())/Some(RUNTIME_VOLVOX_GRID_SERVICE.get_or_init(super::create_runtime).as_ref())/' runtime/src/volvoxgrid_ffi_runtime.rs
+	@$(SED_I) '/^#!\[allow(dead_code)\]/a use volvoxgrid_engine::proto::volvoxgrid::v1::*;' runtime/src/volvoxtree_ffi_runtime.rs
+	@$(SED_I) 's/RUNTIME_VOLVOX_TREE_SERVICE\.get()\.map(|p| p\.as_ref())/Some(RUNTIME_VOLVOX_TREE_SERVICE.get_or_init(super::create_tree_runtime).as_ref())/' runtime/src/volvoxtree_ffi_runtime.rs
 	# Tree service codegen currently emits the same free symbol as the grid service.
-	@$(SED_I) 's/pub extern "C" fn Synurang_Free/pub extern "C" fn Synurang_Tree_Free/' plugin/src/volvoxtree_ffi_plugin.rs
+	@$(SED_I) 's/pub extern "C" fn Synurang_Free/pub extern "C" fn Synurang_Tree_Free/' runtime/src/volvoxtree_ffi_runtime.rs
 	# WASM bindings
 	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
-		$(PROTOC_PLUGIN_FLAG) \
-		--synurang-ffi_out=web/crate/src --synurang-ffi_opt=lang=rust,mode=wasm \
+		$(PROTOC_GEN_SYNURANG_FFI_FLAG) \
+		--synurang-ffi_out=runtime/src/wasm --synurang-ffi_opt=lang=rust,mode=wasm \
 		proto/volvoxgrid.proto
-	@$(SED_I) '/^#!\[allow(dead_code)\]/a use super::*;' web/crate/src/volvoxgrid_wasm.rs
-	# ActiveX native runtime bindings now come from v1 proto
+	@perl -0pi -e 's/VolvoxGridServicePlugin/VolvoxGridServiceRuntime/g; s/register_volvox_grid_service_plugin/register_volvox_grid_service_runtime/g; s/get_volvox_grid_service_plugin/get_volvox_grid_service_runtime/g; s/PLUGIN_VOLVOX_GRID_SERVICE/RUNTIME_VOLVOX_GRID_SERVICE/g; s/PluginStream/RuntimeStream/g; s/plugin not registered/runtime not registered/g; s/Plugin Traits/Runtime Traits/g; s/\bplugin\b/runtime/g; s/\bPlugin\b/Runtime/g' runtime/src/wasm/volvoxgrid_wasm.rs
+	@$(SED_I) '/^#!\[allow(dead_code)\]/a use super::*;' runtime/src/wasm/volvoxgrid_wasm.rs
+	# ActiveX native FFI bindings now come from v1 proto
 	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
-		$(PROTOC_PLUGIN_FLAG) \
+		$(PROTOC_GEN_SYNURANG_FFI_FLAG) \
 		--synurang-ffi_out=$(VSFLEXGRID_DIR)/crate/src --synurang-ffi_opt=lang=rust,mode=native \
 		proto/volvoxgrid.proto
+	@perl -0pi -e 's/VolvoxGridServicePlugin/VolvoxGridServiceRuntime/g; s/register_volvox_grid_service_plugin/register_volvox_grid_service_runtime/g; s/get_volvox_grid_service_plugin/get_volvox_grid_service_runtime/g; s/PLUGIN_VOLVOX_GRID_SERVICE/RUNTIME_VOLVOX_GRID_SERVICE/g; s/PluginStream/RuntimeStream/g; s/plugin not registered/runtime not registered/g; s/Plugin Trait/Runtime Trait/g; s/\bplugin\b/runtime/g; s/\bPlugin\b/Runtime/g' $(VSFLEXGRID_DIR)/crate/src/volvoxgrid_ffi_native.rs
 	@$(SED_I) '/^#!\[allow(clippy/a use super::*;' $(VSFLEXGRID_DIR)/crate/src/volvoxgrid_ffi_native.rs
 	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
-		$(PROTOC_PLUGIN_FLAG) \
+		$(PROTOC_GEN_SYNURANG_FFI_FLAG) \
 		--synurang-ffi_out=$(VSFLEXGRID_DIR)/include --synurang-ffi_opt=lang=c,mode=native \
 		proto/volvoxgrid.proto
 	# ActiveX COM dispatch metadata
 	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
-		$(PROTOC_PLUGIN_FLAG) \
+		$(PROTOC_GEN_SYNURANG_FFI_FLAG) \
 		--synurang-ffi_out=$(VSFLEXGRID_DIR)/include --synurang-ffi_opt=lang=c,mode=native \
 		$(VSFLEXGRID_DIR)/proto/volvoxgrid_activex.proto
 	@tmp_activex_dir=$$(mktemp -d); \
 	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
-		$(PROTOC_PLUGIN_FLAG) \
+		$(PROTOC_GEN_SYNURANG_FFI_FLAG) \
 		--synurang-ffi_out=$$tmp_activex_dir --synurang-ffi_opt=lang=c,mode=activex \
 		$(VSFLEXGRID_DIR)/proto/volvoxgrid_activex.proto; \
 	cp $$tmp_activex_dir/volvoxgrid_activex_activex.h $(VSFLEXGRID_DIR)/include/volvoxgrid_activex.h; \
@@ -777,11 +789,11 @@ codegen: build_plugin
 	rm -rf $$tmp_activex_dir
 	@rustfmt \
 		codegen/volvoxgrid_ffi.rs \
-		plugin/src/volvoxgrid_ffi_plugin.rs \
-		plugin/src/volvoxtree_ffi_plugin.rs \
-		web/crate/src/volvoxgrid_wasm.rs \
+		runtime/src/volvoxgrid_ffi_runtime.rs \
+		runtime/src/volvoxtree_ffi_runtime.rs \
+		runtime/src/wasm/volvoxgrid_wasm.rs \
 		$(VSFLEXGRID_DIR)/crate/src/volvoxgrid_ffi_native.rs
-	@echo "Codegen complete: codegen/ + $(DOTNET_COMMON_CODEGEN_DIR)/ + $(WEB_TS_CODEGEN_DIR)/ + plugin/ + web/ + $(VSFLEXGRID_DIR)/"
+	@echo "Codegen complete: codegen/ + $(DOTNET_COMMON_CODEGEN_DIR)/ + $(WEB_TS_CODEGEN_DIR)/ + runtime/ + web/ + $(VSFLEXGRID_DIR)/"
 
 # =============================================================================
 # Android
@@ -822,8 +834,8 @@ android-build:
 	fi
 	@echo "Android build complete."
 
-android-plugin:
-	@echo "Building Android VolvoxGrid plugin shared libraries (debug + debug AAR)..."
+android-library:
+	@echo "Building Android VolvoxGrid shared libraries (debug + debug AAR)..."
 	@set -e; \
 	SDK_DIR=""; \
 	if [ -n "$$ANDROID_HOME" ]; then \
@@ -854,34 +866,34 @@ android-plugin:
 	if command -v rustup >/dev/null 2>&1 && rustup target list --installed 2>/dev/null | grep -qx "x86_64-linux-android"; then \
 		NDK_TARGETS="$$NDK_TARGETS -t x86_64"; \
 	else \
-		echo "Note: Rust target x86_64-linux-android is not installed; skipping x86_64 plugin binary."; \
+		echo "Note: Rust target x86_64-linux-android is not installed; skipping x86_64 library."; \
 		echo "      Install with: rustup target add x86_64-linux-android"; \
 	fi; \
-	PLUGIN_FEATURE_ARGS="--features gpu"; \
-	PLUGIN_SO_NAME="libvolvoxgrid_plugin.so"; \
+	LIBRARY_FEATURE_ARGS="--features gpu"; \
+	LIBRARY_SO_NAME="libvolvoxgrid.so"; \
 	if [ "$(strip $(VOLVOXGRID_VARIANT))" = "lite" ]; then \
-		echo "Using Android plugin variant: lite (--no-default-features --features demo)"; \
-		PLUGIN_FEATURE_ARGS="--no-default-features --features demo"; \
-		PLUGIN_SO_NAME="libvolvoxgrid_plugin_lite.so"; \
+		echo "Using Android library variant: lite (--no-default-features --features demo)"; \
+		LIBRARY_FEATURE_ARGS="--no-default-features --features demo"; \
+		LIBRARY_SO_NAME="libvolvoxgrid_lite.so"; \
 	elif [ -n "$(strip $(VOLVOXGRID_VARIANT))" ]; then \
 		echo "Note: unknown VOLVOXGRID_VARIANT='$(VOLVOXGRID_VARIANT)', falling back to normal."; \
 	fi; \
-	rm -rf "$(ANDROID_PLUGIN_OUTPUT_DIR)"; \
-	rm -rf "$(ANDROID_APP_PLUGIN_DIR)"; \
-	rm -rf "$(FLUTTER_ANDROID_PLUGIN_OUTPUT_DIR)"; \
+	rm -rf "$(ANDROID_LIBRARY_OUTPUT_DIR)"; \
+	rm -rf "$(ANDROID_APP_LIBRARY_DIR)"; \
+	rm -rf "$(FLUTTER_ANDROID_LIBRARY_OUTPUT_DIR)"; \
 	rm -rf "$(ANDROID_PROJECT_DIR)/example/build"; \
-	cd plugin && ANDROID_NDK_HOME="$$NDK_DIR" cargo ndk $$NDK_TARGETS -o "$(ANDROID_PLUGIN_OUTPUT_DIR)" build -j "$(CARGO_BUILD_JOBS)" $$PLUGIN_FEATURE_ARGS; \
-	if [ "$$PLUGIN_SO_NAME" != "libvolvoxgrid_plugin.so" ]; then \
+	cd runtime && ANDROID_NDK_HOME="$$NDK_DIR" cargo ndk $$NDK_TARGETS -o "$(ANDROID_LIBRARY_OUTPUT_DIR)" build -j "$(CARGO_BUILD_JOBS)" $$LIBRARY_FEATURE_ARGS; \
+	if [ "$$LIBRARY_SO_NAME" != "libvolvoxgrid.so" ]; then \
 		for ABI in arm64-v8a armeabi-v7a x86_64; do \
-			SRC_SO="$(ANDROID_PLUGIN_OUTPUT_DIR)/$$ABI/libvolvoxgrid_plugin.so"; \
-			DST_SO="$(ANDROID_PLUGIN_OUTPUT_DIR)/$$ABI/$$PLUGIN_SO_NAME"; \
+			SRC_SO="$(ANDROID_LIBRARY_OUTPUT_DIR)/$$ABI/libvolvoxgrid.so"; \
+			DST_SO="$(ANDROID_LIBRARY_OUTPUT_DIR)/$$ABI/$$LIBRARY_SO_NAME"; \
 			if [ -f "$$SRC_SO" ]; then \
 				mv "$$SRC_SO" "$$DST_SO"; \
 			fi; \
 		done; \
 		fi; \
-		mkdir -p "$(FLUTTER_ANDROID_PLUGIN_OUTPUT_DIR)"; \
-		cp -a "$(ANDROID_PLUGIN_OUTPUT_DIR)/." "$(FLUTTER_ANDROID_PLUGIN_OUTPUT_DIR)/"; \
+		mkdir -p "$(FLUTTER_ANDROID_LIBRARY_OUTPUT_DIR)"; \
+		cp -a "$(ANDROID_LIBRARY_OUTPUT_DIR)/." "$(FLUTTER_ANDROID_LIBRARY_OUTPUT_DIR)/"; \
 		if [ -n "$$SDK_DIR" ]; then \
 			export ANDROID_HOME="$$SDK_DIR"; \
 			export ANDROID_SDK_ROOT="$$SDK_DIR"; \
@@ -907,8 +919,8 @@ android-plugin:
 				"$(ANDROID_PROJECT_DIR)/volvoxgrid-android/build/intermediates/stripped_native_libs/debug/out/lib"; do \
 				SRC_JNI="$$ROOT/$$ABI/libvolvoxgrid_jni.so"; \
 				if [ -f "$$SRC_JNI" ]; then \
-					mkdir -p "$(FLUTTER_ANDROID_PLUGIN_OUTPUT_DIR)/$$ABI"; \
-					cp -f "$$SRC_JNI" "$(FLUTTER_ANDROID_PLUGIN_OUTPUT_DIR)/$$ABI/libvolvoxgrid_jni.so"; \
+					mkdir -p "$(FLUTTER_ANDROID_LIBRARY_OUTPUT_DIR)/$$ABI"; \
+					cp -f "$$SRC_JNI" "$(FLUTTER_ANDROID_LIBRARY_OUTPUT_DIR)/$$ABI/libvolvoxgrid_jni.so"; \
 					JNI_COPIED=1; \
 					break; \
 				fi; \
@@ -936,7 +948,7 @@ android-plugin:
 		ARTIFACT_ID="$$PACKAGE_ARTIFACT_ID" \
 		GIT_COMMIT="$(AAR_GIT_COMMIT)" \
 		BUILD_DATE="$(AAR_BUILD_DATE)" \
-		PLUGIN_BUILD_MODE="$$PACKAGE_MODE" \
+		LIBRARY_BUILD_MODE="$$PACKAGE_MODE" \
 		AAR_BUILD_TYPE="debug" \
 		ANDROID_ABIS="$(AAR_ANDROID_ABIS)" \
 		BUILD_JOBS="$(BUILD_JOBS)" \
@@ -958,10 +970,10 @@ android-plugin:
 					DESKTOP_VERSION=0; \
 			fi; \
 		fi
-	@echo "Android plugin build complete."
+	@echo "Android library build complete."
 
-android-plugin-release:
-	@echo "Building Android VolvoxGrid plugin shared libraries (release)..."
+android-library-release:
+	@echo "Building Android VolvoxGrid shared libraries (release)..."
 	@set -e; \
 	SDK_DIR=""; \
 	if [ -n "$$ANDROID_HOME" ]; then \
@@ -992,34 +1004,34 @@ android-plugin-release:
 	if command -v rustup >/dev/null 2>&1 && rustup target list --installed 2>/dev/null | grep -qx "x86_64-linux-android"; then \
 		NDK_TARGETS="$$NDK_TARGETS -t x86_64"; \
 	else \
-		echo "Note: Rust target x86_64-linux-android is not installed; skipping x86_64 plugin binary."; \
+		echo "Note: Rust target x86_64-linux-android is not installed; skipping x86_64 library."; \
 		echo "      Install with: rustup target add x86_64-linux-android"; \
 	fi; \
-	PLUGIN_FEATURE_ARGS="--features gpu"; \
-	PLUGIN_SO_NAME="libvolvoxgrid_plugin.so"; \
+	LIBRARY_FEATURE_ARGS="--features gpu"; \
+	LIBRARY_SO_NAME="libvolvoxgrid.so"; \
 	if [ "$(strip $(VOLVOXGRID_VARIANT))" = "lite" ]; then \
-		echo "Using Android plugin variant: lite (--no-default-features --features demo)"; \
-		PLUGIN_FEATURE_ARGS="--no-default-features --features demo"; \
-		PLUGIN_SO_NAME="libvolvoxgrid_plugin_lite.so"; \
+		echo "Using Android library variant: lite (--no-default-features --features demo)"; \
+		LIBRARY_FEATURE_ARGS="--no-default-features --features demo"; \
+		LIBRARY_SO_NAME="libvolvoxgrid_lite.so"; \
 	elif [ -n "$(strip $(VOLVOXGRID_VARIANT))" ]; then \
 		echo "Note: unknown VOLVOXGRID_VARIANT='$(VOLVOXGRID_VARIANT)', falling back to normal."; \
 	fi; \
-	rm -rf "$(ANDROID_PLUGIN_OUTPUT_DIR)"; \
-	rm -rf "$(ANDROID_APP_PLUGIN_DIR)"; \
-	rm -rf "$(FLUTTER_ANDROID_PLUGIN_OUTPUT_DIR)"; \
+	rm -rf "$(ANDROID_LIBRARY_OUTPUT_DIR)"; \
+	rm -rf "$(ANDROID_APP_LIBRARY_DIR)"; \
+	rm -rf "$(FLUTTER_ANDROID_LIBRARY_OUTPUT_DIR)"; \
 	rm -rf "$(ANDROID_PROJECT_DIR)/example/build"; \
-	cd plugin && ANDROID_NDK_HOME="$$NDK_DIR" cargo ndk $$NDK_TARGETS -o "$(ANDROID_PLUGIN_OUTPUT_DIR)" build -j "$(CARGO_BUILD_JOBS)" --release $$PLUGIN_FEATURE_ARGS; \
-	if [ "$$PLUGIN_SO_NAME" != "libvolvoxgrid_plugin.so" ]; then \
+	cd runtime && ANDROID_NDK_HOME="$$NDK_DIR" cargo ndk $$NDK_TARGETS -o "$(ANDROID_LIBRARY_OUTPUT_DIR)" build -j "$(CARGO_BUILD_JOBS)" --release $$LIBRARY_FEATURE_ARGS; \
+	if [ "$$LIBRARY_SO_NAME" != "libvolvoxgrid.so" ]; then \
 		for ABI in arm64-v8a armeabi-v7a x86_64; do \
-			SRC_SO="$(ANDROID_PLUGIN_OUTPUT_DIR)/$$ABI/libvolvoxgrid_plugin.so"; \
-			DST_SO="$(ANDROID_PLUGIN_OUTPUT_DIR)/$$ABI/$$PLUGIN_SO_NAME"; \
+			SRC_SO="$(ANDROID_LIBRARY_OUTPUT_DIR)/$$ABI/libvolvoxgrid.so"; \
+			DST_SO="$(ANDROID_LIBRARY_OUTPUT_DIR)/$$ABI/$$LIBRARY_SO_NAME"; \
 			if [ -f "$$SRC_SO" ]; then \
 				mv "$$SRC_SO" "$$DST_SO"; \
 			fi; \
 		done; \
 		fi; \
-		mkdir -p "$(FLUTTER_ANDROID_PLUGIN_OUTPUT_DIR)"; \
-		cp -a "$(ANDROID_PLUGIN_OUTPUT_DIR)/." "$(FLUTTER_ANDROID_PLUGIN_OUTPUT_DIR)/"; \
+		mkdir -p "$(FLUTTER_ANDROID_LIBRARY_OUTPUT_DIR)"; \
+		cp -a "$(ANDROID_LIBRARY_OUTPUT_DIR)/." "$(FLUTTER_ANDROID_LIBRARY_OUTPUT_DIR)/"; \
 		if [ -n "$$SDK_DIR" ]; then \
 			export ANDROID_HOME="$$SDK_DIR"; \
 			export ANDROID_SDK_ROOT="$$SDK_DIR"; \
@@ -1045,8 +1057,8 @@ android-plugin-release:
 				"$(ANDROID_PROJECT_DIR)/volvoxgrid-android/build/intermediates/stripped_native_libs/release/out/lib"; do \
 				SRC_JNI="$$ROOT/$$ABI/libvolvoxgrid_jni.so"; \
 				if [ -f "$$SRC_JNI" ]; then \
-					mkdir -p "$(FLUTTER_ANDROID_PLUGIN_OUTPUT_DIR)/$$ABI"; \
-					cp -f "$$SRC_JNI" "$(FLUTTER_ANDROID_PLUGIN_OUTPUT_DIR)/$$ABI/libvolvoxgrid_jni.so"; \
+					mkdir -p "$(FLUTTER_ANDROID_LIBRARY_OUTPUT_DIR)/$$ABI"; \
+					cp -f "$$SRC_JNI" "$(FLUTTER_ANDROID_LIBRARY_OUTPUT_DIR)/$$ABI/libvolvoxgrid_jni.so"; \
 					JNI_COPIED=1; \
 					break; \
 				fi; \
@@ -1074,7 +1086,7 @@ android-plugin-release:
 				ARTIFACT_ID="$$PACKAGE_ARTIFACT_ID" \
 				GIT_COMMIT="$(AAR_GIT_COMMIT)" \
 				BUILD_DATE="$(AAR_BUILD_DATE)" \
-				PLUGIN_BUILD_MODE="$$PACKAGE_MODE" \
+				LIBRARY_BUILD_MODE="$$PACKAGE_MODE" \
 				AAR_BUILD_TYPE="release" \
 				ANDROID_ABIS="$(AAR_ANDROID_ABIS)" \
 				BUILD_JOBS="$(BUILD_JOBS)" \
@@ -1096,7 +1108,7 @@ android-plugin-release:
 							DESKTOP_VERSION=0; \
 					fi; \
 				fi
-	@echo "Android release plugin build complete."
+	@echo "Android release library build complete."
 
 android-install: $(ANDROID_INSTALL_PREREQ)
 	@echo "Installing Android example app..."
@@ -1133,7 +1145,7 @@ android-install: $(ANDROID_INSTALL_PREREQ)
 	@echo "Android install complete."
 
 android-install-release: $(ANDROID_INSTALL_RELEASE_PREREQ)
-	@echo "Installing Android example app (with release plugin libs)..."
+	@echo "Installing Android example app (with release library libs)..."
 	@echo "Using GRADLE_MAX_WORKERS=$(GRADLE_MAX_WORKERS)"
 	@SDK_DIR=""; \
 	if [ -n "$$ANDROID_HOME" ]; then \
@@ -1264,7 +1276,7 @@ docker_android: docker_android_aar_image
 		-e GIT_COMMIT="$(AAR_GIT_COMMIT)" \
 		-e BUILD_DATE="$(AAR_BUILD_DATE)" \
 		-e ANDROID_ABIS="$(AAR_ANDROID_ABIS)" \
-		-e PLUGIN_BUILD_MODE=lite \
+		-e LIBRARY_BUILD_MODE=lite \
 		"$(AAR_DOCKER_IMAGE)"
 	@echo "Android AAR artifacts (default + lite): dist/maven/"
 	@if echo "$(AAR_VERSION)" | grep -q -- '-SNAPSHOT$$'; then \
@@ -1582,15 +1594,15 @@ publish_github:
 			echo "Verifying embedded version for XCFramework (expected $(IOS_VERSION))..."; \
 			bash "$$VERIFY_SCRIPT" "$(IOS_VERSION)" "$(IOS_XCFRAMEWORK_DIR)" || exit 1; \
 			echo "Zipping XCFramework..."; \
-		cd dist/ios && rm -f VolvoxGridPlugin.xcframework.zip && \
-			zip -r VolvoxGridPlugin.xcframework.zip VolvoxGridPlugin.xcframework/; \
+		cd dist/ios && rm -f VolvoxGrid.xcframework.zip && \
+			zip -r VolvoxGrid.xcframework.zip VolvoxGrid.xcframework/; \
 		cd "$(CURRENT_DIR)"; \
 		CHECKSUM=$$(swift package compute-checksum "$(IOS_XCFRAMEWORK_ZIP)" 2>/dev/null || shasum -a 256 "$(IOS_XCFRAMEWORK_ZIP)" | cut -d' ' -f1); \
 		echo "Checksum: $$CHECKSUM"; \
 		gh release upload "$$TAG" "$(IOS_XCFRAMEWORK_ZIP)" --repo "$(IOS_GITHUB_REPO)" --clobber; \
 		echo "Updating Package.swift..."; \
-		URL="https://github.com/$(IOS_GITHUB_REPO)/releases/download/$$TAG/VolvoxGridPlugin.xcframework.zip"; \
-		printf '// swift-tools-version:5.9\nimport PackageDescription\n\nlet package = Package(\n    name: "VolvoxGrid",\n    products: [\n        .library(name: "VolvoxGrid", targets: ["VolvoxGridPlugin"]),\n    ],\n    targets: [\n        .binaryTarget(\n            name: "VolvoxGridPlugin",\n            url: "%s",\n            checksum: "%s"\n        ),\n    ]\n)\n' "$$URL" "$$CHECKSUM" > Package.swift; \
+		URL="https://github.com/$(IOS_GITHUB_REPO)/releases/download/$$TAG/VolvoxGrid.xcframework.zip"; \
+			printf '// swift-tools-version:5.9\nimport PackageDescription\n\nlet package = Package(\n    name: "VolvoxGrid",\n    products: [\n        .library(name: "VolvoxGrid", targets: ["VolvoxGrid"]),\n    ],\n    targets: [\n        .binaryTarget(\n            name: "VolvoxGrid",\n            url: "%s",\n            checksum: "%s"\n        ),\n    ]\n)\n' "$$URL" "$$CHECKSUM" > Package.swift; \
 		echo "XCFramework uploaded, Package.swift updated."; \
 	else \
 		echo "Skip iOS: $(IOS_XCFRAMEWORK_DIR) not found."; \
@@ -1794,7 +1806,7 @@ flutter-run-release: $(FLUTTER_RUN_RELEASE_PREREQ)
 
 flutter-linux: flutter-setup
 	@if [ "$(VOLVOXGRID_SOURCE_RESOLVED)" != "maven" ]; then \
-		$(MAKE) host-plugin; \
+		$(MAKE) host-library; \
 	fi
 	cd "$(FLUTTER_EXAMPLE_DIR)" && \
 	  if [ "$(VOLVOXGRID_SOURCE_RESOLVED)" = "maven" ]; then \
@@ -1804,28 +1816,28 @@ flutter-linux: flutter-setup
 	      --dart-define=VOLVOXGRID_VERSION=$(VOLVOXGRID_VERSION); \
 	  else \
 	    VOLVOXGRID_SOURCE=$(VOLVOXGRID_SOURCE_RESOLVED) VOLVOXGRID_VERSION=$(VOLVOXGRID_VERSION) \
-	    LD_LIBRARY_PATH="$(VOLVOXGRID_PLUGIN_DEBUG_DIR):$${LD_LIBRARY_PATH}" \
+	    LD_LIBRARY_PATH="$(VOLVOXGRID_LIBRARY_DEBUG_DIR):$${LD_LIBRARY_PATH}" \
 	    flutter run -d linux --dart-define=VG_ENABLE_FLING=true \
 	      --dart-define=VOLVOXGRID_SOURCE=$(VOLVOXGRID_SOURCE_RESOLVED) \
 	      --dart-define=VOLVOXGRID_VERSION=$(VOLVOXGRID_VERSION); \
 	  fi
 
 # =============================================================================
-# GTK4 Visual Test — plugin FFI host path
+# GTK4 Visual Test — library FFI host path
 # =============================================================================
-gtk-test: host-plugin
+gtk-test: host-library
 	@echo "Building GTK4 test..."
 	cd gtk-test && cargo build $(CARGO_JOBS_FLAG)
 	@echo "Launching GTK4 test..."
-	VOLVOXGRID_PLUGIN_PATH="$(JAVA_DESKTOP_PLUGIN)" ./target/debug/volvoxgrid-gtk-test
+	VOLVOXGRID_LIBRARY_PATH="$(JAVA_DESKTOP_LIBRARY)" ./target/debug/volvoxgrid-gtk-test
 
-gtk-test-release: host-plugin-release
+gtk-test-release: host-library-release
 	@echo "Building GTK4 test (release)..."
 	cd gtk-test && cargo build $(CARGO_JOBS_FLAG) --release
 	@echo "Launching GTK4 test (release)..."
-	VOLVOXGRID_PLUGIN_PATH="$(JAVA_DESKTOP_PLUGIN_RELEASE)" ./target/release/volvoxgrid-gtk-test
+	VOLVOXGRID_LIBRARY_PATH="$(JAVA_DESKTOP_LIBRARY_RELEASE)" ./target/release/volvoxgrid-gtk-test
 
-gtk-bench: host-plugin-release
+gtk-bench: host-library-release
 	@echo "Building GTK4 benchmark (release)..."
 	cd gtk-test && cargo build $(CARGO_JOBS_FLAG) --release --bin headless_bench
 	@echo "Running GTK4 benchmark matrix (release, sudo with session env)..."
@@ -1872,12 +1884,12 @@ vsflexgrid-release: activex-release
 # Clean
 # =============================================================================
 clean:
-	@for dir in engine plugin smoke-test gtk-test web/crate $(VSFLEXGRID_DIR)/crate; do \
+	@for dir in engine runtime smoke-test gtk-test $(VSFLEXGRID_DIR)/crate; do \
 		echo "Cleaning $$dir..."; \
 		( cd "$$dir" && cargo clean ); \
 	done
 	rm -rf "$(FLUTTER_EXAMPLE_DIR)/build"
 clean-all: clean
-	rm -rf web/crate/pkg web/example/wasm web/example/node_modules web/js/node_modules
+	rm -rf web/example/wasm web/example/node_modules web/js/wasm web/js/node_modules
 	rm -rf web/example/public/doom
 	rm -rf adapters/sheet/node_modules adapters/sheet/dist adapters/sheet/wasm

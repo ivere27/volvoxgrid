@@ -16,28 +16,28 @@ import (
 const defaultTerminalBufferCapacity = 32 * 1024
 
 type Client struct {
-	plugin *synurang.Plugin
+	runtime *synurang.Plugin
 	client pb.VolvoxGridServiceClient
 }
 
-func NewClient(pluginPath string) (*Client, error) {
-	plugin, err := synurang.LoadPlugin(pluginPath)
+func NewClient(libraryPath string) (*Client, error) {
+	runtime, err := synurang.LoadPlugin(libraryPath)
 	if err != nil {
-		return nil, fmt.Errorf("load plugin: %w", err)
+		return nil, fmt.Errorf("load library: %w", err)
 	}
 
-	conn := synurang.NewPluginClientConn(plugin, "VolvoxGridService")
+	conn := synurang.NewPluginClientConn(runtime, "VolvoxGridService")
 	return &Client{
-		plugin: plugin,
+		runtime: runtime,
 		client: pb.NewVolvoxGridServiceClient(conn),
 	}, nil
 }
 
 func (c *Client) Close() error {
-	if c == nil || c.plugin == nil {
+	if c == nil || c.runtime == nil {
 		return nil
 	}
-	return c.plugin.Close()
+	return c.runtime.Close()
 }
 
 func (c *Client) GetDemoData(name string) ([]byte, error) {

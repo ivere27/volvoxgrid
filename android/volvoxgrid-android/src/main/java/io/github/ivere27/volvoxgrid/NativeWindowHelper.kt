@@ -5,7 +5,7 @@ import android.view.Surface
 /**
  * JNI helper for acquiring/releasing ANativeWindow pointers from Android Surfaces.
  *
- * Used by [VolvoxGridView] to pass a raw surface handle to the GPU renderer plugin.
+ * Used by [VolvoxGridView] to pass a raw surface handle to the GPU renderer runtime.
  */
 object NativeWindowHelper {
     init {

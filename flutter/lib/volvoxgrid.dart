@@ -303,7 +303,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
   double _pendingViewportDpr = 1.0;
   bool _viewportDispatchScheduled = false;
 
-  /// Native RGBA render buffer shared with the plugin.
+  /// Native RGBA render buffer shared with the runtime.
   ffi.Pointer<ffi.Uint8>? _pixelBuffer;
   int _bufferWidth = 0;
   int _bufferHeight = 0;

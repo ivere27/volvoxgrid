@@ -46,7 +46,7 @@ Hosts should own platform concerns:
 - native edit and dropdown overlays when needed
 - frame scheduling
 
-The engine and plugin own:
+The engine and runtime own:
 
 - grid state
 - layout
@@ -61,7 +61,7 @@ The GUI stack is layered like this:
 1. Retained grid state
 2. Backend-agnostic canvas pipeline
 3. CPU and GPU renderers
-4. Plugin render/event streams
+4. Runtime render/event streams
 5. Platform hosts
 
 ## 1. Retained Grid State
@@ -135,7 +135,7 @@ The CPU path renders into a host-owned RGBA buffer. The host sends a `BufferRead
 - width
 - height
 
-The plugin maps that buffer and calls the CPU renderer, which paints the grid into the shared memory region.
+The runtime maps that buffer and calls the CPU renderer, which paints the grid into the shared memory region.
 
 Important CPU-path behavior:
 
@@ -171,13 +171,13 @@ Important GPU-path behavior:
 
 In practice, the GPU path is best when the platform can provide a stable native surface or platform texture.
 
-## 4. Plugin Session Layer
+## 4. Runtime Session Layer
 
 Primary file:
 
-- `plugin/src/lib.rs`
+- `runtime/src/lib.rs`
 
-The plugin is the bridge between platform hosts and the engine.
+The runtime is the bridge between platform hosts and the engine.
 
 It exposes two important streaming interfaces:
 
@@ -299,7 +299,7 @@ Primary pieces:
 - `web/js/src/volvoxgrid.ts`
 - `web/js/src/volvoxgrid-element.ts`
 
-The web host wraps the WASM build and renders into an HTML canvas. It is useful as a reference for a browser shell that still uses the same grid engine ideas, even though the integration mechanics differ from native plugin hosts.
+The web host wraps the WASM build and renders into an HTML canvas. It is useful as a reference for a browser shell that still uses the same grid engine ideas, even though the integration mechanics differ from native hosts.
 
 ### `.NET`
 
@@ -320,8 +320,8 @@ The usual CPU path looks like this:
 3. Host opens a render session.
 4. Host sends `ViewportState` whenever size changes.
 5. Host allocates a direct RGBA buffer and sends `BufferReady`.
-6. Plugin renders into that buffer.
-7. Plugin returns `FrameDone` with dirty rect and optional metrics.
+6. Runtime renders into that buffer.
+7. Runtime returns `FrameDone` with dirty rect and optional metrics.
 8. Host blits or presents the resulting pixels.
 
 Flow:
@@ -329,7 +329,7 @@ Flow:
 ```text
 host buffer
     -> BufferReady(handle, stride, width, height)
-    -> plugin render_session
+    -> runtime render_session
     -> engine Renderer / Canvas
     -> RGBA pixels written in place
     -> FrameDone(dirty rect, metrics)
@@ -342,23 +342,23 @@ The usual GPU path looks like this:
 1. Host selects a GPU renderer mode.
 2. Host creates or exposes a native surface handle.
 3. Host sends `GpuSurfaceReady`.
-4. Plugin lazily creates `GpuRenderer` if needed.
-5. Plugin configures or reconfigures the `wgpu` surface.
+4. Runtime lazily creates `GpuRenderer` if needed.
+5. Runtime configures or reconfigures the `wgpu` surface.
 6. Engine renders directly to the surface.
-7. Plugin returns `GpuFrameDone`.
+7. Runtime returns `GpuFrameDone`.
 
 Flow:
 
 ```text
 native surface handle
     -> GpuSurfaceReady(handle, width, height)
-    -> plugin render_session
+    -> runtime render_session
     -> GpuRenderer + wgpu surface
     -> present to native surface
     -> GpuFrameDone
 ```
 
-If surface setup fails, the plugin can drop back to CPU mode rather than leaving the grid unusable.
+If surface setup fails, the runtime can drop back to CPU mode rather than leaving the grid unusable.
 
 ## Input Lifecycle
 
@@ -369,7 +369,7 @@ Hosts forward user input as render-session messages:
 - `ScrollEvent`
 - `ZoomEvent`
 
-The plugin translates those into shared engine input handlers. That keeps interaction behavior aligned across hosts.
+The runtime translates those into shared engine input handlers. That keeps interaction behavior aligned across hosts.
 
 Examples:
 
@@ -510,7 +510,7 @@ Useful constraints to keep in mind:
 - Flutter desktop currently uses CPU mode
 - GPU surface handling is platform-specific even though the engine contract is shared
 - edit/dropdown overlays are host-driven, so exact UX can vary by platform
-- some hosts may redraw full surfaces even when the plugin reports only a dirty rect
+- some hosts may redraw full surfaces even when the runtime reports only a dirty rect
 
 ## Recommended Reading Order
 
@@ -520,7 +520,7 @@ If you are modifying the GUI stack, read in this order:
 2. `engine/src/canvas.rs`
 3. `engine/src/render.rs`
 4. `engine/src/gpu_render.rs`
-5. `plugin/src/lib.rs`
+5. `runtime/src/lib.rs`
 6. the host for your platform:
    - Android: `android/volvoxgrid-android/src/main/java/io/github/ivere27/volvoxgrid/VolvoxGridView.kt`
    - Java desktop: `java/desktop/src/main/java/io/github/ivere27/volvoxgrid/desktop/VolvoxGridDesktopPanel.java`
@@ -528,4 +528,4 @@ If you are modifying the GUI stack, read in this order:
    - Web: `web/js/src/volvoxgrid.ts`
    - `.NET`: `dotnet/src/common`
 
-That order matches the real layering: retained state first, render pipeline second, plugin bridge third, host shell last.
+That order matches the real layering: retained state first, render pipeline second, runtime bridge third, host shell last.

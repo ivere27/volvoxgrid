@@ -12,12 +12,12 @@ namespace VolvoxGrid.DotNet
         private bool _disposed;
 
         public VolvoxGridClient(
-            string pluginPath = null,
+            string libraryPath = null,
             int viewportWidth = 1024,
             int viewportHeight = 768,
             float scale = 1.0f)
         {
-            _client = new Internal.VolvoxClient(pluginPath);
+            _client = new Internal.VolvoxClient(libraryPath);
             _gridId = _client.CreateGrid(viewportWidth, viewportHeight, scale);
         }
 

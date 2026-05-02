@@ -158,7 +158,7 @@ fi
 
 # ── Locate / Build native library ──────────────────────────────────
 NATIVE_LIB_DIR="$ROOT_DIR/target/release"
-NATIVE_LIB_PATH="$NATIVE_LIB_DIR/libvolvoxgrid_plugin.so"
+NATIVE_LIB_PATH="$NATIVE_LIB_DIR/libvolvoxgrid.so"
 if [ "$SKIP_BUILD" -eq 0 ]; then
     NEED_REBUILD=0
     REBUILD_REASON=""
@@ -167,10 +167,10 @@ if [ "$SKIP_BUILD" -eq 0 ]; then
         REBUILD_REASON="(library missing)"
     else
         BUILD_INPUTS=(
-            "$ROOT_DIR/plugin/src"
+            "$ROOT_DIR/runtime/src"
             "$ROOT_DIR/engine/src"
             "$ROOT_DIR/proto/volvoxgrid.proto"
-            "$ROOT_DIR/plugin/Cargo.toml"
+            "$ROOT_DIR/runtime/Cargo.toml"
             "$ROOT_DIR/engine/Cargo.toml"
         )
         for input in "${BUILD_INPUTS[@]}"; do
@@ -193,7 +193,7 @@ if [ "$SKIP_BUILD" -eq 0 ]; then
         if [ -n "$REBUILD_REASON" ]; then
             echo "  $REBUILD_REASON"
         fi
-        cargo build --manifest-path "$ROOT_DIR/plugin/Cargo.toml" --release 2>&1 | tail -3
+        cargo build --manifest-path "$ROOT_DIR/runtime/Cargo.toml" --release 2>&1 | tail -3
     else
         echo "[1/6] Native library already built."
     fi
@@ -202,7 +202,7 @@ else
 fi
 
 if [ ! -f "$NATIVE_LIB_PATH" ]; then
-    echo "ERROR: libvolvoxgrid_plugin.so not found in $NATIVE_LIB_DIR"
+    echo "ERROR: libvolvoxgrid.so not found in $NATIVE_LIB_DIR"
     exit 1
 fi
 

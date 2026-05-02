@@ -2,7 +2,7 @@
  *
  * MinGW + Rust raw-dylib can emit imports for Win8+/Win10 APIs
  * (bcryptprimitives!ProcessPrng, WaitOnAddress/WakeByAddress*).
- * Provide local fallbacks so the plugin does not depend on those DLLs.
+ * Provide local fallbacks so the runtime does not depend on those DLLs.
  */
 
 #include <windows.h>

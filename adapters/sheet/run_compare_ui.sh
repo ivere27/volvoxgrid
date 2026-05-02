@@ -115,7 +115,7 @@ if [ "$SKIP_BUILD" -eq 0 ]; then
     echo "[build] Building VolvoxGrid WASM runtime..."
     command -v wasm-pack >/dev/null 2>&1 || { echo "ERROR: wasm-pack not found"; exit 1; }
     # Build to web/example/wasm/ (symlinked from adapters/sheet/wasm/)
-    (cd "$ROOT_DIR/web/crate" && rustup run nightly wasm-pack build . --release --target web --out-dir "$ROOT_DIR/web/example/wasm" --features gpu) >/dev/null
+    (cd "$ROOT_DIR/runtime" && rustup run nightly wasm-pack build . --release --target web --out-dir "$ROOT_DIR/web/example/wasm" --out-name volvoxgrid_wasm --no-default-features --features wasm-default,gpu) >/dev/null
     echo "  Done."
 
     echo "[build] Building VolvoxGrid web JS runtime..."

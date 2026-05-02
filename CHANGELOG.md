@@ -2,6 +2,11 @@
 
 All notable changes to VolvoxGrid are documented here. Per-package changelogs may have additional detail (e.g. [flutter/CHANGELOG.md](flutter/CHANGELOG.md)).
 
+## 0.8.5
+
+- Replaced the plugin crate with the shared `volvoxgrid-runtime` library for native and Web builds.
+- Fixed Web pinch-to-zoom handling, canvas clipping, and sticky row/column behavior.
+
 ## 0.8.4
 
 - Fixed tree auto-resize behavior and updated the Web DOOM demo CDN/proxy integration.

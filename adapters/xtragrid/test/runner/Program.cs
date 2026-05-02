@@ -43,7 +43,7 @@ namespace VolvoxGrid.DotNet.ScriptRunner
         public string GridAssemblyPath { get; private set; }
         public string ScriptsDir { get; private set; }
         public string OutDir { get; private set; }
-        public string PluginPath { get; private set; }
+        public string LibraryPath { get; private set; }
         public string TestsFilter { get; private set; }
         public int Width { get; private set; }
         public int Height { get; private set; }
@@ -56,7 +56,7 @@ namespace VolvoxGrid.DotNet.ScriptRunner
             Height = 640;
             SettleMs = 350;
             Suffix = "vv";
-            PluginPath = string.Empty;
+            LibraryPath = string.Empty;
             TestsFilter = string.Empty;
         }
 
@@ -106,13 +106,13 @@ namespace VolvoxGrid.DotNet.ScriptRunner
                 {
                     options.OutDir = arg.Substring("--out-dir=".Length);
                 }
-                else if (arg == "--plugin-path")
+                else if (arg == "--library-path")
                 {
-                    options.PluginPath = RequireValue(args, ref i, "--plugin-path");
+                    options.LibraryPath = RequireValue(args, ref i, "--library-path");
                 }
-                else if (arg.StartsWith("--plugin-path=", StringComparison.Ordinal))
+                else if (arg.StartsWith("--library-path=", StringComparison.Ordinal))
                 {
-                    options.PluginPath = arg.Substring("--plugin-path=".Length);
+                    options.LibraryPath = arg.Substring("--library-path=".Length);
                 }
                 else if (arg == "--tests")
                 {
@@ -234,7 +234,7 @@ namespace VolvoxGrid.DotNet.ScriptRunner
             string gridAssemblyPath = NormalizePath(_options.GridAssemblyPath);
             string scriptsDir = NormalizePath(_options.ScriptsDir);
             string outDir = NormalizePath(_options.OutDir);
-            string pluginPath = string.IsNullOrEmpty(_options.PluginPath) ? string.Empty : NormalizePath(_options.PluginPath);
+            string libraryPath = string.IsNullOrEmpty(_options.LibraryPath) ? string.Empty : NormalizePath(_options.LibraryPath);
 
             if (!File.Exists(gridAssemblyPath))
             {
@@ -282,7 +282,7 @@ namespace VolvoxGrid.DotNet.ScriptRunner
                     }
 
                     var method = CompileCaseMethod(testCase);
-                    RunSingleCase(testCase, method, gridAssembly, pluginPath, imagePath);
+                    RunSingleCase(testCase, method, gridAssembly, libraryPath, imagePath);
 
                     Console.WriteLine("[{0:00}] {1} / OK", testCase.Number, testCase.Name);
                     results.Add(CaseResult.FromSuccess(testCase, imagePath));
@@ -624,11 +624,11 @@ namespace VolvoxGrid.ScriptCaseRuntime
             ScriptCase testCase,
             MethodInfo method,
             Assembly gridAssembly,
-            string pluginPath,
+            string libraryPath,
             string imagePath)
         {
             LogVerbose("[{0:00}] create environment", testCase.Number);
-            using (var environment = ScriptCaseEnvironment.Create(_options.Engine, gridAssembly, pluginPath))
+            using (var environment = ScriptCaseEnvironment.Create(_options.Engine, gridAssembly, libraryPath))
             using (var form = new Form())
             {
                 LogVerbose("[{0:00}] environment ready", testCase.Number);

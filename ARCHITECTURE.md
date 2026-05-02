@@ -8,22 +8,22 @@ For product overview and package installation, see [README.md](README.md). For r
 
 VolvoxGrid is organized around one Rust grid engine with multiple host paths:
 
-- GUI hosts use the shared pixel-rendering engine through the native plugin or WASM bindings
+- GUI hosts use the shared pixel-rendering engine through the native runtime or WASM bindings
 - TUI hosts use the same engine through terminal-oriented render sessions
 - platform wrappers stay thin and translate native events, buffers, and lifecycle into the shared contract
 - adapters sit above wrappers and map third-party grid APIs into VolvoxGrid behavior
 
 At a high level:
 
-`host or adapter -> wrapper -> plugin or wasm binding -> engine`
+`host or adapter -> wrapper -> runtime or wasm binding -> engine`
 
 The engine owns grid state, layout, selection, edit flow, sorting, scrolling, rendering, and semantic grid events. Hosts own windowing, event loops, surfaces, and packaging.
 
 ## Repo Layout
 
 - `engine/`: core retained grid model, layout, rendering, text integration, and event production
-- `plugin/`: Synurang native plugin used by desktop, Android, Flutter, `.NET`, and other native hosts
-- `web/crate/`: WASM-facing Rust crate
+- `runtime/`: Synurang native runtime used by desktop, Android, Flutter, `.NET`, and other native hosts
+- `runtime/`: native runtime crate and WASM-facing Rust crate
 - `web/js/`: browser loader, TypeScript API, default input helpers, and WASM packaging glue
 - `proto/`: protobuf service and render-session contract
 - `codegen/`: generated bindings and shared generated outputs
@@ -56,13 +56,13 @@ The protobuf definitions in `proto/` define the public contract between the engi
 
 If the shape of requests, responses, or render-session messages changes, start in `proto/`.
 
-### Native Plugin
+### Native Runtime
 
-The native plugin is the shared host-facing boundary for non-web integrations. It exposes the protobuf-driven API over Synurang FFI and manages render and event streams for native clients.
+The native runtime is the shared host-facing boundary for non-web integrations. It exposes the protobuf-driven API over Synurang FFI and manages render and event streams for native clients.
 
 ### WASM Path
 
-The web path uses the Rust WASM crate plus the TypeScript wrapper instead of the native plugin. The engine logic is still shared, but loading, JS interop, and browser integration are web-specific.
+The web path uses the Rust WASM crate plus the TypeScript wrapper instead of the native runtime. The engine logic is still shared, but loading, JS interop, and browser integration are web-specific.
 
 ### Wrappers And Hosts
 
@@ -87,7 +87,7 @@ The engine exposes two output modes through the same proto API:
 Adding a new native language binding does not require changing the engine. The steps are:
 
 1. Generate protobuf bindings for the target language (`make codegen` or run `protoc` directly).
-2. Load `libvolvoxgrid_plugin` and call into it via Synurang FFI.
+2. Load `libvolvoxgrid` and call into it via Synurang FFI.
 3. Open a `RenderSession` stream for GUI or TUI rendering.
 4. Forward host input (pointer, keyboard, terminal bytes) and present the rendered output.
 
@@ -96,7 +96,7 @@ The existing native wrappers (Flutter/Dart, Java/Kotlin, C#, Go) are concrete ex
 ## Where To Change Things
 
 - Grid behavior, layout, painting, or shared event semantics: `engine/`
-- Native FFI/session behavior: `plugin/`
+- Native FFI/session behavior: `runtime/`
 - Browser-only loading or JS ergonomics: `web/js/`
 - Shared API surface: `proto/` then `make codegen`
 - Flutter wrapper behavior: `flutter/`
@@ -110,11 +110,11 @@ The existing native wrappers (Flutter/Dart, Java/Kotlin, C#, Go) are concrete ex
 
 You do not need every tool for every change, but the full repo can involve:
 
-- Rust stable via `rustup` (engine, plugin, all native builds)
+- Rust stable via `rustup` (engine, runtime, all native builds)
 - `protoc` (proto contract changes via `make codegen`)
 - Go 1.22+ for `protoc-gen-synurang-ffi` and the Go TUI host (`go/`)
 - Node.js and npm for web and adapter packages (`web/`, `adapters/`)
-- Rust nightly and `wasm-pack` for WASM builds (`web/crate/`)
+- Rust nightly and `wasm-pack` for WASM builds (`runtime/`)
 - Flutter SDK for Flutter work (`flutter/`)
 - Android SDK, Android NDK, and `cargo-ndk` for Android work (`android/`)
 - JDK and Gradle for Java and Android packaging (`java/`, `android/`)
@@ -157,7 +157,7 @@ When changing the public contract:
 
 1. Edit the relevant file in `proto/`.
 2. Run `make codegen`.
-3. Update the engine, plugin, and every affected wrapper.
+3. Update the engine, runtime, and every affected wrapper.
 4. Rebuild at least one affected host path.
 5. Run the relevant smoke or sample flow.
 
@@ -167,8 +167,8 @@ Do not hand-edit generated binding outputs unless you are fixing the generation 
 
 Local developer builds:
 
-- `make build`: debug plugin build
-- `make release`: release plugin build
+- `make build`: debug native library build
+- `make release`: release native library build
 
 Packaging builds:
 
@@ -190,7 +190,7 @@ Snapshot note:
 Use the smallest loop that proves the change:
 
 - `make test`: Rust unit tests
-- `make run`: plugin smoke test
+- `make run`: native library smoke test
 - `make gtk-test`: native GUI host verification on Linux
 - `make java-desktop-run`: desktop wrapper verification
 - `make android` or `make flutter-run`: mobile wrapper verification

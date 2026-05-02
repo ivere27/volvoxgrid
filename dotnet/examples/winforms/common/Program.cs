@@ -18,7 +18,7 @@ namespace VolvoxGrid.DotNet.Sample
             AppLog.Info("VolvoxGrid.WinFormsSample starting");
             AppLog.Info("BaseDirectory=" + AppDomain.CurrentDomain.BaseDirectory);
             AppLog.Info("CurrentDirectory=" + Directory.GetCurrentDirectory());
-            AppLog.Info("VOLVOXGRID_PLUGIN_PATH=" + (Environment.GetEnvironmentVariable("VOLVOXGRID_PLUGIN_PATH") ?? string.Empty));
+            AppLog.Info("VOLVOXGRID_LIBRARY_PATH=" + (Environment.GetEnvironmentVariable("VOLVOXGRID_LIBRARY_PATH") ?? string.Empty));
 
             Application.ThreadException += delegate(object sender, System.Threading.ThreadExceptionEventArgs args)
             {
@@ -334,17 +334,17 @@ namespace VolvoxGrid.DotNet.Sample
             Controls.Add(topBar);
             Controls.Add(_status);
 
-            string pluginPath = ResolvePluginPath();
-            if (!string.IsNullOrEmpty(pluginPath))
+            string libraryPath = ResolveLibraryPath();
+            if (!string.IsNullOrEmpty(libraryPath))
             {
-                _grid.PluginPath = pluginPath;
-                SetStatus("Plugin detected: " + pluginPath);
-                AppLog.Info("Plugin path resolved: " + pluginPath);
+                _grid.LibraryPath = libraryPath;
+                SetStatus("Library detected: " + libraryPath);
+                AppLog.Info("Library path resolved: " + libraryPath);
             }
             else
             {
-                SetStatus("Plugin not found. Set VOLVOXGRID_PLUGIN_PATH or place the plugin beside the executable.");
-                AppLog.Info("Plugin path was not resolved.");
+                SetStatus("Library not found. Set VOLVOXGRID_LIBRARY_PATH or place the library beside the executable.");
+                AppLog.Info("Library path was not resolved.");
             }
 
             _grid.FlingImpulseGain = 40.0f;
@@ -846,9 +846,9 @@ namespace VolvoxGrid.DotNet.Sample
             };
         }
 
-        private static string ResolvePluginPath()
+        private static string ResolveLibraryPath()
         {
-            string envPath = Environment.GetEnvironmentVariable("VOLVOXGRID_PLUGIN_PATH");
+            string envPath = Environment.GetEnvironmentVariable("VOLVOXGRID_LIBRARY_PATH");
             if (!string.IsNullOrEmpty(envPath) && File.Exists(envPath))
             {
                 return envPath;
@@ -858,12 +858,12 @@ namespace VolvoxGrid.DotNet.Sample
             string baseDir = AppDomain.CurrentDomain.BaseDirectory;
             var candidates = new List<string>
             {
-                Path.Combine(baseDir, "volvoxgrid_plugin.dll"),
-                Path.Combine(cwd, "volvoxgrid_plugin.dll"),
-                Path.Combine(cwd, "target", "x86_64-pc-windows-gnu", "debug", "volvoxgrid_plugin.dll"),
-                Path.Combine(cwd, "target", "x86_64-pc-windows-gnu", "release", "volvoxgrid_plugin.dll"),
-                Path.Combine(cwd, "target", "dotnet", "winforms_debug", "volvoxgrid_plugin.dll"),
-                Path.Combine(cwd, "target", "dotnet", "winforms_release", "volvoxgrid_plugin.dll"),
+                Path.Combine(baseDir, "volvoxgrid.dll"),
+                Path.Combine(cwd, "volvoxgrid.dll"),
+                Path.Combine(cwd, "target", "x86_64-pc-windows-gnu", "debug", "volvoxgrid.dll"),
+                Path.Combine(cwd, "target", "x86_64-pc-windows-gnu", "release", "volvoxgrid.dll"),
+                Path.Combine(cwd, "target", "dotnet", "winforms_debug", "volvoxgrid.dll"),
+                Path.Combine(cwd, "target", "dotnet", "winforms_release", "volvoxgrid.dll"),
             };
 
             for (int i = 0; i < candidates.Count; i++)

@@ -1,10 +1,10 @@
 /// High-level Dart controller wrapping the VolvoxGrid FFI service.
 ///
-/// [VolvoxGridController] creates a native grid via the Synurang plugin,
+/// [VolvoxGridController] creates a native grid via the Synurang runtime,
 /// exposes property getters/setters (rows, cols, text, etc.), and notifies
 /// listeners so that the [VolvoxGridWidget] can repaint when data changes.
 ///
-/// The API is asynchronous because calls cross an FFI/plugin boundary.
+/// The API is asynchronous because calls cross an FFI/runtime boundary.
 /// For high-volume updates, prefer [setCells], [setTableData], and
 /// [withRedrawSuspended] to minimize per-call overhead.
 library;

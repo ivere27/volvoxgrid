@@ -328,7 +328,7 @@ private:
     void StopEventThread();
 
     // ═══════════════════════════════════════════════════════
-    // Synurang Plugin State
+    // Synurang Host State
     // ═══════════════════════════════════════════════════════
 
     synurang::PluginHost                               m_pluginHost;
@@ -375,8 +375,8 @@ private:
     long                                               m_dataMode = 0;
     VARIANT_BOOL                                       m_virtualData = VARIANT_FALSE;
 
-    // Helper: invoke a unary RPC on the plugin
-    std::vector<uint8_t> InvokePlugin(const std::string& method,
+    // Helper: invoke a unary RPC through the plugin host
+    std::vector<uint8_t> InvokeRuntime(const std::string& method,
                                       const std::vector<uint8_t>& data);
 
     // Helper: BSTR <-> std::string

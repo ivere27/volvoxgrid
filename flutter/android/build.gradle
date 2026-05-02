@@ -88,41 +88,41 @@ if (volvoxgridSource == "local") {
     tasks.register("prepareVolvoxGridJniLibs") {
         def soInputs = project.provider {
             supportedAndroidAbis.collectMany { abi ->
-                soCandidatesForAbi(abi, "libvolvoxgrid_plugin.so").findAll { it.isFile() }
+                soCandidatesForAbi(abi, "libvolvoxgrid.so").findAll { it.isFile() }
             }
         }
-        inputs.files(soInputs).withPropertyName("volvoxgridPluginSoInputs")
+        inputs.files(soInputs).withPropertyName("volvoxgridLibrarySoInputs")
         outputs.dir(generatedJniLibsDir)
         doLast {
             delete(generatedJniLibsDir)
             List<String> copiedAbis = []
 
             for (String abi : supportedAndroidAbis) {
-                File pluginSo = resolveSoForAbi(abi, "libvolvoxgrid_plugin.so")
+                File librarySo = resolveSoForAbi(abi, "libvolvoxgrid.so")
 
-                if (pluginSo == null) {
+                if (librarySo == null) {
                     continue
                 }
 
                 File outDir = new File(generatedJniLibsDir, abi)
                 outDir.mkdirs()
                 copy {
-                    from pluginSo
+                    from librarySo
                     into outDir
-                    rename { "libvolvoxgrid_plugin.so" }
+                    rename { "libvolvoxgrid.so" }
                 }
                 copiedAbis.add(abi)
             }
 
             if (copiedAbis.isEmpty()) {
                 throw new GradleException(
-                    "Unable to find libvolvoxgrid_plugin.so for any Android ABI. " +
-                    "Run `make android-plugin` (or `make android-plugin-release`) from the repo root " +
+                    "Unable to find libvolvoxgrid.so for any Android ABI. " +
+                    "Run `make android-library` (or `make android-library-release`) from the repo root " +
                     "before building Flutter."
                 )
             }
 
-            logger.lifecycle("Prepared VolvoxGrid native plugin for ABIs: ${copiedAbis.join(', ')}")
+            logger.lifecycle("Prepared VolvoxGrid native library for ABIs: ${copiedAbis.join(', ')}")
         }
     }
 

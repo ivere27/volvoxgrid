@@ -399,7 +399,7 @@ pub struct VolvoxGrid {
     pub scroll_tips: bool,
     /// Whether wheel/touch scroll can continue with inertial fling physics.
     pub fling_enabled: bool,
-    /// Whether pinch zoom gestures are accepted by the engine/plugin.
+    /// Whether pinch zoom gestures are accepted by the engine/runtime.
     pub pinch_zoom_enabled: bool,
     /// Multiplier used to convert wheel/touch delta into fling velocity.
     pub fling_impulse_gain: f32,
@@ -484,13 +484,13 @@ pub struct VolvoxGrid {
     // ── Debug Overlay ────────────────────────────────────────────────
     /// Whether the debug overlay is visible.
     pub debug_overlay: bool,
-    /// Last frame render time in milliseconds (set by plugin/wasm before render).
+    /// Last frame render time in milliseconds (set by runtime/wasm before render).
     pub debug_frame_time_ms: f32,
     /// Smoothed FPS (exponential moving average).
     pub debug_fps: f32,
-    /// Current zoom level (1.0 = 100%), synced from plugin zoom_levels.
+    /// Current zoom level (1.0 = 100%), synced from runtime zoom_levels.
     pub debug_zoom_level: f64,
-    /// Actual renderer in use: 0 = CPU, 1 = GPU (set by plugin at render time).
+    /// Actual renderer in use: 0 = CPU, 1 = GPU (set by runtime at render time).
     pub debug_renderer_actual: i32,
     /// Name of the GPU backend in use (e.g. "Vulkan", "OpenGL", "WebGPU").
     pub debug_gpu_backend: String,

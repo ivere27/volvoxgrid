@@ -60,9 +60,9 @@ namespace VolvoxGrid.DotNet.Internal
         private readonly object _invokeLock = new object();
         private readonly SynurangReflectionHost _host;
 
-        public VolvoxClient(string pluginPath)
+        public VolvoxClient(string libraryPath)
         {
-            string resolved = ResolvePluginPath(pluginPath);
+            string resolved = ResolveLibraryPath(libraryPath);
             _host = SynurangReflectionHost.Load(resolved);
         }
 
@@ -684,23 +684,22 @@ namespace VolvoxGrid.DotNet.Internal
             return landscape ? PrintOrientation.PRINT_LANDSCAPE : PrintOrientation.PRINT_PORTRAIT;
         }
 
-        private static string ResolvePluginPath(string explicitPath)
+        private static string ResolveLibraryPath(string explicitPath)
         {
             if (!string.IsNullOrEmpty(explicitPath))
             {
                 return explicitPath;
             }
 
-            string envPath = Environment.GetEnvironmentVariable("VOLVOXGRID_PLUGIN_PATH");
+            string envPath = Environment.GetEnvironmentVariable("VOLVOXGRID_LIBRARY_PATH");
             if (!string.IsNullOrEmpty(envPath))
             {
                 return envPath;
             }
-
-            bool windowsRuntime = IsWindowsRuntime();
-            string[] pluginNames = windowsRuntime
-                ? new[] { "volvoxgrid_plugin.dll" }
-                : new[] { "libvolvoxgrid_plugin.so", "libvolvoxgrid_plugin.dylib", "volvoxgrid_plugin.dll" };
+            bool windows = IsWindows();
+            string[] libraryNames = windows
+                ? new[] { "volvoxgrid.dll" }
+                : new[] { "libvolvoxgrid.so", "libvolvoxgrid.dylib", "volvoxgrid.dll" };
 
             var candidates = new List<string>();
             string baseDir = AppDomain.CurrentDomain.BaseDirectory;
@@ -746,9 +745,9 @@ namespace VolvoxGrid.DotNet.Internal
                     continue;
                 }
 
-                for (int p = 0; p < pluginNames.Length; p++)
+                for (int p = 0; p < libraryNames.Length; p++)
                 {
-                    string fullPath = Path.Combine(dir, pluginNames[p]);
+                    string fullPath = Path.Combine(dir, libraryNames[p]);
                     if (File.Exists(fullPath))
                     {
                         return fullPath;
@@ -757,10 +756,10 @@ namespace VolvoxGrid.DotNet.Internal
             }
 
             throw new FileNotFoundException(
-                "Could not locate VolvoxGrid plugin. Set VOLVOXGRID_PLUGIN_PATH or pass pluginPath explicitly.");
+                "Could not locate VolvoxGrid library. Set VOLVOXGRID_LIBRARY_PATH or pass a library path explicitly.");
         }
 
-        private static bool IsWindowsRuntime()
+        private static bool IsWindows()
         {
             PlatformID platform = Environment.OSVersion.Platform;
             return platform == PlatformID.Win32NT

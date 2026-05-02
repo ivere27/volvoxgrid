@@ -96,22 +96,22 @@ sample_basename_for_kind() {
     esac
 }
 
-native_plugin_basename() {
+native_library_basename() {
     local tfm="$1"
     if [ "$tfm" = "net40" ] || [[ "$tfm" == *"-windows"* ]]; then
-        printf 'volvoxgrid_plugin.dll\n'
+        printf 'volvoxgrid.dll\n'
         return
     fi
 
     case "$(uname -s 2>/dev/null || echo unknown)" in
         Darwin)
-            printf 'libvolvoxgrid_plugin.dylib\n'
+            printf 'libvolvoxgrid.dylib\n'
             ;;
         MINGW*|MSYS*|CYGWIN*)
-            printf 'volvoxgrid_plugin.dll\n'
+            printf 'volvoxgrid.dll\n'
             ;;
         *)
-            printf 'libvolvoxgrid_plugin.so\n'
+            printf 'libvolvoxgrid.so\n'
             ;;
     esac
 }
@@ -206,7 +206,7 @@ else
     SAMPLE_KIND="$TARGET_SAMPLE"
 fi
 SAMPLE_BASENAME="$(sample_basename_for_kind "$SAMPLE_KIND")"
-PLUGIN_BASENAME="$(native_plugin_basename "$TARGET_TFM")"
+LIBRARY_BASENAME="$(native_library_basename "$TARGET_TFM")"
 STAGE_DIR="$(resolve_stage_dir "$PROFILE" "$TARGET_TFM" "$TARGET_ARCH" "$SAMPLE_KIND")"
 ENTRY_NAME="${SAMPLE_BASENAME}.dll"
 if [ "$TARGET_TFM" = "net40" ]; then
@@ -346,7 +346,7 @@ if [ "$TARGET_TFM" = "net40" ]; then
 
     require_stage_file "${SAMPLE_BASENAME}.exe"
     require_stage_file "VolvoxGrid.DotNet.dll"
-    require_stage_file "$PLUGIN_BASENAME"
+    require_stage_file "$LIBRARY_BASENAME"
 
     echo "Running sample: $STAGE_DIR/${SAMPLE_BASENAME}.exe"
     echo "Arch=$TARGET_ARCH"
@@ -357,7 +357,7 @@ if [ "$TARGET_TFM" = "net40" ]; then
     for name in \
         "${SAMPLE_BASENAME}.exe" \
         "VolvoxGrid.DotNet.dll" \
-        "$PLUGIN_BASENAME"
+        "$LIBRARY_BASENAME"
     do
         path="$STAGE_DIR/$name"
         wine_path="$(to_wine_path "$path")"
@@ -432,7 +432,7 @@ require_stage_file "${SAMPLE_BASENAME}.dll"
 require_stage_file "${SAMPLE_BASENAME}.deps.json"
 require_stage_file "${SAMPLE_BASENAME}.runtimeconfig.json"
 require_stage_file "VolvoxGrid.DotNet.dll"
-require_stage_file "$PLUGIN_BASENAME"
+require_stage_file "$LIBRARY_BASENAME"
 
 if [[ "$TARGET_TFM" == *"-windows"* ]] && ! is_windows_host; then
     echo "ERROR: DOTNET_TFM=$TARGET_TFM requires Windows runtime."
@@ -455,7 +455,7 @@ for name in \
     "${SAMPLE_BASENAME}.deps.json" \
     "${SAMPLE_BASENAME}.runtimeconfig.json" \
     "VolvoxGrid.DotNet.dll" \
-    "$PLUGIN_BASENAME"
+    "$LIBRARY_BASENAME"
 do
     path="$STAGE_DIR/$name"
     size_bytes="$(wc -c < "$path" | tr -d '[:space:]')"

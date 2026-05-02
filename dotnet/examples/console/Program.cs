@@ -24,7 +24,7 @@ namespace VolvoxGrid.DotNet.ConsoleSample
                 Log("INFO", "VolvoxGrid.ConsoleSample starting", null);
                 Log("INFO", "BaseDirectory=" + AppDomain.CurrentDomain.BaseDirectory, null);
                 Log("INFO", "CurrentDirectory=" + Directory.GetCurrentDirectory(), null);
-                Log("INFO", "VOLVOXGRID_PLUGIN_PATH=" + (Environment.GetEnvironmentVariable("VOLVOXGRID_PLUGIN_PATH") ?? string.Empty), null);
+                Log("INFO", "VOLVOXGRID_LIBRARY_PATH=" + (Environment.GetEnvironmentVariable("VOLVOXGRID_LIBRARY_PATH") ?? string.Empty), null);
 
                 if (smokeMode)
                 {

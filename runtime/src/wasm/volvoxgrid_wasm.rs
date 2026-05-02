@@ -66,18 +66,18 @@ fn stream_status(status: u8) -> Vec<u8> {
 // Stream Interfaces (WASM)
 // =============================================================================
 
-pub trait PluginStreamSender<T> {
+pub trait RuntimeStreamSender<T> {
     fn send(&self, msg: T) -> bool;
     fn is_cancelled(&self) -> bool;
 }
 
-pub trait PluginStreamReceiver<T> {
+pub trait RuntimeStreamReceiver<T> {
     fn recv(&self) -> Option<T>;
     fn is_cancelled(&self) -> bool;
 }
 
-pub trait PluginStreamBidi<Req, Resp>:
-    PluginStreamSender<Resp> + PluginStreamReceiver<Req>
+pub trait RuntimeStreamBidi<Req, Resp>:
+    RuntimeStreamSender<Resp> + RuntimeStreamReceiver<Req>
 {
 }
 
@@ -107,7 +107,7 @@ impl<T> LocalStreamSender<T> {
     }
 }
 
-impl<T: Message + Default> PluginStreamSender<T> for LocalStreamSender<T> {
+impl<T: Message + Default> RuntimeStreamSender<T> for LocalStreamSender<T> {
     fn send(&self, msg: T) -> bool {
         if self.cancelled.get() {
             return false;
@@ -153,7 +153,7 @@ impl<T> LocalStreamReceiver<T> {
     }
 }
 
-impl<T: Message + Default> PluginStreamReceiver<T> for LocalStreamReceiver<T> {
+impl<T: Message + Default> RuntimeStreamReceiver<T> for LocalStreamReceiver<T> {
     fn recv(&self) -> Option<T> {
         if self.cancelled.get() {
             return None;
@@ -200,7 +200,7 @@ impl<Req, Resp> LocalStreamBidi<Req, Resp> {
     }
 }
 
-impl<Req: Message + Default, Resp: Message + Default> PluginStreamSender<Resp>
+impl<Req: Message + Default, Resp: Message + Default> RuntimeStreamSender<Resp>
     for LocalStreamBidi<Req, Resp>
 {
     fn send(&self, msg: Resp) -> bool {
@@ -212,7 +212,7 @@ impl<Req: Message + Default, Resp: Message + Default> PluginStreamSender<Resp>
     }
 }
 
-impl<Req: Message + Default, Resp: Message + Default> PluginStreamReceiver<Req>
+impl<Req: Message + Default, Resp: Message + Default> RuntimeStreamReceiver<Req>
     for LocalStreamBidi<Req, Resp>
 {
     fn recv(&self) -> Option<Req> {
@@ -224,16 +224,16 @@ impl<Req: Message + Default, Resp: Message + Default> PluginStreamReceiver<Req>
     }
 }
 
-impl<Req: Message + Default, Resp: Message + Default> PluginStreamBidi<Req, Resp>
+impl<Req: Message + Default, Resp: Message + Default> RuntimeStreamBidi<Req, Resp>
     for LocalStreamBidi<Req, Resp>
 {
 }
 
 // =============================================================================
-// Plugin Traits
+// Runtime Traits
 // =============================================================================
 
-pub trait VolvoxGridServicePlugin: Send + Sync + 'static {
+pub trait VolvoxGridServiceRuntime: Send + Sync + 'static {
     fn create(&self, request: CreateRequest) -> Result<CreateResponse, String>;
     fn destroy(&self, request: DestroyRequest) -> Result<DestroyResponse, String>;
     fn configure(&self, request: ConfigureRequest) -> Result<ConfigureResponse, String>;
@@ -293,25 +293,25 @@ pub trait VolvoxGridServicePlugin: Send + Sync + 'static {
     fn get_demo_data(&self, request: GetDemoDataRequest) -> Result<GetDemoDataResponse, String>;
     fn render_session(
         &self,
-        stream: &dyn PluginStreamBidi<RenderInput, RenderOutput>,
+        stream: &dyn RuntimeStreamBidi<RenderInput, RenderOutput>,
     ) -> Result<(), String>;
     fn event_stream(
         &self,
         request: EventStreamRequest,
-        stream: &dyn PluginStreamSender<GridEvent>,
+        stream: &dyn RuntimeStreamSender<GridEvent>,
     ) -> Result<(), String>;
 }
 
-static PLUGIN_VOLVOX_GRID_SERVICE: OnceLock<Box<dyn VolvoxGridServicePlugin>> = OnceLock::new();
+static RUNTIME_VOLVOX_GRID_SERVICE: OnceLock<Box<dyn VolvoxGridServiceRuntime>> = OnceLock::new();
 
-/// Register a plugin implementation. Returns `true` on success, `false` if
-/// a plugin was already registered (the new plugin is dropped).
-pub fn register_volvox_grid_service_plugin(plugin: impl VolvoxGridServicePlugin) -> bool {
-    PLUGIN_VOLVOX_GRID_SERVICE.set(Box::new(plugin)).is_ok()
+/// Register a runtime implementation. Returns `true` on success, `false` if
+/// a runtime was already registered (the new runtime is dropped).
+pub fn register_volvox_grid_service_runtime(runtime: impl VolvoxGridServiceRuntime) -> bool {
+    RUNTIME_VOLVOX_GRID_SERVICE.set(Box::new(runtime)).is_ok()
 }
 
-fn get_volvox_grid_service_plugin() -> Option<&'static dyn VolvoxGridServicePlugin> {
-    PLUGIN_VOLVOX_GRID_SERVICE.get().map(|p| p.as_ref())
+fn get_volvox_grid_service_runtime() -> Option<&'static dyn VolvoxGridServiceRuntime> {
+    RUNTIME_VOLVOX_GRID_SERVICE.get().map(|p| p.as_ref())
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -375,10 +375,10 @@ fn volvox_grid_service_run_stream(ctx: &mut VolvoxGridServiceStreamContext) {
         return;
     }
 
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             ctx.stream_error = true;
             ctx.finished = true;
             return;
@@ -394,7 +394,7 @@ fn volvox_grid_service_run_stream(ctx: &mut VolvoxGridServiceStreamContext) {
             let bidi = LocalStreamBidi::<RenderInput, RenderOutput>::from_queue(std::mem::take(
                 &mut ctx.send_queue,
             ));
-            match plugin.render_session(&bidi) {
+            match runtime.render_session(&bidi) {
                 Ok(_) => {
                     if let Some(e) = bidi.take_decode_error() {
                         set_last_error(e);
@@ -448,7 +448,7 @@ fn volvox_grid_service_run_stream(ctx: &mut VolvoxGridServiceStreamContext) {
             };
 
             let sender = LocalStreamSender::<GridEvent>::new();
-            match plugin.event_stream(req, &sender) {
+            match runtime.event_stream(req, &sender) {
                 Ok(_) => {
                     if let Some(e) = sender.take_encode_error() {
                         set_last_error(e);
@@ -483,10 +483,10 @@ pub fn volvox_grid_create(
     scale: f32,
     config: &[u8],
 ) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -503,7 +503,7 @@ pub fn volvox_grid_create(
         },
         ..Default::default()
     };
-    match plugin.create(req) {
+    match runtime.create(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -519,10 +519,10 @@ pub fn volvox_grid_create(
 
 #[wasm_bindgen]
 pub fn volvox_grid_destroy(grid_id: i64) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -530,7 +530,7 @@ pub fn volvox_grid_destroy(grid_id: i64) -> Vec<u8> {
         grid_id,
         ..Default::default()
     };
-    match plugin.destroy(req) {
+    match runtime.destroy(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -546,10 +546,10 @@ pub fn volvox_grid_destroy(grid_id: i64) -> Vec<u8> {
 
 #[wasm_bindgen]
 pub fn volvox_grid_configure(grid_id: i64, config: &[u8]) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -564,7 +564,7 @@ pub fn volvox_grid_configure(grid_id: i64, config: &[u8]) -> Vec<u8> {
         },
         ..Default::default()
     };
-    match plugin.configure(req) {
+    match runtime.configure(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -580,10 +580,10 @@ pub fn volvox_grid_configure(grid_id: i64, config: &[u8]) -> Vec<u8> {
 
 #[wasm_bindgen]
 pub fn volvox_grid_get_config(grid_id: i64) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -591,7 +591,7 @@ pub fn volvox_grid_get_config(grid_id: i64) -> Vec<u8> {
         grid_id,
         ..Default::default()
     };
-    match plugin.get_config(req) {
+    match runtime.get_config(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -607,10 +607,10 @@ pub fn volvox_grid_get_config(grid_id: i64) -> Vec<u8> {
 
 #[wasm_bindgen]
 pub fn volvox_grid_load_font_data_pb(data: &[u8]) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -621,7 +621,7 @@ pub fn volvox_grid_load_font_data_pb(data: &[u8]) -> Vec<u8> {
             return Vec::new();
         }
     };
-    match plugin.load_font_data(req) {
+    match runtime.load_font_data(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -637,10 +637,10 @@ pub fn volvox_grid_load_font_data_pb(data: &[u8]) -> Vec<u8> {
 
 #[wasm_bindgen]
 pub fn volvox_grid_define_columns_pb(data: &[u8]) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -651,7 +651,7 @@ pub fn volvox_grid_define_columns_pb(data: &[u8]) -> Vec<u8> {
             return Vec::new();
         }
     };
-    match plugin.define_columns(req) {
+    match runtime.define_columns(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -667,10 +667,10 @@ pub fn volvox_grid_define_columns_pb(data: &[u8]) -> Vec<u8> {
 
 #[wasm_bindgen]
 pub fn volvox_grid_get_schema(grid_id: i64) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -678,7 +678,7 @@ pub fn volvox_grid_get_schema(grid_id: i64) -> Vec<u8> {
         grid_id,
         ..Default::default()
     };
-    match plugin.get_schema(req) {
+    match runtime.get_schema(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -694,10 +694,10 @@ pub fn volvox_grid_get_schema(grid_id: i64) -> Vec<u8> {
 
 #[wasm_bindgen]
 pub fn volvox_grid_define_rows_pb(data: &[u8]) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -708,7 +708,7 @@ pub fn volvox_grid_define_rows_pb(data: &[u8]) -> Vec<u8> {
             return Vec::new();
         }
     };
-    match plugin.define_rows(req) {
+    match runtime.define_rows(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -724,10 +724,10 @@ pub fn volvox_grid_define_rows_pb(data: &[u8]) -> Vec<u8> {
 
 #[wasm_bindgen]
 pub fn volvox_grid_insert_rows_pb(data: &[u8]) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -738,7 +738,7 @@ pub fn volvox_grid_insert_rows_pb(data: &[u8]) -> Vec<u8> {
             return Vec::new();
         }
     };
-    match plugin.insert_rows(req) {
+    match runtime.insert_rows(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -754,10 +754,10 @@ pub fn volvox_grid_insert_rows_pb(data: &[u8]) -> Vec<u8> {
 
 #[wasm_bindgen]
 pub fn volvox_grid_remove_rows(grid_id: i64, index: i32, count: i32) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -767,7 +767,7 @@ pub fn volvox_grid_remove_rows(grid_id: i64, index: i32, count: i32) -> Vec<u8> 
         count,
         ..Default::default()
     };
-    match plugin.remove_rows(req) {
+    match runtime.remove_rows(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -783,10 +783,10 @@ pub fn volvox_grid_remove_rows(grid_id: i64, index: i32, count: i32) -> Vec<u8> 
 
 #[wasm_bindgen]
 pub fn volvox_grid_move_column(grid_id: i64, col: i32, position: i32) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -796,7 +796,7 @@ pub fn volvox_grid_move_column(grid_id: i64, col: i32, position: i32) -> Vec<u8>
         position,
         ..Default::default()
     };
-    match plugin.move_column(req) {
+    match runtime.move_column(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -812,10 +812,10 @@ pub fn volvox_grid_move_column(grid_id: i64, col: i32, position: i32) -> Vec<u8>
 
 #[wasm_bindgen]
 pub fn volvox_grid_move_row(grid_id: i64, row: i32, position: i32) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -825,7 +825,7 @@ pub fn volvox_grid_move_row(grid_id: i64, row: i32, position: i32) -> Vec<u8> {
         position,
         ..Default::default()
     };
-    match plugin.move_row(req) {
+    match runtime.move_row(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -841,10 +841,10 @@ pub fn volvox_grid_move_row(grid_id: i64, row: i32, position: i32) -> Vec<u8> {
 
 #[wasm_bindgen]
 pub fn volvox_grid_update_cells_pb(data: &[u8]) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -855,7 +855,7 @@ pub fn volvox_grid_update_cells_pb(data: &[u8]) -> Vec<u8> {
             return Vec::new();
         }
     };
-    match plugin.update_cells(req) {
+    match runtime.update_cells(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -881,10 +881,10 @@ pub fn volvox_grid_get_cells(
     include_typed: bool,
     include_barcode_status: bool,
 ) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -900,7 +900,7 @@ pub fn volvox_grid_get_cells(
         include_barcode_status,
         ..Default::default()
     };
-    match plugin.get_cells(req) {
+    match runtime.get_cells(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -916,10 +916,10 @@ pub fn volvox_grid_get_cells(
 
 #[wasm_bindgen]
 pub fn volvox_grid_load_table_pb(data: &[u8]) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -930,7 +930,7 @@ pub fn volvox_grid_load_table_pb(data: &[u8]) -> Vec<u8> {
             return Vec::new();
         }
     };
-    match plugin.load_table(req) {
+    match runtime.load_table(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -946,10 +946,10 @@ pub fn volvox_grid_load_table_pb(data: &[u8]) -> Vec<u8> {
 
 #[wasm_bindgen]
 pub fn volvox_grid_load_data_pb(data: &[u8]) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -960,7 +960,7 @@ pub fn volvox_grid_load_data_pb(data: &[u8]) -> Vec<u8> {
             return Vec::new();
         }
     };
-    match plugin.load_data(req) {
+    match runtime.load_data(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -976,10 +976,10 @@ pub fn volvox_grid_load_data_pb(data: &[u8]) -> Vec<u8> {
 
 #[wasm_bindgen]
 pub fn volvox_grid_append_data_pb(data: &[u8]) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -990,7 +990,7 @@ pub fn volvox_grid_append_data_pb(data: &[u8]) -> Vec<u8> {
             return Vec::new();
         }
     };
-    match plugin.append_data(req) {
+    match runtime.append_data(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -1006,10 +1006,10 @@ pub fn volvox_grid_append_data_pb(data: &[u8]) -> Vec<u8> {
 
 #[wasm_bindgen]
 pub fn volvox_grid_clear(grid_id: i64, scope: i32, region: i32) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -1019,7 +1019,7 @@ pub fn volvox_grid_clear(grid_id: i64, scope: i32, region: i32) -> Vec<u8> {
         region,
         ..Default::default()
     };
-    match plugin.clear(req) {
+    match runtime.clear(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -1035,10 +1035,10 @@ pub fn volvox_grid_clear(grid_id: i64, scope: i32, region: i32) -> Vec<u8> {
 
 #[wasm_bindgen]
 pub fn volvox_grid_select_pb(data: &[u8]) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -1049,7 +1049,7 @@ pub fn volvox_grid_select_pb(data: &[u8]) -> Vec<u8> {
             return Vec::new();
         }
     };
-    match plugin.select(req) {
+    match runtime.select(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -1065,10 +1065,10 @@ pub fn volvox_grid_select_pb(data: &[u8]) -> Vec<u8> {
 
 #[wasm_bindgen]
 pub fn volvox_grid_get_selection(grid_id: i64) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -1076,7 +1076,7 @@ pub fn volvox_grid_get_selection(grid_id: i64) -> Vec<u8> {
         grid_id,
         ..Default::default()
     };
-    match plugin.get_selection(req) {
+    match runtime.get_selection(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -1092,10 +1092,10 @@ pub fn volvox_grid_get_selection(grid_id: i64) -> Vec<u8> {
 
 #[wasm_bindgen]
 pub fn volvox_grid_show_cell(grid_id: i64, row: i32, col: i32) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -1105,7 +1105,7 @@ pub fn volvox_grid_show_cell(grid_id: i64, row: i32, col: i32) -> Vec<u8> {
         col,
         ..Default::default()
     };
-    match plugin.show_cell(req) {
+    match runtime.show_cell(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -1121,10 +1121,10 @@ pub fn volvox_grid_show_cell(grid_id: i64, row: i32, col: i32) -> Vec<u8> {
 
 #[wasm_bindgen]
 pub fn volvox_grid_set_top_row(grid_id: i64, row: i32) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -1133,7 +1133,7 @@ pub fn volvox_grid_set_top_row(grid_id: i64, row: i32) -> Vec<u8> {
         row,
         ..Default::default()
     };
-    match plugin.set_top_row(req) {
+    match runtime.set_top_row(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -1149,10 +1149,10 @@ pub fn volvox_grid_set_top_row(grid_id: i64, row: i32) -> Vec<u8> {
 
 #[wasm_bindgen]
 pub fn volvox_grid_set_left_col(grid_id: i64, col: i32) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -1161,7 +1161,7 @@ pub fn volvox_grid_set_left_col(grid_id: i64, col: i32) -> Vec<u8> {
         col,
         ..Default::default()
     };
-    match plugin.set_left_col(req) {
+    match runtime.set_left_col(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -1177,10 +1177,10 @@ pub fn volvox_grid_set_left_col(grid_id: i64, col: i32) -> Vec<u8> {
 
 #[wasm_bindgen]
 pub fn volvox_grid_edit_pb(data: &[u8]) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -1191,7 +1191,7 @@ pub fn volvox_grid_edit_pb(data: &[u8]) -> Vec<u8> {
             return Vec::new();
         }
     };
-    match plugin.edit(req) {
+    match runtime.edit(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -1207,10 +1207,10 @@ pub fn volvox_grid_edit_pb(data: &[u8]) -> Vec<u8> {
 
 #[wasm_bindgen]
 pub fn volvox_grid_sort_pb(data: &[u8]) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -1221,7 +1221,7 @@ pub fn volvox_grid_sort_pb(data: &[u8]) -> Vec<u8> {
             return Vec::new();
         }
     };
-    match plugin.sort(req) {
+    match runtime.sort(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -1247,10 +1247,10 @@ pub fn volvox_grid_subtotal(
     add_outline: bool,
     font: &[u8],
 ) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -1272,7 +1272,7 @@ pub fn volvox_grid_subtotal(
         },
         ..Default::default()
     };
-    match plugin.subtotal(req) {
+    match runtime.subtotal(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -1294,10 +1294,10 @@ pub fn volvox_grid_auto_size(
     equal: bool,
     max_width: i32,
 ) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -1309,7 +1309,7 @@ pub fn volvox_grid_auto_size(
         max_width,
         ..Default::default()
     };
-    match plugin.auto_size(req) {
+    match runtime.auto_size(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -1325,10 +1325,10 @@ pub fn volvox_grid_auto_size(
 
 #[wasm_bindgen]
 pub fn volvox_grid_outline(grid_id: i64, level: i32) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -1337,7 +1337,7 @@ pub fn volvox_grid_outline(grid_id: i64, level: i32) -> Vec<u8> {
         level,
         ..Default::default()
     };
-    match plugin.outline(req) {
+    match runtime.outline(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -1353,10 +1353,10 @@ pub fn volvox_grid_outline(grid_id: i64, level: i32) -> Vec<u8> {
 
 #[wasm_bindgen]
 pub fn volvox_grid_get_node_pb(data: &[u8]) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -1367,7 +1367,7 @@ pub fn volvox_grid_get_node_pb(data: &[u8]) -> Vec<u8> {
             return Vec::new();
         }
     };
-    match plugin.get_node(req) {
+    match runtime.get_node(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -1383,10 +1383,10 @@ pub fn volvox_grid_get_node_pb(data: &[u8]) -> Vec<u8> {
 
 #[wasm_bindgen]
 pub fn volvox_grid_find_pb(data: &[u8]) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -1397,7 +1397,7 @@ pub fn volvox_grid_find_pb(data: &[u8]) -> Vec<u8> {
             return Vec::new();
         }
     };
-    match plugin.find(req) {
+    match runtime.find(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -1420,10 +1420,10 @@ pub fn volvox_grid_aggregate(
     row2: i32,
     col2: i32,
 ) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -1436,7 +1436,7 @@ pub fn volvox_grid_aggregate(
         col2,
         ..Default::default()
     };
-    match plugin.aggregate(req) {
+    match runtime.aggregate(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -1452,10 +1452,10 @@ pub fn volvox_grid_aggregate(
 
 #[wasm_bindgen]
 pub fn volvox_grid_get_merged_range(grid_id: i64, row: i32, col: i32) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -1465,7 +1465,7 @@ pub fn volvox_grid_get_merged_range(grid_id: i64, row: i32, col: i32) -> Vec<u8>
         col,
         ..Default::default()
     };
-    match plugin.get_merged_range(req) {
+    match runtime.get_merged_range(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -1481,10 +1481,10 @@ pub fn volvox_grid_get_merged_range(grid_id: i64, row: i32, col: i32) -> Vec<u8>
 
 #[wasm_bindgen]
 pub fn volvox_grid_merge_cells(grid_id: i64, range: &[u8]) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -1499,7 +1499,7 @@ pub fn volvox_grid_merge_cells(grid_id: i64, range: &[u8]) -> Vec<u8> {
         },
         ..Default::default()
     };
-    match plugin.merge_cells(req) {
+    match runtime.merge_cells(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -1515,10 +1515,10 @@ pub fn volvox_grid_merge_cells(grid_id: i64, range: &[u8]) -> Vec<u8> {
 
 #[wasm_bindgen]
 pub fn volvox_grid_unmerge_cells(grid_id: i64, range: &[u8]) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -1533,7 +1533,7 @@ pub fn volvox_grid_unmerge_cells(grid_id: i64, range: &[u8]) -> Vec<u8> {
         },
         ..Default::default()
     };
-    match plugin.unmerge_cells(req) {
+    match runtime.unmerge_cells(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -1549,10 +1549,10 @@ pub fn volvox_grid_unmerge_cells(grid_id: i64, range: &[u8]) -> Vec<u8> {
 
 #[wasm_bindgen]
 pub fn volvox_grid_get_merged_regions(grid_id: i64) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -1560,7 +1560,7 @@ pub fn volvox_grid_get_merged_regions(grid_id: i64) -> Vec<u8> {
         grid_id,
         ..Default::default()
     };
-    match plugin.get_merged_regions(req) {
+    match runtime.get_merged_regions(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -1576,10 +1576,10 @@ pub fn volvox_grid_get_merged_regions(grid_id: i64) -> Vec<u8> {
 
 #[wasm_bindgen]
 pub fn volvox_grid_get_memory_usage(grid_id: i64) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -1587,7 +1587,7 @@ pub fn volvox_grid_get_memory_usage(grid_id: i64) -> Vec<u8> {
         grid_id,
         ..Default::default()
     };
-    match plugin.get_memory_usage(req) {
+    match runtime.get_memory_usage(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -1603,10 +1603,10 @@ pub fn volvox_grid_get_memory_usage(grid_id: i64) -> Vec<u8> {
 
 #[wasm_bindgen]
 pub fn volvox_grid_clipboard_pb(data: &[u8]) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -1617,7 +1617,7 @@ pub fn volvox_grid_clipboard_pb(data: &[u8]) -> Vec<u8> {
             return Vec::new();
         }
     };
-    match plugin.clipboard(req) {
+    match runtime.clipboard(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -1633,10 +1633,10 @@ pub fn volvox_grid_clipboard_pb(data: &[u8]) -> Vec<u8> {
 
 #[wasm_bindgen]
 pub fn volvox_grid_export(grid_id: i64, format: i32, scope: i32) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -1646,7 +1646,7 @@ pub fn volvox_grid_export(grid_id: i64, format: i32, scope: i32) -> Vec<u8> {
         scope,
         ..Default::default()
     };
-    match plugin.export(req) {
+    match runtime.export(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -1662,10 +1662,10 @@ pub fn volvox_grid_export(grid_id: i64, format: i32, scope: i32) -> Vec<u8> {
 
 #[wasm_bindgen]
 pub fn volvox_grid_print_pb(data: &[u8]) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -1676,7 +1676,7 @@ pub fn volvox_grid_print_pb(data: &[u8]) -> Vec<u8> {
             return Vec::new();
         }
     };
-    match plugin.print(req) {
+    match runtime.print(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -1692,10 +1692,10 @@ pub fn volvox_grid_print_pb(data: &[u8]) -> Vec<u8> {
 
 #[wasm_bindgen]
 pub fn volvox_grid_archive(grid_id: i64, name: &str, action: i32, data: &[u8]) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -1706,7 +1706,7 @@ pub fn volvox_grid_archive(grid_id: i64, name: &str, action: i32, data: &[u8]) -
         data: data.to_vec(),
         ..Default::default()
     };
-    match plugin.archive(req) {
+    match runtime.archive(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -1722,10 +1722,10 @@ pub fn volvox_grid_archive(grid_id: i64, name: &str, action: i32, data: &[u8]) -
 
 #[wasm_bindgen]
 pub fn volvox_grid_resize_viewport(grid_id: i64, width: i32, height: i32) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -1735,7 +1735,7 @@ pub fn volvox_grid_resize_viewport(grid_id: i64, width: i32, height: i32) -> Vec
         height,
         ..Default::default()
     };
-    match plugin.resize_viewport(req) {
+    match runtime.resize_viewport(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -1751,10 +1751,10 @@ pub fn volvox_grid_resize_viewport(grid_id: i64, width: i32, height: i32) -> Vec
 
 #[wasm_bindgen]
 pub fn volvox_grid_set_redraw(grid_id: i64, enabled: bool) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -1763,7 +1763,7 @@ pub fn volvox_grid_set_redraw(grid_id: i64, enabled: bool) -> Vec<u8> {
         enabled,
         ..Default::default()
     };
-    match plugin.set_redraw(req) {
+    match runtime.set_redraw(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -1779,10 +1779,10 @@ pub fn volvox_grid_set_redraw(grid_id: i64, enabled: bool) -> Vec<u8> {
 
 #[wasm_bindgen]
 pub fn volvox_grid_refresh(grid_id: i64) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -1790,7 +1790,7 @@ pub fn volvox_grid_refresh(grid_id: i64) -> Vec<u8> {
         grid_id,
         ..Default::default()
     };
-    match plugin.refresh(req) {
+    match runtime.refresh(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -1806,10 +1806,10 @@ pub fn volvox_grid_refresh(grid_id: i64) -> Vec<u8> {
 
 #[wasm_bindgen]
 pub fn volvox_grid_load_demo(grid_id: i64, demo: &str) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -1818,7 +1818,7 @@ pub fn volvox_grid_load_demo(grid_id: i64, demo: &str) -> Vec<u8> {
         demo: demo.to_string(),
         ..Default::default()
     };
-    match plugin.load_demo(req) {
+    match runtime.load_demo(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -1834,10 +1834,10 @@ pub fn volvox_grid_load_demo(grid_id: i64, demo: &str) -> Vec<u8> {
 
 #[wasm_bindgen]
 pub fn volvox_grid_get_demo_data(demo: &str) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
+    let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
         None => {
-            set_last_error("plugin not registered".into());
+            set_last_error("runtime not registered".into());
             return Vec::new();
         }
     };
@@ -1845,7 +1845,7 @@ pub fn volvox_grid_get_demo_data(demo: &str) -> Vec<u8> {
         demo: demo.to_string(),
         ..Default::default()
     };
-    match plugin.get_demo_data(req) {
+    match runtime.get_demo_data(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
@@ -1865,8 +1865,8 @@ pub fn volvox_grid_get_demo_data(demo: &str) -> Vec<u8> {
 
 #[wasm_bindgen]
 pub fn volvox_grid_stream_open(method: &str) -> i64 {
-    if get_volvox_grid_service_plugin().is_none() {
-        set_last_error("plugin not registered".into());
+    if get_volvox_grid_service_runtime().is_none() {
+        set_last_error("runtime not registered".into());
         return -1;
     }
 

@@ -31,43 +31,43 @@ internal object NativeTextRendererBridge {
         ): ByteArray
     }
 
-    private val pluginHandleField by lazy {
+    private val runtimeHandleField by lazy {
         PluginHost::class.java.getDeclaredField("handle").apply { isAccessible = true }
     }
 
-    private fun pluginHandle(host: PluginHost): Long = pluginHandleField.getLong(host)
+    private fun runtimeHandle(host: PluginHost): Long = runtimeHandleField.getLong(host)
 
     fun hasBuiltinTextEngine(host: PluginHost): Boolean {
         return runCatching {
-            nativeHasBuiltinTextEngine(pluginHandle(host))
+            nativeHasBuiltinTextEngine(runtimeHandle(host))
         }.getOrDefault(true)
     }
 
     fun registerTextRenderer(host: PluginHost, gridId: Long, callback: Callback): Boolean {
         val rc = runCatching {
-            nativeRegisterTextRenderer(pluginHandle(host), gridId, callback)
+            nativeRegisterTextRenderer(runtimeHandle(host), gridId, callback)
         }.getOrElse { -1 }
         return rc == 0
     }
 
     fun clearTextRenderer(host: PluginHost, gridId: Long) {
         runCatching {
-            nativeClearTextRenderer(pluginHandle(host), gridId)
+            nativeClearTextRenderer(runtimeHandle(host), gridId)
         }
     }
 
     fun setCacheCap(host: PluginHost, gridId: Long, cap: Int) {
         runCatching {
-            nativeSetTextRendererCacheCap(pluginHandle(host), gridId, cap)
+            nativeSetTextRendererCacheCap(runtimeHandle(host), gridId, cap)
         }
     }
 
-    private external fun nativeHasBuiltinTextEngine(pluginHandle: Long): Boolean
+    private external fun nativeHasBuiltinTextEngine(runtimeHandle: Long): Boolean
     private external fun nativeRegisterTextRenderer(
-        pluginHandle: Long,
+        runtimeHandle: Long,
         gridId: Long,
         callback: Callback
     ): Int
-    private external fun nativeClearTextRenderer(pluginHandle: Long, gridId: Long): Int
-    private external fun nativeSetTextRendererCacheCap(pluginHandle: Long, gridId: Long, cap: Int)
+    private external fun nativeClearTextRenderer(runtimeHandle: Long, gridId: Long): Int
+    private external fun nativeSetTextRendererCacheCap(runtimeHandle: Long, gridId: Long, cap: Int)
 }

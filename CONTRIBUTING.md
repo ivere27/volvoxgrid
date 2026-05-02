@@ -53,7 +53,7 @@ Examples:
 - `engine: optimize cell rendering performance`
 - `flutter: add support for custom cell editors`
 - `web: fix wasm memory leak in grid disposal`
-- `plugin: update ffi bindings for new proto fields`
+- `runtime: update ffi bindings for new proto fields`
 
 ### Pull Request Guidelines
 
@@ -81,7 +81,7 @@ Examples:
 git clone https://github.com/ivere27/volvoxgrid.git
 cd volvoxgrid
 
-# Build Engine & Plugin (Debug)
+# Build Engine & Runtime (Debug)
 make build
 
 # Run Smoke Test
@@ -97,7 +97,7 @@ make web
 # Requires connected Android device or emulator
 make flutter-run
 
-# Run GTK4 Plugin-Host Visual Test (Linux)
+# Run GTK4 Runtime-Host Visual Test (Linux)
 make gtk-test
 
 # Run Go TUI Example
@@ -115,10 +115,10 @@ make java-tui-run
 ```
 volvoxgrid/
 ├── engine/          # Core grid logic (Rust)
-├── plugin/          # Synurang FFI plugin wrapper (Rust)
+├── runtime/          # Synurang FFI runtime wrapper (Rust)
 ├── proto/           # Protobuf definitions
 ├── codegen/         # Generated FFI bindings
-├── flutter/         # Flutter plugin & example app
+├── flutter/         # Flutter runtime & example app
 ├── android/         # Android wrapper & example
 ├── java/            # Java desktop wrapper & TUI example
 │   ├── common/
@@ -140,7 +140,7 @@ volvoxgrid/
 │   ├── vsflexgrid/  # ActiveX control (Windows)
 │   ├── xtragrid/    # XtraGrid adapter
 │   └── report/      # Report adapter
-├── gtk-test/        # GTK4 plugin-host visual test harness
+├── gtk-test/        # GTK4 library-host visual test harness
 ├── smoke-test/      # CLI smoke test
 ├── docker/          # Reproducible packaging
 ├── scripts/         # Build and utility scripts
@@ -152,11 +152,11 @@ volvoxgrid/
 ## Testing
 
 - **Unit Tests**: Run `make test` to run Rust unit tests in the `engine` crate.
-- **Smoke Test**: Run `make run` to verify the plugin works with the Rust host.
+- **Smoke Test**: Run `make run` to verify the native library works with the Rust host.
 - **Integration**:
     - **Flutter**: Run the example app via `make flutter-run`.
     - **Web**: Run the web demo via `make web`.
-    - **GTK**: Run the GTK plugin-host harness via `make gtk-test` to visually verify the native FFI path on Linux.
+    - **GTK**: Run the GTK library-host harness via `make gtk-test` to visually verify the native FFI path on Linux.
 
 ## Questions?
 

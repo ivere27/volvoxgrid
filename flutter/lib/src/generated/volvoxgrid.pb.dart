@@ -15167,7 +15167,7 @@ class SetColRequest extends $pb.GeneratedMessage {
 
 /// Enable/disable rendering. When transitioning from disabled to enabled,
 /// the engine suppresses the next animation frame and forces an immediate
-/// dirty repaint (plugin/src/lib.rs SetRedraw). Useful for batching many
+/// dirty repaint (runtime/src/lib.rs SetRedraw). Useful for batching many
 /// mutations without intermediate renders.
 class SetRedrawRequest extends $pb.GeneratedMessage {
   factory SetRedrawRequest({
@@ -17524,8 +17524,8 @@ class KeyEvent extends $pb.GeneratedMessage {
 
 /// CPU rendering: host provides an RGBA buffer for the engine to render into.
 /// The engine writes pixels in RGBA byte order (R at offset+0, G+1, B+2, A+3).
-/// The plugin maps the buffer via `handle` as a raw pointer and calls the CPU
-/// renderer. See plugin/src/lib.rs BufferReady handling.
+/// The runtime maps the buffer via `handle` as a raw pointer and calls the CPU
+/// renderer. See runtime/src/lib.rs BufferReady handling.
 class BufferReady extends $pb.GeneratedMessage {
   factory BufferReady({
     $fixnum.Int64? handle,
@@ -17932,8 +17932,8 @@ class TerminalCommand extends $pb.GeneratedMessage {
 }
 
 /// GPU rendering: host provides a native surface for wgpu.
-/// handle=0 means surface destroyed. See plugin/src/lib.rs GpuSurfaceReady.
-/// If GPU initialization fails, the plugin falls back to CPU mode silently.
+/// handle=0 means surface destroyed. See runtime/src/lib.rs GpuSurfaceReady.
+/// If GPU initialization fails, the runtime falls back to CPU mode silently.
 class GpuSurfaceReady extends $pb.GeneratedMessage {
   factory GpuSurfaceReady({
     $fixnum.Int64? surfaceHandle,
@@ -18791,7 +18791,7 @@ class CursorChange extends $pb.GeneratedMessage {
 /// Emitted on RenderOutput when the engine wants the host to show an
 /// edit overlay. The host should position a native text input at (x,y)
 /// with the given dimensions and pre-fill it with current_value.
-/// See plugin/src/lib.rs build_edit_request().
+/// See runtime/src/lib.rs build_edit_request().
 class EditRequest extends $pb.GeneratedMessage {
   factory EditRequest({
     $core.int? row,

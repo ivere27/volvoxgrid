@@ -126,7 +126,7 @@ Or use the `<volvox-grid>` custom element:
 
 ```yaml
 dependencies:
-  volvoxgrid: ^0.8.4
+  volvoxgrid: ^0.8.5
 ```
 
 ```dart
@@ -148,7 +148,7 @@ VolvoxGridWidget(controller: controller)
 
 ```kotlin
 dependencies {
-    implementation("io.github.ivere27:volvoxgrid-desktop:0.8.4")
+    implementation("io.github.ivere27:volvoxgrid-desktop:0.8.5")
 }
 ```
 
@@ -164,7 +164,7 @@ ctrl.setCellText(0, 0, "Widget A");
 
 ## Packages
 
-Examples below use `0.8.4`. Replace it with the release you want to consume.
+Examples below use `0.8.5`. Replace it with the release you want to consume.
 
 ### Maven / Gradle
 
@@ -172,8 +172,8 @@ Android:
 
 ```kotlin
 dependencies {
-    implementation("io.github.ivere27:volvoxgrid-android:0.8.4")
-    // or: implementation("io.github.ivere27:volvoxgrid-android-lite:0.8.4")
+    implementation("io.github.ivere27:volvoxgrid-android:0.8.5")
+    // or: implementation("io.github.ivere27:volvoxgrid-android-lite:0.8.5")
 }
 ```
 
@@ -185,7 +185,7 @@ repositories {
 }
 
 dependencies {
-    implementation("io.github.ivere27:volvoxgrid-desktop:0.8.4")
+    implementation("io.github.ivere27:volvoxgrid-desktop:0.8.5")
 }
 ```
 
@@ -198,7 +198,7 @@ Platform docs:
 
 ```yaml
 dependencies:
-  volvoxgrid: ^0.8.4
+  volvoxgrid: ^0.8.5
 ```
 
 The Flutter package resolves Android and desktop native binaries from Maven Central at build time. See [flutter/README.md](flutter/README.md).
@@ -215,7 +215,7 @@ See [web/js/README.md](web/js/README.md) for the web package API and [GUI.md](GU
 
 ### Go
 
-The Go package provides a TUI host and client API for the native plugin. It is not published to a module proxy yet; use it from the repo:
+The Go package provides a TUI host and client API for the native library. It is not published to a module proxy yet; use it from the repo:
 
 ```go
 import (
@@ -234,7 +234,7 @@ The managed wrapper package ID is `VolvoxGrid.DotNet`. The repo currently docume
 dotnet pack dotnet/src/VolvoxGrid.DotNet.csproj -c Release
 ```
 
-The native `volvoxgrid_plugin` library is still a runtime dependency.
+The native `volvoxgrid` library is still a library dependency.
 
 ## Documents
 

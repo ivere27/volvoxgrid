@@ -6,7 +6,7 @@ set -euo pipefail
 
 REPO_ROOT="${REPO_ROOT:-$(pwd)}"
 TARGET="${WEB_DOCKER_TARGET:-all}"
-VERSION="${VOLVOXGRID_VERSION:-${VERSION:-0.8.4}}"
+VERSION="${VOLVOXGRID_VERSION:-${VERSION:-0.8.5}}"
 WASM_DIST_ROOT="${REPO_ROOT}/dist/wasm"
 WASM_LITE_DIST_ROOT="${REPO_ROOT}/dist/wasm-lite"
 WEB_DIST_ROOT="${REPO_ROOT}/dist/web"
@@ -89,8 +89,8 @@ write_sheet_demo_index() {
 
     async function main() {
       await init();
-      if (typeof wasm.init_v1_plugin === "function") {
-        wasm.init_v1_plugin();
+      if (typeof wasm.init_v1_runtime === "function") {
+        wasm.init_v1_runtime();
       }
 
       const sheet = new VolvoxSheet({

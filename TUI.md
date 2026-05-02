@@ -1,6 +1,6 @@
 # TUI
 
-VolvoxGrid TUI is the terminal-host path for VolvoxGrid. It uses the same grid engine, grid state, and plugin service as the pixel-rendered hosts, but targets terminal cells or ANSI byte streams instead of RGBA buffers.
+VolvoxGrid TUI is the terminal-host path for VolvoxGrid. It uses the same grid engine, grid state, and runtime service as the pixel-rendered hosts, but targets terminal cells or ANSI byte streams instead of RGBA buffers.
 
 This document is for developers who want to:
 
@@ -15,11 +15,11 @@ The TUI stack follows a small set of design rules.
 
 ### One grid engine
 
-There is no separate terminal-only grid model. TUI uses the same `VolvoxGrid` state and the same plugin service as the desktop, web, and mobile-style hosts. Selection, editing, sorting, layout, scrolling, and data loading stay in the shared engine path.
+There is no separate terminal-only grid model. TUI uses the same `VolvoxGrid` state and the same runtime service as the desktop, web, and mobile-style hosts. Selection, editing, sorting, layout, scrolling, and data loading stay in the shared engine path.
 
 ### Thin hosts
 
-Terminal hosts should stay narrow. A host is responsible for terminal setup and application chrome. The plugin is responsible for terminal parsing, grid event translation, rendering, and output encoding.
+Terminal hosts should stay narrow. A host is responsible for terminal setup and application chrome. The runtime is responsible for terminal parsing, grid event translation, rendering, and output encoding.
 
 ### Viewport-based embedding
 
@@ -38,7 +38,7 @@ The terminal byte-stream path keeps previous frame state and emits only changed 
 At a high level, the stack is split into three layers:
 
 1. Engine TUI renderer
-2. Plugin session and terminal protocol logic
+2. Runtime session and terminal protocol logic
 3. Language-specific terminal hosts and sample apps
 
 The ownership split is intentional.
@@ -52,7 +52,7 @@ Host responsibilities:
 - decide where the grid viewport lives
 - draw app-level chrome outside the grid viewport
 
-Plugin responsibilities:
+Runtime responsibilities:
 
 - parse terminal escape sequences
 - translate decoded input into grid events
@@ -84,7 +84,7 @@ The host:
 - provides a byte buffer through `BufferReady`
 - writes the returned bytes to stdout
 
-The plugin:
+The runtime:
 
 - parses the input stream
 - renders the grid
@@ -129,12 +129,12 @@ Core responsibilities:
 
 This layer knows how to paint a terminal-shaped surface. It does not know how stdin bytes are read or how ANSI mouse escape sequences are parsed.
 
-### 2. Plugin session layer
+### 2. Runtime session layer
 
 Primary files:
 
-- `plugin/src/terminal_tui.rs`
-- `plugin/src/lib.rs`
+- `runtime/src/terminal_tui.rs`
+- `runtime/src/lib.rs`
 
 This layer connects terminal behavior to the shared render session.
 
@@ -226,7 +226,7 @@ If `required_capacity` is larger than the supplied host buffer, the host should 
 
 ## Input Model
 
-The host forwards raw terminal bytes. The plugin parser turns those bytes into regular grid-facing events.
+The host forwards raw terminal bytes. The runtime parser turns those bytes into regular grid-facing events.
 
 Supported input categories include:
 
@@ -237,7 +237,7 @@ Supported input categories include:
 - focus notifications
 - bracketed paste
 
-After decoding, the plugin maps those events into the same grid input handlers used by non-terminal hosts.
+After decoding, the runtime maps those events into the same grid input handlers used by non-terminal hosts.
 
 ## Terminal Navigation And Edit Policy
 
@@ -250,7 +250,7 @@ Built-in behavior:
 - `h`, `j`, `k`, `l` map to arrow navigation
 - printable characters are not blindly forwarded when auto-start edit is off
 
-This policy lives in the plugin TUI session layer. It is intentionally shared across hosts, but it is not yet exposed as a clean standalone public configuration surface.
+This policy lives in the runtime TUI session layer. It is intentionally shared across hosts, but it is not yet exposed as a clean standalone public configuration surface.
 
 ## Layout Model
 
@@ -273,7 +273,7 @@ The renderer is viewport-aware:
 
 That means the host can keep status lines or prompts outside the grid while the grid continues to render in local coordinates inside its rectangle.
 
-For the ANSI thin-host path, the plugin uses a transparent background mode so the host terminal theme can remain visible where the grid does not need to paint an explicit background.
+For the ANSI thin-host path, the runtime uses a transparent background mode so the host terminal theme can remain visible where the grid does not need to paint an explicit background.
 
 ## End-To-End Flow
 
@@ -287,7 +287,7 @@ stdin bytes / resize / capability detection
          terminal_viewport
          terminal_input
          buffer
-    -> plugin render_session
+    -> runtime render_session
     -> terminal parser + TUI session
     -> engine TuiRenderer
     -> ANSI diff encoder
@@ -300,7 +300,7 @@ Raw-cell flow:
 ```text
 host-owned TuiCell buffer
     -> BufferReady(handle, stride, width, height)
-    -> plugin render_session
+    -> runtime render_session
     -> engine TuiRenderer
     -> FrameDone(dirty rect)
 ```
@@ -315,7 +315,7 @@ Recommended responsibilities:
 
 - keep terminal mode handling in the host
 - keep prompts, footers, and debug overlays in the host
-- treat the plugin as the owner of escape parsing and grid rendering
+- treat the runtime as the owner of escape parsing and grid rendering
 - reserve a viewport for the grid instead of teaching the grid about app chrome
 
 ### If you are building a custom terminal renderer
@@ -327,7 +327,7 @@ Use the raw-cell path if you need:
 - a non-ANSI transport
 - tight integration with another terminal UI framework
 
-In that model, the host owns presentation and the plugin only fills cell buffers.
+In that model, the host owns presentation and the runtime only fills cell buffers.
 
 ## Repo Examples
 
@@ -390,8 +390,8 @@ Useful implementation constraints to keep in mind:
 If you are modifying the TUI stack, start here:
 
 1. `engine/src/canvas_tui.rs`
-2. `plugin/src/terminal_tui.rs`
-3. `plugin/src/lib.rs`
+2. `runtime/src/terminal_tui.rs`
+3. `runtime/src/lib.rs`
 4. the host wrapper for your language:
    - `go/pkg/volvoxgrid/tui`
    - `dotnet/src/common/VolvoxGridTerminal.cs`

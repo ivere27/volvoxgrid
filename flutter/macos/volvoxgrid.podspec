@@ -4,7 +4,7 @@
 #
 Pod::Spec.new do |s|
   s.name             = 'volvoxgrid'
-  s.version          = '0.8.4'
+  s.version          = '0.8.5'
   s.summary          = 'VolvoxGrid pixel-rendering grid widget for Flutter.'
   s.description      = <<-DESC
 VolvoxGrid pixel-rendering grid widget for Flutter.
@@ -15,7 +15,7 @@ VolvoxGrid pixel-rendering grid widget for Flutter.
 
   s.source           = { :path => '.' }
   s.source_files     = 'Classes/**/*'
-  s.vendored_libraries = 'x64/libvolvoxgrid_plugin.dylib'
+  s.vendored_libraries = 'x64/libvolvoxgrid.dylib'
 
   s.dependency 'FlutterMacOS'
 
@@ -31,9 +31,9 @@ VolvoxGrid pixel-rendering grid widget for Flutter.
     :script => <<-SCRIPT
 set -eu
 PACKAGE_ROOT="${PODS_TARGET_SRCROOT}"
-PLUGIN_ROOT="${PACKAGE_ROOT}/.."
+REPO_ROOT="${PACKAGE_ROOT}/.."
 VOLVOXGRID_SOURCE="${VOLVOXGRID_SOURCE:-maven}"
-VOLVOXGRID_VERSION="${VOLVOXGRID_VERSION:-0.8.4}"
+VOLVOXGRID_VERSION="${VOLVOXGRID_VERSION:-0.8.5}"
 
 if [ "${VOLVOXGRID_SOURCE}" != "maven" ]; then
   exit 0
@@ -45,8 +45,8 @@ case "${VOLVOXGRID_VERSION}" in
   *-SNAPSHOT) EXTRA_ARGS="--refresh-dependencies" ;;
 esac
 
-if [ -x "${PLUGIN_ROOT}/android/gradlew" ]; then
-  "${PLUGIN_ROOT}/android/gradlew" -p "${GRADLE_DIR}" -PvolvoxgridVersion="${VOLVOXGRID_VERSION}" ${EXTRA_ARGS} copyNative
+if [ -x "${REPO_ROOT}/android/gradlew" ]; then
+  "${REPO_ROOT}/android/gradlew" -p "${GRADLE_DIR}" -PvolvoxgridVersion="${VOLVOXGRID_VERSION}" ${EXTRA_ARGS} copyNative
 elif command -v gradle >/dev/null 2>&1; then
   gradle -p "${GRADLE_DIR}" -PvolvoxgridVersion="${VOLVOXGRID_VERSION}" ${EXTRA_ARGS} copyNative
 else

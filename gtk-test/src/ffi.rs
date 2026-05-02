@@ -13,7 +13,7 @@ type StreamRecvFunc = unsafe extern "C" fn(u64, *mut i32, *mut i32) -> *mut u8;
 type StreamCloseSendFunc = unsafe extern "C" fn(u64);
 type StreamCloseFunc = unsafe extern "C" fn(u64);
 
-pub struct PluginLibrary {
+pub struct RuntimeLibrary {
     handle: *mut libc::c_void,
     free_fn: FreeFunc,
     invoke_fn: InvokeFunc,
@@ -24,21 +24,21 @@ pub struct PluginLibrary {
     stream_close_fn: StreamCloseFunc,
 }
 
-pub struct PluginStream {
-    plugin: Arc<PluginLibrary>,
+pub struct RuntimeStream {
+    runtime: Arc<RuntimeLibrary>,
     handle: u64,
     closed: AtomicBool,
     send_lock: Mutex<()>,
 }
 
-unsafe impl Send for PluginLibrary {}
-unsafe impl Sync for PluginLibrary {}
-unsafe impl Send for PluginStream {}
-unsafe impl Sync for PluginStream {}
+unsafe impl Send for RuntimeLibrary {}
+unsafe impl Sync for RuntimeLibrary {}
+unsafe impl Send for RuntimeStream {}
+unsafe impl Sync for RuntimeStream {}
 
-impl PluginLibrary {
+impl RuntimeLibrary {
     pub fn load(path: &str) -> Result<Arc<Self>, String> {
-        let c_path = CString::new(path).map_err(|_| format!("invalid plugin path: {path}"))?;
+        let c_path = CString::new(path).map_err(|_| format!("invalid library path: {path}"))?;
         let handle = unsafe { libc::dlopen(c_path.as_ptr(), libc::RTLD_LAZY) };
         if handle.is_null() {
             return Err(last_dlerror().unwrap_or_else(|| "dlopen failed".to_string()));
@@ -131,7 +131,7 @@ impl PluginLibrary {
             if resp_len == 0 {
                 return Ok(Vec::new());
             }
-            return Err(format!("plugin returned null for {method}"));
+            return Err(format!("runtime returned null for {method}"));
         }
 
         let copy_len = if resp_len < 0 { -resp_len } else { resp_len } as usize;
@@ -145,15 +145,15 @@ impl PluginLibrary {
         Ok(result)
     }
 
-    pub fn open_stream(self: &Arc<Self>, method: &str) -> Result<Arc<PluginStream>, String> {
+    pub fn open_stream(self: &Arc<Self>, method: &str) -> Result<Arc<RuntimeStream>, String> {
         let c_method = CString::new(method).map_err(|_| format!("invalid method: {method}"))?;
         let handle = unsafe { (self.stream_open_fn)(c_method.as_ptr()) };
         if handle == 0 {
             return Err(format!("failed to open stream for {method}"));
         }
 
-        Ok(Arc::new(PluginStream {
-            plugin: Arc::clone(self),
+        Ok(Arc::new(RuntimeStream {
+            runtime: Arc::clone(self),
             handle,
             closed: AtomicBool::new(false),
             send_lock: Mutex::new(()),
@@ -161,7 +161,7 @@ impl PluginLibrary {
     }
 }
 
-impl Drop for PluginLibrary {
+impl Drop for RuntimeLibrary {
     fn drop(&mut self) {
         unsafe {
             libc::dlclose(self.handle);
@@ -169,7 +169,7 @@ impl Drop for PluginLibrary {
     }
 }
 
-impl PluginStream {
+impl RuntimeStream {
     pub fn send_raw(&self, data: &[u8]) -> Result<(), String> {
         if self.closed.load(Ordering::SeqCst) {
             return Err("stream is closed".to_string());
@@ -177,7 +177,7 @@ impl PluginStream {
 
         let _guard = self.send_lock.lock().unwrap();
         let rc = unsafe {
-            (self.plugin.stream_send_fn)(
+            (self.runtime.stream_send_fn)(
                 self.handle,
                 if data.is_empty() {
                     std::ptr::null()
@@ -200,7 +200,8 @@ impl PluginStream {
 
         let mut resp_len = 0i32;
         let mut status = 0i32;
-        let resp = unsafe { (self.plugin.stream_recv_fn)(self.handle, &mut resp_len, &mut status) };
+        let resp =
+            unsafe { (self.runtime.stream_recv_fn)(self.handle, &mut resp_len, &mut status) };
 
         match status {
             0 => {
@@ -208,16 +209,16 @@ impl PluginStream {
                     if resp_len == 0 {
                         return Ok(Some(Vec::new()));
                     }
-                    return Err("plugin returned null stream payload".to_string());
+                    return Err("runtime returned null stream payload".to_string());
                 }
                 let result =
                     unsafe { std::slice::from_raw_parts(resp, resp_len as usize).to_vec() };
-                unsafe { (self.plugin.free_fn)(resp) };
+                unsafe { (self.runtime.free_fn)(resp) };
                 Ok(Some(result))
             }
             1 => {
                 if !resp.is_null() {
-                    unsafe { (self.plugin.free_fn)(resp) };
+                    unsafe { (self.runtime.free_fn)(resp) };
                 }
                 Ok(None)
             }
@@ -225,17 +226,17 @@ impl PluginStream {
                 if !resp.is_null() && resp_len > 0 {
                     let payload =
                         unsafe { std::slice::from_raw_parts(resp, resp_len as usize).to_vec() };
-                    unsafe { (self.plugin.free_fn)(resp) };
+                    unsafe { (self.runtime.free_fn)(resp) };
                     return Err(format_ffi_error(&payload));
                 }
                 if !resp.is_null() {
-                    unsafe { (self.plugin.free_fn)(resp) };
+                    unsafe { (self.runtime.free_fn)(resp) };
                 }
-                Err(format!("plugin stream error {code}"))
+                Err(format!("runtime stream error {code}"))
             }
             code => {
                 if !resp.is_null() {
-                    unsafe { (self.plugin.free_fn)(resp) };
+                    unsafe { (self.runtime.free_fn)(resp) };
                 }
                 Err(format!("stream transport error {code}"))
             }
@@ -244,7 +245,7 @@ impl PluginStream {
 
     pub fn close_send(&self) {
         if !self.closed.load(Ordering::SeqCst) {
-            unsafe { (self.plugin.stream_close_send_fn)(self.handle) };
+            unsafe { (self.runtime.stream_close_send_fn)(self.handle) };
         }
     }
 
@@ -253,19 +254,19 @@ impl PluginStream {
             return;
         }
         unsafe {
-            (self.plugin.stream_close_fn)(self.handle);
+            (self.runtime.stream_close_fn)(self.handle);
         }
     }
 }
 
-impl Drop for PluginStream {
+impl Drop for RuntimeStream {
     fn drop(&mut self) {
         self.close();
     }
 }
 
-pub fn resolve_default_plugin_path() -> String {
-    if let Ok(path) = std::env::var("VOLVOXGRID_PLUGIN_PATH") {
+pub fn resolve_default_library_path() -> String {
+    if let Ok(path) = std::env::var("VOLVOXGRID_LIBRARY_PATH") {
         let trimmed = path.trim();
         if !trimmed.is_empty() {
             return trimmed.to_string();
@@ -273,21 +274,21 @@ pub fn resolve_default_plugin_path() -> String {
     }
 
     let candidates = [
-        "target/debug/libvolvoxgrid_plugin.so",
-        "target/release/libvolvoxgrid_plugin.so",
-        "../target/debug/libvolvoxgrid_plugin.so",
-        "../target/release/libvolvoxgrid_plugin.so",
-        "plugin/target/debug/libvolvoxgrid_plugin.so",
-        "plugin/target/release/libvolvoxgrid_plugin.so",
-        "../plugin/target/debug/libvolvoxgrid_plugin.so",
-        "../plugin/target/release/libvolvoxgrid_plugin.so",
+        "target/debug/libvolvoxgrid.so",
+        "target/release/libvolvoxgrid.so",
+        "../target/debug/libvolvoxgrid.so",
+        "../target/release/libvolvoxgrid.so",
+        "runtime/target/debug/libvolvoxgrid.so",
+        "runtime/target/release/libvolvoxgrid.so",
+        "../runtime/target/debug/libvolvoxgrid.so",
+        "../runtime/target/release/libvolvoxgrid.so",
     ];
     for candidate in candidates {
         if Path::new(candidate).exists() {
             return candidate.to_string();
         }
     }
-    "target/debug/libvolvoxgrid_plugin.so".to_string()
+    "target/debug/libvolvoxgrid.so".to_string()
 }
 
 fn lookup_symbol<T>(handle: *mut libc::c_void, name: &str) -> Result<T, String> {

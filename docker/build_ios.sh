@@ -3,7 +3,7 @@ set -euo pipefail
 
 # iOS static library build script — runs inside Docker (Dockerfile.ios).
 #
-# Cross-compiles the Rust volvoxgrid plugin as a static library (.a) for
+# Cross-compiles the Rust volvoxgrid native library as a static library (.a) for
 # iOS device (arm64) and simulator (arm64 + x86_64), then creates an
 # XCFramework-style directory layout.
 #
@@ -11,7 +11,7 @@ set -euo pipefail
 
 REPO_ROOT="${REPO_ROOT:-$(pwd)}"
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-${REPO_ROOT}/target}"
-VERSION="${VERSION:-0.8.4}"
+VERSION="${VERSION:-0.8.5}"
 GIT_COMMIT="${GIT_COMMIT:-$(git -C "${REPO_ROOT}" rev-parse --short=12 HEAD 2>/dev/null || echo unknown)}"
 BUILD_DATE="${BUILD_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
 DIST_DIR="${DIST_DIR:-${REPO_ROOT}/dist/ios}"
@@ -43,9 +43,9 @@ export VOLVOXGRID_VERSION="${VOLVOXGRID_VERSION:-${VERSION}}"
 export VOLVOXGRID_GIT_COMMIT="${VOLVOXGRID_GIT_COMMIT:-${GIT_COMMIT}}"
 export VOLVOXGRID_BUILD_DATE="${VOLVOXGRID_BUILD_DATE:-${BUILD_DATE}}"
 
-PLUGIN_CRATE="${REPO_ROOT}/plugin"
-if [[ ! -f "${PLUGIN_CRATE}/Cargo.toml" ]]; then
-  echo "Error: plugin crate not found at ${PLUGIN_CRATE}" >&2
+LIBRARY_CRATE="${REPO_ROOT}/runtime"
+if [[ ! -f "${LIBRARY_CRATE}/Cargo.toml" ]]; then
+  echo "Error: native library crate not found at ${LIBRARY_CRATE}" >&2
   exit 1
 fi
 
@@ -55,25 +55,25 @@ trap cleanup EXIT
 
 # ── Build static libraries for each iOS target ─────────────────────────────
 
-echo "Building plugin: aarch64-apple-ios (device, staticlib)..."
-(cd "${PLUGIN_CRATE}" && cargo rustc -j "${CARGO_BUILD_JOBS}" --release --lib --target aarch64-apple-ios --crate-type staticlib)
-DEVICE_LIB="${CARGO_TARGET_DIR}/aarch64-apple-ios/release/libvolvoxgrid_plugin.a"
+echo "Building library: aarch64-apple-ios (device, staticlib)..."
+(cd "${LIBRARY_CRATE}" && cargo rustc -j "${CARGO_BUILD_JOBS}" --release --lib --target aarch64-apple-ios --crate-type staticlib)
+DEVICE_LIB="${CARGO_TARGET_DIR}/aarch64-apple-ios/release/libvolvoxgrid.a"
 if [[ ! -f "${DEVICE_LIB}" ]]; then
   echo "Error: device static lib not found: ${DEVICE_LIB}" >&2
   exit 1
 fi
 
-echo "Building plugin: aarch64-apple-ios-sim (simulator arm64, staticlib)..."
-(cd "${PLUGIN_CRATE}" && cargo rustc -j "${CARGO_BUILD_JOBS}" --release --lib --target aarch64-apple-ios-sim --crate-type staticlib)
-SIM_ARM64_LIB="${CARGO_TARGET_DIR}/aarch64-apple-ios-sim/release/libvolvoxgrid_plugin.a"
+echo "Building library: aarch64-apple-ios-sim (simulator arm64, staticlib)..."
+(cd "${LIBRARY_CRATE}" && cargo rustc -j "${CARGO_BUILD_JOBS}" --release --lib --target aarch64-apple-ios-sim --crate-type staticlib)
+SIM_ARM64_LIB="${CARGO_TARGET_DIR}/aarch64-apple-ios-sim/release/libvolvoxgrid.a"
 if [[ ! -f "${SIM_ARM64_LIB}" ]]; then
   echo "Error: simulator arm64 static lib not found: ${SIM_ARM64_LIB}" >&2
   exit 1
 fi
 
-echo "Building plugin: x86_64-apple-ios (simulator x86_64, staticlib)..."
-(cd "${PLUGIN_CRATE}" && cargo rustc -j "${CARGO_BUILD_JOBS}" --release --lib --target x86_64-apple-ios --crate-type staticlib)
-SIM_X64_LIB="${CARGO_TARGET_DIR}/x86_64-apple-ios/release/libvolvoxgrid_plugin.a"
+echo "Building library: x86_64-apple-ios (simulator x86_64, staticlib)..."
+(cd "${LIBRARY_CRATE}" && cargo rustc -j "${CARGO_BUILD_JOBS}" --release --lib --target x86_64-apple-ios --crate-type staticlib)
+SIM_X64_LIB="${CARGO_TARGET_DIR}/x86_64-apple-ios/release/libvolvoxgrid.a"
 if [[ ! -f "${SIM_X64_LIB}" ]]; then
   echo "Error: simulator x86_64 static lib not found: ${SIM_X64_LIB}" >&2
   exit 1
@@ -81,7 +81,7 @@ fi
 
 # ── Create simulator universal binary ───────────────────────────────────────
 echo "Creating simulator universal binary (arm64 + x86_64)..."
-SIM_UNIVERSAL="${WORK_DIR}/libvolvoxgrid_plugin_sim.a"
+SIM_UNIVERSAL="${WORK_DIR}/libvolvoxgrid_sim.a"
 
 # Use ar to merge both archives into one
 SIM_MERGE_DIR="${WORK_DIR}/sim-merge"
@@ -99,24 +99,24 @@ ar crs "${SIM_UNIVERSAL}" "${SIM_MERGE_DIR}/arm64"/*.o "${SIM_MERGE_DIR}/x86_64"
 
 # ── Create XCFramework structure ────────────────────────────────────────────
 echo "Creating XCFramework directory structure..."
-XCFW_DIR="${DIST_DIR}/VolvoxGridPlugin.xcframework"
+XCFW_DIR="${DIST_DIR}/VolvoxGrid.xcframework"
 rm -rf "${XCFW_DIR}"
 
 # Device slice
 DEVICE_DIR="${XCFW_DIR}/ios-arm64"
 mkdir -p "${DEVICE_DIR}"
-cp "${DEVICE_LIB}" "${DEVICE_DIR}/libvolvoxgrid_plugin.a"
+cp "${DEVICE_LIB}" "${DEVICE_DIR}/libvolvoxgrid.a"
 
 # Simulator slice (universal arm64 + x86_64)
 SIM_DIR="${XCFW_DIR}/ios-arm64_x86_64-simulator"
 mkdir -p "${SIM_DIR}"
-cp "${SIM_UNIVERSAL}" "${SIM_DIR}/libvolvoxgrid_plugin.a"
+cp "${SIM_UNIVERSAL}" "${SIM_DIR}/libvolvoxgrid.a"
 
 # ── Generate C header ──────────────────────────────────────────────────────
-HEADER_FILE="${DIST_DIR}/volvoxgrid_plugin.h"
+HEADER_FILE="${DIST_DIR}/volvoxgrid.h"
 cat > "${HEADER_FILE}" <<'HEADER'
-#ifndef VOLVOXGRID_PLUGIN_H
-#define VOLVOXGRID_PLUGIN_H
+#ifndef VOLVOXGRID_H
+#define VOLVOXGRID_H
 
 #include <stdint.h>
 #include <stddef.h>
@@ -125,23 +125,21 @@ cat > "${HEADER_FILE}" <<'HEADER'
 extern "C" {
 #endif
 
-// Synurang FFI plugin entry points
-int32_t synurang_plugin_call(
-    int32_t service_id,
-    int32_t method_id,
-    const uint8_t *input_buf,
-    size_t input_len,
-    uint8_t **output_buf,
-    size_t *output_len
+// Synurang FFI runtime entry points.
+char *Synurang_Invoke_VolvoxGridService(
+    const char *method,
+    const char *data,
+    int32_t data_len,
+    int32_t *resp_len
 );
 
-void synurang_plugin_free(uint8_t *buf, size_t len);
+void Synurang_Free(void *ptr);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif // VOLVOXGRID_PLUGIN_H
+#endif // VOLVOXGRID_H
 HEADER
 
 # ── Generate Info.plist for XCFramework ─────────────────────────────────────
@@ -160,7 +158,7 @@ cat > "${XCFW_DIR}/Info.plist" <<'PLIST'
       <key>LibraryIdentifier</key>
       <string>ios-arm64</string>
       <key>LibraryPath</key>
-      <string>libvolvoxgrid_plugin.a</string>
+      <string>libvolvoxgrid.a</string>
       <key>HeadersPath</key>
       <string>Headers</string>
       <key>SupportedArchitectures</key>
@@ -174,7 +172,7 @@ cat > "${XCFW_DIR}/Info.plist" <<'PLIST'
       <key>LibraryIdentifier</key>
       <string>ios-arm64_x86_64-simulator</string>
       <key>LibraryPath</key>
-      <string>libvolvoxgrid_plugin.a</string>
+      <string>libvolvoxgrid.a</string>
       <key>HeadersPath</key>
       <string>Headers</string>
       <key>SupportedArchitectures</key>
@@ -200,6 +198,6 @@ cp "${HEADER_FILE}" "${SIM_DIR}/Headers/"
 echo ""
 echo "Built iOS artifacts:"
 echo "  ${XCFW_DIR}/"
-echo "    ios-arm64/libvolvoxgrid_plugin.a"
-echo "    ios-arm64_x86_64-simulator/libvolvoxgrid_plugin.a"
+echo "    ios-arm64/libvolvoxgrid.a"
+echo "    ios-arm64_x86_64-simulator/libvolvoxgrid.a"
 echo "  ${HEADER_FILE}"

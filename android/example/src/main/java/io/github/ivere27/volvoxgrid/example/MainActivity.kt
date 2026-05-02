@@ -46,13 +46,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var swDebug: Switch
     private lateinit var spTextCache: Spinner
     private var rendererMode = 0 // 0=AUTO, 1=CPU, 2=GPU, 3=GPU(Vulkan), 4=GPU(GLES)
-    private var litePluginLoaded = false
+    private var liteLibraryLoaded = false
     private var debugOverlayEnabled = false
     private var scrollBlitEnabled = false
     private var editEnabled = false
     private var textLayoutCacheCap = 8192
     // Keep enabled by default. VolvoxGridView now falls back automatically to
-    // CPU present path if runtime surface producer switching fails on device.
+    // CPU present path if native surface producer switching fails on device.
     private val useGpuSurfacePath = true
     private val textCacheCapOptions = intArrayOf(8192, 4096, 1024, 256, 0)
     private val rendererModeOptions = arrayOf("AUTO", "CPU", "GPU", "GPU (Vulk)", "GPU (GLES)")
@@ -90,7 +90,7 @@ class MainActivity : AppCompatActivity() {
         spRendererMode.adapter = modeAdapter
         spRendererMode.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                if (litePluginLoaded && position > 0) {
+                if (liteLibraryLoaded && position > 0) {
                     spRendererMode.setSelection(0)
                     return
                 }
@@ -161,7 +161,7 @@ class MainActivity : AppCompatActivity() {
         btnDemoStress.setOnClickListener { switchDemo("stress") }
 
         setGridControlsEnabled(false)
-        updateStatus("Initializing plugin...")
+        updateStatus("Initializing library...")
 
         // Listen for grid events
         gridView.eventListener = object : VolvoxGridView.GridEventListener {
@@ -205,9 +205,9 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Initialize plugin once, then load Sales demo
+        // Initialize the native library once, then load Sales demo
         thread { 
-            if (initializePlugin()) {
+            if (initializeLibrary()) {
                 switchDemo("sales") 
             }
         }
@@ -221,29 +221,23 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         gridView.release()
-        // Plugin host is closed by gridView.release() if it owns it, 
-        // but since we shared it, we should be careful. 
-        // gridView.release() calls plugin?.close(). 
-        // Since we passed the host to initialize(), gridView thinks it owns it?
-        // Actually PluginHost is refcounted or just a handle? 
-        // It's a JNI wrapper. closing it invalidates it.
-        // We should ensure gridView doesn't double-close or close prematurely if we were swapping.
-        // But onDestroy means app is closing, so closing plugin is fine.
+        // This demo keeps a shared PluginHost for its grid instances; closing on
+        // app shutdown is fine.
     }
 
-    private fun initializePlugin(): Boolean {
+    private fun initializeLibrary(): Boolean {
         val libDir = applicationInfo.nativeLibraryDir
-        val pluginPath = resolvePluginPath(libDir)
+        val libraryPath = resolveLibraryPath(libDir)
 
-        if (pluginPath == null) {
-            updateStatus("Plugin not found: $libDir/libvolvoxgrid_plugin.so or $libDir/libvolvoxgrid_plugin_lite.so")
+        if (libraryPath == null) {
+            updateStatus("Library not found: $libDir/libvolvoxgrid.so or $libDir/libvolvoxgrid_lite.so")
             return false
         }
 
         try {
-            pluginHost = PluginHost.load(pluginPath)
-            litePluginLoaded = pluginPath.endsWith("libvolvoxgrid_plugin_lite.so")
-            if (litePluginLoaded) {
+            pluginHost = PluginHost.load(libraryPath)
+            liteLibraryLoaded = libraryPath.endsWith("libvolvoxgrid_lite.so")
+            if (liteLibraryLoaded) {
                 rendererMode = 0
                 runOnUiThread {
                     spRendererMode.setSelection(0)
@@ -252,16 +246,16 @@ class MainActivity : AppCompatActivity() {
             }
             return true
         } catch (e: Exception) {
-            updateStatus("Plugin load failed: ${e.message}")
-            android.util.Log.e("VolvoxGridDemo", "Plugin load failed", e)
+            updateStatus("Library load failed: ${e.message}")
+            android.util.Log.e("VolvoxGridDemo", "Library load failed", e)
             return false
         }
     }
 
-    private fun resolvePluginPath(libDir: String): String? {
+    private fun resolveLibraryPath(libDir: String): String? {
         val candidates = listOf(
-            "libvolvoxgrid_plugin.so",
-            "libvolvoxgrid_plugin_lite.so",
+            "libvolvoxgrid.so",
+            "libvolvoxgrid_lite.so",
         )
         for (name in candidates) {
             val path = "$libDir/$name"
@@ -624,7 +618,7 @@ class MainActivity : AppCompatActivity() {
             btnDemoSales.isEnabled = enabled
             btnDemoHierarchy.isEnabled = enabled
             btnDemoStress.isEnabled = enabled
-            spRendererMode.isEnabled = enabled && !litePluginLoaded
+            spRendererMode.isEnabled = enabled && !liteLibraryLoaded
             swDebug.isEnabled = enabled
             spTextCache.isEnabled = enabled
         }

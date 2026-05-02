@@ -1,4 +1,4 @@
-/// VolvoxGrid FFI bindings -- loads the native plugin and re-exports the
+/// VolvoxGrid FFI bindings -- loads the native library and re-exports the
 /// generated protobuf service client and messages.
 ///
 /// The generated files live under `lib/src/generated/` and are produced by
@@ -494,7 +494,7 @@ class VolvoxGridService {
       );
 }
 
-/// Initialize the VolvoxGrid plugin FFI runtime.
+/// Initialize the VolvoxGrid FFI runtime.
 ///
 /// Call this once at app startup, before any grid operations:
 ///
@@ -507,15 +507,15 @@ class VolvoxGridService {
 /// ```
 String _defaultLibraryFileName() {
   if (Platform.isAndroid || Platform.isLinux) {
-    return 'libvolvoxgrid_plugin.so';
+    return 'libvolvoxgrid.so';
   }
   if (Platform.isMacOS) {
-    return 'libvolvoxgrid_plugin.dylib';
+    return 'libvolvoxgrid.dylib';
   }
   if (Platform.isWindows) {
-    return 'volvoxgrid_plugin.dll';
+    return 'volvoxgrid.dll';
   }
-  return 'libvolvoxgrid_plugin.so';
+  return 'libvolvoxgrid.so';
 }
 
 bool _looksLikeLibraryPath(String value) {
@@ -585,8 +585,8 @@ Iterable<String> _candidateLibraryPaths(String fileName) sync* {
 
   add(fileName);
 
-  if (Platform.isAndroid && fileName != 'libvolvoxgrid_plugin.so') {
-    add('libvolvoxgrid_plugin.so');
+  if (Platform.isAndroid && fileName != 'libvolvoxgrid.so') {
+    add('libvolvoxgrid.so');
   }
 
   yield* candidates;

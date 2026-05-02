@@ -93,21 +93,21 @@ else
   BUILD_FLAGS=()
 fi
 
-PLUGIN_PATH="${REPO_ROOT}/target/${PROFILE}/libvolvoxgrid_plugin.so"
+VOLVOXGRID_LIBRARY_FILE="${REPO_ROOT}/target/${PROFILE}/libvolvoxgrid.so"
 BENCH_BIN="${REPO_ROOT}/target/${PROFILE}/headless_bench"
 RUN_ARGS=("${BENCH_ARGS[@]}")
 
 if [[ "${NO_BUILD}" -eq 0 ]]; then
   require_cmd cargo
-  echo "Building plugin (${PROFILE})..."
-  cargo build "${BUILD_FLAGS[@]}" -p volvoxgrid-plugin --features gpu
+  echo "Building VolvoxGrid library (${PROFILE})..."
+  cargo build "${BUILD_FLAGS[@]}" -p volvoxgrid-runtime --features gpu
   echo "Building headless benchmark (${PROFILE})..."
   cargo build "${BUILD_FLAGS[@]}" -p volvoxgrid-gtk-test --bin headless_bench
 fi
 
-if [[ ! -f "${PLUGIN_PATH}" ]]; then
-  echo "Error: plugin library not found: ${PLUGIN_PATH}" >&2
-  echo "Set VOLVOXGRID_PLUGIN_PATH manually or rerun without --no-build." >&2
+if [[ ! -f "${VOLVOXGRID_LIBRARY_FILE}" ]]; then
+  echo "Error: VolvoxGrid library not found: ${VOLVOXGRID_LIBRARY_FILE}" >&2
+  echo "Set VOLVOXGRID_LIBRARY_PATH manually or rerun without --no-build." >&2
   exit 1
 fi
 
@@ -124,7 +124,7 @@ SUMMARY_FILE="${TMP_DIR}/summary-lines.txt"
 
 echo
 echo "Running ${RUNS} benchmark iteration(s)..."
-echo "Plugin: ${PLUGIN_PATH}"
+echo "Library: ${VOLVOXGRID_LIBRARY_FILE}"
 echo "Binary: ${BENCH_BIN}"
 echo "Args: ${RUN_ARGS[*]}"
 
@@ -134,7 +134,7 @@ for run in $(seq 1 "${RUNS}"); do
   echo "===== run ${run}/${RUNS} ====="
 
   set +e
-  VOLVOXGRID_PLUGIN_PATH="${PLUGIN_PATH}" "${BENCH_BIN}" "${RUN_ARGS[@]}" | tee "${LOG_FILE}"
+  VOLVOXGRID_LIBRARY_PATH="${VOLVOXGRID_LIBRARY_FILE}" "${BENCH_BIN}" "${RUN_ARGS[@]}" | tee "${LOG_FILE}"
   STATUS=${PIPESTATUS[0]}
   set -e
 

@@ -10,18 +10,18 @@ import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Set;
 
-final class NativePluginPathResolver {
-    private static volatile Path extractedPluginPath;
+final class NativeLibraryPathResolver {
+    private static volatile Path extractedLibraryPath;
 
-    private NativePluginPathResolver() {}
+    private NativeLibraryPathResolver() {}
 
-    static String resolvePluginPath(String[] args) {
+    static String resolveLibraryPath(String[] args) {
         String fromArg = firstArg(args);
         if (fromArg != null) {
             return toAbsolutePath(fromArg);
         }
 
-        String fromEnv = System.getenv("VOLVOXGRID_PLUGIN_PATH");
+        String fromEnv = System.getenv("VOLVOXGRID_LIBRARY_PATH");
         if (!isBlank(fromEnv)) {
             return toAbsolutePath(fromEnv);
         }
@@ -38,10 +38,10 @@ final class NativePluginPathResolver {
         return null;
     }
 
-    static String expectedPluginFileHint() {
-        String[] names = pluginNamesForCurrentOs();
+    static String expectedLibraryFileHint() {
+        String[] names = libraryNamesForCurrentOs();
         if (names.length == 0) {
-            return "libvolvoxgrid_plugin.so";
+            return "libvolvoxgrid.so";
         }
         return names[0];
     }
@@ -84,7 +84,7 @@ final class NativePluginPathResolver {
         Path grandParent = parent != null ? parent.getParent() : null;
         Path[] roots = new Path[] {cwd, parent, grandParent};
         String[] relDirs = new String[] {"target/debug", "target/release"};
-        String[] fileNames = pluginNamesForCurrentOs();
+        String[] fileNames = libraryNamesForCurrentOs();
 
         for (Path root : roots) {
             if (root == null) {
@@ -103,14 +103,14 @@ final class NativePluginPathResolver {
     }
 
     private static Path detectFromClasspathArtifact() {
-        Path cached = extractedPluginPath;
+        Path cached = extractedLibraryPath;
         if (cached != null && Files.isRegularFile(cached)) {
             return cached;
         }
 
         String[] platforms = classpathPlatformDirsForCurrentOs();
-        String[] fileNames = pluginNamesForCurrentOs();
-        ClassLoader classLoader = NativePluginPathResolver.class.getClassLoader();
+        String[] fileNames = libraryNamesForCurrentOs();
+        ClassLoader classLoader = NativeLibraryPathResolver.class.getClassLoader();
         for (String platform : platforms) {
             for (String fileName : fileNames) {
                 String resourcePath = "native/" + platform + "/" + fileName;
@@ -118,8 +118,8 @@ final class NativePluginPathResolver {
                     if (input == null) {
                         continue;
                     }
-                    Path extracted = extractTempPlugin(input, fileName);
-                    extractedPluginPath = extracted;
+                    Path extracted = extractTempLibrary(input, fileName);
+                    extractedLibraryPath = extracted;
                     return extracted;
                 } catch (IOException ignored) {
                     // Try the next candidate.
@@ -129,8 +129,8 @@ final class NativePluginPathResolver {
         return null;
     }
 
-    private static Path extractTempPlugin(InputStream input, String fileName) throws IOException {
-        String prefix = "volvoxgrid-plugin-";
+    private static Path extractTempLibrary(InputStream input, String fileName) throws IOException {
+        String prefix = "volvoxgrid-library-";
         String suffix = fileName.startsWith(".") ? fileName : "-" + fileName;
         Path extracted = Files.createTempFile(prefix, suffix);
         Files.copy(input, extracted, StandardCopyOption.REPLACE_EXISTING);
@@ -178,14 +178,14 @@ final class NativePluginPathResolver {
         return dirs.toArray(new String[0]);
     }
 
-    private static String[] pluginNamesForCurrentOs() {
+    private static String[] libraryNamesForCurrentOs() {
         String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
         if (os.contains("win")) {
-            return new String[] {"volvoxgrid_plugin.dll", "libvolvoxgrid_plugin.dll"};
+            return new String[] {"volvoxgrid.dll"};
         }
         if (os.contains("mac") || os.contains("darwin")) {
-            return new String[] {"libvolvoxgrid_plugin.dylib", "volvoxgrid_plugin.dylib"};
+            return new String[] {"libvolvoxgrid.dylib"};
         }
-        return new String[] {"libvolvoxgrid_plugin.so", "volvoxgrid_plugin.so"};
+        return new String[] {"libvolvoxgrid.so"};
     }
 }

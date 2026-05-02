@@ -1,6 +1,6 @@
 [package]
-name = "volvoxgrid-wasm"
-version = "0.8.4"
+name = "volvoxgrid-runtime"
+version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -9,20 +9,33 @@ repository.workspace = true
 wasm-opt = false
 
 [lib]
+name = "volvoxgrid"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = ["regex", "demo"]
+default = ["standard", "demo"]
+wasm-default = ["regex", "demo"]
+standard = [
+    "cosmic-text",
+    "rayon",
+    "regex",
+]
 demo = ["volvoxgrid-engine/demo"]
-wasm-threads = ["dep:wasm-bindgen-rayon"]
 cosmic-text = ["volvoxgrid-engine/cosmic-text"]
-gpu = ["volvoxgrid-engine/gpu", "cosmic-text"]
 rayon = ["volvoxgrid-engine/rayon"]
 regex = ["volvoxgrid-engine/regex"]
+gpu = ["volvoxgrid-engine/gpu", "dep:pollster", "dep:wgpu"]
+wasm-threads = ["dep:wasm-bindgen-rayon"]
 
 [dependencies]
-volvoxgrid-engine = { path = "../../engine", default-features = false, features = ["proto"] }
 prost = "0.12"
+volvoxgrid-engine = { path = "../engine", default-features = false, features = ["grpc"] }
+ctor = "0.2"
+lazy_static = "1.5"
+pollster = { version = "0.4", optional = true }
+wgpu = { version = "24", optional = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 wasm-bindgen-rayon = { version = "1.2", optional = true }
@@ -30,3 +43,6 @@ js-sys = "0.3"
 web-sys = { version = "0.3", features = ["console", "ImageData", "HtmlCanvasElement"] }
 web-time = "1"
 getrandom = { version = "0.2", features = ["js"] }
+
+[build-dependencies]
+cc = "1"

@@ -250,7 +250,7 @@ namespace VolvoxGrid.DotNet.ScriptRunner
         public Compat.GridControl Grid { get; private set; }
         public Compat.GridView View { get; private set; }
 
-        public static ScriptCaseEnvironment Create(string engine, Assembly gridAssembly, string pluginPath)
+        public static ScriptCaseEnvironment Create(string engine, Assembly gridAssembly, string libraryPath)
         {
             if (string.Equals(engine, "ref", StringComparison.OrdinalIgnoreCase))
             {
@@ -259,7 +259,7 @@ namespace VolvoxGrid.DotNet.ScriptRunner
 
             if (string.Equals(engine, "vv", StringComparison.OrdinalIgnoreCase))
             {
-                return new ScriptCaseEnvironment(new VolvoxDotNetGridBackend(gridAssembly, pluginPath));
+                return new ScriptCaseEnvironment(new VolvoxDotNetGridBackend(gridAssembly, libraryPath));
             }
 
             throw new ArgumentException("Unsupported engine: " + engine);
@@ -586,7 +586,7 @@ namespace VolvoxGrid.DotNet.ScriptRunner
         private bool _showIndicator;
         private object _dataSource;
 
-        public VolvoxDotNetGridBackend(Assembly gridAssembly, string pluginPath)
+        public VolvoxDotNetGridBackend(Assembly gridAssembly, string libraryPath)
         {
             Type gridType = gridAssembly.GetType("VolvoxGrid.DotNet.VolvoxGridControl", true);
             _gridObject = Activator.CreateInstance(gridType);
@@ -599,9 +599,9 @@ namespace VolvoxGrid.DotNet.ScriptRunner
             _columnType = gridAssembly.GetType("VolvoxGrid.DotNet.VolvoxGridColumn", true);
             _columns = new List<VolvoxDotNetGridColumnBackend>();
 
-            if (!string.IsNullOrEmpty(pluginPath))
+            if (!string.IsNullOrEmpty(libraryPath))
             {
-                ReflectionUtil.SetPropertyValue(_gridObject, "PluginPath", pluginPath);
+                ReflectionUtil.SetPropertyValue(_gridObject, "LibraryPath", libraryPath);
             }
         }
 

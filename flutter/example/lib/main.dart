@@ -32,13 +32,13 @@ Future<void> main() async {
   );
   await initVolvoxGrid();
 
-  // Verify plugin connectivity
+  // Verify runtime connectivity
   try {
     const channel = MethodChannel('io.github.ivere27.volvoxgrid');
     final version = await channel.invokeMethod('getPlatformVersion');
-    _debugLog(() => 'VolvoxGrid Plugin active: $version');
+    _debugLog(() => 'VolvoxGrid Runtime active: $version');
   } catch (e) {
-    _debugLog(() => 'VolvoxGrid Plugin error: $e');
+    _debugLog(() => 'VolvoxGrid Runtime error: $e');
   }
 
   runApp(const VolvoxGridDemoApp());

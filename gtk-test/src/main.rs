@@ -27,7 +27,7 @@ use gtk4::{
 use prost::Message;
 use serde::{Deserialize, Serialize};
 
-use ffi::{resolve_default_plugin_path, PluginLibrary, PluginStream};
+use ffi::{resolve_default_library_path, RuntimeLibrary, RuntimeStream};
 use proto::volvoxgrid::v1 as pb;
 
 const APP_ID: &str = "io.github.ivere27.volvoxgrid.GtkTest";
@@ -253,7 +253,7 @@ fn hierarchy_outline_levels(rows: &[HierarchyJsonRow]) -> Result<Vec<i32>, Strin
 
 #[derive(Clone)]
 struct VolvoxServiceClient {
-    plugin: Arc<PluginLibrary>,
+    runtime: Arc<RuntimeLibrary>,
 }
 
 enum UiMessage {
@@ -491,8 +491,8 @@ struct State {
     grid_id: i64,
     grid_sessions: HashMap<String, i64>,
     stream_epoch: u64,
-    render_stream: Arc<PluginStream>,
-    event_stream: Arc<PluginStream>,
+    render_stream: Arc<RuntimeStream>,
+    event_stream: Arc<RuntimeStream>,
     viewport_width: i32,
     viewport_height: i32,
     display_target: Option<FrameTarget>,
@@ -548,7 +548,7 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
     let create = client.create_grid(DEFAULT_WIDTH, DEFAULT_HEIGHT)?;
     let sales_grid_id = create.grid_id;
     if sales_grid_id <= 0 {
-        return Err("plugin returned no grid id".to_string());
+        return Err("runtime returned no grid id".to_string());
     }
     apply_initial_config_for_grid(&client, sales_grid_id, false)?;
     load_sales_json_demo(&client, sales_grid_id)?;
@@ -586,10 +586,10 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
         event_count: 0,
         last_event: "(none)".to_string(),
         status_note: if create.warnings.is_empty() {
-            format!("Plugin loaded from {}", resolve_default_plugin_path())
+            format!("Library loaded from {}", resolve_default_library_path())
         } else {
             format!(
-                "Plugin loaded with warnings: {}",
+                "Library loaded with warnings: {}",
                 create.warnings.join(", ")
             )
         },
@@ -1658,7 +1658,7 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
 
     let window = ApplicationWindow::builder()
         .application(app)
-        .title("VolvoxGrid GTK4 - Plugin FFI Test")
+        .title("VolvoxGrid GTK4 - Runtime FFI Test")
         .default_width(DEFAULT_WIDTH)
         .default_height(DEFAULT_HEIGHT)
         .child(&vbox)
@@ -1699,9 +1699,9 @@ fn install_inline_editor_css() {
 
 impl VolvoxServiceClient {
     fn load_default() -> Result<Self, String> {
-        let path = resolve_default_plugin_path();
-        let plugin = PluginLibrary::load(&path)?;
-        Ok(Self { plugin })
+        let path = resolve_default_library_path();
+        let runtime = RuntimeLibrary::load(&path)?;
+        Ok(Self { runtime })
     }
 
     fn create_grid(&self, width: i32, height: i32) -> Result<pb::CreateResponse, String> {
@@ -1823,14 +1823,14 @@ impl VolvoxServiceClient {
         Ok(())
     }
 
-    fn open_render_session(&self) -> Result<Arc<PluginStream>, String> {
-        self.plugin
+    fn open_render_session(&self) -> Result<Arc<RuntimeStream>, String> {
+        self.runtime
             .open_stream("/volvoxgrid.v1.VolvoxGridService/RenderSession")
     }
 
-    fn open_event_stream(&self, grid_id: i64) -> Result<Arc<PluginStream>, String> {
+    fn open_event_stream(&self, grid_id: i64) -> Result<Arc<RuntimeStream>, String> {
         let stream = self
-            .plugin
+            .runtime
             .open_stream("/volvoxgrid.v1.VolvoxGridService/EventStream")?;
         let request = pb::EventStreamRequest { grid_id };
         stream.send_raw(&request.encode_to_vec())?;
@@ -2198,7 +2198,7 @@ impl VolvoxServiceClient {
                 margin_right: Some(20),
                 margin_bottom: Some(20),
                 header: Some("VolvoxGrid GTK Test".to_string()),
-                footer: Some("Plugin FFI".to_string()),
+                footer: Some("Runtime FFI".to_string()),
                 show_page_numbers: Some(true),
             },
         )
@@ -2228,7 +2228,7 @@ impl VolvoxServiceClient {
         Req: Message,
         Resp: Message + Default,
     {
-        let data = self.plugin.invoke_raw(method, &req.encode_to_vec())?;
+        let data = self.runtime.invoke_raw(method, &req.encode_to_vec())?;
         Resp::decode(data.as_slice()).map_err(|err| format!("decode failed for {method}: {err}"))
     }
 }
@@ -3432,7 +3432,7 @@ fn ensure_demo_grid(state: &mut State, demo: &str) -> Result<(i64, bool), String
     let create = state.client.create_grid(width, height)?;
     let grid_id = create.grid_id;
     if grid_id <= 0 {
-        return Err("plugin returned no grid id".to_string());
+        return Err("runtime returned no grid id".to_string());
     }
     apply_initial_config_for_grid(&state.client, grid_id, state.scroll_blit_enabled)?;
     state.grid_sessions.insert(demo.to_string(), grid_id);
@@ -3522,7 +3522,7 @@ fn switch_demo_session(
     })
 }
 
-fn spawn_render_output_thread(stream: Arc<PluginStream>, sender: UiMessageSender, epoch: u64) {
+fn spawn_render_output_thread(stream: Arc<RuntimeStream>, sender: UiMessageSender, epoch: u64) {
     std::thread::spawn(move || loop {
         match stream.recv_raw() {
             Ok(Some(data)) => match pb::RenderOutput::decode(data.as_slice()) {
@@ -3552,7 +3552,7 @@ fn spawn_render_output_thread(stream: Arc<PluginStream>, sender: UiMessageSender
     });
 }
 
-fn spawn_grid_event_thread(stream: Arc<PluginStream>, sender: UiMessageSender, epoch: u64) {
+fn spawn_grid_event_thread(stream: Arc<RuntimeStream>, sender: UiMessageSender, epoch: u64) {
     std::thread::spawn(move || loop {
         match stream.recv_raw() {
             Ok(Some(data)) => match pb::GridEvent::decode(data.as_slice()) {

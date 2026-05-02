@@ -13,8 +13,8 @@
     "build": "vite build",
     "postbuild": "cp ./doom-remote-proxy-sw.js ./dist/doom-remote-proxy-sw.js",
     "preview": "vite preview",
-    "build:wasm": "cd ../crate && rustup run nightly wasm-pack build . --target web --out-dir ../example/wasm --features gpu",
-    "build:wasm:threaded": "cd ../crate && RUSTFLAGS='-C target-feature=+atomics,+bulk-memory,+mutable-globals' rustup run nightly wasm-pack build . --target web --out-dir ../example/wasm --features wasm-threads,gpu -Z build-std=std,panic_abort"
+    "build:wasm": "cd ../../runtime && rustup run nightly wasm-pack build . --target web --out-dir ../web/example/wasm --out-name volvoxgrid_wasm --no-default-features --features wasm-default,gpu",
+    "build:wasm:threaded": "cd ../../runtime && RUSTFLAGS='-C target-feature=+atomics,+bulk-memory,+mutable-globals' rustup run nightly wasm-pack build . --target web --out-dir ../web/example/wasm --out-name volvoxgrid_wasm --no-default-features --features wasm-default,wasm-threads,gpu -Z build-std=std,panic_abort"
   },
   "devDependencies": {
     "typescript": "^5.0.0",

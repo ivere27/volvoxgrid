@@ -3,7 +3,7 @@
 This document covers VolvoxGrid IME behavior across:
 
 - shared Rust engine and proto contract
-- language bindings and runtime hosts
+- language bindings and native hosts
 - compatibility adapters
 - natural-language composition coverage
 
@@ -175,7 +175,7 @@ Practical result:
 Primary files:
 
 - `web/js/src/volvoxgrid.ts`
-- `web/crate/src/lib.rs`
+- `runtime/src/wasm.rs`
 
 Current behavior:
 

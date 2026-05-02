@@ -54,9 +54,9 @@ async function initWasm() {
   if (wasmReady) return wasm;
   await init();
   wasm = wasmModule;
-  // Register v1 protobuf service plugin
-  if (typeof wasm.init_v1_plugin === "function") {
-    try { wasm.init_v1_plugin(); } catch { /* already registered */ }
+  // Register v1 protobuf service runtime
+  if (typeof wasm.init_v1_runtime === "function") {
+    try { wasm.init_v1_runtime(); } catch { /* already registered */ }
   }
   wasmReady = true;
 

@@ -301,7 +301,7 @@ public final class VolvoxGridDesktopClient {
     }
 
     public EventStream openEventStream(EventStreamRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
-        SynurangDesktopBridge.PluginStreamBridge stream = bridge.openStream(SERVICE, EVENT_STREAM);
+        SynurangDesktopBridge.RuntimeStreamBridge stream = bridge.openStream(SERVICE, EVENT_STREAM);
         stream.send(request.toByteArray());
         stream.closeSend();
         return new EventStream(stream);
@@ -328,9 +328,9 @@ public final class VolvoxGridDesktopClient {
     }
 
     public static final class RenderSession implements AutoCloseable {
-        private final SynurangDesktopBridge.PluginStreamBridge stream;
+        private final SynurangDesktopBridge.RuntimeStreamBridge stream;
 
-        private RenderSession(SynurangDesktopBridge.PluginStreamBridge stream) {
+        private RenderSession(SynurangDesktopBridge.RuntimeStreamBridge stream) {
             this.stream = Objects.requireNonNull(stream, "stream");
         }
 
@@ -361,9 +361,9 @@ public final class VolvoxGridDesktopClient {
     }
 
     public static final class EventStream implements AutoCloseable {
-        private final SynurangDesktopBridge.PluginStreamBridge stream;
+        private final SynurangDesktopBridge.RuntimeStreamBridge stream;
 
-        private EventStream(SynurangDesktopBridge.PluginStreamBridge stream) {
+        private EventStream(SynurangDesktopBridge.RuntimeStreamBridge stream) {
             this.stream = Objects.requireNonNull(stream, "stream");
         }
 

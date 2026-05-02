@@ -43,7 +43,7 @@ public final class VolvoxGridDesktopExample {
     private final AtomicBoolean closed = new AtomicBoolean(false);
 
     private final Map<String, Long> gridMap = new LinkedHashMap<>();
-    private volatile SynurangDesktopBridge plugin;
+    private volatile SynurangDesktopBridge bridge;
     private volatile VolvoxGridDesktopClient client;
     private volatile VolvoxGridDesktopController controller;
     private volatile String currentDemo = "";
@@ -79,23 +79,23 @@ public final class VolvoxGridDesktopExample {
     }
 
     private void start(String[] args) {
-        String pluginPath = NativePluginPathResolver.resolvePluginPath(args);
-        if (pluginPath == null) {
-            System.err.println("Plugin path not found.");
-            System.err.println("Provide first arg, or set VOLVOXGRID_PLUGIN_PATH,");
+        String libraryPath = NativeLibraryPathResolver.resolveLibraryPath(args);
+        if (libraryPath == null) {
+            System.err.println("Library path not found.");
+            System.err.println("Provide first arg, or set VOLVOXGRID_LIBRARY_PATH,");
             System.err.println("or use the volvoxgrid-desktop Maven artifact with embedded native libs,");
-            System.err.println("or place " + NativePluginPathResolver.expectedPluginFileHint() + " under target/debug.");
+            System.err.println("or place " + NativeLibraryPathResolver.expectedLibraryFileHint() + " under target/debug.");
             return;
         }
-        if (!SynurangDesktopBridge.isRuntimeAvailable()) {
-            System.err.println("Synurang desktop runtime classes are not found on classpath.");
+        if (!SynurangDesktopBridge.isHostAvailable()) {
+            System.err.println("Synurang desktop host classes are not found on classpath.");
             System.err.println("Expected: io.github.ivere27.synurang.PluginHost");
             return;
         }
 
         try {
-            this.plugin = SynurangDesktopBridge.load(pluginPath);
-            this.client = new VolvoxGridDesktopClient(plugin);
+            this.bridge = SynurangDesktopBridge.load(libraryPath);
+            this.client = new VolvoxGridDesktopClient(bridge);
         } catch (Exception e) {
             e.printStackTrace(System.err);
             return;
@@ -268,10 +268,10 @@ public final class VolvoxGridDesktopExample {
         if (demo.equals(currentDemo) && controller != null) {
             return;
         }
-        SynurangDesktopBridge host = plugin;
+        SynurangDesktopBridge host = bridge;
         VolvoxGridDesktopClient svc = client;
         if (host == null || svc == null) {
-            updateStatus("Plugin is not initialized");
+            updateStatus("Runtime is not initialized");
             return;
         }
 
@@ -572,7 +572,7 @@ public final class VolvoxGridDesktopExample {
         }
 
         try {
-            SynurangDesktopBridge host = plugin;
+            SynurangDesktopBridge host = bridge;
             if (host != null) {
                 host.close();
             }
@@ -580,7 +580,7 @@ public final class VolvoxGridDesktopExample {
             // best effort
         }
 
-        plugin = null;
+        bridge = null;
         client = null;
         controller = null;
         worker.shutdownNow();

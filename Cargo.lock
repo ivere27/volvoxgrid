@@ -2563,7 +2563,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "volvoxgrid-activex"
-version = "0.8.4"
+version = "0.8.5"
 dependencies = [
  "lazy_static",
  "prost 0.12.6",
@@ -2573,7 +2573,7 @@ dependencies = [
 
 [[package]]
 name = "volvoxgrid-engine"
-version = "0.8.4"
+version = "0.8.5"
 dependencies = [
  "barcoders",
  "bytemuck",
@@ -2599,7 +2599,7 @@ dependencies = [
 
 [[package]]
 name = "volvoxgrid-gtk-test"
-version = "0.8.4"
+version = "0.8.5"
 dependencies = [
  "cairo-rs",
  "gtk4",
@@ -2611,33 +2611,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "volvoxgrid-plugin"
-version = "0.8.4"
+name = "volvoxgrid-runtime"
+version = "0.8.5"
 dependencies = [
  "cc",
  "ctor",
- "lazy_static",
- "pollster",
- "prost 0.12.6",
- "volvoxgrid-engine",
- "wgpu",
-]
-
-[[package]]
-name = "volvoxgrid-smoke"
-version = "0.8.4"
-dependencies = [
- "prost 0.12.6",
- "synurang-host",
- "volvoxgrid-engine",
-]
-
-[[package]]
-name = "volvoxgrid-wasm"
-version = "0.8.4"
-dependencies = [
  "getrandom 0.2.17",
  "js-sys",
+ "lazy_static",
+ "pollster",
  "prost 0.12.6",
  "volvoxgrid-engine",
  "wasm-bindgen",
@@ -2645,6 +2627,16 @@ dependencies = [
  "wasm-bindgen-rayon",
  "web-sys",
  "web-time",
+ "wgpu",
+]
+
+[[package]]
+name = "volvoxgrid-smoke"
+version = "0.8.5"
+dependencies = [
+ "prost 0.12.6",
+ "synurang-host",
+ "volvoxgrid-engine",
 ]
 
 [[package]]

@@ -38,9 +38,9 @@
 
     async function main() {
       await init();
-      // Register the v1 protobuf service plugin (required for styles, configure, etc.)
-      if (typeof wasm.init_v1_plugin === "function") {
-        wasm.init_v1_plugin();
+      // Register the v1 protobuf service runtime (required for styles, configure, etc.)
+      if (typeof wasm.init_v1_runtime === "function") {
+        wasm.init_v1_runtime();
       }
 
       const sheet = new VolvoxSheet({

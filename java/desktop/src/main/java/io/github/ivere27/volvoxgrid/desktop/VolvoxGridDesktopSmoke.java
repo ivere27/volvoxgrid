@@ -12,24 +12,24 @@ import io.github.ivere27.volvoxgrid.LayoutConfig;
 import io.github.ivere27.volvoxgrid.UpdateCellsRequest;
 
 /**
- * Headless smoke test for desktop Synurang + VolvoxGrid plugin.
+ * Headless smoke test for desktop Synurang + VolvoxGrid host.
  */
 public final class VolvoxGridDesktopSmoke {
     private VolvoxGridDesktopSmoke() {}
 
     public static void main(String[] args) {
-        String pluginPath = NativePluginPathResolver.resolvePluginPath(args);
-        if (pluginPath == null) {
-            System.err.println("Plugin path not found.");
-            System.err.println("Provide first arg, or set VOLVOXGRID_PLUGIN_PATH,");
+        String libraryPath = NativeLibraryPathResolver.resolveLibraryPath(args);
+        if (libraryPath == null) {
+            System.err.println("Library path not found.");
+            System.err.println("Provide first arg, or set VOLVOXGRID_LIBRARY_PATH,");
             System.err.println("or use the volvoxgrid-desktop Maven artifact with embedded native libs,");
-            System.err.println("or place " + NativePluginPathResolver.expectedPluginFileHint() + " under target/debug.");
+            System.err.println("or place " + NativeLibraryPathResolver.expectedLibraryFileHint() + " under target/debug.");
             System.exit(2);
             return;
         }
 
-        if (!SynurangDesktopBridge.isRuntimeAvailable()) {
-            System.err.println("Synurang desktop runtime is not available on classpath.");
+        if (!SynurangDesktopBridge.isHostAvailable()) {
+            System.err.println("Synurang desktop host is not available on classpath.");
             System.exit(3);
             return;
         }
@@ -37,7 +37,7 @@ public final class VolvoxGridDesktopSmoke {
         SynurangDesktopBridge bridge = null;
         long gridId = 0L;
         try {
-            bridge = SynurangDesktopBridge.load(pluginPath);
+            bridge = SynurangDesktopBridge.load(libraryPath);
             VolvoxGridDesktopClient client = new VolvoxGridDesktopClient(bridge);
 
             GridConfig config = GridConfig.newBuilder()

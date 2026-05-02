@@ -14,7 +14,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use cairo::ImageSurface;
-use ffi::{resolve_default_plugin_path, PluginLibrary, PluginStream};
+use ffi::{resolve_default_library_path, RuntimeLibrary, RuntimeStream};
 use gtk4::gdk;
 use gtk4::glib;
 use gtk4::prelude::*;
@@ -519,13 +519,13 @@ impl Default for Args {
 
 #[derive(Clone)]
 struct VolvoxServiceClient {
-    plugin: Arc<PluginLibrary>,
+    runtime: Arc<RuntimeLibrary>,
 }
 
 struct BenchSession {
     client: VolvoxServiceClient,
     grid_id: i64,
-    render_stream: Arc<PluginStream>,
+    render_stream: Arc<RuntimeStream>,
     host: BenchHost,
 }
 
@@ -688,9 +688,9 @@ impl PhaseStats {
 
 impl VolvoxServiceClient {
     fn load_default() -> Result<Self, String> {
-        let path = resolve_default_plugin_path();
-        let plugin = PluginLibrary::load(&path)?;
-        Ok(Self { plugin })
+        let path = resolve_default_library_path();
+        let runtime = RuntimeLibrary::load(&path)?;
+        Ok(Self { runtime })
     }
 
     fn create_grid(
@@ -906,8 +906,8 @@ impl VolvoxServiceClient {
         Ok(())
     }
 
-    fn open_render_session(&self) -> Result<Arc<PluginStream>, String> {
-        self.plugin
+    fn open_render_session(&self) -> Result<Arc<RuntimeStream>, String> {
+        self.runtime
             .open_stream("/volvoxgrid.v1.VolvoxGridService/RenderSession")
     }
 
@@ -916,7 +916,7 @@ impl VolvoxServiceClient {
         Req: Message,
         Resp: Message + Default,
     {
-        let data = self.plugin.invoke_raw(method, &req.encode_to_vec())?;
+        let data = self.runtime.invoke_raw(method, &req.encode_to_vec())?;
         Resp::decode(data.as_slice()).map_err(|err| format!("decode failed for {method}: {err}"))
     }
 }
