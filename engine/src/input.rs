@@ -1989,11 +1989,13 @@ fn emit_pointer_move_and_hover(
         .is_some_and(|prev| indicator_control_hover_target(grid, &prev.target))
         || indicator_control_hover_target(grid, &next.target);
     if let Some(prev) = grid.last_hover_target.replace(next.clone()) {
-        grid.events.push(GridEventData::LeaveCell {
-            row: prev.row,
-            col: prev.col,
-            target: prev.target,
-        });
+        if !is_background_target(&prev.target) {
+            grid.events.push(GridEventData::LeaveCell {
+                row: prev.row,
+                col: prev.col,
+                target: prev.target,
+            });
+        }
     }
     grid.events.push(GridEventData::MouseMove {
         button,
@@ -2002,11 +2004,13 @@ fn emit_pointer_move_and_hover(
         y,
         target: next.target.clone(),
     });
-    grid.events.push(GridEventData::EnterCell {
-        row: next.row,
-        col: next.col,
-        target: next.target,
-    });
+    if !is_background_target(&next.target) {
+        grid.events.push(GridEventData::EnterCell {
+            row: next.row,
+            col: next.col,
+            target: next.target,
+        });
+    }
     if repaint_indicator_hover {
         grid.mark_dirty();
     }
@@ -2704,9 +2708,13 @@ fn resolve_col_hit(
         }
     } else {
         effective_x = local_x + scroll_x as i32 - pinned_left_w;
-        col = layout.col_at_x(effective_x);
-        if grid.is_col_pinned(col) != 0 {
+        if !grid.extend_last_col && (effective_x < 0 || effective_x >= layout.total_width) {
             col = -1;
+        } else {
+            col = layout.col_at_x(effective_x);
+            if grid.is_col_pinned(col) != 0 {
+                col = -1;
+            }
         }
     }
 
@@ -5178,6 +5186,22 @@ mod tests {
     }
 
     #[test]
+    fn hit_test_maps_right_empty_area_to_background_when_last_column_is_not_extended() {
+        let mut grid = VolvoxGrid::new(1, 300, 120, 3, 4, 0, 0);
+        for col in 0..grid.cols {
+            grid.set_col_width(col, 40);
+        }
+        grid.cols_hidden.insert(3);
+        prime_layout(&mut grid);
+
+        let hit = hit_test(&mut grid, 250.0, 5.0);
+
+        assert_eq!(hit.area, HitArea::Background);
+        assert_eq!(hit.row, -1);
+        assert_eq!(hit.col, -1);
+    }
+
+    #[test]
     fn hit_test_sticky_left_col_returns_overlay_col_not_scrolled_col_underneath() {
         let mut grid = VolvoxGrid::new(1, 160, 120, 3, 6, 0, 0);
         for col in 0..grid.cols {
@@ -5428,6 +5452,74 @@ mod tests {
             GridEventData::EnterCell { target, .. }
                 if target.kind == pb::GridTargetKind::GridTargetRowIndicator as i32
                     && target.slot_index == 2
+        )));
+    }
+
+    #[test]
+    fn pointer_move_does_not_emit_enter_leave_for_background() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 3, 0, 0);
+        prime_layout(&mut grid);
+
+        handle_pointer_move(&mut grid, 10.0, 10.0, 0, 0);
+        let events = grid.events.drain();
+        assert!(events.iter().any(|e| matches!(
+            &e.data,
+            GridEventData::EnterCell { row: 0, col: 0, target }
+                if target.kind == pb::GridTargetKind::GridTargetDataCell as i32
+        )));
+
+        handle_pointer_move(&mut grid, 700.0, 10.0, 0, 0);
+        let events = grid.events.drain();
+        assert!(events.iter().any(|e| matches!(
+            &e.data,
+            GridEventData::LeaveCell { row: 0, col: 0, target }
+                if target.kind == pb::GridTargetKind::GridTargetDataCell as i32
+        )));
+        assert!(events.iter().any(|e| matches!(
+            &e.data,
+            GridEventData::MouseMove { target, .. }
+                if target.kind == pb::GridTargetKind::GridTargetBackground as i32
+        )));
+        assert!(!events.iter().any(|e| matches!(
+            &e.data,
+            GridEventData::EnterCell { target, .. }
+                if target.kind == pb::GridTargetKind::GridTargetBackground as i32
+        )));
+
+        handle_pointer_move(&mut grid, 10.0, 10.0, 0, 0);
+        let events = grid.events.drain();
+        assert!(!events.iter().any(|e| matches!(
+            &e.data,
+            GridEventData::LeaveCell { target, .. }
+                if target.kind == pb::GridTargetKind::GridTargetBackground as i32
+        )));
+        assert!(events.iter().any(|e| matches!(
+            &e.data,
+            GridEventData::EnterCell { row: 0, col: 0, target }
+                if target.kind == pb::GridTargetKind::GridTargetDataCell as i32
+        )));
+    }
+
+    #[test]
+    fn pointer_move_coalesces_transient_enter_leave_before_drain() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 3, 0, 0);
+        prime_layout(&mut grid);
+
+        handle_pointer_move(&mut grid, 10.0, 10.0, 0, 0);
+        handle_pointer_move(&mut grid, 700.0, 10.0, 0, 0);
+
+        let events = grid.events.drain();
+        assert_eq!(events.len(), 1);
+        assert!(events.iter().any(|e| matches!(
+            &e.data,
+            GridEventData::MouseMove { target, .. }
+                if target.kind == pb::GridTargetKind::GridTargetBackground as i32
+        )));
+        assert!(!events.iter().any(|e| matches!(
+            &e.data,
+            GridEventData::EnterCell { target, .. }
+            | GridEventData::LeaveCell { target, .. }
+                if target.kind == pb::GridTargetKind::GridTargetDataCell as i32
         )));
     }
 
