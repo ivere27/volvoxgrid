@@ -1947,6 +1947,7 @@ service VolvoxGridService {
   rpc SetColComboList(SetColComboListRequest) returns (Empty);
   rpc SetComboList(SetComboListRequest)     returns (Empty);
   rpc SetComboSearch(SetBoolProp)           returns (Empty);
+  rpc GetComboSearch(GridHandle)            returns (Int32Value);
   rpc SetShowComboButton(SetShowComboButtonRequest) returns (Empty);
   rpc BuildComboList(BuildComboListRequest) returns (StringValue);
   rpc SetTabBehavior(SetTabBehaviorRequest) returns (Empty);
@@ -1979,6 +1980,7 @@ service VolvoxGridService {
   rpc SetCellChecked(SetCellCheckedRequest) returns (Empty);
   rpc GetCellChecked(GetCellCheckedRequest) returns (Int32Value);
   rpc SetOwnerDraw(SetOwnerDrawRequest)     returns (Empty);
+  rpc GetOwnerDraw(GridHandle)              returns (Int32Value);
   rpc CellBorder(CellBorderRequest)         returns (Empty);
   rpc CellBorderRange(CellBorderRangeRequest) returns (Empty);
   rpc SetWordWrap(SetBoolProp)              returns (Empty);
@@ -2046,6 +2048,7 @@ service VolvoxGridService {
   rpc SetAutoSearchDelay(SetInt32Prop)      returns (Empty);
   rpc SetAutoSizeMouse(SetBoolProp)         returns (Empty);
   rpc SetScrollTips(SetBoolProp)            returns (Empty);
+  rpc GetScrollTips(GridHandle)             returns (Int32Value);
   rpc SetInteractionConfig(SetInteractionConfigRequest) returns (Empty);
   rpc GetInteractionConfig(GridHandle)      returns (InteractionConfig);
 

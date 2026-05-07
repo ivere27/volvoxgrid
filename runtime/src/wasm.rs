@@ -4474,12 +4474,22 @@ pub fn is_dirty(id: i32) -> i32 {
     with_grid(id, |grid| if grid.dirty { 1 } else { 0 }).unwrap_or(0)
 }
 
-/// Returns the cursor style the host should display.
-/// 0 = default, 1 = col-resize, 2 = row-resize, 3 = move/grab,
-/// 4 = pointer/hand, 5 = pointer/hand (interactive cell content)
+/// Returns the semantic cursor hint the host should display, encoded as
+/// `pb::CursorType` (CURSOR_DEFAULT=0, CURSOR_RESIZE_COL=1,
+/// CURSOR_RESIZE_ROW=2, CURSOR_MOVE_COL=3, CURSOR_TEXT=4, CURSOR_HAND=5,
+/// CURSOR_MOVE_ROW=6, CURSOR_WAIT=7, CURSOR_NOT_ALLOWED=8,
+/// CURSOR_CROSSHAIR=9, CURSOR_COPY=10).
+#[wasm_bindgen]
+pub fn get_cursor_hint(id: i32) -> i32 {
+    with_grid(id, |grid| grid.cursor_hint).unwrap_or(0)
+}
+
+/// Compatibility alias for `get_cursor_hint`. Prefer `get_cursor_hint` in new
+/// code; this export exists so adapters built against the previous name keep
+/// working during the transition.
 #[wasm_bindgen]
 pub fn get_cursor_style(id: i32) -> i32 {
-    with_grid(id, |grid| grid.cursor_style).unwrap_or(0)
+    get_cursor_hint(id)
 }
 
 /// Returns the current cursor row.

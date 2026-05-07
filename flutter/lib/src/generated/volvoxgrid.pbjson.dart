@@ -1404,6 +1404,32 @@ final $typed_data.Uint8List frameKindDescriptor = $convert.base64Decode(
     'CglGcmFtZUtpbmQSFAoQRlJBTUVfS0lORF9GUkFNRRAAEhwKGEZSQU1FX0tJTkRfU0VTU0lPTl'
     '9TVEFSVBABEhoKFkZSQU1FX0tJTkRfU0VTU0lPTl9FTkQQAg==');
 
+@$core.Deprecated('Use cursorTypeDescriptor instead')
+const CursorType$json = {
+  '1': 'CursorType',
+  '2': [
+    {'1': 'CURSOR_DEFAULT', '2': 0},
+    {'1': 'CURSOR_RESIZE_COL', '2': 1},
+    {'1': 'CURSOR_RESIZE_ROW', '2': 2},
+    {'1': 'CURSOR_MOVE_COL', '2': 3},
+    {'1': 'CURSOR_TEXT', '2': 4},
+    {'1': 'CURSOR_HAND', '2': 5},
+    {'1': 'CURSOR_MOVE_ROW', '2': 6},
+    {'1': 'CURSOR_WAIT', '2': 7},
+    {'1': 'CURSOR_NOT_ALLOWED', '2': 8},
+    {'1': 'CURSOR_CROSSHAIR', '2': 9},
+    {'1': 'CURSOR_COPY', '2': 10},
+  ],
+};
+
+/// Descriptor for `CursorType`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List cursorTypeDescriptor = $convert.base64Decode(
+    'CgpDdXJzb3JUeXBlEhIKDkNVUlNPUl9ERUZBVUxUEAASFQoRQ1VSU09SX1JFU0laRV9DT0wQAR'
+    'IVChFDVVJTT1JfUkVTSVpFX1JPVxACEhMKD0NVUlNPUl9NT1ZFX0NPTBADEg8KC0NVUlNPUl9U'
+    'RVhUEAQSDwoLQ1VSU09SX0hBTkQQBRITCg9DVVJTT1JfTU9WRV9ST1cQBhIPCgtDVVJTT1JfV0'
+    'FJVBAHEhYKEkNVUlNPUl9OT1RfQUxMT1dFRBAIEhQKEENVUlNPUl9DUk9TU0hBSVIQCRIPCgtD'
+    'VVJTT1JfQ09QWRAK');
+
 @$core.Deprecated('Use fontDescriptor instead')
 const Font$json = {
   '1': 'Font',
@@ -9109,32 +9135,16 @@ const CursorChange$json = {
       '3': 1,
       '4': 1,
       '5': 14,
-      '6': '.volvoxgrid.v1.CursorChange.CursorType',
+      '6': '.volvoxgrid.v1.CursorType',
       '10': 'cursor'
     },
-  ],
-  '4': [CursorChange_CursorType$json],
-};
-
-@$core.Deprecated('Use cursorChangeDescriptor instead')
-const CursorChange_CursorType$json = {
-  '1': 'CursorType',
-  '2': [
-    {'1': 'DEFAULT', '2': 0},
-    {'1': 'RESIZE_COL', '2': 1},
-    {'1': 'RESIZE_ROW', '2': 2},
-    {'1': 'MOVE_COL', '2': 3},
-    {'1': 'TEXT', '2': 4},
-    {'1': 'HAND', '2': 5},
   ],
 };
 
 /// Descriptor for `CursorChange`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List cursorChangeDescriptor = $convert.base64Decode(
-    'CgxDdXJzb3JDaGFuZ2USPgoGY3Vyc29yGAEgASgOMiYudm9sdm94Z3JpZC52MS5DdXJzb3JDaG'
-    'FuZ2UuQ3Vyc29yVHlwZVIGY3Vyc29yIlsKCkN1cnNvclR5cGUSCwoHREVGQVVMVBAAEg4KClJF'
-    'U0laRV9DT0wQARIOCgpSRVNJWkVfUk9XEAISDAoITU9WRV9DT0wQAxIICgRURVhUEAQSCAoESE'
-    'FORBAF');
+    'CgxDdXJzb3JDaGFuZ2USMQoGY3Vyc29yGAEgASgOMhkudm9sdm94Z3JpZC52MS5DdXJzb3JUeX'
+    'BlUgZjdXJzb3I=');
 
 @$core.Deprecated('Use editRequestDescriptor instead')
 const EditRequest$json = {

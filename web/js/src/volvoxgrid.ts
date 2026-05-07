@@ -6334,10 +6334,26 @@ export class VolvoxGrid {
     const modifier = this.modifierBits(e);
     this.wasm.handle_pointer_move(this.gridId, x * this.dprX, y * this.dprY, button, modifier);
 
-    // Sync cursor style from engine
-    const cursorStyle = Number(this.wasm.get_cursor_style(this.gridId));
-    const CURSOR_MAP = ["default", "col-resize", "row-resize", "grab", "pointer", "pointer"];
-    this.canvas.style.cursor = CURSOR_MAP[cursorStyle] ?? "default";
+    // Sync cursor from engine. Engine emits a semantic hint encoded as
+    // pb::CursorType; prefer get_cursor_hint and fall back to the legacy
+    // get_cursor_style export during the transition.
+    // Index aligned to proto/volvoxgrid.proto enum CursorType.
+    const getHint = this.wasm.get_cursor_hint ?? this.wasm.get_cursor_style;
+    const cursorHint = Number(getHint.call(this.wasm, this.gridId));
+    const CURSOR_MAP = [
+      "default",      // 0  CURSOR_DEFAULT
+      "col-resize",   // 1  CURSOR_RESIZE_COL
+      "row-resize",   // 2  CURSOR_RESIZE_ROW
+      "grab",         // 3  CURSOR_MOVE_COL
+      "text",         // 4  CURSOR_TEXT
+      "pointer",      // 5  CURSOR_HAND
+      "grab",         // 6  CURSOR_MOVE_ROW
+      "wait",         // 7  CURSOR_WAIT
+      "not-allowed",  // 8  CURSOR_NOT_ALLOWED
+      "crosshair",    // 9  CURSOR_CROSSHAIR
+      "copy",         // 10 CURSOR_COPY
+    ];
+    this.canvas.style.cursor = CURSOR_MAP[cursorHint] ?? "default";
 
     if (e.buttons) {
       this.dirty = true;

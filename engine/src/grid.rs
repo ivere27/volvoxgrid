@@ -540,10 +540,16 @@ pub struct VolvoxGrid {
     pub mouse_col: i32,
     /// Last event target reported by pointer hover.
     pub last_hover_target: Option<HoverTarget>,
-    /// Cursor style the host should display.
-    /// 0 = default, 1 = col-resize, 2 = row-resize, 3 = move/grab,
-    /// 4 = pointer/hand, 5 = pointer/hand (interactive cell content)
-    pub cursor_style: i32,
+    /// Semantic cursor hint the host should display, encoded as
+    /// `pb::CursorType`:
+    /// 0 = CURSOR_DEFAULT, 1 = CURSOR_RESIZE_COL, 2 = CURSOR_RESIZE_ROW,
+    /// 3 = CURSOR_MOVE_COL, 4 = CURSOR_TEXT, 5 = CURSOR_HAND,
+    /// 6 = CURSOR_MOVE_ROW, 7 = CURSOR_WAIT, 8 = CURSOR_NOT_ALLOWED,
+    /// 9 = CURSOR_CROSSHAIR, 10 = CURSOR_COPY.
+    /// Adapters map this hint to their platform's cursor primitive
+    /// (Win32 HCURSOR, CSS cursor, Flutter MouseCursor, …) and decide
+    /// whether a host-side override (e.g. ActiveX `MousePointer`) wins.
+    pub cursor_hint: i32,
 
     // ── Resize Tracking ──────────────────────────────────────────────────
     /// Whether a column/row resize drag is in progress.
@@ -939,7 +945,7 @@ impl VolvoxGrid {
             mouse_row: -1,
             mouse_col: -1,
             last_hover_target: None,
-            cursor_style: 0,
+            cursor_hint: 0,
 
             // Resize tracking
             resize_active: false,

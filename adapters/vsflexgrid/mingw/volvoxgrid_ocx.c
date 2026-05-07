@@ -5762,19 +5762,21 @@ static HCURSOR vfg_cursor_from_mouse_pointer(int32_t mouse_pointer) {
     }
 }
 
-static HCURSOR vfg_cursor_from_engine_style(int32_t cursor_style) {
-    switch (cursor_style) {
-    case 1:
-        return LoadCursor(NULL, IDC_SIZEWE);
-    case 2:
-        return LoadCursor(NULL, IDC_SIZENS);
-    case 3:
-        return LoadCursor(NULL, IDC_SIZEALL);
-    case 4:
-    case 5:
-        return LoadCursor(NULL, IDC_HAND);
-    default:
-        return LoadCursor(NULL, IDC_ARROW);
+/* Maps the engine's semantic cursor hint (pb::CursorType, see
+ * proto/volvoxgrid.proto) to a Win32 HCURSOR. */
+static HCURSOR vfg_cursor_from_engine_hint(int32_t cursor_hint) {
+    switch (cursor_hint) {
+    case 1:  /* CURSOR_RESIZE_COL  */ return LoadCursor(NULL, IDC_SIZEWE);
+    case 2:  /* CURSOR_RESIZE_ROW  */ return LoadCursor(NULL, IDC_SIZENS);
+    case 3:  /* CURSOR_MOVE_COL    */ return LoadCursor(NULL, IDC_SIZEALL);
+    case 4:  /* CURSOR_TEXT        */ return LoadCursor(NULL, IDC_IBEAM);
+    case 5:  /* CURSOR_HAND        */ return LoadCursor(NULL, IDC_HAND);
+    case 6:  /* CURSOR_MOVE_ROW    */ return LoadCursor(NULL, IDC_SIZEALL);
+    case 7:  /* CURSOR_WAIT        */ return LoadCursor(NULL, IDC_WAIT);
+    case 8:  /* CURSOR_NOT_ALLOWED */ return LoadCursor(NULL, IDC_NO);
+    case 9:  /* CURSOR_CROSSHAIR   */ return LoadCursor(NULL, IDC_CROSS);
+    case 10: /* CURSOR_COPY        */ return LoadCursor(NULL, IDC_HAND);
+    default: /* CURSOR_DEFAULT     */ return LoadCursor(NULL, IDC_ARROW);
     }
 }
 
@@ -5784,7 +5786,7 @@ static HCURSOR vfg_resolve_cursor(VolvoxGridObject *obj) {
     if (obj->mouse_pointer_cached != 0) {
         cursor = vfg_cursor_from_mouse_pointer(obj->mouse_pointer_cached);
     } else {
-        cursor = vfg_cursor_from_engine_style(volvox_grid_get_cursor_style_native(obj->grid_id));
+        cursor = vfg_cursor_from_engine_hint(volvox_grid_get_cursor_hint_native(obj->grid_id));
     }
     return cursor ? cursor : LoadCursor(NULL, IDC_ARROW);
 }

@@ -3860,7 +3860,7 @@ pub fn handle_pointer_move(grid: &mut VolvoxGrid, x: f32, y: f32, button: i32, m
 
     // Handle active resize drag
     if grid.resize_active {
-        grid.cursor_style = if grid.resize_is_col { 1 } else { 2 };
+        grid.cursor_hint = if grid.resize_is_col { 1 } else { 2 };
         if grid.resize_is_col {
             let delta = (x - grid.resize_start_pos) as i32;
             let new_width = (grid.resize_start_size + delta).max(0);
@@ -3898,7 +3898,7 @@ pub fn handle_pointer_move(grid: &mut VolvoxGrid, x: f32, y: f32, button: i32, m
     // behaviors to avoid conflicts with selection/sort click.
     if grid.col_drag_pending {
         if maybe_activate_pending_col_drag(grid, x, y) {
-            grid.cursor_style = 3; // move/grab
+            grid.cursor_hint = 3; // move/grab
             grid.mark_dirty();
         }
         return;
@@ -3906,7 +3906,7 @@ pub fn handle_pointer_move(grid: &mut VolvoxGrid, x: f32, y: f32, button: i32, m
 
     // Handle active column drag/reorder
     if grid.col_drag_active {
-        grid.cursor_style = 3; // move/grab
+        grid.cursor_hint = 3; // move/grab
         update_col_drag_target(grid, x, y);
         grid.mark_dirty();
         return;
@@ -3929,7 +3929,7 @@ pub fn handle_pointer_move(grid: &mut VolvoxGrid, x: f32, y: f32, button: i32, m
 
     // Handle active freeze drag
     if grid.freeze_drag_active {
-        grid.cursor_style = if grid.freeze_drag_is_row { 2 } else { 1 };
+        grid.cursor_hint = if grid.freeze_drag_is_row { 2 } else { 1 };
         let hit = hit_test(grid, x, y);
         if grid.freeze_drag_is_row && hit.row >= grid.fixed_rows {
             let new_frozen = (hit.row - grid.fixed_rows).max(0);
@@ -3972,7 +3972,7 @@ pub fn handle_pointer_move(grid: &mut VolvoxGrid, x: f32, y: f32, button: i32, m
     }
 
     // Update cursor style based on hit area
-    grid.cursor_style = match hit.area {
+    grid.cursor_hint = match hit.area {
         HitArea::ColBorder => {
             if col_resize_enabled(grid) {
                 1 // col-resize
@@ -3988,7 +3988,7 @@ pub fn handle_pointer_move(grid: &mut VolvoxGrid, x: f32, y: f32, button: i32, m
             }
         }
         HitArea::IndicatorRowStartResize => 1,
-        HitArea::OutlineButton => 4,
+        HitArea::OutlineButton => 5,
         HitArea::DropdownButton | HitArea::CheckBox => 5,
         HitArea::Cell
         | HitArea::CellText
@@ -5972,7 +5972,7 @@ mod tests {
 
         handle_pointer_move(&mut grid, hover_x, hover_y, 0, 0);
 
-        assert_eq!(grid.cursor_style, 5);
+        assert_eq!(grid.cursor_hint, 5);
     }
 
     #[test]
@@ -5991,7 +5991,7 @@ mod tests {
 
         handle_pointer_move(&mut grid, hover_x, hover_y, 0, 0);
 
-        assert_eq!(grid.cursor_style, 5);
+        assert_eq!(grid.cursor_hint, 5);
     }
 
     #[test]
@@ -6048,7 +6048,7 @@ mod tests {
         );
 
         handle_pointer_move(&mut grid, hover_x, hover_y, 0, 0);
-        assert_eq!(grid.cursor_style, 5);
+        assert_eq!(grid.cursor_hint, 5);
     }
 
     #[test]

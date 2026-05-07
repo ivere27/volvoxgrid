@@ -206,6 +206,14 @@ int32_t volvox_grid_set_font_strikethrough_native(int64_t id, int32_t value);
 int32_t volvox_grid_get_font_strikethrough_native(int64_t id);
 int32_t volvox_grid_set_font_width_native(int64_t id, int32_t value);
 int32_t volvox_grid_get_font_width_native(int64_t id);
+/* Returns the engine's semantic cursor hint, encoded as
+ * pb::cursor_change::CursorType:
+ *   0 = DEFAULT, 1 = RESIZE_COL, 2 = RESIZE_ROW,
+ *   3 = MOVE_COL, 4 = TEXT,      5 = HAND.
+ * Adapters map this to a native cursor primitive. */
+int32_t volvox_grid_get_cursor_hint_native(int64_t id);
+/* Compatibility alias for volvox_grid_get_cursor_hint_native. Prefer the
+ * _hint name in new code. */
 int32_t volvox_grid_get_cursor_style_native(int64_t id);
 
 /* ActiveX compatibility helpers */

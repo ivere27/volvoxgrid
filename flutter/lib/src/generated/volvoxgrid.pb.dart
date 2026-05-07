@@ -18735,7 +18735,7 @@ class SelectionUpdate extends $pb.GeneratedMessage {
 
 class CursorChange extends $pb.GeneratedMessage {
   factory CursorChange({
-    CursorChange_CursorType? cursor,
+    CursorType? cursor,
   }) {
     final result = create();
     if (cursor != null) result.cursor = cursor;
@@ -18755,8 +18755,8 @@ class CursorChange extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'CursorChange',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
-    ..aE<CursorChange_CursorType>(1, _omitFieldNames ? '' : 'cursor',
-        enumValues: CursorChange_CursorType.values)
+    ..aE<CursorType>(1, _omitFieldNames ? '' : 'cursor',
+        enumValues: CursorType.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -18779,9 +18779,9 @@ class CursorChange extends $pb.GeneratedMessage {
   static CursorChange? _defaultInstance;
 
   @$pb.TagNumber(1)
-  CursorChange_CursorType get cursor => $_getN(0);
+  CursorType get cursor => $_getN(0);
   @$pb.TagNumber(1)
-  set cursor(CursorChange_CursorType value) => $_setField(1, value);
+  set cursor(CursorType value) => $_setField(1, value);
   @$pb.TagNumber(1)
   $core.bool hasCursor() => $_has(0);
   @$pb.TagNumber(1)

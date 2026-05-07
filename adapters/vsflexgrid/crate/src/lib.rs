@@ -8894,9 +8894,19 @@ pub extern "C" fn volvox_grid_get_font_width_native(id: i64) -> i32 {
         .unwrap_or(0)
 }
 
+/// Returns the semantic cursor hint emitted by the engine, encoded as
+/// `pb::CursorType` (see proto/volvoxgrid.proto). The OCX maps this to a
+/// Win32 `HCURSOR`, honoring the host's `MousePointer` override when set.
+#[no_mangle]
+pub extern "C" fn volvox_grid_get_cursor_hint_native(id: i64) -> i32 {
+    GRID_MANAGER.with_grid(id, |g| g.cursor_hint).unwrap_or(0)
+}
+
+/// Compatibility alias for `volvox_grid_get_cursor_hint_native`. Prefer the
+/// `_hint` name in new adapter code.
 #[no_mangle]
 pub extern "C" fn volvox_grid_get_cursor_style_native(id: i64) -> i32 {
-    GRID_MANAGER.with_grid(id, |g| g.cursor_style).unwrap_or(0)
+    volvox_grid_get_cursor_hint_native(id)
 }
 
 // ---------------------------------------------------------------------------
@@ -10445,9 +10455,11 @@ mod tests {
 
         GRID_MANAGER
             .with_grid(grid_id, |g| {
-                g.cursor_style = 5;
+                g.cursor_hint = 5;
             })
             .unwrap();
+        assert_eq!(volvox_grid_get_cursor_hint_native(grid_id), 5);
+        // Compatibility alias must agree with the new export.
         assert_eq!(volvox_grid_get_cursor_style_native(grid_id), 5);
 
         let out = volvox_grid_destroy_grid(grid_id, std::ptr::null_mut());

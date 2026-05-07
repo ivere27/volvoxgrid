@@ -290,14 +290,19 @@ namespace Volvoxgrid.V1
         CORNER_SLOT_CUSTOM = 3,
     }
 
-    public enum CursorChange_CursorType
+    public enum CursorType
     {
-        DEFAULT = 0,
-        RESIZE_COL = 1,
-        RESIZE_ROW = 2,
-        MOVE_COL = 3,
-        TEXT = 4,
-        HAND = 5,
+        CURSOR_DEFAULT = 0,
+        CURSOR_RESIZE_COL = 1,
+        CURSOR_RESIZE_ROW = 2,
+        CURSOR_MOVE_COL = 3,
+        CURSOR_TEXT = 4,
+        CURSOR_HAND = 5,
+        CURSOR_MOVE_ROW = 6,
+        CURSOR_WAIT = 7,
+        CURSOR_NOT_ALLOWED = 8,
+        CURSOR_CROSSHAIR = 9,
+        CURSOR_COPY = 10,
     }
 
     public enum CustomRenderMode
@@ -4146,7 +4151,7 @@ namespace Volvoxgrid.V1
 
     public sealed class CursorChange
     {
-        public CursorChange_CursorType Cursor { get; set; }
+        public CursorType Cursor { get; set; }
 
         // ── Serialization ──
 
@@ -4171,7 +4176,7 @@ namespace Volvoxgrid.V1
             {
                 switch (field)
                 {
-                    case 1: msg.Cursor = (CursorChange_CursorType)r.ReadInt32(); break;
+                    case 1: msg.Cursor = (CursorType)r.ReadInt32(); break;
                     default: r.SkipField(wire); break;
                 }
             }
