@@ -61,6 +61,25 @@ The custom element creates a shadow DOM canvas and initializes VolvoxGrid automa
 | `volvoxgrid/generated/volvoxgrid_ffi.js` | Generated low-level FFI constants |
 | `volvoxgrid/generated/volvoxgrid_lite.js` | Generated protobuf-lite message codecs |
 | `volvoxgrid/default-input.js` | Default keyboard/mouse input helpers |
+| `volvoxgrid/volvoxgrid-element.js` | Custom element registration |
+
+## Package Builds
+
+```bash
+npm run build
+```
+
+This compiles the TypeScript package into `dist/` and also writes the minified browser bundle at `dist/volvoxgrid.min.js` with a source map. The package `unpkg` and `jsdelivr` fields point to that minified file.
+
+The adapter packages follow the same release shape:
+
+| Package | Minified bundle |
+|---|---|
+| `volvoxgrid` | `dist/volvoxgrid.min.js` |
+| `@volvoxgrid/ag-grid` | `dist/ag-grid-volvox.min.js` |
+| `@volvoxgrid/sheet` | `dist/volvox-sheet.min.js` |
+
+Release demos can load these bundles from jsDelivr with import maps, while generated low-level modules remain available under `dist/generated/`.
 
 ## Data Operations
 
@@ -145,7 +164,7 @@ npm run build:wasm
 npm run build:wasm:threaded
 ```
 
-The WASM output is written to `web/js/wasm/`.
+These scripts build the WASM-facing target from the shared `runtime/` crate and write package-local output to `web/js/wasm/`. Repo-level `make wasm` and `make web` write demo output to `web/example/wasm/`.
 
 ## Running the Example
 
@@ -155,7 +174,15 @@ From the repo root:
 make web
 ```
 
-This builds the WASM crate and starts the Vite dev server for the example app in `web/example/`.
+This builds the runtime WASM target and starts the Vite dev server for the example app in `web/example/`.
+
+For release-style demo output:
+
+```bash
+WEB_DOCKER_TARGET=web make docker_web
+```
+
+That build writes `dist/web/demos/web/` and externalizes `volvoxgrid` through a CDN import map. Use `WEB_DOCKER_TARGET=sheet` or `WEB_DOCKER_TARGET=sheet-lite` for the sheet demos.
 
 ## License
 

@@ -22,9 +22,9 @@ The engine owns grid state, layout, selection, edit flow, sorting, scrolling, re
 ## Repo Layout
 
 - `engine/`: core retained grid model, layout, rendering, text integration, and event production
-- `runtime/`: Synurang native runtime used by desktop, Android, Flutter, `.NET`, and other native hosts
-- `runtime/`: native runtime crate and WASM-facing Rust crate
-- `web/js/`: browser loader, TypeScript API, default input helpers, and WASM packaging glue
+- `runtime/`: shared Rust crate for the native Synurang runtime and WASM build targets
+- `web/js/`: browser loader, TypeScript API, default input helpers, npm package files, and WASM packaging glue
+- `web/example/`: Vite browser demo and release-demo source
 - `proto/`: protobuf service and render-session contract
 - `codegen/`: generated bindings and shared generated outputs
 - `flutter/`, `android/`, `java/`, `dotnet/`, `go/`: platform wrappers and samples
@@ -62,7 +62,7 @@ The native runtime is the shared host-facing boundary for non-web integrations. 
 
 ### WASM Path
 
-The web path uses the Rust WASM crate plus the TypeScript wrapper instead of the native runtime. The engine logic is still shared, but loading, JS interop, and browser integration are web-specific.
+The web path builds the WASM-facing entry points from `runtime/` with `wasm-pack` and layers the `web/js/` TypeScript wrapper on top. The engine logic is still shared, but loading, JS interop, packaging, and browser integration are web-specific.
 
 ### Wrappers And Hosts
 
@@ -113,7 +113,7 @@ You do not need every tool for every change, but the full repo can involve:
 - Rust stable via `rustup` (engine, runtime, all native builds)
 - `protoc` (proto contract changes via `make codegen`)
 - Go 1.22+ for `protoc-gen-synurang-ffi` and the Go TUI host (`go/`)
-- Node.js and npm for web and adapter packages (`web/`, `adapters/`)
+- Node.js and npm for web demos, the web package, and adapter packages (`web/js/`, `web/example/`, `adapters/`)
 - Rust nightly and `wasm-pack` for WASM builds (`runtime/`)
 - Flutter SDK for Flutter work (`flutter/`)
 - Android SDK, Android NDK, and `cargo-ndk` for Android work (`android/`)
@@ -141,6 +141,9 @@ Targeted local loops:
 
 ```bash
 make web
+make web-lite
+make sheet
+make sheet-lite
 make flutter-run
 make android
 make java-desktop-run
@@ -174,8 +177,11 @@ Packaging builds:
 
 - `make docker_android_aar`
 - `make docker_desktop`
+- `make docker_web`
 - `make docker_ios`
 - `make docker_all`
+
+Web packaging is targetable with `WEB_DOCKER_TARGET={all|bundle|web|sheet|sheet-lite|report|wasm|wasm-lite|wasm-threaded}`. The web and sheet release-demo targets externalize package JavaScript through CDN import maps and use the minified browser bundles.
 
 Publishing:
 

@@ -211,6 +211,8 @@ npm install @volvoxgrid/ag-grid
 npm install @volvoxgrid/sheet
 ```
 
+The web and adapter npm packages publish minified `dist/*.min.js` browser bundles for unpkg/jsDelivr usage in addition to their module exports.
+
 See [web/js/README.md](web/js/README.md) for the web package API and [GUI.md](GUI.md) for engine behavior.
 
 ### Go
