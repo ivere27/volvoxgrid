@@ -1966,6 +1966,30 @@ fn target_identity_from_hit(grid: &VolvoxGrid, hit: &HitTestResult) -> EventTarg
     }
 }
 
+fn hover_target_identity_int_value(target: &EventTarget) -> Option<i64> {
+    if target.kind == pb::GridTargetKind::GridTargetCornerIndicator as i32
+        && target.band == pb::IndicatorBand::CornerTopStart as i32
+        && target.slot_kind == pb::CornerIndicatorSlotKind::CornerSlotOutlineLevels as i32
+    {
+        Some(target.int_value)
+    } else {
+        None
+    }
+}
+
+fn same_hover_target_identity(prev: &HoverTarget, next: &HoverTarget) -> bool {
+    prev.row == next.row
+        && prev.col == next.col
+        && prev.target.kind == next.target.kind
+        && prev.target.band == next.target.band
+        && prev.target.slot_index == next.target.slot_index
+        && prev.target.slot_kind == next.target.slot_kind
+        && prev.target.sub_mode_bits == next.target.sub_mode_bits
+        && prev.target.custom_key == next.target.custom_key
+        && hover_target_identity_int_value(&prev.target)
+            == hover_target_identity_int_value(&next.target)
+}
+
 fn emit_pointer_move_and_hover(
     grid: &mut VolvoxGrid,
     hit: &HitTestResult,
@@ -1980,7 +2004,12 @@ fn emit_pointer_move_and_hover(
         col: hit.col,
         target,
     };
-    if grid.last_hover_target.as_ref() == Some(&next) {
+    if grid
+        .last_hover_target
+        .as_ref()
+        .is_some_and(|prev| same_hover_target_identity(prev, &next))
+    {
+        grid.last_hover_target = Some(next);
         return;
     }
     let repaint_indicator_hover = grid
@@ -5548,6 +5577,58 @@ mod tests {
             | GridEventData::LeaveCell { target, .. }
                 if target.kind == pb::GridTargetKind::GridTargetDataCell as i32
         )));
+    }
+
+    #[test]
+    fn pointer_move_stays_entered_after_checkbox_click_changes_cell_state() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 2, 1, 0);
+        grid.edit_trigger_mode = 2;
+        grid.selection.row = 1;
+        grid.selection.col = 1;
+        grid.selection.set_extent(1, 1, grid.rows, grid.cols);
+        grid.columns[0].data_type = pb::ColumnDataType::ColumnDataBoolean as i32;
+        grid.columns[0].alignment = pb::Align::CenterCenter as i32;
+        grid.cells.set_text(1, 0, "No".to_string());
+        {
+            let cell = grid.cells.get_mut(1, 0);
+            let extra = cell.extra_mut();
+            extra.value = crate::cell::CellValueData::Bool(false);
+            extra.checked = pb::CheckedState::CheckedUnchecked as i32;
+        }
+        prime_layout(&mut grid);
+
+        let (bx, by, bw, bh) = checkbox_rect(&grid, 1, 0).expect("checkbox rect");
+        let hover_x = bx as f32 + bw as f32 * 0.5;
+        let hover_y = by as f32 + bh as f32 * 0.5;
+
+        handle_pointer_move(&mut grid, hover_x, hover_y, 0, 0);
+        let events = grid.events.drain();
+        assert!(events.iter().any(|e| matches!(
+            &e.data,
+            GridEventData::EnterCell { row: 1, col: 0, target }
+                if target.kind == pb::GridTargetKind::GridTargetDataCell as i32
+                    && (target.status_flags
+                        & pb::GridEventTargetFlag::GridTargetFlagSelected as u32) == 0
+        )));
+
+        handle_pointer_down(&mut grid, hover_x, hover_y, 0, 0, false);
+        let _ = grid.events.drain();
+
+        handle_pointer_move(&mut grid, hover_x + 1.0, hover_y, 0, 0);
+        let events = grid.events.drain();
+        assert!(!events.iter().any(|e| matches!(
+            e.data,
+            GridEventData::MouseMove { .. }
+                | GridEventData::EnterCell { .. }
+                | GridEventData::LeaveCell { .. }
+        )));
+        assert!(grid.last_hover_target.as_ref().is_some_and(|hover| {
+            hover.row == 1
+                && hover.col == 0
+                && (hover.target.status_flags
+                    & pb::GridEventTargetFlag::GridTargetFlagSelected as u32)
+                    != 0
+        }));
     }
 
     #[test]
