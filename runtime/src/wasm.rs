@@ -99,6 +99,10 @@ enum PendingAction {
         old_text: String,
         committed_text: String,
     },
+    ToggleCheckbox {
+        row: i32,
+        col: i32,
+    },
     BeforeSort {
         col: i32,
     },
@@ -426,6 +430,37 @@ fn request_before_edit(
     let event = volvoxgrid_engine::event::GridEventData::BeforeEdit { row, col };
     grid.events.push_with_id(event_id, event.clone());
     queue_pending_decision_event(grid_id, event_id, event);
+}
+
+fn request_before_checkbox_toggle(
+    grid_id: i64,
+    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+    row: i32,
+    col: i32,
+) -> bool {
+    if !input::can_toggle_checkbox_cell(grid, row, col) {
+        return false;
+    }
+
+    if !decision_channel_enabled(grid_id) {
+        grid.events
+            .push(volvoxgrid_engine::event::GridEventData::BeforeEdit { row, col });
+        input::apply_checkbox_toggle_after_before_edit(grid, row, col);
+        return true;
+    }
+
+    let event_id = next_event_id();
+    PENDING_ACTIONS.lock().unwrap().insert(
+        (grid_id, event_id),
+        PendingActionEntry {
+            created_at: Instant::now(),
+            action: PendingAction::ToggleCheckbox { row, col },
+        },
+    );
+    let event = volvoxgrid_engine::event::GridEventData::BeforeEdit { row, col };
+    grid.events.push_with_id(event_id, event.clone());
+    queue_pending_decision_event(grid_id, event_id, event);
+    true
 }
 
 fn request_validate_edit(
@@ -788,6 +823,12 @@ fn apply_pending_action(grid_id: i64, action: PendingAction, cancel: bool) {
                 grid.edit.cancel();
             }
             shared::apply_committed_edit_text(grid, row, col, old_text, committed_text);
+        }
+        PendingAction::ToggleCheckbox { row, col } => {
+            if cancel {
+                return;
+            }
+            input::apply_checkbox_toggle_after_before_edit(grid, row, col);
         }
         PendingAction::BeforeSort { col } => {
             if cancel {
@@ -4062,6 +4103,9 @@ fn handle_pointer_down_after_before_mouse(
                 .map_or(false, |rp| rp.is_collapsed);
             request_before_node_toggle(grid_id, grid, hit.row, collapsing);
         }
+        if area == input::HitArea::CheckBox && !dbl_click {
+            request_before_checkbox_toggle(grid_id, grid, hit.row, hit.col);
+        }
         let is_cell_like = area == input::HitArea::Cell
             || area == input::HitArea::FixedRow
             || area == input::HitArea::FixedCol;
@@ -4191,7 +4235,18 @@ pub fn handle_key_down(id: i32, key_code: i32, modifier: i32) {
                     ..input::InputBehavior::default()
                 },
             );
-            if (key_code == 13 || key_code == 113)
+            let sel_row = grid.selection.row;
+            let sel_col = grid.selection.col;
+            let queued_checkbox_toggle = (key_code == 32 || key_code == 13)
+                && !grid.host_key_dispatch
+                && !was_editing
+                && !grid.is_editing()
+                && input::selected_outline_label_keyboard_target(grid).is_none()
+                && request_before_checkbox_toggle(grid_id, grid, sel_row, sel_col);
+            let selected_checkbox = input::is_boolean_checkbox_cell(grid, sel_row, sel_col);
+            if !queued_checkbox_toggle
+                && !selected_checkbox
+                && (key_code == 13 || key_code == 113)
                 && !grid.host_key_dispatch
                 && grid.edit_trigger_mode >= 1
                 && !was_editing
@@ -4199,8 +4254,8 @@ pub fn handle_key_down(id: i32, key_code: i32, modifier: i32) {
                 request_before_edit(
                     grid_id,
                     grid,
-                    grid.selection.row,
-                    grid.selection.col,
+                    sel_row,
+                    sel_col,
                     false,
                     None,
                     None,
@@ -4239,13 +4294,18 @@ pub fn handle_key_press(id: i32, char_code: u32) {
                 && grid.edit_trigger_mode >= 1
                 && grid.type_ahead_mode == 0
             {
+                let sel_row = grid.selection.row;
+                let sel_col = grid.selection.col;
+                if input::is_boolean_checkbox_cell(grid, sel_row, sel_col) {
+                    return;
+                }
                 if let Some(seed) = char::from_u32(char_code).map(|c| c.to_string()) {
                     if !seed.is_empty() {
                         request_before_edit(
                             grid_id,
                             grid,
-                            grid.selection.row,
-                            grid.selection.col,
+                            sel_row,
+                            sel_col,
                             false,
                             Some(seed),
                             None,

@@ -215,6 +215,10 @@ enum PendingAction {
         click_caret: Option<i32>,
         caret_end: Option<bool>,
     },
+    ToggleCheckbox {
+        row: i32,
+        col: i32,
+    },
     BeforeSort {
         col: i32,
     },
@@ -2049,6 +2053,38 @@ fn request_before_edit(
     );
 }
 
+fn request_before_checkbox_toggle(
+    grid_id: i64,
+    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+    row: i32,
+    col: i32,
+) -> bool {
+    if !input::can_toggle_checkbox_cell(grid, row, col) {
+        return false;
+    }
+
+    if !decision_channel_enabled(grid_id) {
+        grid.events
+            .push(volvoxgrid_engine::event::GridEventData::BeforeEdit { row, col });
+        input::apply_checkbox_toggle_after_before_edit(grid, row, col);
+        return true;
+    }
+
+    let event_id = next_event_id();
+    PENDING_ACTIONS.lock().unwrap().insert(
+        (grid_id, event_id),
+        PendingActionEntry {
+            created_at: Instant::now(),
+            action: PendingAction::ToggleCheckbox { row, col },
+        },
+    );
+    grid.events.push_with_id(
+        event_id,
+        volvoxgrid_engine::event::GridEventData::BeforeEdit { row, col },
+    );
+    true
+}
+
 fn request_before_dropdown_open(
     grid_id: i64,
     grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
@@ -2364,6 +2400,12 @@ fn apply_pending_action(grid_id: i64, action: PendingAction, cancel: bool) {
                 click_caret,
                 caret_end,
             );
+        }
+        PendingAction::ToggleCheckbox { row, col } => {
+            if cancel {
+                return;
+            }
+            input::apply_checkbox_toggle_after_before_edit(grid, row, col);
         }
         PendingAction::BeforeSort { col } => {
             if cancel {
@@ -7909,6 +7951,9 @@ fn handle_pointer_down_after_before_mouse(
                 .map_or(false, |rp| rp.is_collapsed);
             request_before_node_toggle(grid_id, g, hit.row, collapsing);
         }
+        if area == HitArea::CheckBox && !dbl_click {
+            request_before_checkbox_toggle(grid_id, g, hit.row, hit.col);
+        }
 
         let is_cell_like =
             area == HitArea::Cell || area == HitArea::FixedRow || area == HitArea::FixedCol;
@@ -8067,12 +8112,26 @@ pub extern "C" fn volvox_grid_key_down_native(id: i64, key_code: i32, modifier: 
                     ..InputBehavior::default()
                 },
             );
-            if key_code == 113 && !g.host_key_dispatch && g.edit_trigger_mode >= 1 && !was_editing {
+            let sel_row = g.selection.row;
+            let sel_col = g.selection.col;
+            let queued_checkbox_toggle = (key_code == 32 || key_code == 13)
+                && !g.host_key_dispatch
+                && !was_editing
+                && !g.is_editing()
+                && input::selected_outline_label_keyboard_target(g).is_none()
+                && request_before_checkbox_toggle(id, g, sel_row, sel_col);
+            if !queued_checkbox_toggle
+                && key_code == 113
+                && !input::is_boolean_checkbox_cell(g, sel_row, sel_col)
+                && !g.host_key_dispatch
+                && g.edit_trigger_mode >= 1
+                && !was_editing
+            {
                 request_before_edit(
                     id,
                     g,
-                    g.selection.row,
-                    g.selection.col,
+                    sel_row,
+                    sel_col,
                     false,
                     None,
                     None,
@@ -8108,19 +8167,15 @@ pub extern "C" fn volvox_grid_key_press_native(id: i64, char_code: u32) -> i32 {
                 && g.edit_trigger_mode >= 1
                 && g.type_ahead_mode == 0
             {
+                let sel_row = g.selection.row;
+                let sel_col = g.selection.col;
+                if input::is_boolean_checkbox_cell(g, sel_row, sel_col) {
+                    return;
+                }
                 if let Some(seed_char) = char::from_u32(char_code).filter(|c| *c >= ' ') {
                     let seed = seed_char.to_string();
                     if !seed.is_empty() {
-                        request_before_edit(
-                            id,
-                            g,
-                            g.selection.row,
-                            g.selection.col,
-                            false,
-                            Some(seed),
-                            None,
-                            None,
-                        );
+                        request_before_edit(id, g, sel_row, sel_col, false, Some(seed), None, None);
                     }
                 }
             }
