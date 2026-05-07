@@ -1001,7 +1001,7 @@ fn checkbox_rect(grid: &VolvoxGrid, row: i32, col: i32) -> Option<(i32, i32, i32
     }
 
     let (cx, cy, cw, ch) = grid.cell_screen_rect(row, col)?;
-    let box_size = crate::canvas::checkbox_box_size(ch);
+    let box_size = crate::canvas::checkbox_box_size_for_rect(cw, ch);
     let style_override = grid.get_cell_style(row, col);
     let alignment = crate::canvas::resolve_alignment(grid, row, col, &style_override, "");
     let (halign, valign) = crate::canvas::alignment_components(alignment);
@@ -6150,6 +6150,21 @@ mod tests {
             e.data,
             GridEventData::BeforeEdit { .. } | GridEventData::StartEdit { .. }
         )));
+    }
+
+    #[test]
+    fn checkbox_rect_uses_min_cell_dimension() {
+        let mut grid = VolvoxGrid::new(1, 16, 64, 1, 1, 0, 0);
+        grid.columns[0].data_type = pb::ColumnDataType::ColumnDataBoolean as i32;
+        grid.columns[0].alignment = pb::Align::CenterCenter as i32;
+        grid.set_col_width(0, 12);
+        grid.set_row_height(0, 60);
+        prime_layout(&mut grid);
+
+        let (_, _, bw, bh) = checkbox_rect(&grid, 0, 0).expect("checkbox rect");
+        assert_eq!(bw, bh);
+        assert!(bw <= 12);
+        assert!(bw >= 8);
     }
 
     #[test]
