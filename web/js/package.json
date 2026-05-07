@@ -1,6 +1,6 @@
 {
   "name": "volvoxgrid",
-  "version": "0.8.5",
+  "version": "0.8.6",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -10,6 +10,8 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "unpkg": "dist/volvoxgrid.min.js",
+  "jsdelivr": "dist/volvoxgrid.min.js",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -37,11 +39,13 @@
     "wasm"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && npm run build:min",
+    "build:min": "esbuild dist/index.js --bundle --minify --format=esm --target=es2020 --outfile=dist/volvoxgrid.min.js --sourcemap",
     "build:wasm": "cd ../../runtime && rustup run nightly wasm-pack build . --target web --out-dir ../web/js/wasm --out-name volvoxgrid_wasm --no-default-features --features wasm-default",
     "build:wasm:threaded": "cd ../../runtime && RUSTFLAGS='-C target-feature=+atomics,+bulk-memory,+mutable-globals' rustup run nightly wasm-pack build . --target web --out-dir ../web/js/wasm --out-name volvoxgrid_wasm --no-default-features --features wasm-default,wasm-threads -Z build-std=std,panic_abort"
   },
   "devDependencies": {
+    "esbuild": "^0.24.0",
     "typescript": "^5.0.0"
   }
 }

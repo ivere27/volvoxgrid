@@ -5,7 +5,7 @@
 # output BMPs to PNG, and generates a side-by-side HTML report.
 #
 # Usage:
-#   ./run_compare_ui.sh [--data] [--headless] [--no-headless] [--jobs N] [--only-vv] [--no-diff] [--no-html] [--test N] [--tests LIST]
+#   ./run_compare_ui.sh [--data] [--headless] [--no-headless] [--jobs N] [--only-vv] [--no-diff] [--no-html] [--strict-state] [--test N] [--tests LIST]
 #
 # Headless mode:
 #   - enabled by default via xvfb-run
@@ -479,9 +479,13 @@ echo ""
 command -v wine >/dev/null 2>&1 || { echo "ERROR: wine not found"; exit 1; }
 command -v i686-w64-mingw32-gcc >/dev/null 2>&1 || { echo "ERROR: i686-w64-mingw32-gcc not found"; exit 1; }
 
-# Make Wine runs non-interactive for automation/CI.
-WINEDEBUG=-all wine reg add "HKCU\\Software\\Wine\\WineDbg" /v ShowCrashDialog /t REG_DWORD /d 0 /f >/dev/null 2>&1 || true
-WINEDEBUG=-all wine reg add "HKCU\\Software\\Wine\\WineDbg" /v ShowAssertDialog /t REG_DWORD /d 0 /f >/dev/null 2>&1 || true
+# Make Wine runs non-interactive for automation/CI. Some sandboxed make
+# runners reject these optional registry writes; the real compare does not
+# depend on them.
+if [ "${RUN_COMPARE_UI_SKIP_WINE_DBG_REG:-0}" != "1" ]; then
+    WINEDEBUG=-all wine reg add "HKCU\\Software\\Wine\\WineDbg" /v ShowCrashDialog /t REG_DWORD /d 0 /f >/dev/null 2>&1 || true
+    WINEDEBUG=-all wine reg add "HKCU\\Software\\Wine\\WineDbg" /v ShowAssertDialog /t REG_DWORD /d 0 /f >/dev/null 2>&1 || true
+fi
 
 if [ ! -f "$REF_OCX" ]; then
     echo "WARNING: $REF_OCX not found — will run with --only-vv"
@@ -571,11 +575,15 @@ fi
 ln -sfn "$(realpath "$TESTS_DIR")" "$OUT_DIR/tests"
 
 # Run in output dir so BMPs land there; capture output for similarity parsing
+COMPARE_RC=0
 pushd "$OUT_DIR" > /dev/null
 find . -maxdepth 1 -type f \( -name "test_*_lg.bmp" -o -name "test_*_vv.bmp" -o -name "test_*_diff.bmp" -o -name "test_*_lg.png" -o -name "test_*_vv.png" -o -name "test_*_diff.png" -o -name "test_*_cells.diff.txt" -o -name "compare_output.worker*.log" \) -delete
 COMPARE_LOG="compare_output.log"
 if [ "$JOBS" -le 1 ]; then
-    WINEDEBUG=-all run_compare_worker "${ARGS[@]:-}" 2>/dev/null | tee "$COMPARE_LOG" || true
+    set +e
+    WINEDEBUG=-all run_compare_worker "${ARGS[@]:-}" 2>/dev/null | tee "$COMPARE_LOG"
+    COMPARE_RC=${PIPESTATUS[0]}
+    set -e
 else
     declare -A TEST_SET=()
     TEST_FILTER=""
@@ -649,7 +657,10 @@ else
 
     if [ "${#TEST_SET[@]}" -eq 0 ]; then
         echo "  WARN: --jobs requested, but no valid tests parsed; falling back to sequential"
-        WINEDEBUG=-all run_compare_worker "${ARGS[@]:-}" 2>/dev/null | tee "$COMPARE_LOG" || true
+        set +e
+        WINEDEBUG=-all run_compare_worker "${ARGS[@]:-}" 2>/dev/null | tee "$COMPARE_LOG"
+        COMPARE_RC=${PIPESTATUS[0]}
+        set -e
     else
         mapfile -t TEST_LIST < <(printf "%s\n" "${!TEST_SET[@]}" | sort -n)
         for t in "${TEST_LIST[@]}"; do
@@ -733,6 +744,7 @@ else
         cat "$COMPARE_LOG"
         if [ "$WORKER_FAILS" -gt 0 ]; then
             echo "  WARN: $WORKER_FAILS worker(s) exited non-zero"
+            COMPARE_RC=1
         fi
     fi
 fi
@@ -1066,4 +1078,10 @@ if [ "${#CELL_DIFF_CASES[@]}" -gt 0 ]; then
 else
     echo "  Cell Text Diff Cases: none"
 fi
+if [ "${COMPARE_RC:-0}" -ne 0 ]; then
+    echo "  Compare exited non-zero: ${COMPARE_RC}"
+fi
 echo "════════════════════════════════════════════════"
+if [ "${COMPARE_RC:-0}" -ne 0 ]; then
+    exit "$COMPARE_RC"
+fi

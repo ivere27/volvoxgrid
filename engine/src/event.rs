@@ -435,6 +435,25 @@ impl EventQueue {
 
     /// Push an event onto the back of the queue.
     pub fn push(&mut self, event: GridEventData) {
+        if let GridEventData::LeaveCell { row, col, target } = &event {
+            // Drop a transient data-cell hover that entered and left before delivery.
+            let cancels_pending_enter = self.queue.back().is_some_and(|back| {
+                target.kind == pb::GridTargetKind::GridTargetDataCell as i32
+                    && back.event_id == 0
+                    && matches!(
+                        &back.data,
+                        GridEventData::EnterCell {
+                            row: enter_row,
+                            col: enter_col,
+                            target: enter_target,
+                        } if enter_row == row && enter_col == col && enter_target == target
+                    )
+            });
+            if cancels_pending_enter {
+                self.queue.pop_back();
+                return;
+            }
+        }
         if matches!(event, GridEventData::MouseMove { .. }) {
             if let Some(back) = self.queue.back_mut() {
                 if back.event_id == 0 && matches!(back.data, GridEventData::MouseMove { .. }) {
@@ -459,6 +478,11 @@ impl EventQueue {
     /// Pop the next event from the front of the queue, or `None` if empty.
     pub fn pop(&mut self) -> Option<QueuedGridEvent> {
         self.queue.pop_front()
+    }
+
+    /// Inspect the next event without removing it from the queue.
+    pub fn peek(&self) -> Option<&QueuedGridEvent> {
+        self.queue.front()
     }
 
     /// Drain all pending events into a `Vec`, leaving the queue empty.

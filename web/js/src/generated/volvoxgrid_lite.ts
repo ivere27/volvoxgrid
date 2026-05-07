@@ -854,13 +854,18 @@ export enum CornerIndicatorSlotKind {
   CORNER_SLOT_OUTLINE_LEVELS = 2,
   CORNER_SLOT_CUSTOM = 3,
 }
-export enum CursorChange_CursorType {
-  DEFAULT = 0,
-  RESIZE_COL = 1,
-  RESIZE_ROW = 2,
-  MOVE_COL = 3,
-  TEXT = 4,
-  HAND = 5,
+export enum CursorType {
+  CURSOR_DEFAULT = 0,
+  CURSOR_RESIZE_COL = 1,
+  CURSOR_RESIZE_ROW = 2,
+  CURSOR_MOVE_COL = 3,
+  CURSOR_TEXT = 4,
+  CURSOR_HAND = 5,
+  CURSOR_MOVE_ROW = 6,
+  CURSOR_WAIT = 7,
+  CURSOR_NOT_ALLOWED = 8,
+  CURSOR_CROSSHAIR = 9,
+  CURSOR_COPY = 10,
 }
 export enum CustomRenderMode {
   CUSTOM_RENDER_NONE = 0,
@@ -7277,10 +7282,10 @@ export class CursorChange implements LiteMessage {
       jsonName: "cursor",
       prop: "cursor",
       kind: "enum" as ProtoKind,
-      enumType: CursorChange_CursorType,
+      enumType: CursorType,
     },
   ];
-  cursor: CursorChange_CursorType = 0;
+  cursor: CursorType = 0;
 
   constructor(init?: Partial<CursorChange>) {
     initMessage(this, CursorChange.fields, init as Record<string, unknown> | undefined);

@@ -1,12 +1,14 @@
 {
   "name": "@volvoxgrid/sheet",
-  "version": "0.8.5",
+  "version": "0.8.6",
   "license": "Apache-2.0",
   "description": "Spreadsheet-style sheet adapter for VolvoxGrid",
   "type": "module",
   "main": "dist/volvox-sheet.umd.js",
   "module": "dist/volvox-sheet.js",
   "types": "dist/index.d.ts",
+  "unpkg": "dist/volvox-sheet.min.js",
+  "jsdelivr": "dist/volvox-sheet.min.js",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -20,13 +22,15 @@
   ],
   "scripts": {
     "dev": "vite",
-    "build": "vite build && tsc -p tsconfig.build.json --emitDeclarationOnly",
+    "build": "vite build && tsc -p tsconfig.build.json --emitDeclarationOnly && npm run build:min",
+    "build:min": "esbuild dist/volvox-sheet.js --bundle --minify --format=esm --target=es2020 --outfile=dist/volvox-sheet.min.js --sourcemap --external:volvoxgrid --external:volvoxgrid/*",
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
-    "volvoxgrid": "^0.8.5"
+    "volvoxgrid": "^0.8.6"
   },
   "devDependencies": {
+    "esbuild": "^0.24.0",
     "typescript": "^5.0.0",
     "vite": "^6.0.0",
     "volvoxgrid": "file:../../web/js"

@@ -6,7 +6,7 @@ set -euo pipefail
 
 REPO_ROOT="${REPO_ROOT:-$(pwd)}"
 TARGET="${WEB_DOCKER_TARGET:-all}"
-VERSION="${VOLVOXGRID_VERSION:-${VERSION:-0.8.5}}"
+VERSION="${VOLVOXGRID_VERSION:-${VERSION:-0.8.6}}"
 WASM_DIST_ROOT="${REPO_ROOT}/dist/wasm"
 WASM_LITE_DIST_ROOT="${REPO_ROOT}/dist/wasm-lite"
 WEB_DIST_ROOT="${REPO_ROOT}/dist/web"
@@ -54,9 +54,9 @@ write_sheet_demo_index() {
 
   if [[ -n "${cdn_base}" ]]; then
     css_url="${cdn_base}/@volvoxgrid/sheet@${VERSION}/dist/assets/sheet.css"
-    importmap_vg="${cdn_base}/volvoxgrid@${VERSION}/dist/index.js"
+    importmap_vg="${cdn_base}/volvoxgrid@${VERSION}/dist/volvoxgrid.min.js"
     wasm_url="${cdn_base}/${wasm_pkg}@${VERSION}/wasm/volvoxgrid_wasm.js"
-    sheet_url="${cdn_base}/@volvoxgrid/sheet@${VERSION}/dist/volvox-sheet.js"
+    sheet_url="${cdn_base}/@volvoxgrid/sheet@${VERSION}/dist/volvox-sheet.min.js"
   fi
 
   cat > "${out_dir}/index.html" <<EOF
@@ -168,7 +168,11 @@ build_web_dist() {
   (
     cd "${REPO_ROOT}/web/example"
     npm ci
-    VITE_WASM_URL="${WASM_CDN_URL}" VITE_VG_INITIAL_SCALE="${WEB_SCALE:-1.0}" npm run build -- --base /demos/web/
+    VITE_WASM_URL="${WASM_CDN_URL}" \
+      VITE_VG_INITIAL_SCALE="${WEB_SCALE:-1.0}" \
+      VITE_VG_EXTERNAL=1 \
+      VITE_VG_VERSION="${VERSION}" \
+      npm run build -- --base /demos/web/
   )
   copy_dir_clean "${REPO_ROOT}/web/example/dist" "${WEB_DIST_ROOT}/demos/web"
   copy_dir_clean "${REPO_ROOT}/web/example/wasm" "${WEB_DIST_ROOT}/demos/web/wasm"

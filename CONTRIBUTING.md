@@ -115,7 +115,7 @@ make java-tui-run
 ```
 volvoxgrid/
 ├── engine/          # Core grid logic (Rust)
-├── runtime/          # Synurang FFI runtime wrapper (Rust)
+├── runtime/          # Synurang FFI runtime wrapper and WASM targets (Rust)
 ├── proto/           # Protobuf definitions
 ├── codegen/         # Generated FFI bindings
 ├── flutter/         # Flutter runtime & example app
@@ -129,10 +129,9 @@ volvoxgrid/
 ├── go/              # Go TUI host & client API
 │   ├── pkg/
 │   └── examples/
-├── web/             # WebAssembly crate & JS/TS bindings
-│   ├── crate/
-│   ├── js/
-│   └── example/
+├── web/             # Browser package and demo
+│   ├── js/          # JS/TS npm package and package-local WASM output
+│   └── example/     # Vite browser demo and release-demo source
 ├── adapters/        # Compatibility layers
 │   ├── aggrid/      # AG Grid API adapter (npm)
 │   ├── sheet/       # Sheet API adapter (npm)

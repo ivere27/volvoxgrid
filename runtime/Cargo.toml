@@ -24,7 +24,7 @@ demo = ["volvoxgrid-engine/demo"]
 cosmic-text = ["volvoxgrid-engine/cosmic-text"]
 rayon = ["volvoxgrid-engine/rayon"]
 regex = ["volvoxgrid-engine/regex"]
-gpu = ["volvoxgrid-engine/gpu", "dep:pollster", "dep:wgpu"]
+gpu = ["cosmic-text", "volvoxgrid-engine/gpu", "dep:pollster", "dep:wgpu"]
 wasm-threads = ["dep:wasm-bindgen-rayon"]
 
 [dependencies]

@@ -1180,7 +1180,7 @@ mod tests {
     }
 
     #[test]
-    fn outline_matches_vsflexgrid_level_semantics() {
+    fn outline_matches_legacy_level_semantics() {
         let mut grid = zero_based_outline_grid();
 
         outline(&mut grid, 1);

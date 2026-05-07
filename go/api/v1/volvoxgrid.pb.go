@@ -4413,6 +4413,87 @@ func (FrameKind) EnumDescriptor() ([]byte, []int) {
 	return file_volvoxgrid_proto_rawDescGZIP(), []int{74}
 }
 
+// Semantic cursor hint emitted by the engine. Adapters map this to their
+// platform's cursor primitive (Win32 HCURSOR, CSS cursor, Flutter MouseCursor,
+// .NET System.Windows.Forms.Cursor, …) and may layer their own host-side
+// override on top (e.g. ActiveX `MousePointer`).
+//
+// New values may be appended; do NOT renumber existing values — the wire
+// encoding is already shipped through `CursorChange.cursor` and the FFI
+// `volvox_grid_get_cursor_hint` exports.
+type CursorType int32
+
+const (
+	CursorType_CURSOR_DEFAULT     CursorType = 0
+	CursorType_CURSOR_RESIZE_COL  CursorType = 1  // ↔ vertical edge between columns
+	CursorType_CURSOR_RESIZE_ROW  CursorType = 2  // ↕ horizontal edge between rows
+	CursorType_CURSOR_MOVE_COL    CursorType = 3  // ⇔ column reorder drag
+	CursorType_CURSOR_TEXT        CursorType = 4  // I-beam over editable text
+	CursorType_CURSOR_HAND        CursorType = 5  // pointer over an interactive target
+	CursorType_CURSOR_MOVE_ROW    CursorType = 6  // ⇕ row reorder / freeze-row drag
+	CursorType_CURSOR_WAIT        CursorType = 7  // engine busy (long sort, refresh, …)
+	CursorType_CURSOR_NOT_ALLOWED CursorType = 8  // drop rejected, readonly cell signal
+	CursorType_CURSOR_CROSSHAIR   CursorType = 9  // range-select / fill-handle drag
+	CursorType_CURSOR_COPY        CursorType = 10 // ctrl-drag duplicate
+)
+
+// Enum value maps for CursorType.
+var (
+	CursorType_name = map[int32]string{
+		0:  "CURSOR_DEFAULT",
+		1:  "CURSOR_RESIZE_COL",
+		2:  "CURSOR_RESIZE_ROW",
+		3:  "CURSOR_MOVE_COL",
+		4:  "CURSOR_TEXT",
+		5:  "CURSOR_HAND",
+		6:  "CURSOR_MOVE_ROW",
+		7:  "CURSOR_WAIT",
+		8:  "CURSOR_NOT_ALLOWED",
+		9:  "CURSOR_CROSSHAIR",
+		10: "CURSOR_COPY",
+	}
+	CursorType_value = map[string]int32{
+		"CURSOR_DEFAULT":     0,
+		"CURSOR_RESIZE_COL":  1,
+		"CURSOR_RESIZE_ROW":  2,
+		"CURSOR_MOVE_COL":    3,
+		"CURSOR_TEXT":        4,
+		"CURSOR_HAND":        5,
+		"CURSOR_MOVE_ROW":    6,
+		"CURSOR_WAIT":        7,
+		"CURSOR_NOT_ALLOWED": 8,
+		"CURSOR_CROSSHAIR":   9,
+		"CURSOR_COPY":        10,
+	}
+)
+
+func (x CursorType) Enum() *CursorType {
+	p := new(CursorType)
+	*p = x
+	return p
+}
+
+func (x CursorType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (CursorType) Descriptor() protoreflect.EnumDescriptor {
+	return file_volvoxgrid_proto_enumTypes[75].Descriptor()
+}
+
+func (CursorType) Type() protoreflect.EnumType {
+	return &file_volvoxgrid_proto_enumTypes[75]
+}
+
+func (x CursorType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use CursorType.Descriptor instead.
+func (CursorType) EnumDescriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{75}
+}
+
 type ArchiveRequest_Action int32
 
 const (
@@ -4452,11 +4533,11 @@ func (x ArchiveRequest_Action) String() string {
 }
 
 func (ArchiveRequest_Action) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[75].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[76].Descriptor()
 }
 
 func (ArchiveRequest_Action) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[75]
+	return &file_volvoxgrid_proto_enumTypes[76]
 }
 
 func (x ArchiveRequest_Action) Number() protoreflect.EnumNumber {
@@ -4504,11 +4585,11 @@ func (x PointerEvent_Type) String() string {
 }
 
 func (PointerEvent_Type) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[76].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[77].Descriptor()
 }
 
 func (PointerEvent_Type) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[76]
+	return &file_volvoxgrid_proto_enumTypes[77]
 }
 
 func (x PointerEvent_Type) Number() protoreflect.EnumNumber {
@@ -4556,11 +4637,11 @@ func (x ZoomEvent_Phase) String() string {
 }
 
 func (ZoomEvent_Phase) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[77].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[78].Descriptor()
 }
 
 func (ZoomEvent_Phase) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[77]
+	return &file_volvoxgrid_proto_enumTypes[78]
 }
 
 func (x ZoomEvent_Phase) Number() protoreflect.EnumNumber {
@@ -4608,11 +4689,11 @@ func (x KeyEvent_Type) String() string {
 }
 
 func (KeyEvent_Type) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[78].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[79].Descriptor()
 }
 
 func (KeyEvent_Type) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[78]
+	return &file_volvoxgrid_proto_enumTypes[79]
 }
 
 func (x KeyEvent_Type) Number() protoreflect.EnumNumber {
@@ -4654,11 +4735,11 @@ func (x TerminalCommand_Kind) String() string {
 }
 
 func (TerminalCommand_Kind) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[79].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[80].Descriptor()
 }
 
 func (TerminalCommand_Kind) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[79]
+	return &file_volvoxgrid_proto_enumTypes[80]
 }
 
 func (x TerminalCommand_Kind) Number() protoreflect.EnumNumber {
@@ -4668,64 +4749,6 @@ func (x TerminalCommand_Kind) Number() protoreflect.EnumNumber {
 // Deprecated: Use TerminalCommand_Kind.Descriptor instead.
 func (TerminalCommand_Kind) EnumDescriptor() ([]byte, []int) {
 	return file_volvoxgrid_proto_rawDescGZIP(), []int{181, 0}
-}
-
-type CursorChange_CursorType int32
-
-const (
-	CursorChange_DEFAULT    CursorChange_CursorType = 0
-	CursorChange_RESIZE_COL CursorChange_CursorType = 1
-	CursorChange_RESIZE_ROW CursorChange_CursorType = 2
-	CursorChange_MOVE_COL   CursorChange_CursorType = 3
-	CursorChange_TEXT       CursorChange_CursorType = 4
-	CursorChange_HAND       CursorChange_CursorType = 5
-)
-
-// Enum value maps for CursorChange_CursorType.
-var (
-	CursorChange_CursorType_name = map[int32]string{
-		0: "DEFAULT",
-		1: "RESIZE_COL",
-		2: "RESIZE_ROW",
-		3: "MOVE_COL",
-		4: "TEXT",
-		5: "HAND",
-	}
-	CursorChange_CursorType_value = map[string]int32{
-		"DEFAULT":    0,
-		"RESIZE_COL": 1,
-		"RESIZE_ROW": 2,
-		"MOVE_COL":   3,
-		"TEXT":       4,
-		"HAND":       5,
-	}
-)
-
-func (x CursorChange_CursorType) Enum() *CursorChange_CursorType {
-	p := new(CursorChange_CursorType)
-	*p = x
-	return p
-}
-
-func (x CursorChange_CursorType) String() string {
-	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
-}
-
-func (CursorChange_CursorType) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[80].Descriptor()
-}
-
-func (CursorChange_CursorType) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[80]
-}
-
-func (x CursorChange_CursorType) Number() protoreflect.EnumNumber {
-	return protoreflect.EnumNumber(x)
-}
-
-// Deprecated: Use CursorChange_CursorType.Descriptor instead.
-func (CursorChange_CursorType) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{189, 0}
 }
 
 // Font specification. Engine default: platform-default family, size 11.0,
@@ -18902,8 +18925,8 @@ func (x *SelectionUpdate) GetRanges() []*CellRange {
 }
 
 type CursorChange struct {
-	state         protoimpl.MessageState  `protogen:"open.v1"`
-	Cursor        CursorChange_CursorType `protobuf:"varint,1,opt,name=cursor,proto3,enum=volvoxgrid.v1.CursorChange_CursorType" json:"cursor,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Cursor        CursorType             `protobuf:"varint,1,opt,name=cursor,proto3,enum=volvoxgrid.v1.CursorType" json:"cursor,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -18938,11 +18961,11 @@ func (*CursorChange) Descriptor() ([]byte, []int) {
 	return file_volvoxgrid_proto_rawDescGZIP(), []int{189}
 }
 
-func (x *CursorChange) GetCursor() CursorChange_CursorType {
+func (x *CursorChange) GetCursor() CursorType {
 	if x != nil {
 		return x.Cursor
 	}
-	return CursorChange_DEFAULT
+	return CursorType_CURSOR_DEFAULT
 }
 
 // Emitted on RenderOutput when the engine wants the host to show an
@@ -25744,19 +25767,9 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"active_row\x18\x01 \x01(\x05R\tactiveRow\x12\x1d\n" +
 	"\n" +
 	"active_col\x18\x02 \x01(\x05R\tactiveCol\x120\n" +
-	"\x06ranges\x18\x03 \x03(\v2\x18.volvoxgrid.v1.CellRangeR\x06ranges\"\xab\x01\n" +
-	"\fCursorChange\x12>\n" +
-	"\x06cursor\x18\x01 \x01(\x0e2&.volvoxgrid.v1.CursorChange.CursorTypeR\x06cursor\"[\n" +
-	"\n" +
-	"CursorType\x12\v\n" +
-	"\aDEFAULT\x10\x00\x12\x0e\n" +
-	"\n" +
-	"RESIZE_COL\x10\x01\x12\x0e\n" +
-	"\n" +
-	"RESIZE_ROW\x10\x02\x12\f\n" +
-	"\bMOVE_COL\x10\x03\x12\b\n" +
-	"\x04TEXT\x10\x04\x12\b\n" +
-	"\x04HAND\x10\x05\"\xcc\x02\n" +
+	"\x06ranges\x18\x03 \x03(\v2\x18.volvoxgrid.v1.CellRangeR\x06ranges\"A\n" +
+	"\fCursorChange\x121\n" +
+	"\x06cursor\x18\x01 \x01(\x0e2\x19.volvoxgrid.v1.CursorTypeR\x06cursor\"\xcc\x02\n" +
 	"\vEditRequest\x12\x10\n" +
 	"\x03row\x18\x01 \x01(\x05R\x03row\x12\x10\n" +
 	"\x03col\x18\x02 \x01(\x05R\x03col\x12\f\n" +
@@ -26608,7 +26621,21 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\tFrameKind\x12\x14\n" +
 	"\x10FRAME_KIND_FRAME\x10\x00\x12\x1c\n" +
 	"\x18FRAME_KIND_SESSION_START\x10\x01\x12\x1a\n" +
-	"\x16FRAME_KIND_SESSION_END\x10\x022\xe6\x1c\n" +
+	"\x16FRAME_KIND_SESSION_END\x10\x02*\xea\x01\n" +
+	"\n" +
+	"CursorType\x12\x12\n" +
+	"\x0eCURSOR_DEFAULT\x10\x00\x12\x15\n" +
+	"\x11CURSOR_RESIZE_COL\x10\x01\x12\x15\n" +
+	"\x11CURSOR_RESIZE_ROW\x10\x02\x12\x13\n" +
+	"\x0fCURSOR_MOVE_COL\x10\x03\x12\x0f\n" +
+	"\vCURSOR_TEXT\x10\x04\x12\x0f\n" +
+	"\vCURSOR_HAND\x10\x05\x12\x13\n" +
+	"\x0fCURSOR_MOVE_ROW\x10\x06\x12\x0f\n" +
+	"\vCURSOR_WAIT\x10\a\x12\x16\n" +
+	"\x12CURSOR_NOT_ALLOWED\x10\b\x12\x14\n" +
+	"\x10CURSOR_CROSSHAIR\x10\t\x12\x0f\n" +
+	"\vCURSOR_COPY\x10\n" +
+	"2\xe6\x1c\n" +
 	"\x11VolvoxGridService\x12E\n" +
 	"\x06Create\x12\x1c.volvoxgrid.v1.CreateRequest\x1a\x1d.volvoxgrid.v1.CreateResponse\x12H\n" +
 	"\aDestroy\x12\x1d.volvoxgrid.v1.DestroyRequest\x1a\x1e.volvoxgrid.v1.DestroyResponse\x12N\n" +
@@ -26756,12 +26783,12 @@ var file_volvoxgrid_proto_goTypes = []any{
 	(DemoDataFormat)(0),                  // 72: volvoxgrid.v1.DemoDataFormat
 	(TerminalColorLevel)(0),              // 73: volvoxgrid.v1.TerminalColorLevel
 	(FrameKind)(0),                       // 74: volvoxgrid.v1.FrameKind
-	(ArchiveRequest_Action)(0),           // 75: volvoxgrid.v1.ArchiveRequest.Action
-	(PointerEvent_Type)(0),               // 76: volvoxgrid.v1.PointerEvent.Type
-	(ZoomEvent_Phase)(0),                 // 77: volvoxgrid.v1.ZoomEvent.Phase
-	(KeyEvent_Type)(0),                   // 78: volvoxgrid.v1.KeyEvent.Type
-	(TerminalCommand_Kind)(0),            // 79: volvoxgrid.v1.TerminalCommand.Kind
-	(CursorChange_CursorType)(0),         // 80: volvoxgrid.v1.CursorChange.CursorType
+	(CursorType)(0),                      // 75: volvoxgrid.v1.CursorType
+	(ArchiveRequest_Action)(0),           // 76: volvoxgrid.v1.ArchiveRequest.Action
+	(PointerEvent_Type)(0),               // 77: volvoxgrid.v1.PointerEvent.Type
+	(ZoomEvent_Phase)(0),                 // 78: volvoxgrid.v1.ZoomEvent.Phase
+	(KeyEvent_Type)(0),                   // 79: volvoxgrid.v1.KeyEvent.Type
+	(TerminalCommand_Kind)(0),            // 80: volvoxgrid.v1.TerminalCommand.Kind
 	(*Font)(nil),                         // 81: volvoxgrid.v1.Font
 	(*Padding)(nil),                      // 82: volvoxgrid.v1.Padding
 	(*Border)(nil),                       // 83: volvoxgrid.v1.Border
@@ -27261,7 +27288,7 @@ var file_volvoxgrid_proto_depIdxs = []int32{
 	55,  // 234: volvoxgrid.v1.ExportResponse.format:type_name -> volvoxgrid.v1.ExportFormat
 	57,  // 235: volvoxgrid.v1.PrintRequest.orientation:type_name -> volvoxgrid.v1.PrintOrientation
 	205, // 236: volvoxgrid.v1.PrintResponse.pages:type_name -> volvoxgrid.v1.PrintPage
-	75,  // 237: volvoxgrid.v1.ArchiveRequest.action:type_name -> volvoxgrid.v1.ArchiveRequest.Action
+	76,  // 237: volvoxgrid.v1.ArchiveRequest.action:type_name -> volvoxgrid.v1.ArchiveRequest.Action
 	115, // 238: volvoxgrid.v1.CreateRequest.config:type_name -> volvoxgrid.v1.GridConfig
 	115, // 239: volvoxgrid.v1.ConfigureRequest.config:type_name -> volvoxgrid.v1.GridConfig
 	72,  // 240: volvoxgrid.v1.GetDemoDataResponse.format:type_name -> volvoxgrid.v1.DemoDataFormat
@@ -27280,11 +27307,11 @@ var file_volvoxgrid_proto_depIdxs = []int32{
 	261, // 253: volvoxgrid.v1.RenderInput.terminal_viewport:type_name -> volvoxgrid.v1.TerminalViewport
 	262, // 254: volvoxgrid.v1.RenderInput.terminal_command:type_name -> volvoxgrid.v1.TerminalCommand
 	252, // 255: volvoxgrid.v1.RenderInput.compare_response:type_name -> volvoxgrid.v1.CompareResponse
-	76,  // 256: volvoxgrid.v1.PointerEvent.type:type_name -> volvoxgrid.v1.PointerEvent.Type
-	77,  // 257: volvoxgrid.v1.ZoomEvent.phase:type_name -> volvoxgrid.v1.ZoomEvent.Phase
-	78,  // 258: volvoxgrid.v1.KeyEvent.type:type_name -> volvoxgrid.v1.KeyEvent.Type
+	77,  // 256: volvoxgrid.v1.PointerEvent.type:type_name -> volvoxgrid.v1.PointerEvent.Type
+	78,  // 257: volvoxgrid.v1.ZoomEvent.phase:type_name -> volvoxgrid.v1.ZoomEvent.Phase
+	79,  // 258: volvoxgrid.v1.KeyEvent.type:type_name -> volvoxgrid.v1.KeyEvent.Type
 	73,  // 259: volvoxgrid.v1.TerminalCapabilities.color_level:type_name -> volvoxgrid.v1.TerminalColorLevel
-	79,  // 260: volvoxgrid.v1.TerminalCommand.kind:type_name -> volvoxgrid.v1.TerminalCommand.Kind
+	80,  // 260: volvoxgrid.v1.TerminalCommand.kind:type_name -> volvoxgrid.v1.TerminalCommand.Kind
 	266, // 261: volvoxgrid.v1.RenderOutput.frame_done:type_name -> volvoxgrid.v1.FrameDone
 	269, // 262: volvoxgrid.v1.RenderOutput.selection:type_name -> volvoxgrid.v1.SelectionUpdate
 	270, // 263: volvoxgrid.v1.RenderOutput.cursor:type_name -> volvoxgrid.v1.CursorChange
@@ -27296,7 +27323,7 @@ var file_volvoxgrid_proto_depIdxs = []int32{
 	74,  // 269: volvoxgrid.v1.FrameDone.frame_kind:type_name -> volvoxgrid.v1.FrameKind
 	268, // 270: volvoxgrid.v1.GpuFrameDone.metrics:type_name -> volvoxgrid.v1.FrameMetrics
 	93,  // 271: volvoxgrid.v1.SelectionUpdate.ranges:type_name -> volvoxgrid.v1.CellRange
-	80,  // 272: volvoxgrid.v1.CursorChange.cursor:type_name -> volvoxgrid.v1.CursorChange.CursorType
+	75,  // 272: volvoxgrid.v1.CursorChange.cursor:type_name -> volvoxgrid.v1.CursorType
 	70,  // 273: volvoxgrid.v1.EditRequest.ui_mode:type_name -> volvoxgrid.v1.EditUiMode
 	275, // 274: volvoxgrid.v1.GridEvent.cell_focus_changing:type_name -> volvoxgrid.v1.CellFocusChangingEvent
 	276, // 275: volvoxgrid.v1.GridEvent.cell_focus_changed:type_name -> volvoxgrid.v1.CellFocusChangedEvent

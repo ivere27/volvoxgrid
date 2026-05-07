@@ -54,25 +54,24 @@ include_directories(${Protobuf_INCLUDE_DIRS})
 set(IDL_FILE ${CMAKE_CURRENT_SOURCE_DIR}/src/VolvoxGrid.idl)
 set(IDL_H    ${CMAKE_CURRENT_BINARY_DIR}/VolvoxGrid_i.h)
 set(IDL_C    ${CMAKE_CURRENT_BINARY_DIR}/VolvoxGrid_i.c)
-set(IDL_TLB  ${CMAKE_CURRENT_BINARY_DIR}/VolvoxGrid.tlb)
 set(IDL_P    ${CMAKE_CURRENT_BINARY_DIR}/VolvoxGrid_p.c)
 set(IDL_D    ${CMAKE_CURRENT_BINARY_DIR}/dlldata.c)
 
 add_custom_command(
-    OUTPUT  ${IDL_H} ${IDL_C} ${IDL_TLB} ${IDL_P} ${IDL_D}
+    OUTPUT  ${IDL_H} ${IDL_C} ${IDL_P} ${IDL_D}
     COMMAND midl
         /h   ${IDL_H}
         /iid ${IDL_C}
-        /tlb ${IDL_TLB}
         /proxy ${IDL_P}
         /dlldata ${IDL_D}
+        /notlb
         /win32
         /env x64
         ${IDL_FILE}
     DEPENDS ${IDL_FILE}
-    COMMENT "Compiling IDL -> VolvoxGrid type library"
+    COMMENT "Compiling IDL -> VolvoxGrid COM headers/stubs"
 )
-add_custom_target(VolvoxGridIDL DEPENDS ${IDL_H} ${IDL_C} ${IDL_TLB})
+add_custom_target(VolvoxGridIDL DEPENDS ${IDL_H} ${IDL_C})
 
 # ---------------------------------------------------------------------------
 # DLL target
@@ -89,7 +88,7 @@ add_library(VolvoxGrid SHARED
 add_dependencies(VolvoxGrid VolvoxGridIDL)
 
 target_include_directories(VolvoxGrid PRIVATE
-    ${CMAKE_CURRENT_BINARY_DIR}   # VolvoxGrid_i.h, VolvoxGrid.tlb
+    ${CMAKE_CURRENT_BINARY_DIR}   # VolvoxGrid_i.h
 )
 
 target_compile_definitions(VolvoxGrid PRIVATE

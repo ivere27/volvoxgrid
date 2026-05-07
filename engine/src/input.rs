@@ -984,7 +984,7 @@ fn dropdown_button_rect(cx: i32, cy: i32, cw: i32, ch: i32) -> Option<(i32, i32,
     crate::canvas::dropdown_button_rect(cx, cy, cw, ch)
 }
 
-fn is_boolean_checkbox_cell(grid: &VolvoxGrid, row: i32, col: i32) -> bool {
+pub fn is_boolean_checkbox_cell(grid: &VolvoxGrid, row: i32, col: i32) -> bool {
     row >= grid.fixed_rows
         && row < grid.rows
         && col >= 0
@@ -1001,7 +1001,7 @@ fn checkbox_rect(grid: &VolvoxGrid, row: i32, col: i32) -> Option<(i32, i32, i32
     }
 
     let (cx, cy, cw, ch) = grid.cell_screen_rect(row, col)?;
-    let box_size = crate::canvas::checkbox_box_size(ch);
+    let box_size = crate::canvas::checkbox_box_size_for_rect(cw, ch);
     let style_override = grid.get_cell_style(row, col);
     let alignment = crate::canvas::resolve_alignment(grid, row, col, &style_override, "");
     let (halign, valign) = crate::canvas::alignment_components(alignment);
@@ -1966,6 +1966,30 @@ fn target_identity_from_hit(grid: &VolvoxGrid, hit: &HitTestResult) -> EventTarg
     }
 }
 
+fn hover_target_identity_int_value(target: &EventTarget) -> Option<i64> {
+    if target.kind == pb::GridTargetKind::GridTargetCornerIndicator as i32
+        && target.band == pb::IndicatorBand::CornerTopStart as i32
+        && target.slot_kind == pb::CornerIndicatorSlotKind::CornerSlotOutlineLevels as i32
+    {
+        Some(target.int_value)
+    } else {
+        None
+    }
+}
+
+fn same_hover_target_identity(prev: &HoverTarget, next: &HoverTarget) -> bool {
+    prev.row == next.row
+        && prev.col == next.col
+        && prev.target.kind == next.target.kind
+        && prev.target.band == next.target.band
+        && prev.target.slot_index == next.target.slot_index
+        && prev.target.slot_kind == next.target.slot_kind
+        && prev.target.sub_mode_bits == next.target.sub_mode_bits
+        && prev.target.custom_key == next.target.custom_key
+        && hover_target_identity_int_value(&prev.target)
+            == hover_target_identity_int_value(&next.target)
+}
+
 fn emit_pointer_move_and_hover(
     grid: &mut VolvoxGrid,
     hit: &HitTestResult,
@@ -1980,7 +2004,12 @@ fn emit_pointer_move_and_hover(
         col: hit.col,
         target,
     };
-    if grid.last_hover_target.as_ref() == Some(&next) {
+    if grid
+        .last_hover_target
+        .as_ref()
+        .is_some_and(|prev| same_hover_target_identity(prev, &next))
+    {
+        grid.last_hover_target = Some(next);
         return;
     }
     let repaint_indicator_hover = grid
@@ -1989,11 +2018,13 @@ fn emit_pointer_move_and_hover(
         .is_some_and(|prev| indicator_control_hover_target(grid, &prev.target))
         || indicator_control_hover_target(grid, &next.target);
     if let Some(prev) = grid.last_hover_target.replace(next.clone()) {
-        grid.events.push(GridEventData::LeaveCell {
-            row: prev.row,
-            col: prev.col,
-            target: prev.target,
-        });
+        if !is_background_target(&prev.target) {
+            grid.events.push(GridEventData::LeaveCell {
+                row: prev.row,
+                col: prev.col,
+                target: prev.target,
+            });
+        }
     }
     grid.events.push(GridEventData::MouseMove {
         button,
@@ -2002,11 +2033,13 @@ fn emit_pointer_move_and_hover(
         y,
         target: next.target.clone(),
     });
-    grid.events.push(GridEventData::EnterCell {
-        row: next.row,
-        col: next.col,
-        target: next.target,
-    });
+    if !is_background_target(&next.target) {
+        grid.events.push(GridEventData::EnterCell {
+            row: next.row,
+            col: next.col,
+            target: next.target,
+        });
+    }
     if repaint_indicator_hover {
         grid.mark_dirty();
     }
@@ -2437,7 +2470,7 @@ fn checkbox_bool_value(grid: &VolvoxGrid, row: i32, col: i32) -> bool {
     }
 }
 
-fn toggle_checkbox_cell(grid: &mut VolvoxGrid, row: i32, col: i32) -> bool {
+pub fn can_toggle_checkbox_cell(grid: &VolvoxGrid, row: i32, col: i32) -> bool {
     if !is_boolean_checkbox_cell(grid, row, col) {
         return false;
     }
@@ -2455,6 +2488,14 @@ fn toggle_checkbox_cell(grid: &mut VolvoxGrid, row: i32, col: i32) -> bool {
         return false;
     }
 
+    true
+}
+
+pub fn apply_checkbox_toggle_after_before_edit(grid: &mut VolvoxGrid, row: i32, col: i32) -> bool {
+    if !can_toggle_checkbox_cell(grid, row, col) {
+        return false;
+    }
+
     let old_text = grid.cells.get_text(row, col).to_string();
     let next_value = !checkbox_bool_value(grid, row, col);
     let next_text = checkbox_text_for_value(&old_text, next_value);
@@ -2469,16 +2510,29 @@ fn toggle_checkbox_cell(grid: &mut VolvoxGrid, row: i32, col: i32) -> bool {
         pb::CheckedState::CheckedUnchecked as i32
     };
 
-    if old_text != next_text {
-        grid.events.push(GridEventData::CellChanged {
-            row,
-            col,
-            old_text,
-            new_text: next_text,
-        });
-    }
+    grid.events.push(GridEventData::AfterEdit {
+        row,
+        col,
+        old_text: old_text.clone(),
+        new_text: next_text.clone(),
+    });
+    grid.events.push(GridEventData::CellChanged {
+        row,
+        col,
+        old_text,
+        new_text: next_text,
+    });
     grid.mark_dirty();
     true
+}
+
+fn toggle_checkbox_cell(grid: &mut VolvoxGrid, row: i32, col: i32) -> bool {
+    if !can_toggle_checkbox_cell(grid, row, col) {
+        return false;
+    }
+
+    grid.events.push(GridEventData::BeforeEdit { row, col });
+    apply_checkbox_toggle_after_before_edit(grid, row, col)
 }
 
 fn resolve_row_hit(
@@ -2704,9 +2758,13 @@ fn resolve_col_hit(
         }
     } else {
         effective_x = local_x + scroll_x as i32 - pinned_left_w;
-        col = layout.col_at_x(effective_x);
-        if grid.is_col_pinned(col) != 0 {
+        if !grid.extend_last_col && (effective_x < 0 || effective_x >= layout.total_width) {
             col = -1;
+        } else {
+            col = layout.col_at_x(effective_x);
+            if grid.is_col_pinned(col) != 0 {
+                col = -1;
+            }
         }
     }
 
@@ -3304,7 +3362,9 @@ pub fn handle_pointer_down_with_behavior(
                     new_col: hit.col,
                 });
 
-                if dbl_click || !toggle_checkbox_cell(grid, hit.row, hit.col) {
+                if dbl_click
+                    || !(behavior.allow_begin_edit && toggle_checkbox_cell(grid, hit.row, hit.col))
+                {
                     grid.mark_dirty();
                 }
             }
@@ -3852,7 +3912,7 @@ pub fn handle_pointer_move(grid: &mut VolvoxGrid, x: f32, y: f32, button: i32, m
 
     // Handle active resize drag
     if grid.resize_active {
-        grid.cursor_style = if grid.resize_is_col { 1 } else { 2 };
+        grid.cursor_hint = if grid.resize_is_col { 1 } else { 2 };
         if grid.resize_is_col {
             let delta = (x - grid.resize_start_pos) as i32;
             let new_width = (grid.resize_start_size + delta).max(0);
@@ -3890,7 +3950,7 @@ pub fn handle_pointer_move(grid: &mut VolvoxGrid, x: f32, y: f32, button: i32, m
     // behaviors to avoid conflicts with selection/sort click.
     if grid.col_drag_pending {
         if maybe_activate_pending_col_drag(grid, x, y) {
-            grid.cursor_style = 3; // move/grab
+            grid.cursor_hint = 3; // move/grab
             grid.mark_dirty();
         }
         return;
@@ -3898,7 +3958,7 @@ pub fn handle_pointer_move(grid: &mut VolvoxGrid, x: f32, y: f32, button: i32, m
 
     // Handle active column drag/reorder
     if grid.col_drag_active {
-        grid.cursor_style = 3; // move/grab
+        grid.cursor_hint = 3; // move/grab
         update_col_drag_target(grid, x, y);
         grid.mark_dirty();
         return;
@@ -3921,7 +3981,7 @@ pub fn handle_pointer_move(grid: &mut VolvoxGrid, x: f32, y: f32, button: i32, m
 
     // Handle active freeze drag
     if grid.freeze_drag_active {
-        grid.cursor_style = if grid.freeze_drag_is_row { 2 } else { 1 };
+        grid.cursor_hint = if grid.freeze_drag_is_row { 2 } else { 1 };
         let hit = hit_test(grid, x, y);
         if grid.freeze_drag_is_row && hit.row >= grid.fixed_rows {
             let new_frozen = (hit.row - grid.fixed_rows).max(0);
@@ -3964,7 +4024,7 @@ pub fn handle_pointer_move(grid: &mut VolvoxGrid, x: f32, y: f32, button: i32, m
     }
 
     // Update cursor style based on hit area
-    grid.cursor_style = match hit.area {
+    grid.cursor_hint = match hit.area {
         HitArea::ColBorder => {
             if col_resize_enabled(grid) {
                 1 // col-resize
@@ -3980,7 +4040,7 @@ pub fn handle_pointer_move(grid: &mut VolvoxGrid, x: f32, y: f32, button: i32, m
             }
         }
         HitArea::IndicatorRowStartResize => 1,
-        HitArea::OutlineButton => 4,
+        HitArea::OutlineButton => 5,
         HitArea::DropdownButton | HitArea::CheckBox => 5,
         HitArea::Cell
         | HitArea::CellText
@@ -4564,7 +4624,9 @@ pub fn handle_key_down_with_behavior(
                     grid.mark_dirty();
                 } else if selected_outline_label_keyboard_target(grid).is_some() {
                     // Tree rows reserve Space for the row-indicator tree.
-                } else if toggle_checkbox_cell(grid, grid.selection.row, grid.selection.col) {
+                } else if behavior.allow_begin_edit
+                    && toggle_checkbox_cell(grid, grid.selection.row, grid.selection.col)
+                {
                     grid.mark_dirty();
                 }
             }
@@ -4577,7 +4639,9 @@ pub fn handle_key_down_with_behavior(
                     grid.mark_dirty();
                 } else if selected_outline_label_keyboard_target(grid).is_some() {
                     // Tree rows reserve Enter for the row-indicator tree.
-                } else if toggle_checkbox_cell(grid, grid.selection.row, grid.selection.col) {
+                } else if behavior.allow_begin_edit
+                    && toggle_checkbox_cell(grid, grid.selection.row, grid.selection.col)
+                {
                     grid.mark_dirty();
                 } else if behavior.allow_begin_edit && grid.edit_trigger_mode >= 1 {
                     begin_edit_from_input(grid, grid.selection.row, grid.selection.col);
@@ -5178,6 +5242,22 @@ mod tests {
     }
 
     #[test]
+    fn hit_test_maps_right_empty_area_to_background_when_last_column_is_not_extended() {
+        let mut grid = VolvoxGrid::new(1, 300, 120, 3, 4, 0, 0);
+        for col in 0..grid.cols {
+            grid.set_col_width(col, 40);
+        }
+        grid.cols_hidden.insert(3);
+        prime_layout(&mut grid);
+
+        let hit = hit_test(&mut grid, 250.0, 5.0);
+
+        assert_eq!(hit.area, HitArea::Background);
+        assert_eq!(hit.row, -1);
+        assert_eq!(hit.col, -1);
+    }
+
+    #[test]
     fn hit_test_sticky_left_col_returns_overlay_col_not_scrolled_col_underneath() {
         let mut grid = VolvoxGrid::new(1, 160, 120, 3, 6, 0, 0);
         for col in 0..grid.cols {
@@ -5429,6 +5509,126 @@ mod tests {
                 if target.kind == pb::GridTargetKind::GridTargetRowIndicator as i32
                     && target.slot_index == 2
         )));
+    }
+
+    #[test]
+    fn pointer_move_does_not_emit_enter_leave_for_background() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 3, 0, 0);
+        prime_layout(&mut grid);
+
+        handle_pointer_move(&mut grid, 10.0, 10.0, 0, 0);
+        let events = grid.events.drain();
+        assert!(events.iter().any(|e| matches!(
+            &e.data,
+            GridEventData::EnterCell { row: 0, col: 0, target }
+                if target.kind == pb::GridTargetKind::GridTargetDataCell as i32
+        )));
+
+        handle_pointer_move(&mut grid, 700.0, 10.0, 0, 0);
+        let events = grid.events.drain();
+        assert!(events.iter().any(|e| matches!(
+            &e.data,
+            GridEventData::LeaveCell { row: 0, col: 0, target }
+                if target.kind == pb::GridTargetKind::GridTargetDataCell as i32
+        )));
+        assert!(events.iter().any(|e| matches!(
+            &e.data,
+            GridEventData::MouseMove { target, .. }
+                if target.kind == pb::GridTargetKind::GridTargetBackground as i32
+        )));
+        assert!(!events.iter().any(|e| matches!(
+            &e.data,
+            GridEventData::EnterCell { target, .. }
+                if target.kind == pb::GridTargetKind::GridTargetBackground as i32
+        )));
+
+        handle_pointer_move(&mut grid, 10.0, 10.0, 0, 0);
+        let events = grid.events.drain();
+        assert!(!events.iter().any(|e| matches!(
+            &e.data,
+            GridEventData::LeaveCell { target, .. }
+                if target.kind == pb::GridTargetKind::GridTargetBackground as i32
+        )));
+        assert!(events.iter().any(|e| matches!(
+            &e.data,
+            GridEventData::EnterCell { row: 0, col: 0, target }
+                if target.kind == pb::GridTargetKind::GridTargetDataCell as i32
+        )));
+    }
+
+    #[test]
+    fn pointer_move_coalesces_transient_enter_leave_before_drain() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 3, 0, 0);
+        prime_layout(&mut grid);
+
+        handle_pointer_move(&mut grid, 10.0, 10.0, 0, 0);
+        handle_pointer_move(&mut grid, 700.0, 10.0, 0, 0);
+
+        let events = grid.events.drain();
+        assert_eq!(events.len(), 1);
+        assert!(events.iter().any(|e| matches!(
+            &e.data,
+            GridEventData::MouseMove { target, .. }
+                if target.kind == pb::GridTargetKind::GridTargetBackground as i32
+        )));
+        assert!(!events.iter().any(|e| matches!(
+            &e.data,
+            GridEventData::EnterCell { target, .. }
+            | GridEventData::LeaveCell { target, .. }
+                if target.kind == pb::GridTargetKind::GridTargetDataCell as i32
+        )));
+    }
+
+    #[test]
+    fn pointer_move_stays_entered_after_checkbox_click_changes_cell_state() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 2, 1, 0);
+        grid.edit_trigger_mode = 2;
+        grid.selection.row = 1;
+        grid.selection.col = 1;
+        grid.selection.set_extent(1, 1, grid.rows, grid.cols);
+        grid.columns[0].data_type = pb::ColumnDataType::ColumnDataBoolean as i32;
+        grid.columns[0].alignment = pb::Align::CenterCenter as i32;
+        grid.cells.set_text(1, 0, "No".to_string());
+        {
+            let cell = grid.cells.get_mut(1, 0);
+            let extra = cell.extra_mut();
+            extra.value = crate::cell::CellValueData::Bool(false);
+            extra.checked = pb::CheckedState::CheckedUnchecked as i32;
+        }
+        prime_layout(&mut grid);
+
+        let (bx, by, bw, bh) = checkbox_rect(&grid, 1, 0).expect("checkbox rect");
+        let hover_x = bx as f32 + bw as f32 * 0.5;
+        let hover_y = by as f32 + bh as f32 * 0.5;
+
+        handle_pointer_move(&mut grid, hover_x, hover_y, 0, 0);
+        let events = grid.events.drain();
+        assert!(events.iter().any(|e| matches!(
+            &e.data,
+            GridEventData::EnterCell { row: 1, col: 0, target }
+                if target.kind == pb::GridTargetKind::GridTargetDataCell as i32
+                    && (target.status_flags
+                        & pb::GridEventTargetFlag::GridTargetFlagSelected as u32) == 0
+        )));
+
+        handle_pointer_down(&mut grid, hover_x, hover_y, 0, 0, false);
+        let _ = grid.events.drain();
+
+        handle_pointer_move(&mut grid, hover_x + 1.0, hover_y, 0, 0);
+        let events = grid.events.drain();
+        assert!(!events.iter().any(|e| matches!(
+            e.data,
+            GridEventData::MouseMove { .. }
+                | GridEventData::EnterCell { .. }
+                | GridEventData::LeaveCell { .. }
+        )));
+        assert!(grid.last_hover_target.as_ref().is_some_and(|hover| {
+            hover.row == 1
+                && hover.col == 0
+                && (hover.target.status_flags
+                    & pb::GridEventTargetFlag::GridTargetFlagSelected as u32)
+                    != 0
+        }));
     }
 
     #[test]
@@ -5880,7 +6080,7 @@ mod tests {
 
         handle_pointer_move(&mut grid, hover_x, hover_y, 0, 0);
 
-        assert_eq!(grid.cursor_style, 5);
+        assert_eq!(grid.cursor_hint, 5);
     }
 
     #[test]
@@ -5899,7 +6099,7 @@ mod tests {
 
         handle_pointer_move(&mut grid, hover_x, hover_y, 0, 0);
 
-        assert_eq!(grid.cursor_style, 5);
+        assert_eq!(grid.cursor_hint, 5);
     }
 
     #[test]
@@ -5956,7 +6156,7 @@ mod tests {
         );
 
         handle_pointer_move(&mut grid, hover_x, hover_y, 0, 0);
-        assert_eq!(grid.cursor_style, 5);
+        assert_eq!(grid.cursor_hint, 5);
     }
 
     #[test]
@@ -6054,10 +6254,127 @@ mod tests {
         );
 
         let events = grid.events.drain();
+        assert!(!events
+            .iter()
+            .any(|e| matches!(e.data, GridEventData::StartEdit { .. })));
+    }
+
+    #[test]
+    fn checkbox_click_emits_edit_events_without_start_edit() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 1, 1, 0);
+        grid.edit_trigger_mode = 2;
+        grid.columns[0].data_type = pb::ColumnDataType::ColumnDataBoolean as i32;
+        grid.columns[0].alignment = pb::Align::CenterCenter as i32;
+        grid.cells.set_text(1, 0, "No".to_string());
+        {
+            let cell = grid.cells.get_mut(1, 0);
+            let extra = cell.extra_mut();
+            extra.value = crate::cell::CellValueData::Bool(false);
+            extra.checked = pb::CheckedState::CheckedUnchecked as i32;
+        }
+        prime_layout(&mut grid);
+
+        let (bx, by, bw, bh) = checkbox_rect(&grid, 1, 0).expect("checkbox rect");
+        let click_x = bx as f32 + bw as f32 * 0.5;
+        let click_y = by as f32 + bh as f32 * 0.5;
+
+        handle_pointer_down(&mut grid, click_x, click_y, 0, 0, false);
+
+        assert!(!grid.is_editing());
+        assert_eq!(grid.cells.get_text(1, 0), "Yes");
+        assert_eq!(
+            grid.cells.get(1, 0).map(|cell| cell.checked()),
+            Some(pb::CheckedState::CheckedChecked as i32)
+        );
+
+        let events = grid.events.drain();
+        assert!(events
+            .iter()
+            .any(|e| matches!(e.data, GridEventData::BeforeEdit { row: 1, col: 0 })));
+        assert!(events.iter().any(|e| matches!(
+            &e.data,
+            GridEventData::AfterEdit {
+                row: 1,
+                col: 0,
+                old_text,
+                new_text,
+            } if old_text.as_str() == "No" && new_text.as_str() == "Yes"
+        )));
+        assert!(events.iter().any(|e| matches!(
+            &e.data,
+            GridEventData::CellChanged {
+                row: 1,
+                col: 0,
+                old_text,
+                new_text,
+            } if old_text.as_str() == "No" && new_text.as_str() == "Yes"
+        )));
+        assert!(!events
+            .iter()
+            .any(|e| matches!(e.data, GridEventData::StartEdit { .. })));
+    }
+
+    #[test]
+    fn checkbox_toggle_waits_when_begin_edit_not_allowed() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 1, 1, 0);
+        grid.edit_trigger_mode = 2;
+        grid.columns[0].data_type = pb::ColumnDataType::ColumnDataBoolean as i32;
+        grid.columns[0].alignment = pb::Align::CenterCenter as i32;
+        grid.cells.set_text(1, 0, "No".to_string());
+        {
+            let cell = grid.cells.get_mut(1, 0);
+            let extra = cell.extra_mut();
+            extra.value = crate::cell::CellValueData::Bool(false);
+            extra.checked = pb::CheckedState::CheckedUnchecked as i32;
+        }
+        prime_layout(&mut grid);
+
+        let (bx, by, bw, bh) = checkbox_rect(&grid, 1, 0).expect("checkbox rect");
+        let click_x = bx as f32 + bw as f32 * 0.5;
+        let click_y = by as f32 + bh as f32 * 0.5;
+
+        handle_pointer_down_with_behavior(
+            &mut grid,
+            click_x,
+            click_y,
+            0,
+            0,
+            false,
+            InputBehavior {
+                allow_begin_edit: false,
+                ..InputBehavior::default()
+            },
+        );
+
+        assert!(!grid.is_editing());
+        assert_eq!(grid.cells.get_text(1, 0), "No");
+        assert_eq!(
+            grid.cells.get(1, 0).map(|cell| cell.checked()),
+            Some(pb::CheckedState::CheckedUnchecked as i32)
+        );
+
+        let events = grid.events.drain();
         assert!(!events.iter().any(|e| matches!(
             e.data,
-            GridEventData::BeforeEdit { .. } | GridEventData::StartEdit { .. }
+            GridEventData::BeforeEdit { .. }
+                | GridEventData::AfterEdit { .. }
+                | GridEventData::CellChanged { .. }
         )));
+    }
+
+    #[test]
+    fn checkbox_rect_uses_min_cell_dimension() {
+        let mut grid = VolvoxGrid::new(1, 16, 64, 1, 1, 0, 0);
+        grid.columns[0].data_type = pb::ColumnDataType::ColumnDataBoolean as i32;
+        grid.columns[0].alignment = pb::Align::CenterCenter as i32;
+        grid.set_col_width(0, 12);
+        grid.set_row_height(0, 60);
+        prime_layout(&mut grid);
+
+        let (_, _, bw, bh) = checkbox_rect(&grid, 0, 0).expect("checkbox rect");
+        assert_eq!(bw, bh);
+        assert!(bw <= 12);
+        assert!(bw >= 8);
     }
 
     #[test]

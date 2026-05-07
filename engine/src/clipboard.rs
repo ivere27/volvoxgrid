@@ -80,21 +80,34 @@ pub fn cut(grid: &mut VolvoxGrid) -> (String, Vec<u8>) {
 /// resulting cell value is written into the grid. Pasting stops at the
 /// grid boundary (does not auto-extend rows/cols).
 pub fn paste(grid: &mut VolvoxGrid, text: &str) {
+    let col_sep = if grid.clip_col_separator.is_empty() {
+        "\t".to_string()
+    } else {
+        grid.clip_col_separator.clone()
+    };
+    let row_sep = if grid.clip_row_separator.is_empty() {
+        "\n".to_string()
+    } else {
+        grid.clip_row_separator.clone()
+    };
+
+    if row_sep == "\n" {
+        let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
+        paste_rows(grid, normalized.split('\n'), &col_sep);
+    } else {
+        paste_rows(grid, text.split(&row_sep), &col_sep);
+    }
+    grid.mark_dirty();
+}
+
+fn paste_rows<'a, I>(grid: &mut VolvoxGrid, rows: I, col_sep: &str)
+where
+    I: IntoIterator<Item = &'a str>,
+{
     let start_row = grid.selection.row;
     let start_col = grid.selection.col;
 
-    let col_sep = if grid.clip_col_separator.is_empty() {
-        "\t"
-    } else {
-        &grid.clip_col_separator
-    };
-    let row_sep = if grid.clip_row_separator.is_empty() {
-        "\n"
-    } else {
-        &grid.clip_row_separator
-    };
-
-    for (ri, line) in text.split(row_sep).enumerate() {
+    for (ri, line) in rows.into_iter().enumerate() {
         let row = start_row + ri as i32;
         if row >= grid.rows {
             break;
@@ -107,7 +120,6 @@ pub fn paste(grid: &mut VolvoxGrid, text: &str) {
             grid.cells.set_text(row, col, cell.to_string());
         }
     }
-    grid.mark_dirty();
 }
 
 /// Delete (clear) all cells within the current selection.
@@ -126,7 +138,7 @@ pub fn delete_selection(grid: &mut VolvoxGrid) {
 
 #[cfg(test)]
 mod tests {
-    use super::{copy, delete_selection};
+    use super::{copy, delete_selection, paste};
     use crate::grid::VolvoxGrid;
 
     fn sample_grid() -> VolvoxGrid {
@@ -162,5 +174,40 @@ mod tests {
         assert_eq!(grid.cells.get_text(0, 0), "");
         assert_eq!(grid.cells.get_text(1, 2), "");
         assert_eq!(grid.cells.get_text(0, 1), "B");
+    }
+
+    #[test]
+    fn paste_default_row_separator_accepts_crlf_without_cell_cr() {
+        let mut grid = sample_grid();
+
+        paste(&mut grid, "A1\tB1\tC1\r\nD1\tE1\tF1");
+
+        assert_eq!(grid.cells.get_text(0, 2), "C1");
+        assert_eq!(grid.cells.get_text(1, 2), "F1");
+    }
+
+    #[test]
+    fn copy_applies_row_map_once() {
+        let mut grid = sample_grid();
+        grid.row_positions = vec![1, 0, 2];
+        grid.cells.set_row_map(grid.row_positions.clone());
+        grid.selection
+            .select_ranges(0, 0, &[(0, 0, 0, 0)], grid.rows, grid.cols);
+
+        let (text, _) = copy(&grid);
+
+        assert_eq!(text, "D");
+    }
+
+    #[test]
+    fn paste_applies_row_map_once() {
+        let mut grid = sample_grid();
+        grid.row_positions = vec![1, 0, 2];
+        grid.cells.set_row_map(grid.row_positions.clone());
+
+        paste(&mut grid, "X");
+
+        assert_eq!(grid.cells.get_text(0, 0), "X");
+        assert_eq!(grid.cells.get_text(1, 0), "A");
     }
 }

@@ -2605,15 +2605,29 @@ message SelectionUpdate {
   repeated CellRange ranges     = 3;
 }
 
+// Semantic cursor hint emitted by the engine. Adapters map this to their
+// platform's cursor primitive (Win32 HCURSOR, CSS cursor, Flutter MouseCursor,
+// .NET System.Windows.Forms.Cursor, …) and may layer their own host-side
+// override on top (e.g. ActiveX `MousePointer`).
+//
+// New values may be appended; do NOT renumber existing values — the wire
+// encoding is already shipped through `CursorChange.cursor` and the FFI
+// `volvox_grid_get_cursor_hint` exports.
+enum CursorType {
+  CURSOR_DEFAULT     = 0;
+  CURSOR_RESIZE_COL  = 1;  // ↔ vertical edge between columns
+  CURSOR_RESIZE_ROW  = 2;  // ↕ horizontal edge between rows
+  CURSOR_MOVE_COL    = 3;  // ⇔ column reorder drag
+  CURSOR_TEXT        = 4;  // I-beam over editable text
+  CURSOR_HAND        = 5;  // pointer over an interactive target
+  CURSOR_MOVE_ROW    = 6;  // ⇕ row reorder / freeze-row drag
+  CURSOR_WAIT        = 7;  // engine busy (long sort, refresh, …)
+  CURSOR_NOT_ALLOWED = 8;  // drop rejected, readonly cell signal
+  CURSOR_CROSSHAIR   = 9;  // range-select / fill-handle drag
+  CURSOR_COPY        = 10; // ctrl-drag duplicate
+}
+
 message CursorChange {
-  enum CursorType {
-    DEFAULT    = 0;
-    RESIZE_COL = 1;
-    RESIZE_ROW = 2;
-    MOVE_COL   = 3;
-    TEXT       = 4;
-    HAND       = 5;
-  }
   CursorType cursor = 1;
 }
 

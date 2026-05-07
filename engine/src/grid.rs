@@ -211,6 +211,8 @@ pub struct VolvoxGrid {
     pub row_height_min: i32,
     /// Global maximum row height in pixels. 0 means no maximum enforced.
     pub row_height_max: i32,
+    /// Global minimum column width in pixels. 0 means no global minimum enforced.
+    pub col_width_min_default: i32,
     /// Per-column minimum widths. Only columns with explicit minimums are stored.
     pub col_width_min: HashMap<i32, i32>,
     /// Per-column maximum widths. Only columns with explicit maximums are stored.
@@ -538,10 +540,16 @@ pub struct VolvoxGrid {
     pub mouse_col: i32,
     /// Last event target reported by pointer hover.
     pub last_hover_target: Option<HoverTarget>,
-    /// Cursor style the host should display.
-    /// 0 = default, 1 = col-resize, 2 = row-resize, 3 = move/grab,
-    /// 4 = pointer/hand, 5 = pointer/hand (interactive cell content)
-    pub cursor_style: i32,
+    /// Semantic cursor hint the host should display, encoded as
+    /// `pb::CursorType`:
+    /// 0 = CURSOR_DEFAULT, 1 = CURSOR_RESIZE_COL, 2 = CURSOR_RESIZE_ROW,
+    /// 3 = CURSOR_MOVE_COL, 4 = CURSOR_TEXT, 5 = CURSOR_HAND,
+    /// 6 = CURSOR_MOVE_ROW, 7 = CURSOR_WAIT, 8 = CURSOR_NOT_ALLOWED,
+    /// 9 = CURSOR_CROSSHAIR, 10 = CURSOR_COPY.
+    /// Adapters map this hint to their platform's cursor primitive
+    /// (Win32 HCURSOR, CSS cursor, Flutter MouseCursor, …) and decide
+    /// whether a host-side override (e.g. ActiveX `MousePointer`) wins.
+    pub cursor_hint: i32,
 
     // ── Resize Tracking ──────────────────────────────────────────────────
     /// Whether a column/row resize drag is in progress.
@@ -751,6 +759,7 @@ impl VolvoxGrid {
             // Min/max
             row_height_min: 0,
             row_height_max: 0,
+            col_width_min_default: 0,
             col_width_min: HashMap::new(),
             col_width_max: HashMap::new(),
 
@@ -936,7 +945,7 @@ impl VolvoxGrid {
             mouse_row: -1,
             mouse_col: -1,
             last_hover_target: None,
-            cursor_style: 0,
+            cursor_hint: 0,
 
             // Resize tracking
             resize_active: false,
@@ -1482,10 +1491,13 @@ impl VolvoxGrid {
     /// Clamps a column width to the configured per-column min/max range.
     pub fn clamp_col_width(&self, col: i32, width: i32) -> i32 {
         let mut w = width;
-        if let Some(&min_w) = self.col_width_min.get(&col) {
-            if min_w > 0 && w < min_w {
-                w = min_w;
-            }
+        let min_w = self
+            .col_width_min
+            .get(&col)
+            .copied()
+            .unwrap_or(self.col_width_min_default);
+        if min_w > 0 && w < min_w {
+            w = min_w;
         }
         if let Some(&max_w) = self.col_width_max.get(&col) {
             if max_w > 0 && w > max_w {
@@ -5423,6 +5435,29 @@ mod tests {
 
         assert_eq!(grid.cells.get_text(1, 1), "keep");
         assert!(grid.cell_styles.contains_key(&(1, 1)));
+    }
+
+    #[test]
+    fn clear_scrollable_everything_keeps_fixed_row_layout_state() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 3, 1, 0);
+        grid.row_positions = vec![1, 0, 2];
+        grid.col_positions = vec![1, 0, 2];
+        grid.row_props.entry(0).or_default().outline_level = 1;
+        grid.rows_hidden.insert(0);
+        grid.row_props.entry(1).or_default().outline_level = 2;
+        grid.rows_hidden.insert(1);
+
+        grid.clear_region(
+            pb::ClearScope::ClearEverything as i32,
+            pb::ClearRegion::ClearScrollable as i32,
+        );
+
+        assert_eq!(grid.row_positions, vec![1, 0, 2]);
+        assert_eq!(grid.col_positions, vec![1, 0, 2]);
+        assert!(grid.row_props.contains_key(&0));
+        assert!(grid.rows_hidden.contains(&0));
+        assert!(!grid.row_props.contains_key(&1));
+        assert!(!grid.rows_hidden.contains(&1));
     }
 
     #[test]

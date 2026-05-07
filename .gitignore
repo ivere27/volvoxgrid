@@ -48,6 +48,7 @@ adapters/xtragrid/test/runner/bin/
 node_modules/
 web/js/dist/
 web/js/package-lock.json
+adapters/aggrid/package-lock.json
 web/js/wasm/
 web/example/dist/
 web/example/wasm/

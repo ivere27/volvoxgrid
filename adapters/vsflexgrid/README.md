@@ -176,7 +176,7 @@ This creates the following registry entries:
 
 ## Comparison Harness
 
-The UI/data comparison runners under `adapters/vsflexgrid/mingw/` now default to a Wine prefix that uses Microsoft MDAC 2.8 SP1 ADO components instead of Wine's builtin `msado15`. This is required for VBScript `CreateObject("ADODB.Recordset")` and legacy `VSFlexGrid8.VSFlexGridADO` binding behavior to match the real OCX path closely enough for comparison.
+The UI/data comparison runners under `adapters/vsflexgrid/mingw/` now default to a Wine prefix that uses Microsoft MDAC 2.8 SP1 ADO components instead of Wine's builtin `msado15`. This is required for VBScript `CreateObject("ADODB.Recordset")` and ADO binding behavior used by legacy hosts.
 
 Default compare environment:
 
@@ -569,8 +569,8 @@ fg.Subtotal 5, 1, 2, "Total", &HFFC0C0FF, &HFF000000, True
 
 ## Limitations
 
-- **No type library** — `GetTypeInfoCount()` returns 0. VB6 IntelliSense
-  requires a separately registered `.tlb` file.
+- **No type information** — `GetTypeInfoCount()` returns 0. Design-time
+  IntelliSense is not provided by the OCX.
 - **No event sourcing** — The OCX does not fire events (e.g. `Click`,
   `RowColChange`). Properties are read/written only.
 - **CPU rendering only** — `IViewObject::Draw()` uses the software renderer.

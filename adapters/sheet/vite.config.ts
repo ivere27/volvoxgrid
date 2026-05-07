@@ -28,6 +28,8 @@ export default defineConfig({
       },
     },
     sourcemap: true,
+    minify: false,
+    cssMinify: "esbuild",
     assetsInlineLimit: 0, // Never inline assets (prevents 3.8MB font in CSS)
   },
 });

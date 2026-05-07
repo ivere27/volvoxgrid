@@ -2817,11 +2817,19 @@ fn render_grid_internal<C: Canvas>(
 
     run_layer!(layer::CELL_BORDERS, render_cell_borders(grid, canvas, &ctx));
 
-    run_layer!(layer::CELL_TEXT, render_cell_text(grid, canvas, &ctx));
-    run_layer!(
-        layer::CELL_PICTURES,
-        render_cell_pictures(grid, canvas, &ctx)
-    );
+    if grid.style.image_over_text {
+        run_layer!(layer::CELL_TEXT, render_cell_text(grid, canvas, &ctx));
+        run_layer!(
+            layer::CELL_PICTURES,
+            render_cell_pictures(grid, canvas, &ctx)
+        );
+    } else {
+        run_layer!(
+            layer::CELL_PICTURES,
+            render_cell_pictures(grid, canvas, &ctx)
+        );
+        run_layer!(layer::CELL_TEXT, render_cell_text(grid, canvas, &ctx));
+    }
     run_layer!(layer::BARCODES, render_barcodes(grid, canvas, &ctx));
     run_layer!(layer::SORT_GLYPHS, render_sort_glyphs(grid, canvas, &ctx));
     run_layer!(
@@ -8100,13 +8108,17 @@ fn render_header_marks<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rende
 // Layer 5 -- Checkboxes
 // ===========================================================================
 
-pub(crate) fn checkbox_box_size(cell_h: i32) -> i32 {
-    let max_size = (cell_h - 2).max(1);
+pub(crate) fn checkbox_box_size(cell_extent: i32) -> i32 {
+    let max_size = (cell_extent - 2).max(1);
     if max_size <= 13 {
         max_size
     } else {
-        (((cell_h as f32) * 0.8).round() as i32).clamp(13, max_size)
+        (((cell_extent as f32) * 0.8).round() as i32).clamp(13, max_size)
     }
+}
+
+pub(crate) fn checkbox_box_size_for_rect(cell_w: i32, cell_h: i32) -> i32 {
+    checkbox_box_size(cell_w.min(cell_h))
 }
 
 fn fill_rect_clipped<C: Canvas>(
@@ -8322,7 +8334,7 @@ fn render_checkboxes<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderC
         // don't shift during smooth scrolling.
         let (ox, oy, ow, oh) = original_cell_bounds(grid, row, col, cx, cy, cw, ch, vp);
 
-        let box_size = checkbox_box_size(oh);
+        let box_size = checkbox_box_size_for_rect(ow, oh);
         let style_override = grid.get_cell_style(row, col);
         let alignment = resolve_alignment(grid, row, col, &style_override, "");
         let (halign, valign) = alignment_components(alignment);
@@ -10651,8 +10663,8 @@ mod tests {
     use super::{
         aligned_editor_draw_x, barcode_centered_square_rect, barcode_layer_needed,
         barcode_render_status, build_or_reuse_ctx, cell_has_checkbox_visual, cell_rect,
-        checkbox_box_size, checkbox_layer_needed, compose_preedit_display_text,
-        draw_linear_barcode, draw_outline_toggle, draw_qr_barcode,
+        checkbox_box_size, checkbox_box_size_for_rect, checkbox_layer_needed,
+        compose_preedit_display_text, draw_linear_barcode, draw_outline_toggle, draw_qr_barcode,
         draw_tree_guide_hline_except_rect, draw_tree_guide_vline_except_rect, dropdown_button_rect,
         dropdown_glyph_metrics, dropdown_layer_needed, encode_linear_barcode,
         linear_barcode_preview_rect, normalized_code128_payload, outline_toggle_box_size,
@@ -12032,6 +12044,45 @@ mod tests {
         assert_eq!(checkbox_box_size(14), 12);
         assert_eq!(checkbox_box_size(20), 16);
         assert!(checkbox_box_size(60) > checkbox_box_size(20));
+    }
+
+    #[test]
+    fn checkbox_box_size_for_rect_uses_min_dimension() {
+        assert_eq!(checkbox_box_size_for_rect(12, 60), checkbox_box_size(12));
+        assert_eq!(checkbox_box_size_for_rect(60, 12), checkbox_box_size(12));
+        assert!(checkbox_box_size_for_rect(12, 60) < checkbox_box_size(60));
+    }
+
+    #[test]
+    fn checkbox_renders_in_narrow_tall_cell() {
+        let width = 16;
+        let height = 64;
+        let stride = width * 4;
+        let mut grid = VolvoxGrid::new(1, width, height, 1, 1, 0, 0);
+        grid.style.back_color_bkg = 0xFFFFFFFF;
+        grid.style.grid_lines = pb::GridLineStyle::GridlineNone as i32;
+        grid.style.grid_lines_fixed = pb::GridLineStyle::GridlineNone as i32;
+        grid.columns[0].data_type = pb::ColumnDataType::ColumnDataBoolean as i32;
+        grid.columns[0].alignment = pb::Align::CenterCenter as i32;
+        grid.set_col_width(0, 12);
+        grid.set_row_height(0, 60);
+        {
+            let extra = grid.cells.get_mut(0, 0).extra_mut();
+            extra.value = crate::cell::CellValueData::Bool(true);
+            extra.checked = pb::CheckedState::CheckedChecked as i32;
+        }
+        grid.ensure_layout();
+
+        let mut text = SolidTextRenderer;
+        let mut buffer = vec![0u8; (stride * height) as usize];
+        let mut canvas = CpuCanvas::new(&mut buffer, width, height, stride, &mut text);
+        render_grid(&grid, &mut canvas);
+
+        let outline = color_bounds(&buffer, width, height, 0xFF707070).expect("checkbox outline");
+        assert!(outline.w <= 12);
+        assert!(outline.h <= 12);
+        assert!(outline.w >= 8);
+        assert!(outline.h >= 8);
     }
 
     #[test]

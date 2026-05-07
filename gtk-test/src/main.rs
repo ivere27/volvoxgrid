@@ -3755,11 +3755,16 @@ fn handle_render_output(
             }
             pb::render_output::Event::Cursor(cursor) => {
                 let name = match cursor.cursor {
-                    x if x == pb::cursor_change::CursorType::ResizeCol as i32 => Some("col-resize"),
-                    x if x == pb::cursor_change::CursorType::ResizeRow as i32 => Some("row-resize"),
-                    x if x == pb::cursor_change::CursorType::MoveCol as i32 => Some("grab"),
-                    x if x == pb::cursor_change::CursorType::Text as i32 => Some("text"),
-                    x if x == pb::cursor_change::CursorType::Hand as i32 => Some("pointer"),
+                    x if x == pb::CursorType::CursorResizeCol as i32 => Some("col-resize"),
+                    x if x == pb::CursorType::CursorResizeRow as i32 => Some("row-resize"),
+                    x if x == pb::CursorType::CursorMoveCol as i32 => Some("grab"),
+                    x if x == pb::CursorType::CursorMoveRow as i32 => Some("grab"),
+                    x if x == pb::CursorType::CursorText as i32 => Some("text"),
+                    x if x == pb::CursorType::CursorHand as i32 => Some("pointer"),
+                    x if x == pb::CursorType::CursorWait as i32 => Some("wait"),
+                    x if x == pb::CursorType::CursorNotAllowed as i32 => Some("not-allowed"),
+                    x if x == pb::CursorType::CursorCrosshair as i32 => Some("crosshair"),
+                    x if x == pb::CursorType::CursorCopy as i32 => Some("copy"),
                     _ => Some("default"),
                 };
                 area.set_cursor_from_name(name);

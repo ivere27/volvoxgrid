@@ -2365,6 +2365,60 @@ class FrameKind extends $pb.ProtobufEnum {
   const FrameKind._(super.value, super.name);
 }
 
+/// Semantic cursor hint emitted by the engine. Adapters map this to their
+/// platform's cursor primitive (Win32 HCURSOR, CSS cursor, Flutter MouseCursor,
+/// .NET System.Windows.Forms.Cursor, …) and may layer their own host-side
+/// override on top (e.g. ActiveX `MousePointer`).
+///
+/// New values may be appended; do NOT renumber existing values — the wire
+/// encoding is already shipped through `CursorChange.cursor` and the FFI
+/// `volvox_grid_get_cursor_hint` exports.
+class CursorType extends $pb.ProtobufEnum {
+  static const CursorType CURSOR_DEFAULT =
+      CursorType._(0, _omitEnumNames ? '' : 'CURSOR_DEFAULT');
+  static const CursorType CURSOR_RESIZE_COL =
+      CursorType._(1, _omitEnumNames ? '' : 'CURSOR_RESIZE_COL');
+  static const CursorType CURSOR_RESIZE_ROW =
+      CursorType._(2, _omitEnumNames ? '' : 'CURSOR_RESIZE_ROW');
+  static const CursorType CURSOR_MOVE_COL =
+      CursorType._(3, _omitEnumNames ? '' : 'CURSOR_MOVE_COL');
+  static const CursorType CURSOR_TEXT =
+      CursorType._(4, _omitEnumNames ? '' : 'CURSOR_TEXT');
+  static const CursorType CURSOR_HAND =
+      CursorType._(5, _omitEnumNames ? '' : 'CURSOR_HAND');
+  static const CursorType CURSOR_MOVE_ROW =
+      CursorType._(6, _omitEnumNames ? '' : 'CURSOR_MOVE_ROW');
+  static const CursorType CURSOR_WAIT =
+      CursorType._(7, _omitEnumNames ? '' : 'CURSOR_WAIT');
+  static const CursorType CURSOR_NOT_ALLOWED =
+      CursorType._(8, _omitEnumNames ? '' : 'CURSOR_NOT_ALLOWED');
+  static const CursorType CURSOR_CROSSHAIR =
+      CursorType._(9, _omitEnumNames ? '' : 'CURSOR_CROSSHAIR');
+  static const CursorType CURSOR_COPY =
+      CursorType._(10, _omitEnumNames ? '' : 'CURSOR_COPY');
+
+  static const $core.List<CursorType> values = <CursorType>[
+    CURSOR_DEFAULT,
+    CURSOR_RESIZE_COL,
+    CURSOR_RESIZE_ROW,
+    CURSOR_MOVE_COL,
+    CURSOR_TEXT,
+    CURSOR_HAND,
+    CURSOR_MOVE_ROW,
+    CURSOR_WAIT,
+    CURSOR_NOT_ALLOWED,
+    CURSOR_CROSSHAIR,
+    CURSOR_COPY,
+  ];
+
+  static final $core.List<CursorType?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 10);
+  static CursorType? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const CursorType._(super.value, super.name);
+}
+
 class ArchiveRequest_Action extends $pb.ProtobufEnum {
   static const ArchiveRequest_Action ACTION_UNSPECIFIED =
       ArchiveRequest_Action._(0, _omitEnumNames ? '' : 'ACTION_UNSPECIFIED');
@@ -2486,38 +2540,6 @@ class TerminalCommand_Kind extends $pb.ProtobufEnum {
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
   const TerminalCommand_Kind._(super.value, super.name);
-}
-
-class CursorChange_CursorType extends $pb.ProtobufEnum {
-  static const CursorChange_CursorType DEFAULT =
-      CursorChange_CursorType._(0, _omitEnumNames ? '' : 'DEFAULT');
-  static const CursorChange_CursorType RESIZE_COL =
-      CursorChange_CursorType._(1, _omitEnumNames ? '' : 'RESIZE_COL');
-  static const CursorChange_CursorType RESIZE_ROW =
-      CursorChange_CursorType._(2, _omitEnumNames ? '' : 'RESIZE_ROW');
-  static const CursorChange_CursorType MOVE_COL =
-      CursorChange_CursorType._(3, _omitEnumNames ? '' : 'MOVE_COL');
-  static const CursorChange_CursorType TEXT =
-      CursorChange_CursorType._(4, _omitEnumNames ? '' : 'TEXT');
-  static const CursorChange_CursorType HAND =
-      CursorChange_CursorType._(5, _omitEnumNames ? '' : 'HAND');
-
-  static const $core.List<CursorChange_CursorType> values =
-      <CursorChange_CursorType>[
-    DEFAULT,
-    RESIZE_COL,
-    RESIZE_ROW,
-    MOVE_COL,
-    TEXT,
-    HAND,
-  ];
-
-  static final $core.List<CursorChange_CursorType?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 5);
-  static CursorChange_CursorType? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
-
-  const CursorChange_CursorType._(super.value, super.name);
 }
 
 const $core.bool _omitEnumNames =

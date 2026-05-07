@@ -58,10 +58,10 @@ STDAPI DllGetClassObject(REFCLSID rclsid, REFIID riid, LPVOID* ppv)
 
 STDAPI DllRegisterServer()
 {
-    return _AtlModule.DllRegisterServer();
+    return _AtlModule.DllRegisterServer(FALSE);
 }
 
 STDAPI DllUnregisterServer()
 {
-    return _AtlModule.DllUnregisterServer();
+    return _AtlModule.DllUnregisterServer(FALSE);
 }

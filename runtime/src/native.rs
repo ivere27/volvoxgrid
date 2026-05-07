@@ -562,6 +562,14 @@ fn handle_pointer_render_input(
                                 }
 
                                 if hit.row >= 0 && hit.col >= 0 {
+                                    if hit.area == volvoxgrid_engine::input::HitArea::CheckBox
+                                        && !pe.dbl_click
+                                    {
+                                        runtime.request_before_checkbox_toggle(
+                                            grid_id, grid, hit.row, hit.col,
+                                        );
+                                    }
+
                                     let is_cell_like = hit.area
                                         == volvoxgrid_engine::input::HitArea::Cell
                                         || hit.area == volvoxgrid_engine::input::HitArea::FixedRow
@@ -773,7 +781,10 @@ fn handle_key_render_input(
                     let (edit_row, edit_col) =
                         volvoxgrid_engine::input::selected_outline_label_edit_target(grid)
                             .unwrap_or((grid.selection.row, grid.selection.col));
-                    if decision_enabled {
+                    if !volvoxgrid_engine::input::is_boolean_checkbox_cell(
+                        grid, edit_row, edit_col,
+                    ) && decision_enabled
+                    {
                         let _ = runtime.request_before_edit(
                             grid_id,
                             grid,
@@ -789,7 +800,9 @@ fn handle_key_render_input(
                             grid.edit.select_all();
                             grid.mark_dirty();
                         }
-                    } else {
+                    } else if !volvoxgrid_engine::input::is_boolean_checkbox_cell(
+                        grid, edit_row, edit_col,
+                    ) {
                         shared::begin_edit_session_core_opts(
                             grid,
                             edit_row,
@@ -857,7 +870,18 @@ fn handle_key_render_input(
                                 },
                             );
                         }
+                        let sel_row = grid.selection.row;
+                        let sel_col = grid.selection.col;
+                        let queued_checkbox_toggle = !uses_outline_expander
+                            && (ke.key_code == 13 || ke.key_code == 32)
+                            && !grid.host_key_dispatch
+                            && !was_editing
+                            && !grid.is_editing()
+                            && runtime.request_before_checkbox_toggle(
+                                grid_id, grid, sel_row, sel_col,
+                            );
                         if !uses_outline_expander
+                            && !queued_checkbox_toggle
                             && (ke.key_code == 13 || ke.key_code == 113)
                             && !grid.host_key_dispatch
                             && grid.edit_trigger_mode >= 1
@@ -872,17 +896,21 @@ fn handle_key_render_input(
                                 } else {
                                     (grid.selection.row, grid.selection.col)
                                 };
-                            let _ = runtime.request_before_edit(
-                                grid_id,
-                                grid,
-                                edit_row,
-                                edit_col,
-                                false,
-                                false,
-                                None,
-                                None,
-                                if ke.key_code == 113 { Some(true) } else { None },
-                            );
+                            if !volvoxgrid_engine::input::is_boolean_checkbox_cell(
+                                grid, edit_row, edit_col,
+                            ) {
+                                let _ = runtime.request_before_edit(
+                                    grid_id,
+                                    grid,
+                                    edit_row,
+                                    edit_col,
+                                    false,
+                                    false,
+                                    None,
+                                    None,
+                                    if ke.key_code == 113 { Some(true) } else { None },
+                                );
+                            }
                         }
                     } else {
                         volvoxgrid_engine::input::handle_key_down(grid, ke.key_code, ke.modifier);
@@ -927,17 +955,21 @@ fn handle_key_render_input(
                                             grid,
                                         )
                                         .unwrap_or((grid.selection.row, grid.selection.col));
-                                    let _ = runtime.request_before_edit(
-                                        grid_id,
-                                        grid,
-                                        edit_row,
-                                        edit_col,
-                                        false,
-                                        false,
-                                        Some(seed),
-                                        None,
-                                        None,
-                                    );
+                                    if !volvoxgrid_engine::input::is_boolean_checkbox_cell(
+                                        grid, edit_row, edit_col,
+                                    ) {
+                                        let _ = runtime.request_before_edit(
+                                            grid_id,
+                                            grid,
+                                            edit_row,
+                                            edit_col,
+                                            false,
+                                            false,
+                                            Some(seed),
+                                            None,
+                                            None,
+                                        );
+                                    }
                                 }
                             }
                         }
@@ -1198,6 +1230,10 @@ enum PendingAction {
         col: i32,
         old_text: String,
         committed_text: String,
+    },
+    ToggleCheckbox {
+        row: i32,
+        col: i32,
     },
     BeforeSort {
         col: i32,
@@ -1915,6 +1951,21 @@ mod tests {
             .expect("grid exists")
     }
 
+    fn configure_checkbox_cell(grid: &mut VolvoxGrid, row: i32, col: i32, checked: bool) {
+        grid.edit_trigger_mode = 1;
+        grid.columns[col as usize].data_type = pb::ColumnDataType::ColumnDataBoolean as i32;
+        grid.cells
+            .set_text(row, col, if checked { "Yes" } else { "No" }.to_string());
+        let cell = grid.cells.get_mut(row, col);
+        let extra = cell.extra_mut();
+        extra.value = volvoxgrid_engine::cell::CellValueData::Bool(checked);
+        extra.checked = if checked {
+            pb::CheckedState::CheckedChecked as i32
+        } else {
+            pb::CheckedState::CheckedUnchecked as i32
+        };
+    }
+
     fn destroy_test_grid(runtime: &VolvoxGridRuntime, grid_id: i64) {
         runtime.clear_grid_state(grid_id);
         runtime.manager().destroy_grid(grid_id);
@@ -2626,6 +2677,82 @@ mod tests {
                 assert!(grid.edit.is_active());
                 assert_eq!(grid.edit.edit_row, 1);
                 assert_eq!(grid.edit.edit_col, 0);
+            })
+            .unwrap();
+
+        destroy_test_grid(&runtime, grid_id);
+    }
+
+    #[test]
+    fn event_decision_cancel_and_allow_checkbox_toggle() {
+        let (runtime, grid_id) = runtime_with_decision_grid(3, 2);
+
+        runtime
+            .with_grid(grid_id, |grid| configure_checkbox_cell(grid, 1, 0, false))
+            .unwrap();
+        let cancel_id = request_pending_event_id(
+            &runtime,
+            grid_id,
+            |runtime, grid_id, grid| {
+                runtime.request_before_checkbox_toggle(grid_id, grid, 1, 0);
+            },
+            |event| matches!(event, GridEventData::BeforeEdit { row: 1, col: 0 }),
+        );
+        let _ = runtime.resolve_event_decision(grid_id, cancel_id, true);
+        runtime
+            .with_grid(grid_id, |grid| {
+                assert_eq!(grid.cells.get_text(1, 0), "No");
+                assert_eq!(
+                    grid.cells.get(1, 0).map(|cell| cell.checked()),
+                    Some(pb::CheckedState::CheckedUnchecked as i32)
+                );
+                let events = grid.events.drain();
+                assert!(!events.iter().any(|event| matches!(
+                    event.data,
+                    GridEventData::AfterEdit { .. } | GridEventData::CellChanged { .. }
+                )));
+            })
+            .unwrap();
+
+        let allow_id = request_pending_event_id(
+            &runtime,
+            grid_id,
+            |runtime, grid_id, grid| {
+                runtime.request_before_checkbox_toggle(grid_id, grid, 1, 0);
+            },
+            |event| matches!(event, GridEventData::BeforeEdit { row: 1, col: 0 }),
+        );
+        let _ = runtime.resolve_event_decision(grid_id, allow_id, false);
+        runtime
+            .with_grid(grid_id, |grid| {
+                assert!(!grid.is_editing());
+                assert_eq!(grid.cells.get_text(1, 0), "Yes");
+                assert_eq!(
+                    grid.cells.get(1, 0).map(|cell| cell.checked()),
+                    Some(pb::CheckedState::CheckedChecked as i32)
+                );
+                let events = grid.events.drain();
+                assert!(events.iter().any(|event| matches!(
+                    &event.data,
+                    GridEventData::AfterEdit {
+                        row: 1,
+                        col: 0,
+                        old_text,
+                        new_text,
+                    } if old_text.as_str() == "No" && new_text.as_str() == "Yes"
+                )));
+                assert!(events.iter().any(|event| matches!(
+                    &event.data,
+                    GridEventData::CellChanged {
+                        row: 1,
+                        col: 0,
+                        old_text,
+                        new_text,
+                    } if old_text.as_str() == "No" && new_text.as_str() == "Yes"
+                )));
+                assert!(!events
+                    .iter()
+                    .any(|event| matches!(event.data, GridEventData::StartEdit { .. })));
             })
             .unwrap();
 
@@ -4211,6 +4338,42 @@ impl VolvoxGridRuntime {
         None
     }
 
+    fn request_before_checkbox_toggle(
+        &self,
+        grid_id: i64,
+        grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+        row: i32,
+        col: i32,
+    ) -> bool {
+        if !volvoxgrid_engine::input::can_toggle_checkbox_cell(grid, row, col) {
+            return false;
+        }
+
+        if !self.decision_channel_enabled(grid_id) {
+            grid.events
+                .push(volvoxgrid_engine::event::GridEventData::BeforeEdit { row, col });
+            volvoxgrid_engine::input::apply_checkbox_toggle_after_before_edit(grid, row, col);
+            return true;
+        }
+
+        let event_id = self.next_event_id();
+        self.pending_actions
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert(
+                (grid_id, event_id),
+                PendingActionEntry {
+                    created_at: Instant::now(),
+                    action: PendingAction::ToggleCheckbox { row, col },
+                },
+            );
+        grid.events.push_with_id(
+            event_id,
+            volvoxgrid_engine::event::GridEventData::BeforeEdit { row, col },
+        );
+        true
+    }
+
     fn request_before_dropdown_open(
         &self,
         grid_id: i64,
@@ -4567,6 +4730,10 @@ impl VolvoxGridRuntime {
         }
 
         if hit.row >= 0 && hit.col >= 0 {
+            if hit.area == volvoxgrid_engine::input::HitArea::CheckBox && !dbl_click {
+                self.request_before_checkbox_toggle(grid_id, grid, hit.row, hit.col);
+            }
+
             let is_cell_like = hit.area == volvoxgrid_engine::input::HitArea::Cell
                 || hit.area == volvoxgrid_engine::input::HitArea::FixedRow
                 || hit.area == volvoxgrid_engine::input::HitArea::FixedCol;
@@ -4816,6 +4983,17 @@ impl VolvoxGridRuntime {
                 })
                 .ok()
                 .flatten(),
+            PendingAction::ToggleCheckbox { row, col } => {
+                if cancel {
+                    return None;
+                }
+                let _ = self.manager().with_grid(grid_id, |grid| {
+                    volvoxgrid_engine::input::apply_checkbox_toggle_after_before_edit(
+                        grid, row, col,
+                    );
+                });
+                None
+            }
             PendingAction::BeforeSort { col } => {
                 if cancel {
                     return None;

@@ -20,7 +20,6 @@ HKCR
             {
                 val ThreadingModel = s 'Apartment'
             }
-            TypeLib = s '{C9A5D6E3-AF40-4B7C-BE8D-3F5A7B9C0D1E}'
             Version = s '0.1'
             ForceRemove Control
             ForceRemove MiscStatus = s '0'

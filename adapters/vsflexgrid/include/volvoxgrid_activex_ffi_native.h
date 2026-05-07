@@ -721,6 +721,12 @@ uint8_t* volvox_grid_set_combo_search(
     int32_t* out_len
 );
 
+/* GetComboSearch */
+uint8_t* volvox_grid_get_combo_search(
+    int64_t id,
+    int32_t* out_len
+);
+
 /* SetShowComboButton */
 uint8_t* volvox_grid_set_show_combo_button(
     int64_t grid_id,
@@ -947,6 +953,12 @@ uint8_t* volvox_grid_get_cell_checked(
 uint8_t* volvox_grid_set_owner_draw(
     int64_t grid_id,
     int32_t mode,
+    int32_t* out_len
+);
+
+/* GetOwnerDraw */
+uint8_t* volvox_grid_get_owner_draw(
+    int64_t id,
     int32_t* out_len
 );
 
@@ -1344,6 +1356,12 @@ uint8_t* volvox_grid_set_auto_size_mouse(
 uint8_t* volvox_grid_set_scroll_tips(
     int64_t grid_id,
     int32_t value,
+    int32_t* out_len
+);
+
+/* GetScrollTips */
+uint8_t* volvox_grid_get_scroll_tips(
+    int64_t id,
     int32_t* out_len
 );
 
