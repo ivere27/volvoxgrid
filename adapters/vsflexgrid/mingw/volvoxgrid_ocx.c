@@ -895,6 +895,10 @@ static int32_t volvox_grid_set_redraw_compat(int64_t grid_id, int32_t value) {
 #define DISPID_VG_WALLPAPER_COMPAT    201
 #define DISPID_VG_WALLPAPERALIGNMENT_COMPAT 202
 #define DISPID_VG_COLINDENT_COMPAT    207
+#define DISPID_VG_ACCESSIBLENAME_COMPAT 212
+#define DISPID_VG_ACCESSIBLEDESCRIPTION_COMPAT 213
+#define DISPID_VG_ACCESSIBLEVALUE_COMPAT 214
+#define DISPID_VG_ACCESSIBLEROLE_COMPAT 215
 #define DISPID_VG_MERGECELLSFIXED_COMPAT 218
 #define DISPID_VG_GROUPCOMPARE_COMPAT 219
 #define DISPID_VG_GETSELECTION_COMPAT 181
@@ -1323,6 +1327,10 @@ static const VG_NameEntry vfg_legacy_names[] = {
     { L"ColIndent", 207 },
     { L"LoadGridURL", 210 },
     { L"FinishEditing", 211 },
+    { L"AccessibleName", 212 },
+    { L"AccessibleDescription", 213 },
+    { L"AccessibleValue", 214 },
+    { L"AccessibleRole", 215 },
     { L"IsSearching", 216 },
     { L"Flags", 217 },
     { L"MergeCellsFixed", 218 },
@@ -1575,6 +1583,14 @@ struct VolvoxGridObject {
     IDispatch *data_source;
     IDispatch *recordset;
     BSTR data_member;
+    /* MSAA a11y properties — control-level only, OCX-local sidecar.
+     * The legacy grid exposes these as ambient/extender properties; the
+     * engine has no concept of accessibility. Default role matches the
+     * legacy control: ROLE_SYSTEM_TABLE (24). */
+    BSTR accessible_name;
+    BSTR accessible_description;
+    BSTR accessible_value;
+    LONG accessible_role;
     int32_t sort_order_cached;
     int32_t ole_drag_mode_cached;
     int32_t ole_drop_mode_cached;
@@ -2463,6 +2479,9 @@ static ULONG STDMETHODCALLTYPE VFG_Release(IDispatch *This) {
         vfg_clear_stored_data_formats(obj);
         if (obj->host_app_name) SysFreeString(obj->host_app_name);
         if (obj->host_obj_name) SysFreeString(obj->host_obj_name);
+        if (obj->accessible_name) SysFreeString(obj->accessible_name);
+        if (obj->accessible_description) SysFreeString(obj->accessible_description);
+        if (obj->accessible_value) SysFreeString(obj->accessible_value);
         if (obj->grid_id >= 0) {
             volvox_grid_set_custom_compare_native(obj->grid_id, NULL, NULL);
             volvox_grid_destroy_grid(obj->grid_id);
@@ -11733,6 +11752,52 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
         }
         break;
 
+    /* MSAA a11y properties — control-level only. State lives on the OCX
+     * sidecar; the engine has no concept of accessibility. */
+    case DISPID_VG_ACCESSIBLENAME_COMPAT:
+    case DISPID_VG_ACCESSIBLEDESCRIPTION_COMPAT:
+    case DISPID_VG_ACCESSIBLEVALUE_COMPAT: {
+        BSTR *slot;
+        if (dispIdMember == DISPID_VG_ACCESSIBLENAME_COMPAT)        slot = &obj->accessible_name;
+        else if (dispIdMember == DISPID_VG_ACCESSIBLEDESCRIPTION_COMPAT) slot = &obj->accessible_description;
+        else                                                         slot = &obj->accessible_value;
+        if (wFlags & DISPATCH_PROPERTYGET) {
+            if (!pVarResult) return E_POINTER;
+            VariantInit(pVarResult);
+            V_VT(pVarResult) = VT_BSTR;
+            V_BSTR(pVarResult) = *slot
+                ? SysAllocStringLen(*slot, SysStringLen(*slot))
+                : SysAllocString(L"");
+            return (V_BSTR(pVarResult) || !*slot) ? S_OK : E_OUTOFMEMORY;
+        }
+        if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
+            VARIANT vtmp;
+            BSTR value = NULL;
+            VariantInit(&vtmp);
+            if (pDispParams->cArgs >= 1) value = variant_to_bstr(ARG(0), &vtmp);
+            vfg_set_bstr_copy(slot, value);
+            VariantClear(&vtmp);
+            return S_OK;
+        }
+        break;
+    }
+
+    case DISPID_VG_ACCESSIBLEROLE_COMPAT:
+        if (wFlags & DISPATCH_PROPERTYGET) {
+            if (!pVarResult) return E_POINTER;
+            VariantInit(pVarResult);
+            V_VT(pVarResult) = VT_I4;
+            V_I4(pVarResult) = obj->accessible_role;
+            return S_OK;
+        }
+        if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
+            int32_t value = 0;
+            if (pDispParams->cArgs >= 1) variant_to_i4(ARG(0), &value);
+            obj->accessible_role = (LONG)value;
+            return S_OK;
+        }
+        break;
+
     case DISPID_VG_SAVEGRID_COMPAT:
         if (wFlags & DISPATCH_METHOD) {
             VARIANT vpath, vfmt;
@@ -14613,6 +14678,10 @@ HRESULT VolvoxGrid_CreateInstance(IUnknown *pOuter, REFIID riid, void **ppv) {
     obj->data_source = NULL;
     obj->recordset = NULL;
     obj->data_member = NULL;
+    obj->accessible_name = NULL;
+    obj->accessible_description = NULL;
+    obj->accessible_value = NULL;
+    obj->accessible_role = 24;
     VariantInit(&obj->height_cached);
     VariantInit(&obj->width_cached);
     SetRectEmpty(&obj->pos_rect);

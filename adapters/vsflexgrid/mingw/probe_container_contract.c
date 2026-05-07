@@ -2332,6 +2332,55 @@ static HRESULT probe_color_option_contract(IDispatch *disp) {
     return ((value & 0x00FFFFFF) == 0x00557799) ? S_OK : E_FAIL;
 }
 
+static HRESULT probe_accessibility_contract(IDispatch *disp) {
+    BSTR value = NULL;
+    LONG role = 0;
+    HRESULT hr;
+
+    /* The legacy grid defaults AccessibleRole to ROLE_SYSTEM_TABLE (24). */
+    hr = get_i4(disp, L"AccessibleRole", &role);
+    if (FAILED(hr)) return hr;
+    if (role != 24) return E_FAIL;
+
+    hr = put_bstr(disp, L"AccessibleName", L"Orders grid");
+    if (FAILED(hr)) return hr;
+    hr = get_bstr(disp, L"AccessibleName", &value);
+    if (FAILED(hr)) return hr;
+    if (!value || wcscmp(value, L"Orders grid") != 0) {
+        if (value) SysFreeString(value);
+        return E_FAIL;
+    }
+    SysFreeString(value);
+    value = NULL;
+
+    hr = put_bstr(disp, L"AccessibleDescription", L"Order rows and columns");
+    if (FAILED(hr)) return hr;
+    hr = get_bstr(disp, L"AccessibleDescription", &value);
+    if (FAILED(hr)) return hr;
+    if (!value || wcscmp(value, L"Order rows and columns") != 0) {
+        if (value) SysFreeString(value);
+        return E_FAIL;
+    }
+    SysFreeString(value);
+    value = NULL;
+
+    hr = put_bstr(disp, L"AccessibleValue", L"Ready");
+    if (FAILED(hr)) return hr;
+    hr = get_bstr(disp, L"AccessibleValue", &value);
+    if (FAILED(hr)) return hr;
+    if (!value || wcscmp(value, L"Ready") != 0) {
+        if (value) SysFreeString(value);
+        return E_FAIL;
+    }
+    SysFreeString(value);
+
+    hr = put_i4(disp, L"AccessibleRole", 42);
+    if (FAILED(hr)) return hr;
+    hr = get_i4(disp, L"AccessibleRole", &role);
+    if (FAILED(hr)) return hr;
+    return role == 42 ? S_OK : E_FAIL;
+}
+
 static HRESULT probe_persist(IClassFactory *factory) {
     IDispatch *src = NULL;
     IDispatch *dst = NULL;
@@ -2461,6 +2510,11 @@ int main(int argc, char **argv) {
                 hr = probe_color_option_contract(disp);
                 if (FAILED(hr)) {
                     print_hr("FAIL Color options", hr);
+                    failed++;
+                }
+                hr = probe_accessibility_contract(disp);
+                if (FAILED(hr)) {
+                    print_hr("FAIL Accessibility options", hr);
                     failed++;
                 }
                 hr = probe_string_option_contract(disp);
