@@ -2,6 +2,16 @@
 
 All notable changes to VolvoxGrid are documented here. Per-package changelogs may have additional detail (e.g. [flutter/CHANGELOG.md](flutter/CHANGELOG.md)).
 
+## 0.8.6
+
+- Expanded the ActiveX/VSFlexGrid compatibility layer with container-contract probing, additional OLE/ADO/owner-draw hooks, persisted-state helpers, image/wallpaper compatibility properties, and MSAA accessibility properties.
+- Added a protocol-level `CursorType` enum and semantic cursor hints across generated bindings, Web/WASM, GTK, and ActiveX while keeping the legacy cursor-style alias available.
+- Fixed Web pointer hover delivery by treating empty grid space as background, suppressing background enter/leave events, and coalescing transient enter/leave pairs before event drain.
+- Fixed checkbox rendering and hit testing in narrow or tall cells by sizing the checkbox from the smaller cell dimension.
+- Fixed checkbox toggles to emit the `BeforeEdit`/`AfterEdit` edit-event sequence, including cancelable before-edit handling, across native, Web/WASM, and ActiveX/VSFlexGrid paths.
+- Fixed duplicate `MouseMove`/`EnterCell` events after checkbox interactions by comparing stable hover target identity while still refreshing target state.
+- Added minified Web, sheet, and AG Grid adapter bundles plus CDN import-map support for release demos.
+
 ## 0.8.5
 
 - Replaced the plugin crate with the shared `volvoxgrid-runtime` library for native and Web builds.
@@ -48,7 +58,10 @@ All notable changes to VolvoxGrid are documented here. Per-package changelogs ma
 
 ## 0.7.0
 
-- Version bump for project-wide 0.7.0 release.
+- Fixed Web font loading and hierarchy auto-resize behavior after fonts load.
+- Added early XtraGrid adapter work and updated Android builds for SDK 36.
+- Improved in-cell editing across Java desktop, .NET host text widgets, ActiveX IME, text selection, clipboard handling, and tab-based selection movement.
+- Improved TUI edit-mode behavior and wide-text rendering, and added ActiveX `FontStyle` compatibility.
 
 ## 0.6.0
 

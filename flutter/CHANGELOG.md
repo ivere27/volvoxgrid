@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.6
+
+- Regenerated Flutter protocol bindings for the new semantic `CursorType` enum.
+
 ## 0.8.5
 
 - Switched desktop and mobile native loading from the old plugin library name to the shared `volvoxgrid` runtime library.
@@ -15,29 +19,27 @@
 
 ## 0.8.2
 
-- Version bump for the project-wide 0.8.2 patch release.
 - Added Flutter controller support for appending data and refreshed generated protocol bindings.
 
 ## 0.8.1
 
-- Version bump for the project-wide 0.8.1 patch release.
 - Synced barcode fixture/docs updates and GTK demo build fixes with the release.
 
 ## 0.8.0
 
-- Version bump for project-wide 0.8.0 release.
+- Synced Flutter bindings and docs for barcode support, aggregate APIs, custom sort responses, dropdown lifecycle events, and event-decision handling.
 
 ## 0.7.1
 
-- Version bump for project-wide 0.7.1 release.
+- Regenerated Flutter bindings for explicit mutating RPC responses and operation-summary fields.
 
 ## 0.7.0
 
-- Version bump for project-wide 0.7.0 release.
+- Synced Flutter package metadata and generated bindings for the in-cell editing and IME-focused release.
 
 ## 0.6.0
 
-- Version bump for project-wide 0.6.0 release.
+- Refreshed package docs and metadata alongside the GUI/TUI documentation split.
 
 ## 0.5.0
 
