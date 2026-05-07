@@ -10,14 +10,6 @@ interface ITypeInfo : IUnknown {
 };
 
 [
-    uuid(00020402-0000-0000-C000-000000000046),
-    object,
-    pointer_default(unique)
-]
-interface ITypeLib : IUnknown {
-};
-
-[
     uuid(00020400-0000-0000-C000-000000000046),
     object,
     dual,

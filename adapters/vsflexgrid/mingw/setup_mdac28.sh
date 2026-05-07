@@ -463,14 +463,24 @@ verify_setup() {
 
     # Check typelib registration.
     local tlb_ok=0
-    local reg_val
-    reg_val="$(WINEDEBUG=-all wine reg query "HKLM\\Software\\Classes\\TypeLib\\{7C0FFAB0-CD84-11D0-949A-00A0C91110ED}\\1.0\\0\\win32" /ve 2>/dev/null)"
-    if echo "$reg_val" | grep -qi "msdatsrc.tlb"; then
-        tlb_ok=1
+    if [ "${SETUP_MDAC28_SKIP_WINE_REG_QUERY:-0}" = "1" ]; then
+        if [ -f "$MDAC_STABLE_DIR/msdatsrc.tlb" ]; then
+            tlb_ok=1
+        fi
+    else
+        local reg_val
+        reg_val="$(WINEDEBUG=-all wine reg query "HKLM\\Software\\Classes\\TypeLib\\{7C0FFAB0-CD84-11D0-949A-00A0C91110ED}\\1.0\\0\\win32" /ve 2>/dev/null)"
+        if echo "$reg_val" | grep -qi "msdatsrc.tlb"; then
+            tlb_ok=1
+        fi
     fi
 
     if [ "$tlb_ok" = "1" ]; then
-        echo "MDAC typelibs are registered"
+        if [ "${SETUP_MDAC28_SKIP_WINE_REG_QUERY:-0}" = "1" ]; then
+            echo "MDAC typelibs are present"
+        else
+            echo "MDAC typelibs are registered"
+        fi
     else
         echo "WARNING: MDAC typelibs are not yet registered"
         echo "  Set MDAC28SDK_DIR to extracted mdac28sdk files and rerun $SELF_NAME."

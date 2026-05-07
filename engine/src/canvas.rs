@@ -2817,11 +2817,19 @@ fn render_grid_internal<C: Canvas>(
 
     run_layer!(layer::CELL_BORDERS, render_cell_borders(grid, canvas, &ctx));
 
-    run_layer!(layer::CELL_TEXT, render_cell_text(grid, canvas, &ctx));
-    run_layer!(
-        layer::CELL_PICTURES,
-        render_cell_pictures(grid, canvas, &ctx)
-    );
+    if grid.style.image_over_text {
+        run_layer!(layer::CELL_TEXT, render_cell_text(grid, canvas, &ctx));
+        run_layer!(
+            layer::CELL_PICTURES,
+            render_cell_pictures(grid, canvas, &ctx)
+        );
+    } else {
+        run_layer!(
+            layer::CELL_PICTURES,
+            render_cell_pictures(grid, canvas, &ctx)
+        );
+        run_layer!(layer::CELL_TEXT, render_cell_text(grid, canvas, &ctx));
+    }
     run_layer!(layer::BARCODES, render_barcodes(grid, canvas, &ctx));
     run_layer!(layer::SORT_GLYPHS, render_sort_glyphs(grid, canvas, &ctx));
     run_layer!(

@@ -431,6 +431,7 @@ static void pump_messages_ms(DWORD ms) {
         while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
             TranslateMessage(&msg);
             DispatchMessage(&msg);
+            if ((LONG)(GetTickCount() - end) >= 0) return;
         }
         if ((LONG)(GetTickCount() - end) >= 0) break;
         Sleep(5);
@@ -1069,7 +1070,6 @@ typedef struct EventProbe {
     IDispatchVtbl *lpVtbl;
     LONG ref;
     IConnectionPoint *cp;
-    ITypeInfo *typeinfo;
     IDispatch *script_dispatch;
     DWORD cookie;
     EventSlot slots[EVT_COUNT];
@@ -1106,12 +1106,43 @@ static const WCHAR *g_event_slot_names[EVT_COUNT] = {
     L"CellButtonClick"
 };
 
+static const DISPID g_event_slot_dispids[EVT_COUNT] = {
+    21,   /* BeforeEdit */
+    22,   /* StartEdit */
+    24,   /* AfterEdit */
+    6,    /* BeforeRowColChange */
+    7,    /* AfterRowColChange */
+    8,    /* BeforeSelChange */
+    9,    /* AfterSelChange */
+    13,   /* BeforeSort */
+    14,   /* AfterSort */
+    19,   /* BeforeCollapse */
+    20,   /* AfterCollapse */
+    10,   /* BeforeScroll */
+    11,   /* AfterScroll */
+    35,   /* BeforeScrollTip */
+    17,   /* BeforeUserResize */
+    18,   /* AfterUserResize */
+    36,   /* AfterUserFreeze */
+    15,   /* BeforeMoveColumn */
+    16,   /* AfterMoveColumn */
+    44,   /* BeforeMoveRow */
+    45,   /* AfterMoveRow */
+    5,    /* BeforeMouseDown */
+    81,   /* BeforeDataRefresh */
+    82,   /* AfterDataRefresh */
+    29,   /* BeforePageBreak */
+    -600, /* Click */
+    -601, /* DblClick */
+    34    /* CellButtonClick */
+};
+
 static void event_probe_init_slots(EventProbe *probe) {
     int i;
     if (!probe) return;
     for (i = 0; i < EVT_COUNT; ++i) {
         probe->slots[i].name = g_event_slot_names[i];
-        probe->slots[i].dispid = DISPID_UNKNOWN;
+        probe->slots[i].dispid = g_event_slot_dispids[i];
         probe->slots[i].script_dispid = DISPID_UNKNOWN;
         probe->slots[i].count = 0;
         probe->slots[i].mutate_on_count = 0;
@@ -1390,28 +1421,12 @@ static IDispatchVtbl g_event_probe_vtbl = {
     eps_invoke
 };
 
-static void event_probe_lookup_dispid(EventProbe *probe, LPCOLESTR name, DISPID *pDispid) {
-    HRESULT hr;
-    LPOLESTR names[1];
-    if (!pDispid) return;
-    *pDispid = DISPID_UNKNOWN;
-    if (!probe || !probe->typeinfo || !name) return;
-    names[0] = (LPOLESTR)name;
-    hr = probe->typeinfo->lpVtbl->GetIDsOfNames(probe->typeinfo, names, 1, pDispid);
-    if (FAILED(hr)) *pDispid = DISPID_UNKNOWN;
-}
-
 static EventProbe *event_probe_attach(IDispatch *disp) {
-    IProvideClassInfo2 *pci2 = NULL;
-    IProvideClassInfo *pci = NULL;
-    ITypeInfo *class_info = NULL;
-    ITypeLib *type_lib = NULL;
     IConnectionPointContainer *cpc = NULL;
     IEnumConnectionPoints *enum_cp = NULL;
     IConnectionPoint *cp = NULL;
     EventProbe *probe = NULL;
     GUID source_guid;
-    UINT type_index = 0;
     ULONG fetched = 0;
     HRESULT hr;
 
@@ -1421,50 +1436,20 @@ static EventProbe *event_probe_attach(IDispatch *disp) {
     hr = disp->lpVtbl->QueryInterface(disp, &IID_IConnectionPointContainer, (void **)&cpc);
     if (FAILED(hr) || !cpc) goto done;
 
-    hr = disp->lpVtbl->QueryInterface(disp, &IID_IProvideClassInfo2, (void **)&pci2);
-    if (SUCCEEDED(hr) && pci2) {
-        hr = pci2->lpVtbl->GetGUID(pci2, GUIDKIND_DEFAULT_SOURCE_DISP_IID, &source_guid);
-    }
-
-    if (FAILED(hr) || IsEqualGUID(&source_guid, &GUID_NULL)) {
-        hr = cpc->lpVtbl->EnumConnectionPoints(cpc, &enum_cp);
-        if (SUCCEEDED(hr) && enum_cp) {
-            hr = enum_cp->lpVtbl->Next(enum_cp, 1, &cp, &fetched);
-            if (hr == S_OK && cp && fetched == 1) {
-                hr = cp->lpVtbl->GetConnectionInterface(cp, &source_guid);
-            }
+    hr = cpc->lpVtbl->EnumConnectionPoints(cpc, &enum_cp);
+    if (SUCCEEDED(hr) && enum_cp) {
+        hr = enum_cp->lpVtbl->Next(enum_cp, 1, &cp, &fetched);
+        if (hr == S_OK && cp && fetched == 1) {
+            hr = cp->lpVtbl->GetConnectionInterface(cp, &source_guid);
         }
     }
     if (FAILED(hr) || IsEqualGUID(&source_guid, &GUID_NULL)) goto done;
-
-    if (pci2) {
-        hr = pci2->lpVtbl->QueryInterface(pci2, &IID_IProvideClassInfo, (void **)&pci);
-    } else {
-        hr = disp->lpVtbl->QueryInterface(disp, &IID_IProvideClassInfo, (void **)&pci);
-    }
-    if (SUCCEEDED(hr) && pci) {
-        hr = pci->lpVtbl->GetClassInfo(pci, &class_info);
-        if (SUCCEEDED(hr) && class_info) {
-            hr = class_info->lpVtbl->GetContainingTypeLib(class_info, &type_lib, &type_index);
-        }
-    }
 
     probe = (EventProbe *)calloc(1, sizeof(*probe));
     if (!probe) goto done;
     probe->lpVtbl = &g_event_probe_vtbl;
     probe->ref = 1;
     event_probe_init_slots(probe);
-    if (type_lib) {
-        hr = type_lib->lpVtbl->GetTypeInfoOfGuid(type_lib, &source_guid, &probe->typeinfo);
-        if (FAILED(hr)) probe->typeinfo = NULL;
-    }
-
-    {
-        int i;
-        for (i = 0; i < EVT_COUNT; ++i) {
-            event_probe_lookup_dispid(probe, probe->slots[i].name, &probe->slots[i].dispid);
-        }
-    }
 
     if (!cp) {
         hr = cpc->lpVtbl->FindConnectionPoint(cpc, &source_guid, &cp);
@@ -1479,12 +1464,7 @@ done:
     if (cp) cp->lpVtbl->Release(cp);
     if (enum_cp) enum_cp->lpVtbl->Release(enum_cp);
     if (cpc) cpc->lpVtbl->Release(cpc);
-    if (type_lib) type_lib->lpVtbl->Release(type_lib);
-    if (class_info) class_info->lpVtbl->Release(class_info);
-    if (pci) pci->lpVtbl->Release(pci);
-    if (pci2) pci2->lpVtbl->Release(pci2);
     if (probe && !probe->cp) {
-        if (probe->typeinfo) probe->typeinfo->lpVtbl->Release(probe->typeinfo);
         free(probe);
         probe = NULL;
     }
@@ -1503,9 +1483,6 @@ static void event_probe_detach(EventProbe **ppProbe) {
     }
     if (probe->script_dispatch) {
         probe->script_dispatch->lpVtbl->Release(probe->script_dispatch);
-    }
-    if (probe->typeinfo) {
-        probe->typeinfo->lpVtbl->Release(probe->typeinfo);
     }
     free(probe);
     *ppProbe = NULL;
@@ -2078,20 +2055,9 @@ static IActiveScriptSiteVtbl g_ss_vtbl = {
 };
 
 static HRESULT get_named_item_typeinfo(IDispatch *disp, ITypeInfo **ppTI) {
-    IProvideClassInfo *pci = NULL;
-    HRESULT hr;
-
     if (!ppTI) return E_POINTER;
     *ppTI = NULL;
     if (!disp) return E_INVALIDARG;
-
-    hr = disp->lpVtbl->QueryInterface(disp, &IID_IProvideClassInfo, (void **)&pci);
-    if (SUCCEEDED(hr) && pci) {
-        hr = pci->lpVtbl->GetClassInfo(pci, ppTI);
-        pci->lpVtbl->Release(pci);
-        if (SUCCEEDED(hr) && *ppTI) return hr;
-    }
-
     return disp->lpVtbl->GetTypeInfo(disp, 0, LOCALE_USER_DEFAULT, ppTI);
 }
 

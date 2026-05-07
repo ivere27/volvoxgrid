@@ -25,7 +25,7 @@
 #include "../include/volvoxgrid_ffi_extra.h"
 #include "../include/volvoxgrid_activex.h"
 
-extern int32_t volvox_grid_set_scroll_tips_native(int64_t id, int32_t value);
+extern int32_t volvox_grid_get_merge_cells_fixed_native(int64_t id);
 
 /* MSDATASRC.DataSource IID {7C0FFAB3-CD84-11D0-949A-00A0C91110ED}. */
 static const GUID IID_VFG_DataSource = {
@@ -35,9 +35,14 @@ static const GUID IID_VFG_DataSource = {
 
 #define VFG_DEFAULT_DPI 96
 #define VFG_BOUND_HEADER_ROWS 1
+#define VFG_BOUND_VIRTUAL_RECORD_THRESHOLD 10000
 #define VFG_BOUND_SELECTOR_COL_WIDTH_PX 13
 #define VFG_BOUND_AUTOSIZE_TEXT_PAD_PX 13
 #define VFG_BOUND_AUTOSIZE_MIN_COL_WIDTH_PX 20
+#define VFG_UNBOUND_CELLFONT_AUTOSIZE_EXTRA_BOLD_BASE_PX 13
+#define VFG_UNBOUND_CELLFONT_AUTOSIZE_EXTRA_NORMAL_BASE_PX 12
+#define VFG_EVENT_TIMER_ID 0xF9E7
+#define VFG_EVENT_TIMER_MS 16
 
 #ifndef GET_X_LPARAM
 #define GET_X_LPARAM(lp) ((int)(short)LOWORD(lp))
@@ -288,31 +293,39 @@ VG_WRAP_I32_2(volvox_grid_get_row_height, int64_t, grid_id, int32_t, index)
 VG_WRAP_I32_2(volvox_grid_get_row_is_visible, int64_t, grid_id, int32_t, index)
 VG_WRAP_I32_2(volvox_grid_get_row_outline_level, int64_t, grid_id, int32_t, index)
 VG_WRAP_I32_1(volvox_grid_get_rows, int64_t, id)
+VG_WRAP_I32_1(volvox_grid_get_picture_type, int64_t, id)
+VG_WRAP_I32_1(volvox_grid_get_scroll_tips, int64_t, id)
+VG_WRAP_I32_1(volvox_grid_get_combo_search, int64_t, id)
+VG_WRAP_I32_1(volvox_grid_get_owner_draw, int64_t, id)
+VG_WRAP_I32_1(volvox_grid_get_group_compare, int64_t, id)
 VG_WRAP_STATUS_2(volvox_grid_remove_item, int64_t, grid_id, int32_t, index)
 VG_WRAP_STATUS_4(volvox_grid_set_cell_checked, int64_t, grid_id, int32_t, row, int32_t, col, int32_t, state)
 VG_WRAP_STATUS_5(volvox_grid_set_cell_flood, int64_t, grid_id, int32_t, row, int32_t, col, uint32_t, color, float, percent)
 VG_WRAP_STATUS_6(volvox_grid_set_cell_back_color_range, int64_t, grid_id, int32_t, row1, int32_t, col1, int32_t, row2, int32_t, col2, uint32_t, color)
 VG_WRAP_STATUS_6(volvox_grid_set_cell_font_bold_range, int64_t, grid_id, int32_t, row1, int32_t, col1, int32_t, row2, int32_t, col2, int32_t, bold)
 VG_WRAP_STATUS_4(volvox_grid_set_col_combo_list, int64_t, grid_id, int32_t, col, const uint8_t*, list, int32_t, list_len)
+VG_WRAP_STATUS_3(volvox_grid_set_combo_list, int64_t, grid_id, const uint8_t*, list, int32_t, list_len)
 VG_WRAP_STATUS_3(volvox_grid_set_col_data_type, int64_t, grid_id, int32_t, col, int32_t, data_type)
 static int32_t volvox_grid_set_col_position_compat(int64_t grid_id, int32_t col, int32_t position);
 static int32_t volvox_grid_set_col_width_compat(int64_t grid_id, int32_t col, int32_t width);
 VG_WRAP_STATUS_2(volvox_grid_set_auto_resize, int64_t, grid_id, int32_t, value)
 VG_WRAP_STATUS_2(volvox_grid_set_combo_index, int64_t, grid_id, int32_t, value)
 VG_WRAP_STATUS_2(volvox_grid_set_edit_max_length, int64_t, grid_id, int32_t, value)
-VG_WRAP_STATUS_2(volvox_grid_set_explorer_bar, int64_t, grid_id, int32_t, mode)
 VG_WRAP_STATUS_2(volvox_grid_set_fixed_cols, int64_t, grid_id, int32_t, fixed_cols)
 VG_WRAP_STATUS_2(volvox_grid_set_fixed_rows, int64_t, grid_id, int32_t, fixed_rows)
 static int32_t volvox_grid_set_is_collapsed_compat(int64_t grid_id, int32_t row, int32_t collapsed);
 VG_WRAP_STATUS_3(volvox_grid_set_is_subtotal, int64_t, grid_id, int32_t, row, int32_t, is_subtotal)
-VG_WRAP_STATUS_3(volvox_grid_set_col_width_min, int64_t, grid_id, int32_t, col, int32_t, value)
-VG_WRAP_STATUS_2(volvox_grid_set_row_height_min, int64_t, grid_id, int32_t, value)
+VG_WRAP_STATUS_2(volvox_grid_set_picture_type, int64_t, grid_id, int32_t, value)
+VG_WRAP_STATUS_2(volvox_grid_set_scroll_tips, int64_t, grid_id, int32_t, value)
+VG_WRAP_STATUS_2(volvox_grid_set_combo_search, int64_t, grid_id, int32_t, value)
+VG_WRAP_STATUS_2(volvox_grid_set_owner_draw, int64_t, grid_id, int32_t, value)
+VG_WRAP_STATUS_2(volvox_grid_set_group_compare, int64_t, grid_id, int32_t, value)
+VG_WRAP_STATUS_2(volvox_grid_set_merge_cells_fixed, int64_t, grid_id, int32_t, value)
 VG_WRAP_STATUS_4(volvox_grid_set_row_data, int64_t, grid_id, int32_t, col, const uint8_t*, data, int32_t, data_len)
 static int32_t volvox_grid_set_row_height_compat(int64_t grid_id, int32_t row, int32_t height);
 static int32_t volvox_grid_set_row_position_compat(int64_t grid_id, int32_t row, int32_t position);
 VG_WRAP_STATUS_2(volvox_grid_set_show_combo_button, int64_t, grid_id, int32_t, mode)
 VG_WRAP_STATUS_2(volvox_grid_set_subtotal_position, int64_t, grid_id, int32_t, position)
-VG_WRAP_STATUS_2(volvox_grid_set_tab_behavior, int64_t, grid_id, int32_t, behavior)
 VG_WRAP_STATUS_5(volvox_grid_set_text_matrix, int64_t, grid_id, int32_t, row, int32_t, col, const uint8_t*, text, int32_t, text_len)
 VG_WRAP_STATUS_3(volvox_grid_show_cell, int64_t, grid_id, int32_t, row, int32_t, col)
 VG_WRAP_STATUS_3(volvox_grid_load_demo, int64_t, grid_id, const uint8_t*, demo, int32_t, demo_len)
@@ -325,9 +338,23 @@ static int32_t volvox_grid_auto_size_compat(
     return vfg_take_status_response(out);
 }
 
+static int32_t vfg_legacy_clear_scope_to_proto(int32_t scope) {
+    switch (scope) {
+    case 0: return 1; /* flexClearEverything -> CLEAR_EVERYTHING */
+    case 1: return 2; /* flexClearFormatting -> CLEAR_FORMATTING */
+    case 2: return 3; /* flexClearData -> CLEAR_DATA */
+    case 3: return 4; /* flexClearSelection -> CLEAR_SELECTION */
+    default: return scope;
+    }
+}
+
 static int32_t volvox_grid_clear_compat(int64_t grid_id, int32_t scope, int32_t region) {
     int32_t out_len = 0;
-    uint8_t *out = volvox_grid_clear(grid_id, scope, region, &out_len);
+    uint8_t *out = volvox_grid_clear(
+        grid_id,
+        vfg_legacy_clear_scope_to_proto(scope),
+        region,
+        &out_len);
     return vfg_take_status_response(out);
 }
 
@@ -565,6 +592,7 @@ static VolvoxGridObject *vfg_find_object_by_grid_id(int64_t grid_id);
 static HRESULT vfg_rebind_ado_source(VolvoxGridObject *obj);
 static int32_t vfg_bound_selector_cols(VolvoxGridObject *obj);
 static int32_t vfg_bound_allows_zero_fixed_cols(VolvoxGridObject *obj);
+static int32_t vfg_compat_default_col_width_px(float font_px);
 static HRESULT vfg_fire_event(VolvoxGridObject *obj, DISPID dispid, VARIANT *args, UINT cArgs);
 static int32_t vfg_custom_compare_callback(
     void *user_data, int32_t row1, int32_t row2, int32_t col);
@@ -667,6 +695,7 @@ VG_WRAP_STATUS_2(volvox_grid_set_extend_last_col, int64_t, grid_id, int32_t, val
 VG_WRAP_STATUS_2(volvox_grid_set_merge_cells, int64_t, grid_id, int32_t, mode)
 VG_WRAP_STATUS_2(volvox_grid_set_outline_bar, int64_t, grid_id, int32_t, style)
 VG_WRAP_STATUS_2(volvox_grid_set_outline_col, int64_t, grid_id, int32_t, col)
+VG_WRAP_STATUS_2(volvox_grid_outline, int64_t, grid_id, int32_t, level)
 VG_WRAP_STATUS_3(volvox_grid_set_merge_row, int64_t, grid_id, int32_t, row, int32_t, merge)
 VG_WRAP_STATUS_3(volvox_grid_set_merge_col, int64_t, grid_id, int32_t, col, int32_t, merge)
 VG_WRAP_STATUS_3(volvox_grid_set_row_outline_level, int64_t, grid_id, int32_t, row, int32_t, level)
@@ -694,6 +723,7 @@ static int32_t volvox_grid_set_redraw_compat(int64_t grid_id, int32_t value) {
 #define volvox_grid_get_col_is_visible volvox_grid_get_col_is_visible_compat
 #define volvox_grid_get_col_width volvox_grid_get_col_width_compat
 #define volvox_grid_get_cols volvox_grid_get_cols_compat
+#define volvox_grid_get_edit_max_length volvox_grid_get_edit_max_length_compat
 #define volvox_grid_get_is_collapsed volvox_grid_get_is_collapsed_compat
 #define volvox_grid_get_is_subtotal volvox_grid_get_is_subtotal_compat
 #define volvox_grid_get_left_col volvox_grid_get_left_col_compat
@@ -716,6 +746,7 @@ static int32_t volvox_grid_set_redraw_compat(int64_t grid_id, int32_t value) {
 #define volvox_grid_set_col volvox_grid_set_col_compat
 #define volvox_grid_set_col_alignment volvox_grid_set_col_alignment_compat
 #define volvox_grid_set_col_combo_list volvox_grid_set_col_combo_list_compat
+#define volvox_grid_set_combo_list volvox_grid_set_combo_list_compat
 #define volvox_grid_set_col_data_type volvox_grid_set_col_data_type_compat
 #define volvox_grid_set_col_hidden volvox_grid_set_col_hidden_compat
 #define volvox_grid_set_col_position volvox_grid_set_col_position_compat
@@ -733,12 +764,14 @@ static int32_t volvox_grid_set_redraw_compat(int64_t grid_id, int32_t value) {
 #define volvox_grid_set_frozen_cols volvox_grid_set_frozen_cols_compat
 #define volvox_grid_set_frozen_rows volvox_grid_set_frozen_rows_compat
 #define volvox_grid_set_high_light volvox_grid_set_high_light_compat
+#define volvox_grid_set_edit_max_length volvox_grid_set_edit_max_length_compat
 #define volvox_grid_set_is_collapsed volvox_grid_set_is_collapsed_compat
 #define volvox_grid_set_is_subtotal volvox_grid_set_is_subtotal_compat
 #define volvox_grid_set_left_col volvox_grid_set_left_col_compat
 #define volvox_grid_set_merge_cells volvox_grid_set_merge_cells_compat
 #define volvox_grid_set_merge_col volvox_grid_set_merge_col_compat
 #define volvox_grid_set_merge_row volvox_grid_set_merge_row_compat
+#define volvox_grid_outline volvox_grid_outline_compat
 #define volvox_grid_set_outline_bar volvox_grid_set_outline_bar_compat
 #define volvox_grid_set_outline_col volvox_grid_set_outline_col_compat
 #define volvox_grid_set_redraw volvox_grid_set_redraw_compat
@@ -786,6 +819,7 @@ static int32_t volvox_grid_set_redraw_compat(int64_t grid_id, int32_t value) {
 #define DISPID_VG_FORMATSTRING_COMPAT 10
 #define DISPID_VG_EDITTEXT_COMPAT     91
 #define DISPID_VG_EDITMAXLENGTH_COMPAT 116
+#define DISPID_VG_COMBOLIST_COMPAT    72
 #define DISPID_VG_COMBOCOUNT_COMPAT   118
 #define DISPID_VG_COMBOINDEX_COMPAT   117
 #define DISPID_VG_COMBOITEM_COMPAT    161
@@ -795,6 +829,7 @@ static int32_t volvox_grid_set_redraw_compat(int64_t grid_id, int32_t value) {
 #define DISPID_VG_SHOWCELL_COMPAT     198
 #define DISPID_VG_VALUEMATRIX_COMPAT  133
 #define DISPID_VG_BUILDCOMBOLIST_COMPAT 195
+#define DISPID_VG_CELLBUTTONPICTURE_COMPAT 177
 #define DISPID_VG_FOCUS_COMPAT        30026
 #define DISPID_VG_MOUSEPOINTER_COMPAT -521
 #define DISPID_VG_APPEARANCE_COMPAT   -520
@@ -803,6 +838,8 @@ static int32_t volvox_grid_set_redraw_compat(int64_t grid_id, int32_t value) {
 #define DISPID_VG_FLOODCOLOR_COMPAT   74
 #define DISPID_VG_FORECOLORFROZEN_COMPAT 192
 #define DISPID_VG_GRIDCOLORFIXED_COMPAT 44
+#define DISPID_VG_CELLPICTURE_COMPAT 49
+#define DISPID_VG_CELLPICTUREALIGNMENT_COMPAT 50
 #define DISPID_VG_CLIP_COMPAT         59
 #define DISPID_VG_BOTTOMROW_COMPAT    86
 #define DISPID_VG_RIGHTCOL_COMPAT     87
@@ -824,7 +861,6 @@ static int32_t volvox_grid_set_redraw_compat(int64_t grid_id, int32_t value) {
 #define DISPID_VG_COPY_COMPAT         225
 #define DISPID_VG_PASTE_COMPAT        226
 #define DISPID_VG_DELETE_COMPAT       227
-#define DISPID_VG_ID_COMPAT           228
 #define DISPID_VG_VERSION_COMPAT      9
 #define DISPID_VG_CLIENTWIDTH_COMPAT  89
 #define DISPID_VG_CLIENTHEIGHT_COMPAT 90
@@ -844,16 +880,21 @@ static int32_t volvox_grid_set_redraw_compat(int64_t grid_id, int32_t value) {
 #define DISPID_VG_SCROLLTIPS_COMPAT   169
 #define DISPID_VG_COMBOSEARCH_COMPAT  178
 #define DISPID_VG_PICTURETYPE_COMPAT  64
+#define DISPID_VG_PICTURESOVER_COMPAT 104
 #define DISPID_VG_OWNERDRAW_COMPAT    97
+#define DISPID_VG_OLEDRAGMODE_COMPAT  99
+#define DISPID_VG_OLEDROPMODE_COMPAT  100
 #define DISPID_VG_ROWPOSITION_COMPAT  124
 #define DISPID_VG_COLPOSITION_COMPAT  125
 #define DISPID_VG_VALUE_COMPAT        73
 #define DISPID_VG_COLIMAGELIST_COMPAT 184
+#define DISPID_VG_NODEOPENPICTURE_COMPAT 196
+#define DISPID_VG_NODECLOSEDPICTURE_COMPAT 197
+#define DISPID_VG_SORTASCENDINGPICTURE_COMPAT 220
+#define DISPID_VG_SORTDESCENDINGPICTURE_COMPAT 221
+#define DISPID_VG_WALLPAPER_COMPAT    201
+#define DISPID_VG_WALLPAPERALIGNMENT_COMPAT 202
 #define DISPID_VG_COLINDENT_COMPAT    207
-#define DISPID_VG_ACCESSIBLENAME_COMPAT 212
-#define DISPID_VG_ACCESSIBLEDESCRIPTION_COMPAT 213
-#define DISPID_VG_ACCESSIBLEVALUE_COMPAT 214
-#define DISPID_VG_ACCESSIBLEROLE_COMPAT 215
 #define DISPID_VG_MERGECELLSFIXED_COMPAT 218
 #define DISPID_VG_GROUPCOMPARE_COMPAT 219
 #define DISPID_VG_GETSELECTION_COMPAT 181
@@ -861,6 +902,7 @@ static int32_t volvox_grid_set_redraw_compat(int64_t grid_id, int32_t value) {
 #define DISPID_VG_OUTLINE_COMPAT      137
 #define DISPID_VG_AGGREGATE_COMPAT    203
 #define DISPID_VG_CELLBORDER_COMPAT   149
+#define DISPID_VG_OLEDRAG_COMPAT      150
 #define DISPID_VG_CELLBORDERRANGE_COMPAT 223
 #define DISPID_VG_PRINTGRID_COMPAT    183
 #define DISPID_VG_ARCHIVE_COMPAT      153
@@ -868,9 +910,11 @@ static int32_t volvox_grid_set_redraw_compat(int64_t grid_id, int32_t value) {
 #define DISPID_VG_DRAGROW_COMPAT      204
 #define DISPID_VG_BINDTOARRAY_COMPAT  163
 #define DISPID_VG_LOADARRAY_COMPAT    179
+#define DISPID_VG_HEIGHT_COMPAT       30095
+#define DISPID_VG_WIDTH_COMPAT        30096
 
-/* Internal helper methods are not part of the VSFlexGrid public contract.
- * Keep them late-bound for local tooling, but move them out of the legacy range. */
+/* Internal helper methods are not part of the public ActiveX contract.
+ * Keep them late-bound for local tooling, but move them out of the compatibility range. */
 #define DISPID_VG_LOADDEMO_INTERNAL        30083
 #define DISPID_VG_RESIZEVIEWPORT_INTERNAL  30084
 #define DISPID_VG_POINTERDOWN_INTERNAL     30085
@@ -886,7 +930,7 @@ static int32_t volvox_grid_set_redraw_compat(int64_t grid_id, int32_t value) {
 #define DISPID_VG_GRIDSTYLE_INTERNAL       30026
 #define DISPID_VG_CELLFLOOD_INTERNAL       30065
 
-/* Remap the generated surface onto the real IVSFlexGrid DISPIDs. */
+/* Remap the generated surface onto the compatibility DISPIDs. */
 #undef DISPID_VG_ROWS
 #define DISPID_VG_ROWS 7
 #undef DISPID_VG_COLS
@@ -1075,7 +1119,8 @@ static const VG_NameEntry vfg_legacy_names[] = {
     { L"Rows", 7 },
     { L"Cols", 8 },
     { L"Version", 9 },
-    { L"ID", DISPID_VG_ID_COMPAT },
+    { L"Height", DISPID_VG_HEIGHT_COMPAT },
+    { L"Width", DISPID_VG_WIDTH_COMPAT },
     { L"FormatString", 10 },
     { L"FixedRows", 11 },
     { L"FixedCols", 12 },
@@ -1278,10 +1323,6 @@ static const VG_NameEntry vfg_legacy_names[] = {
     { L"ColIndent", 207 },
     { L"LoadGridURL", 210 },
     { L"FinishEditing", 211 },
-    { L"AccessibleName", 212 },
-    { L"AccessibleDescription", 213 },
-    { L"AccessibleValue", 214 },
-    { L"AccessibleRole", 215 },
     { L"IsSearching", 216 },
     { L"Flags", 217 },
     { L"MergeCellsFixed", 218 },
@@ -1393,6 +1434,7 @@ static const WCHAR VFG_WINDOW_CLASS_NAME[] = L"VolvoxGridActiveXWindow";
 /* Forward vtable declarations */
 static IDispatchVtbl                 g_VFGDispatchVtbl;
 static IViewObjectVtbl               g_VFGViewObjectVtbl;
+static IViewObject2Vtbl              g_VFGViewObject2Vtbl;
 static IOleObjectVtbl                g_VFGOleObjectVtbl;
 static IOleInPlaceObjectVtbl         g_VFGInPlaceObjectVtbl;
 static IOleInPlaceActiveObjectVtbl   g_VFGInPlaceActiveObjectVtbl;
@@ -1400,8 +1442,12 @@ static IOleControlVtbl               g_VFGOleControlVtbl;
 static IPersistStreamInitVtbl        g_VFGPersistStreamInitVtbl;
 static IConnectionPointContainerVtbl g_VFGConnectionPointContainerVtbl;
 static IConnectionPointVtbl          g_VFGConnectionPointVtbl;
-static IProvideClassInfoVtbl         g_VFGProvideClassInfoVtbl;
-static IProvideClassInfo2Vtbl        g_VFGProvideClassInfo2Vtbl;
+static IEnumConnectionPointsVtbl     g_VFGConnectionPointsEnumVtbl;
+static IEnumConnectionsVtbl          g_VFGConnectionsEnumVtbl;
+static IDataObjectVtbl               g_VFGDataObjectVtbl;
+static IEnumFORMATETCVtbl            g_VFGFormatEtcEnumVtbl;
+static IDropSourceVtbl               g_VFGDropSourceVtbl;
+static IDropTargetVtbl               g_VFGDropTargetVtbl;
 static IObjectSafetyVtbl             g_VFGObjectSafetyVtbl;
 
 typedef struct VFGSinkEntry {
@@ -1417,9 +1463,40 @@ typedef struct VFGVariantSlot {
     struct VFGVariantSlot *next;
 } VFGVariantSlot;
 
+typedef struct VFGStoredDataFormat {
+    CLIPFORMAT format;
+    BYTE *bytes;
+    SIZE_T len;
+    struct VFGStoredDataFormat *next;
+} VFGStoredDataFormat;
+
+typedef struct VFGFormatEtcEnum {
+    IEnumFORMATETCVtbl *lpVtbl;
+    LONG ref;
+    ULONG index;
+    ULONG count;
+    FORMATETC formats[3];
+} VFGFormatEtcEnum;
+
+typedef struct VFGConnectionPointsEnum {
+    IEnumConnectionPointsVtbl *lpVtbl;
+    LONG ref;
+    VolvoxGridObject *obj;
+    ULONG index;
+} VFGConnectionPointsEnum;
+
+typedef struct VFGConnectionsEnum {
+    IEnumConnectionsVtbl *lpVtbl;
+    LONG ref;
+    ULONG index;
+    ULONG count;
+    CONNECTDATA *items;
+} VFGConnectionsEnum;
+
 struct VolvoxGridObject {
     IDispatchVtbl                 *lpVtblDispatch;
     IViewObjectVtbl               *lpVtblViewObject;
+    IViewObject2Vtbl              *lpVtblViewObject2;
     IOleObjectVtbl                *lpVtblOleObject;
     IOleInPlaceObjectVtbl         *lpVtblInPlaceObject;
     IOleInPlaceActiveObjectVtbl   *lpVtblInPlaceActiveObject;
@@ -1427,8 +1504,9 @@ struct VolvoxGridObject {
     IPersistStreamInitVtbl        *lpVtblPersistStreamInit;
     IConnectionPointContainerVtbl *lpVtblConnectionPointContainer;
     IConnectionPointVtbl          *lpVtblConnectionPoint;
-    IProvideClassInfoVtbl         *lpVtblProvideClassInfo;
-    IProvideClassInfo2Vtbl        *lpVtblProvideClassInfo2;
+    IDataObjectVtbl               *lpVtblDataObject;
+    IDropSourceVtbl               *lpVtblDropSource;
+    IDropTargetVtbl               *lpVtblDropTarget;
     IObjectSafetyVtbl             *lpVtblObjectSafety;
     LONG cRef;
     int64_t grid_id;   /* Active grid handle (-1 = none) */
@@ -1445,6 +1523,8 @@ struct VolvoxGridObject {
     int ui_active;
     int frozen_events;
     int has_focus;
+    int dirty;
+    int event_timer_active;
     DWORD object_safety_options;
     BSTR host_app_name;
     BSTR host_obj_name;
@@ -1459,7 +1539,6 @@ struct VolvoxGridObject {
     int32_t bound_col_width_uses_data_offset;
     int32_t has_bound_layout;
     int32_t show_combo_button_explicit;
-    int32_t editable_cached;
     int32_t frozen_rows_cached;
     int32_t frozen_cols_cached;
     int32_t row_sel_cached;
@@ -1467,8 +1546,16 @@ struct VolvoxGridObject {
     int32_t data_mode;
     int32_t virtual_data;
     int32_t auto_resize;
+    int32_t bound_virtual_active;
+    int32_t bound_record_count;
+    int32_t bound_window_start;
+    int32_t bound_window_end;
     int32_t suppress_bound_cursor_sync;
     int32_t suppress_bound_text_writes;
+    int32_t edit_max_length_empty;
+    int32_t mouse_pointer_cached;
+    int32_t col_width_min_twips;
+    int32_t row_height_min_twips;
     int32_t *col_data_type_cache;
     int32_t col_data_type_cache_len;
     BSTR *col_data_cache;
@@ -1481,48 +1568,32 @@ struct VolvoxGridObject {
     int32_t col_edit_mask_cache_len;
     BSTR *col_combo_list_cache;
     int32_t col_combo_list_cache_len;
-    int32_t *col_image_list_cache;
-    int32_t col_image_list_cache_len;
     int32_t *col_indent_cache;
     int32_t col_indent_cache_len;
+    int32_t *is_collapsed_cache;
+    int32_t is_collapsed_cache_len;
     IDispatch *data_source;
     IDispatch *recordset;
     BSTR data_member;
-    BSTR id_cached;
-    BSTR format_string_cached;
-    BSTR clip_separators_cached;
-    BSTR accessible_name_cached;
-    BSTR accessible_description_cached;
-    BSTR accessible_value_cached;
-    VARIANT accessible_role_cached;
-    int32_t mouse_pointer_cached;
-    int32_t appearance_cached;
-    uint32_t back_color_bkg_cached;
-    uint32_t back_color_frozen_cached;
-    uint32_t flood_color_cached_global;
-    uint32_t fore_color_frozen_cached;
-    uint32_t grid_color_fixed_cached;
-    int32_t sheet_border_cached;
-    int32_t font_bold_cached;
-    int32_t font_italic_cached;
-    int32_t font_strikethru_cached;
-    int32_t font_underline_cached;
-    int32_t font_width_cached;
-    int32_t allow_user_freezing_cached;
-    int32_t explorer_bar_cached;
-    int32_t tab_behavior_cached;
-    int32_t col_width_min_cached;
-    int32_t row_height_min_cached;
-    int32_t grid_line_width_cached;
     int32_t sort_order_cached;
-    int32_t scroll_tips_cached;
-    int32_t combo_search_cached;
-    int32_t owner_draw_cached;
-    int32_t picture_type_cached;
-    int32_t merge_cells_fixed_cached;
-    int32_t group_compare_cached;
+    int32_t ole_drag_mode_cached;
+    int32_t ole_drop_mode_cached;
+    int ole_initialized;
+    int drop_registered;
+    volvox_grid_owner_draw_callback_fn owner_draw_callback;
+    void *owner_draw_callback_ctx;
+    volvox_grid_owner_draw_measure_fn owner_draw_measure_callback;
+    void *owner_draw_measure_ctx;
+    int32_t owner_draw_reply_done;
+    VARIANT height_cached;
+    VARIANT width_cached;
+    int32_t last_pointer_button;
+    int32_t last_pointer_modifier;
+    float last_pointer_x;
+    float last_pointer_y;
     struct FloodColorEntry *flood_colors;
     VFGVariantSlot *compat_values;
+    VFGStoredDataFormat *stored_data;
     VolvoxGridObject *registry_next;
 };
 
@@ -1538,6 +1609,7 @@ static void vfg_set_flood_color_cached(
 static uint32_t vfg_get_flood_color_cached(
     VolvoxGridObject *obj, int32_t row, int32_t col);
 static void vfg_clear_flood_color_cache(VolvoxGridObject *obj);
+static void vfg_clear_is_collapsed_cache(VolvoxGridObject *obj);
 static void vfg_release_dispatch(IDispatch **ppDisp);
 static void vfg_clear_ado_binding(VolvoxGridObject *obj);
 static HRESULT vfg_raise_vb_error(EXCEPINFO *pExcepInfo, WORD wCode, LPCOLESTR description);
@@ -1546,17 +1618,23 @@ static HRESULT vfg_dispatch_get_indexed(IDispatch *pDisp, LPCOLESTR name, long i
 static HRESULT vfg_map_excepinfo(HRESULT hr, EXCEPINFO *ei);
 static HRESULT vfg_rebind_ado_source(VolvoxGridObject *obj);
 static HRESULT vfg_sync_bound_state(VolvoxGridObject *obj, DISPID dispid, WORD wFlags);
+static HRESULT vfg_bound_fetch_window(VolvoxGridObject *obj, int32_t start_row, int32_t row_count);
+static HRESULT vfg_bound_fetch_visible_window(VolvoxGridObject *obj);
+static HRESULT vfg_bound_move_recordset_to_row(VolvoxGridObject *obj, int32_t row);
 static HRESULT vfg_bound_add_item(VolvoxGridObject *obj, BSTR item, int32_t index);
 static HRESULT vfg_bound_remove_item(VolvoxGridObject *obj, int32_t index);
 static HRESULT vfg_variant_to_display_bstr(VARIANT *pv, BSTR *pValue);
+static int vfg_variant_is_true(const VARIANT *pv);
+static HRESULT vfg_set_text_matrix_bstr(int64_t gid, int32_t row, int32_t col, BSTR text);
 static int32_t activex_col_data_type_to_engine(int32_t dt);
+static int32_t vfg_bound_physical_col_offset(VolvoxGridObject *obj);
 static void vfg_sync_selection_cache_from_cursor(VolvoxGridObject *obj);
 static void vfg_free_bstr_cache(BSTR *cache, int32_t len);
 static void vfg_set_cached_indexed_bstr(BSTR **cache, int32_t *pLen, int32_t index, BSTR value);
 static BSTR vfg_copy_cached_indexed_bstr(BSTR *cache, int32_t len, int32_t index);
 static void vfg_set_cached_indexed_i32(int32_t **cache, int32_t *pLen, int32_t index, int32_t value);
-static int32_t vfg_get_cached_indexed_i32(int32_t *cache, int32_t len, int32_t index, int32_t fallback);
 static void vfg_free_variant_slots(VFGVariantSlot *slot);
+static void vfg_clear_stored_data_formats(VolvoxGridObject *obj);
 static HRESULT vfg_set_variant_slot(
     VFGVariantSlot **pHead, DISPID dispid, int has_index, int32_t index, VARIANT *value);
 static HRESULT vfg_copy_variant_slot(
@@ -1575,6 +1653,7 @@ static HRESULT vfg_fire_before_sort_event(
     VolvoxGridObject *obj, int32_t col, short *order_io);
 static HRESULT vfg_fire_before_data_refresh_event(
     VolvoxGridObject *obj, VARIANT_BOOL *cancel);
+static void vfg_fire_ado_data_error_event(VolvoxGridObject *obj, HRESULT hr);
 static void vfg_fire_after_row_col_change_event(
     VolvoxGridObject *obj, int32_t old_row, int32_t old_col, int32_t new_row, int32_t new_col);
 static void vfg_fire_start_edit_event(
@@ -1606,6 +1685,10 @@ static void vfg_fire_key_press_edit_event(
     VolvoxGridObject *obj, int32_t row, int32_t col, int32_t key_ascii);
 static void vfg_fire_mouse_event(
     VolvoxGridObject *obj, DISPID dispid, int32_t button, int32_t shift, float x, float y);
+static void vfg_fire_ole_start_drag_event(
+    VolvoxGridObject *obj, IDataObject *data_object, LONG *allowed_effects);
+static void vfg_fire_ole_complete_drag_event(VolvoxGridObject *obj, LONG effect);
+static HRESULT vfg_paste_unicode_data_object(VolvoxGridObject *obj, IDataObject *data_object);
 static HRESULT vfg_try_public_dispatch_fallback(
     VolvoxGridObject *obj,
     DISPID dispid,
@@ -1630,9 +1713,9 @@ static HRESULT vfg_handle_key_down(
 static HRESULT vfg_handle_key_press(
     VolvoxGridObject *obj, uint32_t char_code);
 static HRESULT vfg_pump_engine_events(VolvoxGridObject *obj);
-static HRESULT vfg_load_typeinfo(REFGUID guid, ITypeInfo **ppTypeInfo);
 
 #define VIEWOBJECT_OFFSET offsetof(VolvoxGridObject, lpVtblViewObject)
+#define VIEWOBJECT2_OFFSET offsetof(VolvoxGridObject, lpVtblViewObject2)
 #define OLEOBJECT_OFFSET offsetof(VolvoxGridObject, lpVtblOleObject)
 #define INPLACEOBJECT_OFFSET offsetof(VolvoxGridObject, lpVtblInPlaceObject)
 #define INPLACEACTIVEOBJECT_OFFSET offsetof(VolvoxGridObject, lpVtblInPlaceActiveObject)
@@ -1640,12 +1723,15 @@ static HRESULT vfg_load_typeinfo(REFGUID guid, ITypeInfo **ppTypeInfo);
 #define PERSISTSTREAMINIT_OFFSET offsetof(VolvoxGridObject, lpVtblPersistStreamInit)
 #define CPCONTAINER_OFFSET offsetof(VolvoxGridObject, lpVtblConnectionPointContainer)
 #define CONNECTIONPOINT_OFFSET offsetof(VolvoxGridObject, lpVtblConnectionPoint)
-#define CLASSINFO_OFFSET offsetof(VolvoxGridObject, lpVtblProvideClassInfo)
-#define CLASSINFO2_OFFSET offsetof(VolvoxGridObject, lpVtblProvideClassInfo2)
+#define DATAOBJECT_OFFSET offsetof(VolvoxGridObject, lpVtblDataObject)
+#define DROPSOURCE_OFFSET offsetof(VolvoxGridObject, lpVtblDropSource)
+#define DROPTARGET_OFFSET offsetof(VolvoxGridObject, lpVtblDropTarget)
 #define OBJECTSAFETY_OFFSET offsetof(VolvoxGridObject, lpVtblObjectSafety)
 
 #define OBJ_FROM_VIEWOBJECT(pv) \
     ((VolvoxGridObject *)((char *)(pv) - VIEWOBJECT_OFFSET))
+#define OBJ_FROM_VIEWOBJECT2(pv) \
+    ((VolvoxGridObject *)((char *)(pv) - VIEWOBJECT2_OFFSET))
 #define OBJ_FROM_OLEOBJECT(pv) \
     ((VolvoxGridObject *)((char *)(pv) - OLEOBJECT_OFFSET))
 #define OBJ_FROM_INPLACEOBJECT(pv) \
@@ -1660,10 +1746,12 @@ static HRESULT vfg_load_typeinfo(REFGUID guid, ITypeInfo **ppTypeInfo);
     ((VolvoxGridObject *)((char *)(pv) - CPCONTAINER_OFFSET))
 #define OBJ_FROM_CONNECTIONPOINT(pv) \
     ((VolvoxGridObject *)((char *)(pv) - CONNECTIONPOINT_OFFSET))
-#define OBJ_FROM_CLASSINFO(pv) \
-    ((VolvoxGridObject *)((char *)(pv) - CLASSINFO_OFFSET))
-#define OBJ_FROM_CLASSINFO2(pv) \
-    ((VolvoxGridObject *)((char *)(pv) - CLASSINFO2_OFFSET))
+#define OBJ_FROM_DATAOBJECT(pv) \
+    ((VolvoxGridObject *)((char *)(pv) - DATAOBJECT_OFFSET))
+#define OBJ_FROM_DROPSOURCE(pv) \
+    ((VolvoxGridObject *)((char *)(pv) - DROPSOURCE_OFFSET))
+#define OBJ_FROM_DROPTARGET(pv) \
+    ((VolvoxGridObject *)((char *)(pv) - DROPTARGET_OFFSET))
 #define OBJ_FROM_OBJECTSAFETY(pv) \
     ((VolvoxGridObject *)((char *)(pv) - OBJECTSAFETY_OFFSET))
 
@@ -1676,6 +1764,19 @@ void vfg_init_object_registry(void) {
 
 void vfg_shutdown_object_registry(void) {
     DeleteCriticalSection(&g_vfg_objects_cs);
+}
+
+int vfg_object_registry_count(void) {
+    int count = 0;
+    VolvoxGridObject *obj;
+    EnterCriticalSection(&g_vfg_objects_cs);
+    obj = g_vfg_objects;
+    while (obj) {
+        count++;
+        obj = obj->registry_next;
+    }
+    LeaveCriticalSection(&g_vfg_objects_cs);
+    return count;
 }
 
 static VolvoxGridObject *vfg_find_object_by_grid_id(int64_t grid_id) {
@@ -1877,6 +1978,43 @@ static int32_t vfg_col_engine_from_property(VolvoxGridObject *obj, int32_t col) 
     return col;
 }
 
+static int32_t vfg_row_engine_from_display_property(int64_t grid_id, int32_t row) {
+    int32_t rows;
+    int32_t logical;
+    if (row < 0) return row;
+    rows = volvox_grid_get_rows(grid_id);
+    if (row < rows && volvox_grid_get_row_display_position(grid_id, row) == row) {
+        return row;
+    }
+    for (logical = 0; logical < rows; ++logical) {
+        if (volvox_grid_get_row_display_position(grid_id, logical) == row) {
+            return logical;
+        }
+    }
+    return row;
+}
+
+static int32_t vfg_col_engine_from_display_property(VolvoxGridObject *obj, int32_t col) {
+    int64_t grid_id;
+    int32_t display_col;
+    int32_t cols;
+    int32_t logical;
+    if (!obj || col < 0) return col;
+    grid_id = obj->grid_id;
+    display_col = col;
+    cols = volvox_grid_get_cols(grid_id);
+    if (display_col >= 0 && display_col < cols &&
+        volvox_grid_get_col_display_position(grid_id, display_col) == display_col) {
+        return display_col;
+    }
+    for (logical = 0; logical < cols; ++logical) {
+        if (volvox_grid_get_col_display_position(grid_id, logical) == display_col) {
+            return logical;
+        }
+    }
+    return display_col;
+}
+
 static int32_t vfg_get_col_cached(int64_t grid_id) {
     VolvoxGridObject *obj = vfg_find_object_by_grid_id(grid_id);
     int32_t cols = volvox_grid_get_cols(grid_id);
@@ -1912,11 +2050,6 @@ static int32_t vfg_get_col_sel_cached(int64_t grid_id) {
     return vfg_col_property_from_engine(obj, engine_col);
 }
 
-static int32_t vfg_get_editable_cached(int64_t grid_id) {
-    VolvoxGridObject *obj = vfg_find_object_by_grid_id(grid_id);
-    return obj ? obj->editable_cached : 0;
-}
-
 static int32_t volvox_grid_get_frozen_rows_cached(int64_t grid_id) {
     return vfg_get_frozen_rows_cached(grid_id);
 }
@@ -1941,10 +2074,6 @@ static int32_t volvox_grid_get_col_sel_cached(int64_t grid_id) {
     return vfg_get_col_sel_cached(grid_id);
 }
 
-static int32_t volvox_grid_get_editable_cached(int64_t grid_id) {
-    return vfg_get_editable_cached(grid_id);
-}
-
 static int32_t volvox_grid_set_rows_compat(int64_t grid_id, int32_t rows) {
     int32_t out_len = 0;
     uint8_t *out = vfg_native_set_rows(grid_id, rows, &out_len);
@@ -1954,17 +2083,34 @@ static int32_t volvox_grid_set_rows_compat(int64_t grid_id, int32_t rows) {
         int32_t count = volvox_grid_get_rows(grid_id);
         obj->frozen_rows_cached = vfg_clamp_cached_extent(obj->frozen_rows_cached, count);
         obj->row_sel_cached = vfg_clamp_cached_index(obj->row_sel_cached, count, volvox_grid_get_row(grid_id));
+        vfg_clear_is_collapsed_cache(obj);
     }
     return status;
 }
 
 static int32_t volvox_grid_set_cols_compat(int64_t grid_id, int32_t cols) {
+    int32_t old_count = volvox_grid_get_cols(grid_id);
     int32_t out_len = 0;
     uint8_t *out = vfg_native_set_cols(grid_id, cols, &out_len);
     int32_t status = vfg_take_status_response(out);
     VolvoxGridObject *obj = vfg_find_object_by_grid_id(grid_id);
+    int32_t count = volvox_grid_get_cols(grid_id);
+    if (status == 0 && cols > old_count && count > old_count) {
+        int32_t default_width = vfg_compat_default_col_width_px(
+            volvox_grid_get_font_size(grid_id));
+        if (default_width > 0) {
+            for (int32_t col = old_count; col < count; ++col) {
+                int32_t ignore_len = 0;
+                uint8_t *ignore = vfg_native_set_col_width(
+                    grid_id,
+                    col,
+                    default_width,
+                    &ignore_len);
+                if (ignore) volvox_grid_free(ignore, ignore_len);
+            }
+        }
+    }
     if (obj) {
-        int32_t count = volvox_grid_get_cols(grid_id);
         obj->frozen_cols_cached = vfg_clamp_cached_extent(obj->frozen_cols_cached, count);
         obj->col_sel_cached = vfg_clamp_cached_index(obj->col_sel_cached, count, volvox_grid_get_col(grid_id));
     }
@@ -2000,6 +2146,21 @@ static int32_t volvox_grid_set_row_compat(int64_t grid_id, int32_t row) {
     status = vfg_take_status_response(out);
     if (obj) {
         obj->row_sel_cached = vfg_clamp_cached_index(volvox_grid_get_row(grid_id), rows, row);
+        if (status == 0 && obj->recordset && obj->data_mode != 0 &&
+            new_row >= VFG_BOUND_HEADER_ROWS) {
+            HRESULT hr_move = vfg_bound_move_recordset_to_row(obj, new_row);
+            if (FAILED(hr_move)) {
+                vfg_fire_ado_data_error_event(obj, hr_move);
+                return -1;
+            }
+            if (obj->bound_virtual_active) {
+                hr_move = vfg_bound_fetch_window(obj, new_row, 1);
+                if (FAILED(hr_move)) {
+                    vfg_fire_ado_data_error_event(obj, hr_move);
+                    return -1;
+                }
+            }
+        }
         if (status == 0 && new_row != old_row) {
             VARIANT args[4];
             VariantInit(&args[3]); args[3].vt = VT_I4; args[3].lVal = old_row;
@@ -2086,12 +2247,7 @@ static int32_t volvox_grid_set_frozen_cols_compat(int64_t grid_id, int32_t value
 static int32_t volvox_grid_set_editable_compat(int64_t grid_id, int32_t mode) {
     int32_t out_len = 0;
     uint8_t *out = vfg_native_set_editable(grid_id, mode, &out_len);
-    int32_t status = vfg_take_status_response(out);
-    VolvoxGridObject *obj = vfg_find_object_by_grid_id(grid_id);
-    if (obj) {
-        obj->editable_cached = mode;
-    }
-    return status;
+    return vfg_take_status_response(out);
 }
 
 static int32_t volvox_grid_set_row_sel_compat(int64_t grid_id, int32_t row_sel) {
@@ -2214,6 +2370,11 @@ static HRESULT STDMETHODCALLTYPE VFG_QueryInterface(
         InterlockedIncrement(&obj->cRef);
         return S_OK;
     }
+    if (IsEqualIID(riid, &IID_IViewObject2)) {
+        *ppv = &obj->lpVtblViewObject2;
+        InterlockedIncrement(&obj->cRef);
+        return S_OK;
+    }
     if (IsEqualIID(riid, &IID_IOleObject)) {
         *ppv = &obj->lpVtblOleObject;
         InterlockedIncrement(&obj->cRef);
@@ -2246,13 +2407,18 @@ static HRESULT STDMETHODCALLTYPE VFG_QueryInterface(
         InterlockedIncrement(&obj->cRef);
         return S_OK;
     }
-    if (IsEqualIID(riid, &IID_IProvideClassInfo)) {
-        *ppv = &obj->lpVtblProvideClassInfo;
+    if (IsEqualIID(riid, &IID_IDataObject)) {
+        *ppv = &obj->lpVtblDataObject;
         InterlockedIncrement(&obj->cRef);
         return S_OK;
     }
-    if (IsEqualIID(riid, &IID_IProvideClassInfo2)) {
-        *ppv = &obj->lpVtblProvideClassInfo2;
+    if (IsEqualIID(riid, &IID_IDropSource)) {
+        *ppv = &obj->lpVtblDropSource;
+        InterlockedIncrement(&obj->cRef);
+        return S_OK;
+    }
+    if (IsEqualIID(riid, &IID_IDropTarget)) {
+        *ppv = &obj->lpVtblDropTarget;
         InterlockedIncrement(&obj->cRef);
         return S_OK;
     }
@@ -2289,18 +2455,12 @@ static ULONG STDMETHODCALLTYPE VFG_Release(IDispatch *This) {
         vfg_free_bstr_cache(obj->col_format_cache, obj->col_format_cache_len);
         vfg_free_bstr_cache(obj->col_edit_mask_cache, obj->col_edit_mask_cache_len);
         vfg_free_bstr_cache(obj->col_combo_list_cache, obj->col_combo_list_cache_len);
-        if (obj->col_image_list_cache) HeapFree(GetProcessHeap(), 0, obj->col_image_list_cache);
         if (obj->col_indent_cache) HeapFree(GetProcessHeap(), 0, obj->col_indent_cache);
-        if (obj->clip_separators_cached) SysFreeString(obj->clip_separators_cached);
-        if (obj->id_cached) SysFreeString(obj->id_cached);
-        if (obj->format_string_cached) {
-            SysFreeString(obj->format_string_cached);
-        }
-        if (obj->accessible_name_cached) SysFreeString(obj->accessible_name_cached);
-        if (obj->accessible_description_cached) SysFreeString(obj->accessible_description_cached);
-        if (obj->accessible_value_cached) SysFreeString(obj->accessible_value_cached);
-        VariantClear(&obj->accessible_role_cached);
+        if (obj->is_collapsed_cache) HeapFree(GetProcessHeap(), 0, obj->is_collapsed_cache);
+        VariantClear(&obj->height_cached);
+        VariantClear(&obj->width_cached);
         vfg_free_variant_slots(obj->compat_values);
+        vfg_clear_stored_data_formats(obj);
         if (obj->host_app_name) SysFreeString(obj->host_app_name);
         if (obj->host_obj_name) SysFreeString(obj->host_obj_name);
         if (obj->grid_id >= 0) {
@@ -2318,10 +2478,8 @@ static HRESULT STDMETHODCALLTYPE VFG_GetTypeInfoCount(
     IDispatch *This, UINT *pctinfo)
 {
     (void)This;
-    ITypeInfo *pTypeInfo = NULL;
     if (!pctinfo) return E_POINTER;
-    *pctinfo = SUCCEEDED(vfg_load_typeinfo(&IID_IVolvoxGrid, &pTypeInfo)) ? 1 : 0;
-    if (pTypeInfo) ITypeInfo_Release(pTypeInfo);
+    *pctinfo = 0;
     return S_OK;
 }
 
@@ -2331,8 +2489,8 @@ static HRESULT STDMETHODCALLTYPE VFG_GetTypeInfo(
     (void)This; (void)lcid;
     if (!ppTInfo) return E_POINTER;
     *ppTInfo = NULL;
-    if (iTInfo != 0) return DISP_E_BADINDEX;
-    return vfg_load_typeinfo(&IID_IVolvoxGrid, ppTInfo);
+    (void)iTInfo;
+    return DISP_E_BADINDEX;
 }
 
 static int vfg_lookup_dispid_by_name(
@@ -3062,6 +3220,19 @@ static int32_t vfg_twips_to_px_y(int32_t twips) {
     return MulDiv(twips, vfg_get_screen_dpi_y(), 1440);
 }
 
+static int32_t vfg_compat_default_row_height_px(float font_px) {
+    if (font_px <= 0.0f) return 0;
+    return (int32_t)(font_px + (font_px <= 12.0f ? 5.5f : 6.5f));
+}
+
+static int32_t vfg_compat_default_col_width_px(float font_px) {
+    int32_t font_pt;
+    if (font_px <= 0.0f) return 0;
+    font_pt = (int32_t)(font_px * 72.0f / (float)vfg_get_screen_dpi_y() + 0.5f);
+    if (font_pt < 1) font_pt = 1;
+    return font_pt * 8 - 4;
+}
+
 static int32_t *vfg_capture_col_widths(int64_t gid, int32_t cols) {
     int32_t *widths;
     if (cols <= 0) return NULL;
@@ -3071,6 +3242,17 @@ static int32_t *vfg_capture_col_widths(int64_t gid, int32_t cols) {
         widths[col] = volvox_grid_get_col_width(gid, col);
     }
     return widths;
+}
+
+static int32_t *vfg_capture_row_heights(int64_t gid, int32_t rows) {
+    int32_t *heights;
+    if (rows <= 0) return NULL;
+    heights = (int32_t *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(int32_t) * rows);
+    if (!heights) return NULL;
+    for (int32_t row = 0; row < rows; ++row) {
+        heights[row] = volvox_grid_get_row_height(gid, row);
+    }
+    return heights;
 }
 
 static void vfg_apply_bound_col_widths(
@@ -3117,7 +3299,9 @@ static int32_t vfg_measure_grid_cell_text_width_px(
     int32_t col,
     const uint8_t *font_name_ptr,
     int32_t font_name_len,
-    float font_size)
+    float font_size,
+    int32_t font_bold,
+    int32_t font_italic)
 {
     int32_t best_width = 0;
     int32_t text_len = 0;
@@ -3141,8 +3325,8 @@ static int32_t vfg_measure_grid_cell_text_width_px(
                     font_name_ptr,
                     font_name_len,
                     font_size,
-                    0,
-                    0,
+                    font_bold,
+                    font_italic,
                     -1.0f,
                     &width,
                     &height,
@@ -3162,6 +3346,44 @@ static int32_t vfg_measure_grid_cell_text_width_px(
     return best_width;
 }
 
+static int32_t vfg_grid_cell_text_max_line_chars(int64_t gid, int32_t row, int32_t col) {
+    int32_t best_chars = 0;
+    int32_t text_len = 0;
+    uint8_t *text = volvox_grid_get_text_matrix(gid, row, col, &text_len);
+    if (!text || text_len <= 0) {
+        if (text) volvox_grid_free(text, text_len);
+        return 0;
+    }
+    {
+        int32_t start = 0;
+        for (int32_t i = 0; i <= text_len; ++i) {
+            int at_end = (i == text_len);
+            int line_break = (!at_end && (text[i] == 13 || text[i] == 10));
+            if (!at_end && !line_break) continue;
+            if (i > start) {
+                int32_t chars = vfg_utf8_char_count((const char *)text + start, i - start);
+                if (chars > best_chars) best_chars = chars;
+            }
+            if (!at_end && text[i] == 13 && i + 1 < text_len && text[i + 1] == 10) {
+                ++i;
+            }
+            start = i + 1;
+        }
+    }
+    volvox_grid_free(text, text_len);
+    return best_chars;
+}
+
+static int32_t vfg_unbound_autosize_text_pad_px(float font_size, int32_t font_bold) {
+    int32_t pad;
+    if (font_size >= 12.75f) return 15;
+    if (font_size >= 12.0f) pad = font_bold ? 16 : 15;
+    else if (font_size >= 9.75f) pad = 14;
+    else pad = 13;
+    if (font_bold && pad > 0) --pad;
+    return pad;
+}
+
 static void vfg_apply_bound_autosize_compat_widths(
     int64_t gid,
     int32_t dataColOffset,
@@ -3173,6 +3395,8 @@ static void vfg_apply_bound_autosize_compat_widths(
     int32_t font_name_len = 0;
     uint8_t *font_name = NULL;
     float font_size = volvox_grid_get_font_size(gid);
+    int32_t font_bold = volvox_grid_get_font_bold_native(gid);
+    int32_t font_italic = volvox_grid_get_font_italic_native(gid);
     if (rows <= 0 || totalCols <= 0 || colTo < colFrom) return;
     if (colFrom < 0) colFrom = 0;
     if (colTo >= totalCols) colTo = totalCols - 1;
@@ -3195,11 +3419,23 @@ static void vfg_apply_bound_autosize_compat_widths(
         int32_t basis_px = 0;
         for (int32_t row = 0; row < rows; ++row) {
             int32_t text_px = vfg_measure_grid_cell_text_width_px(
-                gid, row, col, font_name, font_name_len, font_size);
+                gid, row, col, font_name, font_name_len, font_size, font_bold, font_italic);
             if (text_px > basis_px) basis_px = text_px;
         }
         {
             int32_t width_px = basis_px + VFG_BOUND_AUTOSIZE_TEXT_PAD_PX;
+            VolvoxGridObject *width_obj = vfg_find_object_by_grid_id(gid);
+            int active_connection = width_obj && width_obj->recordset &&
+                vfg_recordset_has_active_connection(width_obj->recordset);
+            if (col == dataColOffset && font_size >= 15.0f) {
+                width_px += 1;
+            } else if (col > dataColOffset) {
+                if (width_obj && width_obj->data_mode != 0 && active_connection) {
+                    if (font_size >= 14.0f) width_px += 1;
+                } else if (font_size >= 15.0f) {
+                    width_px += 1;
+                }
+            }
             if (width_px < VFG_BOUND_AUTOSIZE_MIN_COL_WIDTH_PX) {
                 width_px = VFG_BOUND_AUTOSIZE_MIN_COL_WIDTH_PX;
             }
@@ -3210,6 +3446,103 @@ static void vfg_apply_bound_autosize_compat_widths(
             }
         }
     }
+    if (font_name) volvox_grid_free(font_name, font_name_len);
+}
+
+static void vfg_apply_unbound_autosize_compat_widths(
+    int64_t gid,
+    int32_t colFrom,
+    int32_t colTo,
+    int32_t equal,
+    int32_t maxWidthPx)
+{
+    int32_t rows = volvox_grid_get_rows(gid);
+    int32_t totalCols = volvox_grid_get_cols(gid);
+    int32_t font_name_len = 0;
+    uint8_t *font_name = NULL;
+    float font_size = volvox_grid_get_font_size(gid);
+    int32_t font_bold = volvox_grid_get_font_bold_native(gid);
+    int32_t font_italic = volvox_grid_get_font_italic_native(gid);
+    int32_t font_underline = volvox_grid_get_font_underline_native(gid);
+    int32_t pad;
+    int32_t *widths = NULL;
+    if (rows <= 0 || totalCols <= 0 || colTo < colFrom) return;
+    if (colFrom < 0) colFrom = 0;
+    if (colTo >= totalCols) colTo = totalCols - 1;
+    if (colFrom > colTo) return;
+
+    if (font_size <= 0.0f) font_size = 9.0f;
+    pad = vfg_unbound_autosize_text_pad_px(
+        font_size * 72.0f / (float)vfg_get_screen_dpi_y(),
+        font_bold);
+    font_name = volvox_grid_get_font_name(gid, &font_name_len);
+    widths = (int32_t *)HeapAlloc(
+        GetProcessHeap(),
+        HEAP_ZERO_MEMORY,
+        sizeof(int32_t) * (colTo - colFrom + 1));
+    if (!widths) {
+        if (font_name) volvox_grid_free(font_name, font_name_len);
+        return;
+    }
+
+    for (int32_t col = colFrom; col <= colTo; ++col) {
+        int32_t width_px = pad;
+        for (int32_t row = 0; row < rows; ++row) {
+            int32_t cell_font_bold = volvox_grid_get_cell_font_bold(gid, row, col);
+            int32_t text_px = vfg_measure_grid_cell_text_width_px(
+                gid,
+                row,
+                col,
+                font_name,
+                font_name_len,
+                font_size,
+                font_bold || cell_font_bold,
+                font_italic);
+            if (text_px > 0) {
+                int32_t needed = text_px + pad;
+                int32_t line_chars = cell_font_bold
+                    ? vfg_grid_cell_text_max_line_chars(gid, row, col)
+                    : 0;
+                if (cell_font_bold && !font_underline && font_size <= 13.0f &&
+                    text_px <= 50 && line_chars <= 6) {
+                    if (!font_bold) needed -= 1;
+                } else if (cell_font_bold) {
+                    needed += font_bold
+                        ? VFG_UNBOUND_CELLFONT_AUTOSIZE_EXTRA_BOLD_BASE_PX
+                        : VFG_UNBOUND_CELLFONT_AUTOSIZE_EXTRA_NORMAL_BASE_PX;
+                }
+                if (needed > width_px) width_px = needed;
+            }
+        }
+        widths[col - colFrom] = width_px;
+    }
+
+    if (equal) {
+        int32_t width = 0;
+        for (int32_t col = colFrom; col <= colTo; ++col) {
+            int32_t w = widths[col - colFrom];
+            if (w > width) width = w;
+        }
+        if (maxWidthPx > 0 && width > maxWidthPx) width = maxWidthPx;
+        for (int32_t col = colFrom; col <= colTo; ++col) {
+            int32_t ignore_len = 0;
+            uint8_t *ignore = vfg_native_set_col_width(gid, col, width, &ignore_len);
+            if (ignore) volvox_grid_free(ignore, ignore_len);
+        }
+        goto done;
+    }
+
+    for (int32_t col = colFrom; col <= colTo; ++col) {
+        int32_t width = widths[col - colFrom];
+        int32_t ignore_len = 0;
+        uint8_t *ignore;
+        if (maxWidthPx > 0 && width > maxWidthPx) width = maxWidthPx;
+        ignore = vfg_native_set_col_width(gid, col, width, &ignore_len);
+        if (ignore) volvox_grid_free(ignore, ignore_len);
+    }
+
+done:
+    HeapFree(GetProcessHeap(), 0, widths);
     if (font_name) volvox_grid_free(font_name, font_name_len);
 }
 
@@ -3468,6 +3801,15 @@ static void vfg_clear_flood_color_cache(VolvoxGridObject *obj) {
     obj->flood_colors = NULL;
 }
 
+static void vfg_clear_is_collapsed_cache(VolvoxGridObject *obj) {
+    if (!obj) return;
+    if (obj->is_collapsed_cache) {
+        HeapFree(GetProcessHeap(), 0, obj->is_collapsed_cache);
+        obj->is_collapsed_cache = NULL;
+    }
+    obj->is_collapsed_cache_len = 0;
+}
+
 /* Coerce a VARIANT to float */
 static HRESULT variant_to_float(VARIANT *pv, float *out) {
     if (V_VT(pv) == VT_R4) { *out = V_R4(pv); return S_OK; }
@@ -3530,6 +3872,30 @@ static double vfg_u64_to_double(uint64_t u) {
     return v.f64;
 }
 
+static void vfg_decode_cell_range_anchor(
+    const uint8_t *buf,
+    int32_t len,
+    int32_t *row,
+    int32_t *col)
+{
+    int32_t pos = 0;
+    while (pos < len) {
+        uint64_t key = 0;
+        uint64_t value = 0;
+        uint32_t field_no;
+        uint32_t wire_type;
+        if (!vfg_read_varint(buf, len, &pos, &key)) return;
+        field_no = (uint32_t)(key >> 3);
+        wire_type = (uint32_t)(key & 0x7);
+        if (wire_type == 0 && vfg_read_varint(buf, len, &pos, &value)) {
+            if (field_no == 1 && row) *row = (int32_t)value;
+            else if (field_no == 2 && col) *col = (int32_t)value;
+            continue;
+        }
+        if (!vfg_skip_wire(buf, len, &pos, wire_type)) return;
+    }
+}
+
 typedef struct VFGProtoEvent {
     int32_t kind;
     int64_t event_id;
@@ -3586,6 +3952,22 @@ static void vfg_decode_nested_event(
         case 5:
         case 28:
         case 29:
+            if ((kind == 4 || kind == 5)
+                && (field_no == 1 || field_no == 2)
+                && wire_type == 2) {
+                uint64_t msg_len = 0;
+                if (!vfg_read_varint(buf, len, &pos, &msg_len)) return;
+                if (msg_len > (uint64_t)(len - pos)) return;
+                if (field_no == 1) {
+                    vfg_decode_cell_range_anchor(
+                        buf + pos, (int32_t)msg_len, &evt->old_row, &evt->old_col);
+                } else {
+                    vfg_decode_cell_range_anchor(
+                        buf + pos, (int32_t)msg_len, &evt->new_row, &evt->new_col);
+                }
+                pos += (int32_t)msg_len;
+                continue;
+            }
             if (wire_type == 0 && vfg_read_varint(buf, len, &pos, &value)) {
                 if (field_no == 1) evt->old_row = (int32_t)value;
                 else if (field_no == 2) evt->old_col = (int32_t)value;
@@ -3600,12 +3982,15 @@ static void vfg_decode_nested_event(
         case 18:
         case 19:
         case 20:
+        case 22:
         case 26:
         case 27:
         case 31:
         case 32:
         case 33:
         case 38:
+        case 48:
+        case 50:
         case 52:
         case 53:
         case 57:
@@ -3626,6 +4011,7 @@ static void vfg_decode_nested_event(
         case 21:
         case 23:
         case 24:
+        case 56:
         case 42:
         case 43:
             if (wire_type == 0 && vfg_read_varint(buf, len, &pos, &value)) {
@@ -3637,6 +4023,13 @@ static void vfg_decode_nested_event(
             }
             break;
         case 25:
+            if (wire_type == 0 && vfg_read_varint(buf, len, &pos, &value)) {
+                if (field_no == 2) evt->row = (int32_t)value;
+                else if (field_no == 3) evt->col = (int32_t)value;
+                else if (field_no == 4) evt->extra1 = (int32_t)value;
+                continue;
+            }
+            break;
         case 34:
         case 35:
         case 36:
@@ -3646,6 +4039,24 @@ static void vfg_decode_nested_event(
                 else if (field_no == 2) evt->col = (int32_t)value;
                 else if (field_no == 3) evt->extra1 = (int32_t)value;
                 else if (field_no == 4) evt->extra2 = (int32_t)value;
+                continue;
+            }
+            break;
+        case 49:
+            if (field_no == 1 && wire_type == 0 && vfg_read_varint(buf, len, &pos, &value)) {
+                evt->row = (int32_t)value;
+                continue;
+            }
+            if (field_no == 2 && wire_type == 0 && vfg_read_varint(buf, len, &pos, &value)) {
+                evt->col = (int32_t)value;
+                continue;
+            }
+            if (field_no == 3 && wire_type == 5 && vfg_read_fixed32(buf, len, &pos, &u32)) {
+                evt->x = vfg_u32_to_float(u32);
+                continue;
+            }
+            if (field_no == 4 && wire_type == 5 && vfg_read_fixed32(buf, len, &pos, &u32)) {
+                evt->y = vfg_u32_to_float(u32);
                 continue;
             }
             break;
@@ -3669,6 +4080,16 @@ static void vfg_decode_nested_event(
                 continue;
             }
             break;
+        case 65:
+        case 66:
+            if (wire_type == 0 && vfg_read_varint(buf, len, &pos, &value)) {
+                if (field_no == 2) evt->row = (int32_t)value;
+                else if (field_no == 3) evt->col = (int32_t)value;
+                continue;
+            }
+            break;
+        case 14:
+        case 16:
         case 44:
         case 46:
             if (wire_type == 0 && vfg_read_varint(buf, len, &pos, &value)) {
@@ -3678,6 +4099,7 @@ static void vfg_decode_nested_event(
             }
             break;
         case 47:
+        case 63:
             if (field_no == 1 && wire_type == 0 && vfg_read_varint(buf, len, &pos, &value)) {
                 evt->row = (int32_t)value;
                 continue;
@@ -3703,6 +4125,7 @@ static void vfg_decode_nested_event(
                 continue;
             }
             break;
+        case 15:
         case 45:
             if (field_no == 1 && wire_type == 0 && vfg_read_varint(buf, len, &pos, &value)) {
                 evt->key_ascii = (int32_t)value;
@@ -3733,7 +4156,7 @@ static int vfg_decode_grid_event(const uint8_t *buf, int32_t len, VFGProtoEvent 
             evt->event_id = (int64_t)value;
             continue;
         }
-        if (wire_type == 2 && field_no >= 2 && field_no <= 62) {
+        if (wire_type == 2 && field_no >= 2 && field_no <= 68) {
             uint64_t msg_len = 0;
             int32_t msg_pos;
             if (!vfg_read_varint(buf, len, &pos, &msg_len)) return 0;
@@ -3764,15 +4187,31 @@ static void vfg_free_sink_entries(VolvoxGridObject *obj) {
 
 static HRESULT vfg_fire_event(VolvoxGridObject *obj, DISPID dispid, VARIANT *args, UINT cArgs) {
     UINT i;
+    UINT sink_count;
+    IDispatch **snapshot;
     if (!obj || obj->frozen_events) return S_OK;
-    for (i = 0; i < obj->sink_count; ++i) {
+    sink_count = obj->sink_count;
+    if (sink_count == 0) return S_OK;
+
+    snapshot = (IDispatch **)HeapAlloc(
+        GetProcessHeap(), HEAP_ZERO_MEMORY, (SIZE_T)sink_count * sizeof(IDispatch *));
+    if (!snapshot) return E_OUTOFMEMORY;
+
+    for (i = 0; i < sink_count; ++i) {
+        if (i < obj->sink_count && obj->sinks[i].dispatch) {
+            snapshot[i] = obj->sinks[i].dispatch;
+            IDispatch_AddRef(snapshot[i]);
+        }
+    }
+
+    for (i = 0; i < sink_count; ++i) {
         DISPPARAMS dp;
-        if (!obj->sinks[i].dispatch) continue;
+        if (!snapshot[i]) continue;
         memset(&dp, 0, sizeof(dp));
         dp.rgvarg = args;
         dp.cArgs = cArgs;
         IDispatch_Invoke(
-            obj->sinks[i].dispatch,
+            snapshot[i],
             dispid,
             &IID_NULL,
             LOCALE_USER_DEFAULT,
@@ -3781,7 +4220,9 @@ static HRESULT vfg_fire_event(VolvoxGridObject *obj, DISPID dispid, VARIANT *arg
             NULL,
             NULL,
             NULL);
+        IDispatch_Release(snapshot[i]);
     }
+    HeapFree(GetProcessHeap(), 0, snapshot);
     return S_OK;
 }
 
@@ -3830,6 +4271,14 @@ static HRESULT vfg_fire_before_data_refresh_event(
     VARIANT args[1];
     VariantInit(&args[0]); args[0].vt = VT_BYREF | VT_BOOL; args[0].pboolVal = cancel;
     return vfg_fire_event(obj, DISPID_VFG_EVT_BEFOREDATAREFRESH, args, 1);
+}
+
+static void vfg_fire_ado_data_error_event(VolvoxGridObject *obj, HRESULT hr) {
+    VARIANT_BOOL show_msg = VARIANT_TRUE;
+    VARIANT args[2];
+    VariantInit(&args[1]); args[1].vt = VT_I4; args[1].lVal = (LONG)hr;
+    VariantInit(&args[0]); args[0].vt = VT_BYREF | VT_BOOL; args[0].pboolVal = &show_msg;
+    vfg_fire_event(obj, DISPID_VFG_EVT_ERROR, args, 2);
 }
 
 static void vfg_fire_simple_event(VolvoxGridObject *obj, DISPID dispid) {
@@ -3972,6 +4421,11 @@ static int32_t volvox_grid_set_top_row_compat(int64_t grid_id, int32_t row) {
     out = vfg_native_set_top_row(grid_id, row, &out_len);
     status = vfg_take_status_response(out);
     if (status == 0 && obj && new_top != old_top) {
+        HRESULT hr_fetch = vfg_bound_fetch_visible_window(obj);
+        if (FAILED(hr_fetch)) {
+            vfg_fire_ado_data_error_event(obj, hr_fetch);
+            return -1;
+        }
         vfg_fire_after_scroll_event(obj, old_top, old_left, new_top, old_left);
     }
     return status;
@@ -4010,18 +4464,21 @@ static int32_t volvox_grid_set_left_col_compat(int64_t grid_id, int32_t col) {
 static int32_t volvox_grid_set_col_position_compat(int64_t grid_id, int32_t col, int32_t position) {
     VolvoxGridObject *obj = vfg_find_object_by_grid_id(grid_id);
     LONG final_position = position;
-    int32_t old_position = volvox_grid_get_col_display_position(grid_id, col);
+    int32_t cols = volvox_grid_get_cols(grid_id);
+    int32_t old_position = col;
     int32_t out_len = 0;
     uint8_t *out;
     int32_t status;
 
-    if (obj && old_position >= 0 && position != old_position) {
+    if (old_position < 0 || old_position >= cols || final_position < 0 || final_position >= cols) return 0;
+
+    if (obj && position != old_position) {
         VARIANT args[2];
         VariantInit(&args[1]); args[1].vt = VT_I4; args[1].lVal = col;
         VariantInit(&args[0]); args[0].vt = VT_BYREF | VT_I4; args[0].plVal = &final_position;
         vfg_fire_event(obj, DISPID_VFG_EVT_BEFOREMOVECOLUMN, args, 2);
     }
-    if (old_position < 0 || final_position == old_position) return 0;
+    if (final_position == old_position || final_position < 0 || final_position >= cols) return 0;
 
     out = vfg_native_set_col_position(grid_id, col, final_position, &out_len);
     status = vfg_take_status_response(out);
@@ -4037,18 +4494,21 @@ static int32_t volvox_grid_set_col_position_compat(int64_t grid_id, int32_t col,
 static int32_t volvox_grid_set_row_position_compat(int64_t grid_id, int32_t row, int32_t position) {
     VolvoxGridObject *obj = vfg_find_object_by_grid_id(grid_id);
     LONG final_position = position;
-    int32_t old_position = volvox_grid_get_row_display_position(grid_id, row);
+    int32_t rows = volvox_grid_get_rows(grid_id);
+    int32_t old_position = row;
     int32_t out_len = 0;
     uint8_t *out;
     int32_t status;
 
-    if (obj && old_position >= 0 && position != old_position) {
+    if (old_position < 0 || old_position >= rows || final_position < 0 || final_position >= rows) return 0;
+
+    if (obj && position != old_position) {
         VARIANT args[2];
         VariantInit(&args[1]); args[1].vt = VT_I4; args[1].lVal = row;
         VariantInit(&args[0]); args[0].vt = VT_BYREF | VT_I4; args[0].plVal = &final_position;
         vfg_fire_event(obj, DISPID_VFG_EVT_BEFOREMOVEROW, args, 2);
     }
-    if (old_position < 0 || final_position == old_position) return 0;
+    if (final_position == old_position || final_position < 0 || final_position >= rows) return 0;
 
     out = vfg_native_set_row_position(grid_id, row, final_position, &out_len);
     status = vfg_take_status_response(out);
@@ -4063,6 +4523,10 @@ static int32_t volvox_grid_set_row_position_compat(int64_t grid_id, int32_t row,
 
 static int32_t volvox_grid_set_row_height_compat(int64_t grid_id, int32_t row, int32_t height) {
     VolvoxGridObject *obj = vfg_find_object_by_grid_id(grid_id);
+    if (height >= 0 && obj && obj->row_height_min_twips > 0) {
+        int32_t min_height = vfg_twips_to_px_y(obj->row_height_min_twips);
+        if (min_height > 0 && height < min_height) height = min_height;
+    }
     int32_t old_height = volvox_grid_get_row_height(grid_id, row);
     int32_t out_len = 0;
     uint8_t *out;
@@ -4091,6 +4555,10 @@ static int32_t volvox_grid_set_row_height_compat(int64_t grid_id, int32_t row, i
 
 static int32_t volvox_grid_set_col_width_compat(int64_t grid_id, int32_t col, int32_t width) {
     VolvoxGridObject *obj = vfg_find_object_by_grid_id(grid_id);
+    if (width >= 0 && obj && obj->col_width_min_twips > 0) {
+        int32_t min_width = vfg_twips_to_px_x(obj->col_width_min_twips);
+        if (min_width > 0 && width < min_width) width = min_width;
+    }
     int32_t old_width = volvox_grid_get_col_width(grid_id, col);
     int32_t out_len = 0;
     uint8_t *out;
@@ -4223,34 +4691,6 @@ static int vfg_current_modifier_flags(void) {
     return flags;
 }
 
-static HRESULT vfg_load_typeinfo(REFGUID guid, ITypeInfo **ppTypeInfo) {
-    WCHAR modulePath[MAX_PATH];
-    WCHAR tlbPath[MAX_PATH];
-    WCHAR *slash;
-    HMODULE module = NULL;
-    ITypeLib *pTypeLib = NULL;
-    HRESULT hr;
-    if (!ppTypeInfo) return E_POINTER;
-    *ppTypeInfo = NULL;
-    if (!GetModuleHandleExW(
-            GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-            (LPCWSTR)&vfg_load_typeinfo,
-            &module)) {
-        return TYPE_E_CANTLOADLIBRARY;
-    }
-    GetModuleFileNameW(module, modulePath, MAX_PATH);
-    slash = wcsrchr(modulePath, L'\\');
-    if (!slash) slash = wcsrchr(modulePath, L'/');
-    if (slash) *(slash + 1) = L'\0';
-    lstrcpynW(tlbPath, modulePath, MAX_PATH);
-    lstrcatW(tlbPath, L"VolvoxGrid.tlb");
-    hr = LoadTypeLibEx(tlbPath, REGKIND_NONE, &pTypeLib);
-    if (FAILED(hr) || !pTypeLib) return FAILED(hr) ? hr : TYPE_E_CANTLOADLIBRARY;
-    hr = ITypeLib_GetTypeInfoOfGuid(pTypeLib, guid, ppTypeInfo);
-    ITypeLib_Release(pTypeLib);
-    return hr;
-}
-
 static const VG_NameEntry *vfg_lookup_legacy_name_by_dispid(DISPID dispid) {
     const VG_NameEntry *entry = vfg_legacy_names;
     while (entry && entry->name) {
@@ -4258,180 +4698,6 @@ static const VG_NameEntry *vfg_lookup_legacy_name_by_dispid(DISPID dispid) {
         ++entry;
     }
     return NULL;
-}
-
-static HRESULT vfg_find_member_funcdesc(
-    DISPID dispid, WORD wFlags, ITypeInfo **ppTypeInfo, FUNCDESC **ppFuncDesc)
-{
-    ITypeInfo *typeInfo = NULL;
-    TYPEATTR *typeAttr = NULL;
-    HRESULT hr;
-
-    if (!ppTypeInfo || !ppFuncDesc) return E_POINTER;
-    *ppTypeInfo = NULL;
-    *ppFuncDesc = NULL;
-
-    hr = vfg_load_typeinfo(&IID_IVolvoxGrid, &typeInfo);
-    if (FAILED(hr)) return hr;
-
-    hr = ITypeInfo_GetTypeAttr(typeInfo, &typeAttr);
-    if (FAILED(hr) || !typeAttr) {
-        ITypeInfo_Release(typeInfo);
-        return FAILED(hr) ? hr : E_FAIL;
-    }
-
-    for (UINT i = 0; i < typeAttr->cFuncs; ++i) {
-        FUNCDESC *funcDesc = NULL;
-        int matches = 0;
-        hr = ITypeInfo_GetFuncDesc(typeInfo, i, &funcDesc);
-        if (FAILED(hr) || !funcDesc) continue;
-        if (funcDesc->memid == dispid) {
-            if ((wFlags & DISPATCH_PROPERTYGET) && funcDesc->invkind == INVOKE_PROPERTYGET) {
-                matches = 1;
-            } else if ((wFlags & DISPATCH_PROPERTYPUTREF) && funcDesc->invkind == INVOKE_PROPERTYPUTREF) {
-                matches = 1;
-            } else if ((wFlags & DISPATCH_PROPERTYPUT) && funcDesc->invkind == INVOKE_PROPERTYPUT) {
-                matches = 1;
-            } else if ((wFlags & DISPATCH_METHOD) && funcDesc->invkind == INVOKE_FUNC) {
-                matches = 1;
-            }
-            if (!matches && (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) &&
-                (funcDesc->invkind == INVOKE_PROPERTYPUT || funcDesc->invkind == INVOKE_PROPERTYPUTREF)) {
-                matches = 1;
-            }
-        }
-        if (matches) {
-            ITypeInfo_ReleaseTypeAttr(typeInfo, typeAttr);
-            *ppTypeInfo = typeInfo;
-            *ppFuncDesc = funcDesc;
-            return S_OK;
-        }
-        ITypeInfo_ReleaseFuncDesc(typeInfo, funcDesc);
-    }
-
-    ITypeInfo_ReleaseTypeAttr(typeInfo, typeAttr);
-    ITypeInfo_Release(typeInfo);
-    return DISP_E_MEMBERNOTFOUND;
-}
-
-static HRESULT vfg_init_default_variant_from_tdesc(
-    ITypeInfo *typeInfo, const TYPEDESC *tdesc, VARIANT *out)
-{
-    ITypeInfo *refInfo = NULL;
-    TYPEATTR *refAttr = NULL;
-    HRESULT hr;
-
-    if (!tdesc || !out) return E_POINTER;
-    VariantInit(out);
-
-    switch (tdesc->vt) {
-    case VT_EMPTY:
-    case VT_VOID:
-        return S_OK;
-    case VT_NULL:
-        V_VT(out) = VT_NULL;
-        return S_OK;
-    case VT_I1:
-        V_VT(out) = VT_I1;
-        V_I1(out) = 0;
-        return S_OK;
-    case VT_UI1:
-        V_VT(out) = VT_UI1;
-        V_UI1(out) = 0;
-        return S_OK;
-    case VT_I2:
-    case VT_UI2:
-        V_VT(out) = VT_I2;
-        V_I2(out) = 0;
-        return S_OK;
-    case VT_I4:
-    case VT_UI4:
-    case VT_INT:
-    case VT_UINT:
-    case VT_ERROR:
-    case VT_HRESULT:
-        V_VT(out) = VT_I4;
-        V_I4(out) = 0;
-        return S_OK;
-    case VT_R4:
-        V_VT(out) = VT_R4;
-        V_R4(out) = 0.0f;
-        return S_OK;
-    case VT_R8:
-    case VT_DATE:
-        V_VT(out) = VT_R8;
-        V_R8(out) = 0.0;
-        return S_OK;
-    case VT_BOOL:
-        V_VT(out) = VT_BOOL;
-        V_BOOL(out) = VARIANT_FALSE;
-        return S_OK;
-    case VT_BSTR:
-        V_VT(out) = VT_BSTR;
-        V_BSTR(out) = SysAllocString(L"");
-        return V_BSTR(out) ? S_OK : E_OUTOFMEMORY;
-    case VT_DISPATCH:
-        V_VT(out) = VT_DISPATCH;
-        V_DISPATCH(out) = NULL;
-        return S_OK;
-    case VT_UNKNOWN:
-        V_VT(out) = VT_UNKNOWN;
-        V_UNKNOWN(out) = NULL;
-        return S_OK;
-    case VT_VARIANT:
-        return S_OK;
-    case VT_PTR:
-        V_VT(out) = VT_DISPATCH;
-        V_DISPATCH(out) = NULL;
-        return S_OK;
-    case VT_USERDEFINED:
-        if (!typeInfo) {
-            V_VT(out) = VT_I4;
-            V_I4(out) = 0;
-            return S_OK;
-        }
-        hr = ITypeInfo_GetRefTypeInfo(typeInfo, tdesc->hreftype, &refInfo);
-        if (FAILED(hr) || !refInfo) {
-            V_VT(out) = VT_I4;
-            V_I4(out) = 0;
-            return S_OK;
-        }
-        hr = ITypeInfo_GetTypeAttr(refInfo, &refAttr);
-        if (FAILED(hr) || !refAttr) {
-            ITypeInfo_Release(refInfo);
-            V_VT(out) = VT_I4;
-            V_I4(out) = 0;
-            return S_OK;
-        }
-        switch (refAttr->typekind) {
-        case TKIND_ENUM:
-            V_VT(out) = VT_I4;
-            V_I4(out) = 0;
-            break;
-        case TKIND_ALIAS:
-            hr = vfg_init_default_variant_from_tdesc(refInfo, &refAttr->tdescAlias, out);
-            break;
-        case TKIND_DISPATCH:
-        case TKIND_INTERFACE:
-        case TKIND_COCLASS:
-            V_VT(out) = VT_DISPATCH;
-            V_DISPATCH(out) = NULL;
-            hr = S_OK;
-            break;
-        default:
-            V_VT(out) = VT_I4;
-            V_I4(out) = 0;
-            hr = S_OK;
-            break;
-        }
-        ITypeInfo_ReleaseTypeAttr(refInfo, refAttr);
-        ITypeInfo_Release(refInfo);
-        return hr;
-    default:
-        V_VT(out) = VT_I4;
-        V_I4(out) = 0;
-        return S_OK;
-    }
 }
 
 static void vfg_init_byref_default(VARIANT *arg) {
@@ -4486,26 +4752,18 @@ static HRESULT vfg_try_public_dispatch_fallback(
     DISPPARAMS *pDispParams,
     VARIANT *pVarResult)
 {
-    ITypeInfo *typeInfo = NULL;
-    FUNCDESC *funcDesc = NULL;
     HRESULT hr;
     int has_index = 0;
     int32_t index = 0;
 
     if (!obj || !vfg_lookup_legacy_name_by_dispid(dispid)) return DISP_E_MEMBERNOTFOUND;
 
-    hr = vfg_find_member_funcdesc(dispid, wFlags, &typeInfo, &funcDesc);
-    if (FAILED(hr)) return DISP_E_MEMBERNOTFOUND;
-
     if ((wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) && pDispParams) {
         if (pDispParams->cArgs >= 2) {
             has_index = 1;
             variant_to_i4(&pDispParams->rgvarg[1], &index);
         }
-        hr = vfg_set_variant_slot(&obj->compat_values, dispid, has_index, index, &pDispParams->rgvarg[0]);
-        ITypeInfo_ReleaseFuncDesc(typeInfo, funcDesc);
-        ITypeInfo_Release(typeInfo);
-        return hr;
+        return vfg_set_variant_slot(&obj->compat_values, dispid, has_index, index, &pDispParams->rgvarg[0]);
     }
 
     if ((wFlags & DISPATCH_PROPERTYGET) && pDispParams && pDispParams->cArgs >= 1) {
@@ -4514,17 +4772,12 @@ static HRESULT vfg_try_public_dispatch_fallback(
     }
 
     if (wFlags & DISPATCH_PROPERTYGET) {
-        if (!pVarResult) {
-            ITypeInfo_ReleaseFuncDesc(typeInfo, funcDesc);
-            ITypeInfo_Release(typeInfo);
-            return E_POINTER;
-        }
+        if (!pVarResult) return E_POINTER;
         hr = vfg_copy_variant_slot(obj->compat_values, dispid, has_index, index, pVarResult);
         if (FAILED(hr)) {
-            hr = vfg_init_default_variant_from_tdesc(typeInfo, &funcDesc->elemdescFunc.tdesc, pVarResult);
+            VariantInit(pVarResult);
+            hr = S_OK;
         }
-        ITypeInfo_ReleaseFuncDesc(typeInfo, funcDesc);
-        ITypeInfo_Release(typeInfo);
         return hr;
     }
 
@@ -4535,18 +4788,212 @@ static HRESULT vfg_try_public_dispatch_fallback(
             }
         }
         if (pVarResult) {
-            hr = vfg_init_default_variant_from_tdesc(typeInfo, &funcDesc->elemdescFunc.tdesc, pVarResult);
+            VariantInit(pVarResult);
+            hr = S_OK;
         } else {
             hr = S_OK;
         }
-        ITypeInfo_ReleaseFuncDesc(typeInfo, funcDesc);
-        ITypeInfo_Release(typeInfo);
         return hr;
     }
 
-    ITypeInfo_ReleaseFuncDesc(typeInfo, funcDesc);
-    ITypeInfo_Release(typeInfo);
     return DISP_E_MEMBERNOTFOUND;
+}
+
+int32_t volvox_grid_get_dispid_default_native(int64_t id, int32_t dispid, void *variant_out) {
+    VolvoxGridObject *obj = vfg_find_object_by_grid_id(id);
+    DISPPARAMS empty;
+    if (!obj || !variant_out) return E_POINTER;
+    memset(&empty, 0, sizeof(empty));
+    return vfg_try_public_dispatch_fallback(
+        obj,
+        (DISPID)dispid,
+        DISPATCH_PROPERTYGET,
+        &empty,
+        (VARIANT *)variant_out);
+}
+
+static int vfg_fire_owner_draw_cell_hdc(
+    VolvoxGridObject *obj, HDC hdc, int32_t row, int32_t col, const RECT *cell_rect)
+{
+    VARIANT_BOOL done = VARIANT_FALSE;
+    VARIANT args[8];
+    int saved_dc;
+    if (!obj || !hdc || !cell_rect) return 0;
+    saved_dc = SaveDC(hdc);
+    if (!saved_dc) return 0;
+    IntersectClipRect(hdc, cell_rect->left, cell_rect->top, cell_rect->right, cell_rect->bottom);
+    if (obj->owner_draw_callback) {
+        int32_t done = obj->owner_draw_callback(
+            obj->owner_draw_callback_ctx,
+            obj->grid_id,
+            hdc,
+            row,
+            col,
+            cell_rect->left,
+            cell_rect->top,
+            cell_rect->right,
+            cell_rect->bottom);
+        if (done != 0) {
+            RestoreDC(hdc, saved_dc);
+            return 1;
+        }
+    }
+    VariantInit(&args[7]); args[7].vt = VT_I4; args[7].lVal = (LONG)(LONG_PTR)hdc;
+    VariantInit(&args[6]); args[6].vt = VT_I4; args[6].lVal = row;
+    VariantInit(&args[5]); args[5].vt = VT_I4; args[5].lVal = col;
+    VariantInit(&args[4]); args[4].vt = VT_I4; args[4].lVal = cell_rect->left;
+    VariantInit(&args[3]); args[3].vt = VT_I4; args[3].lVal = cell_rect->top;
+    VariantInit(&args[2]); args[2].vt = VT_I4; args[2].lVal = cell_rect->right;
+    VariantInit(&args[1]); args[1].vt = VT_I4; args[1].lVal = cell_rect->bottom;
+    VariantInit(&args[0]); args[0].vt = VT_BYREF | VT_BOOL; args[0].pboolVal = &done;
+    vfg_fire_event(obj, DISPID_VFG_EVT_DRAWCELL, args, 8);
+    RestoreDC(hdc, saved_dc);
+    return done != VARIANT_FALSE;
+}
+
+static void vfg_owner_draw_add_done_rect(HRGN done_rgn, const RECT *cell) {
+    HRGN cell_rgn;
+    if (!done_rgn || !cell) return;
+    cell_rgn = CreateRectRgn(cell->left, cell->top, cell->right, cell->bottom);
+    if (!cell_rgn) return;
+    CombineRgn(done_rgn, done_rgn, cell_rgn, RGN_OR);
+    DeleteObject(cell_rgn);
+}
+
+static int vfg_fire_owner_draw_row_hdc(
+    VolvoxGridObject *obj,
+    HDC hdc,
+    const RECT *bounds,
+    HRGN done_rgn,
+    int32_t row,
+    int top,
+    int bottom)
+{
+    int32_t cols;
+    int32_t fixed_cols;
+    int32_t left_col;
+    int x;
+    int emitted = 0;
+    int done_count = 0;
+    if (!obj || !hdc || !bounds || top >= bounds->bottom || bottom <= bounds->top) return 0;
+    cols = volvox_grid_get_cols(obj->grid_id);
+    fixed_cols = obj->fixed_cols_cached;
+    if (fixed_cols < 0) fixed_cols = 0;
+    if (fixed_cols > cols) fixed_cols = cols;
+    left_col = vfg_get_left_col_cached(obj->grid_id);
+    if (left_col < fixed_cols) left_col = fixed_cols;
+    if (left_col < 0) left_col = 0;
+
+    x = bounds->left;
+    for (int32_t col = 0; col < fixed_cols && col < cols && x < bounds->right; ++col) {
+        int cw = volvox_grid_get_col_width(obj->grid_id, col);
+        RECT cell;
+        if (cw <= 0) cw = 1;
+        SetRect(&cell, x, top, x + cw, bottom);
+        if (cell.right > bounds->left && cell.left < bounds->right) {
+            if (vfg_fire_owner_draw_cell_hdc(obj, hdc, row, col, &cell)) {
+                vfg_owner_draw_add_done_rect(done_rgn, &cell);
+                done_count++;
+            }
+        }
+        x += cw;
+        emitted++;
+        if (emitted > 256) return done_count;
+    }
+
+    for (int32_t col = left_col; col < cols && x < bounds->right; ++col) {
+        int cw = volvox_grid_get_col_width(obj->grid_id, col);
+        RECT cell;
+        if (cw <= 0) cw = 1;
+        SetRect(&cell, x, top, x + cw, bottom);
+        if (cell.right > bounds->left && cell.left < bounds->right) {
+            if (vfg_fire_owner_draw_cell_hdc(obj, hdc, row, col, &cell)) {
+                vfg_owner_draw_add_done_rect(done_rgn, &cell);
+                done_count++;
+            }
+        }
+        x += cw;
+        emitted++;
+        if (emitted > 256) return done_count;
+    }
+    return done_count;
+}
+
+static HRGN vfg_fire_owner_draw_visible_hdc(VolvoxGridObject *obj, HDC hdc, const RECT *bounds) {
+    int32_t mode;
+    int32_t rows;
+    int32_t fixed_rows;
+    int32_t top_row;
+    int y;
+    int emitted = 0;
+    int done_count = 0;
+    HRGN done_rgn;
+    if (!obj || !hdc || !bounds || obj->sink_count == 0) return NULL;
+    mode = volvox_grid_get_owner_draw_compat(obj->grid_id);
+    if (mode == 0) return NULL;
+    done_rgn = CreateRectRgn(0, 0, 0, 0);
+    if (!done_rgn) return NULL;
+    rows = volvox_grid_get_rows(obj->grid_id);
+    fixed_rows = obj->fixed_rows_cached;
+    if (fixed_rows < 0) fixed_rows = 0;
+    if (fixed_rows > rows) fixed_rows = rows;
+    top_row = volvox_grid_get_top_row(obj->grid_id);
+    if (top_row < fixed_rows) top_row = fixed_rows;
+    if (top_row < 0) top_row = 0;
+
+    y = bounds->top;
+    for (int32_t row = 0; row < fixed_rows && row < rows && y < bounds->bottom; ++row) {
+        int rh = volvox_grid_get_row_height(obj->grid_id, row);
+        if (rh <= 0) rh = 1;
+        done_count += vfg_fire_owner_draw_row_hdc(obj, hdc, bounds, done_rgn, row, y, y + rh);
+        y += rh;
+        emitted++;
+        if (emitted > 512) break;
+    }
+
+    for (int32_t row = top_row; emitted <= 512 && row < rows && y < bounds->bottom; ++row) {
+        int rh = volvox_grid_get_row_height(obj->grid_id, row);
+        if (rh <= 0) rh = 1;
+        done_count += vfg_fire_owner_draw_row_hdc(obj, hdc, bounds, done_rgn, row, y, y + rh);
+        y += rh;
+        emitted++;
+    }
+    if (done_count <= 0) {
+        DeleteObject(done_rgn);
+        return NULL;
+    }
+    return done_rgn;
+}
+
+int32_t volvox_grid_set_owner_draw_callback_native(
+    int64_t id,
+    volvox_grid_owner_draw_callback_fn callback,
+    void *ctx)
+{
+    VolvoxGridObject *obj = vfg_find_object_by_grid_id(id);
+    if (!obj) return E_INVALIDARG;
+    obj->owner_draw_callback = callback;
+    obj->owner_draw_callback_ctx = ctx;
+    return S_OK;
+}
+
+int32_t volvox_grid_owner_draw_reply_native(int64_t id, int32_t done) {
+    VolvoxGridObject *obj = vfg_find_object_by_grid_id(id);
+    if (!obj) return E_INVALIDARG;
+    obj->owner_draw_reply_done = done != 0;
+    return S_OK;
+}
+
+int32_t volvox_grid_owner_draw_measure_callback_native(
+    int64_t id,
+    volvox_grid_owner_draw_measure_fn callback,
+    void *ctx)
+{
+    VolvoxGridObject *obj = vfg_find_object_by_grid_id(id);
+    if (!obj) return E_INVALIDARG;
+    obj->owner_draw_measure_callback = callback;
+    obj->owner_draw_measure_ctx = ctx;
+    return S_OK;
 }
 
 static HRESULT vfg_draw_to_dc_sized(
@@ -4558,6 +5005,8 @@ static HRESULT vfg_draw_to_dc_sized(
     uint8_t *pixels;
     BITMAPINFO bmi;
     int32_t rc;
+    HRGN done_rgn = NULL;
+    int saved_clip_dc = 0;
     if (!obj || !hdcDraw || !bounds) return E_INVALIDARG;
     w = (int)(bounds->right - bounds->left);
     h = (int)(bounds->bottom - bounds->top);
@@ -4581,6 +5030,24 @@ static HRESULT vfg_draw_to_dc_sized(
     bmi.bmiHeader.biPlanes = 1;
     bmi.bmiHeader.biBitCount = 32;
     bmi.bmiHeader.biCompression = BI_RGB;
+
+    if (volvox_grid_get_owner_draw_compat(obj->grid_id) != 0 && obj->sink_count > 0) {
+        FillRect(hdcDraw, bounds, (HBRUSH)GetStockObject(WHITE_BRUSH));
+        done_rgn = vfg_fire_owner_draw_visible_hdc(obj, hdcDraw, bounds);
+        if (done_rgn) {
+            HRGN full_rgn = CreateRectRgn(bounds->left, bounds->top, bounds->right, bounds->bottom);
+            HRGN blit_rgn = CreateRectRgn(0, 0, 0, 0);
+            if (full_rgn && blit_rgn &&
+                CombineRgn(blit_rgn, full_rgn, done_rgn, RGN_DIFF) != ERROR) {
+                saved_clip_dc = SaveDC(hdcDraw);
+                if (saved_clip_dc) SelectClipRgn(hdcDraw, blit_rgn);
+            }
+            if (full_rgn) DeleteObject(full_rgn);
+            if (blit_rgn) DeleteObject(blit_rgn);
+            DeleteObject(done_rgn);
+            done_rgn = NULL;
+        }
+    }
 
     if (render_w == w && render_h == h) {
         SetDIBitsToDevice(
@@ -4613,6 +5080,7 @@ static HRESULT vfg_draw_to_dc_sized(
             DIB_RGB_COLORS,
             SRCCOPY);
     }
+    if (saved_clip_dc) RestoreDC(hdcDraw, saved_clip_dc);
 
     HeapFree(GetProcessHeap(), 0, pixels);
     return S_OK;
@@ -4625,6 +5093,32 @@ static HRESULT vfg_draw_to_dc(VolvoxGridObject *obj, HDC hdcDraw, const RECT *bo
     w = (int)(bounds->right - bounds->left);
     h = (int)(bounds->bottom - bounds->top);
     return vfg_draw_to_dc_sized(obj, hdcDraw, bounds, w, h);
+}
+
+int32_t volvox_grid_get_extent_himetric_native(int64_t id, int32_t *cx, int32_t *cy) {
+    VolvoxGridObject *obj = vfg_find_object_by_grid_id(id);
+    if (!obj || !cx || !cy) return E_POINTER;
+    *cx = obj->extent_himetric.cx;
+    *cy = obj->extent_himetric.cy;
+    return S_OK;
+}
+
+int32_t volvox_grid_paint_to_hdc_native(
+    int64_t id,
+    void *hdc,
+    int32_t x,
+    int32_t y,
+    int32_t w,
+    int32_t h,
+    int32_t aspect)
+{
+    VolvoxGridObject *obj = vfg_find_object_by_grid_id(id);
+    RECT bounds;
+    if (!obj || !hdc) return E_POINTER;
+    if (aspect != DVASPECT_CONTENT) return DV_E_DVASPECT;
+    if (w <= 0 || h <= 0) return S_OK;
+    SetRect(&bounds, x, y, x + w, y + h);
+    return vfg_draw_to_dc_sized(obj, (HDC)hdc, &bounds, w, h);
 }
 
 static HRESULT vfg_print_grid(VolvoxGridObject *obj) {
@@ -4801,13 +5295,14 @@ static HRESULT vfg_pump_engine_events(VolvoxGridObject *obj) {
         VARIANT_BOOL cancel = VARIANT_FALSE;
 
         if (!obj || obj->grid_id < 0) return E_FAIL;
-        event_buf = volvox_grid_take_next_event_native(obj->grid_id, &event_len);
+        event_buf = volvox_grid_peek_next_event_native(obj->grid_id, &event_len);
         if (!event_buf || event_len <= 0) {
             if (event_buf) volvox_grid_free(event_buf, event_len);
             break;
         }
         if (!vfg_decode_grid_event(event_buf, event_len, &evt)) {
             volvox_grid_free(event_buf, event_len);
+            volvox_grid_ack_event_native(obj->grid_id, 0);
             continue;
         }
         volvox_grid_free(event_buf, event_len);
@@ -4905,6 +5400,17 @@ static HRESULT vfg_pump_engine_events(VolvoxGridObject *obj) {
                 evt.key_code,
                 evt.modifier);
             break;
+        case 17:
+        case 18: {
+            VARIANT args[2];
+            DISPID dispid = evt.kind == 17
+                ? DISPID_VFG_EVT_SETUPEDITSTYLE
+                : DISPID_VFG_EVT_SETUPEDITWINDOW;
+            VariantInit(&args[1]); args[1].vt = VT_I4; args[1].lVal = evt.row;
+            VariantInit(&args[0]); args[0].vt = VT_I4; args[0].lVal = evt.col;
+            vfg_fire_event(obj, dispid, args, 2);
+            break;
+        }
         case 19: {
             VARIANT args[3];
             int32_t row = evt.row >= 0 ? evt.row : volvox_grid_get_row(obj->grid_id);
@@ -4970,6 +5476,27 @@ static HRESULT vfg_pump_engine_events(VolvoxGridObject *obj) {
             vfg_fire_event(obj, DISPID_VFG_EVT_AFTERCOLLAPSE, args, 2);
             break;
         }
+        case 65: {
+            short state = (short)(evt.col != 0);
+            VARIANT args[3];
+            VariantInit(&args[2]); args[2].vt = VT_I4; args[2].lVal = evt.row;
+            VariantInit(&args[1]); args[1].vt = VT_I2; args[1].iVal = state;
+            VariantInit(&args[0]); args[0].vt = VT_BYREF | VT_BOOL; args[0].pboolVal = &cancel;
+            vfg_fire_event(obj, DISPID_VFG_EVT_BEFORECOLLAPSE, args, 3);
+            if (evt.event_id > 0) {
+                volvox_grid_send_event_decision_native(
+                    obj->grid_id, evt.event_id, cancel != VARIANT_FALSE);
+            }
+            break;
+        }
+        case 66: {
+            short state = (short)(evt.col != 0);
+            VARIANT args[2];
+            VariantInit(&args[1]); args[1].vt = VT_I4; args[1].lVal = evt.row;
+            VariantInit(&args[0]); args[0].vt = VT_I2; args[0].iVal = state;
+            vfg_fire_event(obj, DISPID_VFG_EVT_AFTERCOLLAPSE, args, 2);
+            break;
+        }
         case 28:
             vfg_fire_before_scroll_event(
                 obj, evt.old_row, evt.old_col, evt.new_row, evt.new_col, &cancel);
@@ -5028,6 +5555,19 @@ static HRESULT vfg_pump_engine_events(VolvoxGridObject *obj) {
             vfg_fire_event(obj, dispid, args, 2);
             break;
         }
+        case 38:
+            vfg_fire_before_mouse_down_event(
+                obj,
+                obj->last_pointer_button,
+                obj->last_pointer_modifier,
+                obj->last_pointer_x,
+                obj->last_pointer_y,
+                &cancel);
+            if (evt.event_id > 0) {
+                volvox_grid_send_event_decision_native(
+                    obj->grid_id, evt.event_id, cancel != VARIANT_FALSE);
+            }
+            break;
         case 39:
             vfg_fire_mouse_event(
                 obj, DISPID_VFG_EVT_MOUSEDOWN, evt.button, evt.modifier, evt.x, evt.y);
@@ -5084,6 +5624,23 @@ static HRESULT vfg_pump_engine_events(VolvoxGridObject *obj) {
         case 53:
             vfg_fire_simple_event(obj, DISPID_VFG_EVT_ENDAUTOSEARCH);
             break;
+        case 54:
+            vfg_fire_before_data_refresh_event(obj, &cancel);
+            if (evt.event_id > 0) {
+                volvox_grid_send_event_decision_native(
+                    obj->grid_id, evt.event_id, cancel != VARIANT_FALSE);
+            }
+            break;
+        case 55:
+            vfg_fire_simple_event(obj, DISPID_VFG_EVT_AFTERDATAREFRESH);
+            break;
+        case 56: {
+            VARIANT args[2];
+            VariantInit(&args[1]); args[1].vt = VT_I4; args[1].lVal = evt.row;
+            VariantInit(&args[0]); args[0].vt = VT_I4; args[0].lVal = evt.col;
+            vfg_fire_event(obj, DISPID_VFG_EVT_FILTERDATA, args, 2);
+            break;
+        }
         case 57: {
             VARIANT_BOOL show_msg = VARIANT_TRUE;
             VARIANT args[2];
@@ -5117,9 +5674,22 @@ static HRESULT vfg_pump_engine_events(VolvoxGridObject *obj) {
             vfg_fire_event(obj, DISPID_VFG_EVT_GETHEADERROW, args, 2);
             break;
         }
+        case 63: {
+            VARIANT args[2];
+            int32_t row = evt.row >= 0 ? evt.row : volvox_grid_get_row(obj->grid_id);
+            int32_t col = evt.col >= 0 ? evt.col : volvox_grid_get_col(obj->grid_id);
+            VariantInit(&args[1]); args[1].vt = VT_I4; args[1].lVal = row;
+            VariantInit(&args[0]); args[0].vt = VT_I4; args[0].lVal = col;
+            vfg_fire_event(obj, DISPID_VFG_EVT_COMBODROPDOWN, args, 2);
+            if (evt.event_id > 0) {
+                volvox_grid_send_event_decision_native(obj->grid_id, evt.event_id, 0);
+            }
+            break;
+        }
         default:
             break;
         }
+        volvox_grid_ack_event_native(obj->grid_id, evt.event_id);
     }
     return vfg_invalidate_control(obj);
 }
@@ -5127,12 +5697,11 @@ static HRESULT vfg_pump_engine_events(VolvoxGridObject *obj) {
 static HRESULT vfg_handle_pointer_down(
     VolvoxGridObject *obj, float x, float y, int32_t button, int32_t modifier, int32_t dbl_click)
 {
-    VARIANT_BOOL cancel = VARIANT_FALSE;
     if (!obj) return E_POINTER;
-    vfg_fire_before_mouse_down_event(obj, button, modifier, x, y, &cancel);
-    if (cancel != VARIANT_FALSE) {
-        return S_OK;
-    }
+    obj->last_pointer_button = button;
+    obj->last_pointer_modifier = modifier;
+    obj->last_pointer_x = x;
+    obj->last_pointer_y = y;
     if (volvox_grid_pointer_down_native(obj->grid_id, x, y, button, modifier, dbl_click) != 0) {
         return E_FAIL;
     }
@@ -5307,7 +5876,7 @@ static LRESULT CALLBACK vfg_control_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPAR
         }
         break;
     case WM_GETDLGCODE:
-        if (obj && obj->tab_behavior_cached == 1) {
+        if (obj && volvox_grid_get_tab_behavior_native(obj->grid_id) == 1) {
             return DLGC_WANTTAB | DLGC_WANTARROWS | DLGC_WANTCHARS;
         }
         break;
@@ -5382,6 +5951,12 @@ static LRESULT CALLBACK vfg_control_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPAR
         if (obj) {
             float delta_y = (float)(-(SHORT)HIWORD(wp)) / (float)WHEEL_DELTA;
             volvox_grid_scroll_native(obj->grid_id, 0.0f, delta_y);
+            vfg_pump_engine_events(obj);
+            return 0;
+        }
+        break;
+    case WM_TIMER:
+        if (obj && wp == VFG_EVENT_TIMER_ID) {
             vfg_pump_engine_events(obj);
             return 0;
         }
@@ -5516,6 +6091,20 @@ static HRESULT vfg_activate_in_place(
             return HRESULT_FROM_WIN32(GetLastError());
         }
     }
+    if (!obj->ole_initialized) {
+        HRESULT ole_hr = OleInitialize(NULL);
+        if (SUCCEEDED(ole_hr) || ole_hr == S_FALSE) {
+            obj->ole_initialized = 1;
+        }
+    }
+    if (obj->ole_initialized && !obj->drop_registered && obj->hwnd_ctrl) {
+        HRESULT drop_hr = RegisterDragDrop(
+            obj->hwnd_ctrl,
+            (IDropTarget *)&obj->lpVtblDropTarget);
+        if (SUCCEEDED(drop_hr) || drop_hr == DRAGDROP_E_ALREADYREGISTERED) {
+            obj->drop_registered = 1;
+        }
+    }
     vfg_resize_control_window(obj);
 
     if (obj->inplace_frame) {
@@ -5538,6 +6127,11 @@ static HRESULT vfg_activate_in_place(
     SetFocus(obj->hwnd_ctrl);
     obj->has_focus = 1;
     volvox_grid_set_event_decision_enabled_native(obj->grid_id, 1);
+    if (!obj->event_timer_active) {
+        if (SetTimer(obj->hwnd_ctrl, VFG_EVENT_TIMER_ID, VFG_EVENT_TIMER_MS, NULL)) {
+            obj->event_timer_active = 1;
+        }
+    }
     return vfg_notify_view_change(obj);
 }
 
@@ -5558,8 +6152,20 @@ static HRESULT vfg_deactivate_in_place(VolvoxGridObject *obj) {
         obj->inplace_frame = NULL;
     }
     if (obj->hwnd_ctrl) {
+        if (obj->event_timer_active) {
+            KillTimer(obj->hwnd_ctrl, VFG_EVENT_TIMER_ID);
+            obj->event_timer_active = 0;
+        }
+        if (obj->drop_registered) {
+            RevokeDragDrop(obj->hwnd_ctrl);
+            obj->drop_registered = 0;
+        }
         DestroyWindow(obj->hwnd_ctrl);
         obj->hwnd_ctrl = NULL;
+    }
+    if (obj->ole_initialized) {
+        OleUninitialize();
+        obj->ole_initialized = 0;
     }
     if (obj->in_place_active && obj->inplace_site) {
         IOleInPlaceSite_OnInPlaceDeactivate(obj->inplace_site);
@@ -5574,6 +6180,21 @@ static void vfg_set_bstr_copy(BSTR *target, BSTR value) {
     if (!target) return;
     if (value) {
         BSTR copy = SysAllocStringLen(value, SysStringLen(value));
+        if (!copy) return; /* OOM — keep old value */
+        if (*target) SysFreeString(*target);
+        *target = copy;
+    } else {
+        if (*target) {
+            SysFreeString(*target);
+            *target = NULL;
+        }
+    }
+}
+
+static void vfg_set_olestr_copy(BSTR *target, LPCOLESTR value) {
+    if (!target) return;
+    if (value) {
+        BSTR copy = SysAllocString(value);
         if (!copy) return; /* OOM — keep old value */
         if (*target) SysFreeString(*target);
         *target = copy;
@@ -5661,11 +6282,6 @@ static void vfg_set_cached_indexed_i32(int32_t **cache, int32_t *pLen, int32_t i
     (*cache)[index] = value;
 }
 
-static int32_t vfg_get_cached_indexed_i32(int32_t *cache, int32_t len, int32_t index, int32_t fallback) {
-    if (!cache || index < 0 || index >= len) return fallback;
-    return cache[index];
-}
-
 static VFGVariantSlot *vfg_find_variant_slot(
     VFGVariantSlot *head, DISPID dispid, int has_index, int32_t index)
 {
@@ -5687,6 +6303,70 @@ static void vfg_free_variant_slots(VFGVariantSlot *slot) {
         HeapFree(GetProcessHeap(), 0, slot);
         slot = next;
     }
+}
+
+static void vfg_clear_stored_data_formats(VolvoxGridObject *obj) {
+    VFGStoredDataFormat *slot;
+    if (!obj) return;
+    slot = obj->stored_data;
+    while (slot) {
+        VFGStoredDataFormat *next = slot->next;
+        if (slot->bytes) HeapFree(GetProcessHeap(), 0, slot->bytes);
+        HeapFree(GetProcessHeap(), 0, slot);
+        slot = next;
+    }
+    obj->stored_data = NULL;
+}
+
+static VFGStoredDataFormat *vfg_find_stored_data_format(
+    VolvoxGridObject *obj, CLIPFORMAT format)
+{
+    VFGStoredDataFormat *slot = obj ? obj->stored_data : NULL;
+    while (slot) {
+        if (slot->format == format) return slot;
+        slot = slot->next;
+    }
+    return NULL;
+}
+
+static HRESULT vfg_store_data_format(
+    VolvoxGridObject *obj, CLIPFORMAT format, const BYTE *bytes, SIZE_T len)
+{
+    VFGStoredDataFormat *slot;
+    BYTE *copy = NULL;
+    if (!obj || !format) return E_INVALIDARG;
+    if (len > 0) {
+        copy = (BYTE *)HeapAlloc(GetProcessHeap(), 0, len);
+        if (!copy) return E_OUTOFMEMORY;
+        if (bytes) memcpy(copy, bytes, len);
+        else memset(copy, 0, len);
+    }
+    slot = vfg_find_stored_data_format(obj, format);
+    if (!slot) {
+        slot = (VFGStoredDataFormat *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(*slot));
+        if (!slot) {
+            if (copy) HeapFree(GetProcessHeap(), 0, copy);
+            return E_OUTOFMEMORY;
+        }
+        slot->format = format;
+        slot->next = obj->stored_data;
+        obj->stored_data = slot;
+    }
+    if (slot->bytes) HeapFree(GetProcessHeap(), 0, slot->bytes);
+    slot->bytes = copy;
+    slot->len = len;
+    return S_OK;
+}
+
+int32_t volvox_grid_set_data_format_native(
+    int64_t id,
+    uint32_t cf,
+    const uint8_t *bytes,
+    int32_t len)
+{
+    VolvoxGridObject *obj = vfg_find_object_by_grid_id(id);
+    if (!obj || cf == 0 || len < 0) return E_INVALIDARG;
+    return vfg_store_data_format(obj, (CLIPFORMAT)cf, bytes, (SIZE_T)len);
 }
 
 static HRESULT vfg_set_variant_slot(
@@ -5962,6 +6642,193 @@ static HRESULT vfg_recordset_get_absolute_position(IDispatch *pRS, long *pPos) {
     return hr;
 }
 
+static HRESULT vfg_bound_put_cell_value(
+    VolvoxGridObject *obj,
+    int32_t row,
+    int32_t col,
+    BSTR text)
+{
+    VARIANT vFields, vField, vValue;
+    HRESULT hr;
+    long saved_pos = -1;
+    int32_t field_col;
+    int32_t pos;
+
+    if (!obj || !obj->recordset || row < VFG_BOUND_HEADER_ROWS) return S_FALSE;
+    field_col = col - vfg_bound_physical_col_offset(obj);
+    if (field_col < 0) return S_FALSE;
+    pos = row - VFG_BOUND_HEADER_ROWS + 1;
+    if (pos < 1) return S_FALSE;
+
+    (void)vfg_recordset_get_absolute_position(obj->recordset, &saved_pos);
+    hr = vfg_dispatch_put_i4(obj->recordset, L"AbsolutePosition", pos);
+    if (FAILED(hr)) return hr;
+
+    VariantInit(&vFields);
+    hr = vfg_dispatch_get(obj->recordset, L"Fields", &vFields);
+    if (FAILED(hr) || V_VT(&vFields) != VT_DISPATCH || !V_DISPATCH(&vFields)) {
+        VariantClear(&vFields);
+        if (saved_pos >= 1) {
+            (void)vfg_dispatch_put_i4(obj->recordset, L"AbsolutePosition", (int32_t)saved_pos);
+        }
+        return FAILED(hr) ? hr : E_FAIL;
+    }
+
+    VariantInit(&vField);
+    hr = vfg_dispatch_get_indexed(V_DISPATCH(&vFields), L"Item", field_col, &vField);
+    if (SUCCEEDED(hr) && V_VT(&vField) == VT_DISPATCH && V_DISPATCH(&vField)) {
+        VariantInit(&vValue);
+        V_VT(&vValue) = VT_BSTR;
+        V_BSTR(&vValue) = SysAllocStringLen(text ? text : L"", text ? SysStringLen(text) : 0);
+        hr = V_BSTR(&vValue) || !text || SysStringLen(text) == 0
+            ? vfg_dispatch_put(V_DISPATCH(&vField), L"Value", &vValue)
+            : E_OUTOFMEMORY;
+        VariantClear(&vValue);
+        if (SUCCEEDED(hr)) hr = vfg_dispatch_call(obj->recordset, L"Update");
+    }
+    VariantClear(&vField);
+    VariantClear(&vFields);
+    if (saved_pos >= 1) {
+        (void)vfg_dispatch_put_i4(obj->recordset, L"AbsolutePosition", (int32_t)saved_pos);
+    }
+    return hr;
+}
+
+static HRESULT vfg_bound_move_recordset_to_row(VolvoxGridObject *obj, int32_t row) {
+    int32_t pos;
+    if (!obj || !obj->recordset || row < VFG_BOUND_HEADER_ROWS) return S_FALSE;
+    pos = row - VFG_BOUND_HEADER_ROWS + 1;
+    if (pos < 1) return S_FALSE;
+    return vfg_dispatch_put_i4(obj->recordset, L"AbsolutePosition", pos);
+}
+
+static HRESULT vfg_bound_fetch_window(VolvoxGridObject *obj, int32_t start_row, int32_t row_count) {
+    VARIANT vFields, vEOF, vField, vValue;
+    HRESULT hr;
+    long fieldCount = 0;
+    long saved_pos = -1;
+    int32_t rows;
+    int32_t end_row;
+    int32_t dataColOffset;
+    int64_t gid;
+
+    if (!obj || !obj->recordset || !obj->bound_virtual_active) return S_OK;
+    if (row_count <= 0) return S_OK;
+    gid = obj->grid_id;
+    rows = volvox_grid_get_rows(gid);
+    if (rows <= VFG_BOUND_HEADER_ROWS) return S_OK;
+    if (start_row < VFG_BOUND_HEADER_ROWS) start_row = VFG_BOUND_HEADER_ROWS;
+    if (start_row >= rows) start_row = rows - 1;
+    end_row = start_row + row_count;
+    if (end_row < start_row) end_row = rows;
+    if (end_row > rows) end_row = rows;
+    if (obj->bound_record_count >= 0) {
+        int32_t max_row = VFG_BOUND_HEADER_ROWS + obj->bound_record_count;
+        if (end_row > max_row) end_row = max_row;
+    }
+    if (end_row <= start_row) return S_OK;
+    if (obj->bound_window_start <= start_row && obj->bound_window_end >= end_row) {
+        return S_OK;
+    }
+
+    hr = vfg_recordset_get_field_count(obj->recordset, &fieldCount);
+    if (FAILED(hr)) return hr;
+    if (fieldCount <= 0) return S_OK;
+    dataColOffset = obj->bound_data_col_offset;
+    (void)vfg_recordset_get_absolute_position(obj->recordset, &saved_pos);
+
+    VariantInit(&vFields);
+    hr = vfg_dispatch_get(obj->recordset, L"Fields", &vFields);
+    if (FAILED(hr) || V_VT(&vFields) != VT_DISPATCH || !V_DISPATCH(&vFields)) {
+        VariantClear(&vFields);
+        return FAILED(hr) ? hr : E_FAIL;
+    }
+
+    volvox_grid_set_redraw(gid, 0);
+    for (int32_t row = start_row; row < end_row; ++row) {
+        int32_t pos = row - VFG_BOUND_HEADER_ROWS + 1;
+        hr = vfg_dispatch_put_i4(obj->recordset, L"AbsolutePosition", pos);
+        if (FAILED(hr)) break;
+
+        VariantInit(&vEOF);
+        hr = vfg_dispatch_get(obj->recordset, L"EOF", &vEOF);
+        if (FAILED(hr)) {
+            VariantClear(&vEOF);
+            break;
+        }
+        if (vfg_variant_is_true(&vEOF)) {
+            VariantClear(&vEOF);
+            break;
+        }
+        VariantClear(&vEOF);
+
+        for (int32_t clearCol = 0; clearCol < dataColOffset; ++clearCol) {
+            volvox_grid_set_text_matrix(gid, row, clearCol, (const uint8_t *)"", 0);
+        }
+        for (long col = 0; col < fieldCount; ++col) {
+            int32_t gridCol = dataColOffset + (int32_t)col;
+            int32_t dataType = vfg_get_cached_col_data_type(obj, gridCol);
+            VariantInit(&vField);
+            hr = vfg_dispatch_get_indexed(V_DISPATCH(&vFields), L"Item", col, &vField);
+            if (SUCCEEDED(hr) && V_VT(&vField) == VT_DISPATCH && V_DISPATCH(&vField)) {
+                BSTR cell = NULL;
+                VariantInit(&vValue);
+                hr = vfg_dispatch_get(V_DISPATCH(&vField), L"Value", &vValue);
+                if (SUCCEEDED(hr)) {
+                    if (dataType == 3) {
+                        int32_t checkedState = 0;
+                        if (V_VT(&vValue) != VT_EMPTY && V_VT(&vValue) != VT_NULL) {
+                            checkedState = vfg_variant_is_true(&vValue) ? 1 : 3;
+                        }
+                        volvox_grid_set_cell_checked(gid, row, gridCol, checkedState);
+                        volvox_grid_set_text_matrix(gid, row, gridCol, (const uint8_t *)"", 0);
+                    } else if (SUCCEEDED(vfg_variant_to_display_bstr(&vValue, &cell))) {
+                        volvox_grid_set_cell_checked(gid, row, gridCol, 0);
+                        vfg_set_text_matrix_bstr(gid, row, gridCol, cell);
+                    }
+                }
+                if (cell) SysFreeString(cell);
+                VariantClear(&vValue);
+            }
+            VariantClear(&vField);
+            if (FAILED(hr)) break;
+        }
+        if (FAILED(hr)) break;
+    }
+
+    if (saved_pos >= 1) {
+        (void)vfg_dispatch_put_i4(obj->recordset, L"AbsolutePosition", (int32_t)saved_pos);
+    } else {
+        (void)vfg_dispatch_put_i4(
+            obj->recordset,
+            L"AbsolutePosition",
+            start_row - VFG_BOUND_HEADER_ROWS + 1);
+    }
+    VariantClear(&vFields);
+    if (SUCCEEDED(hr)) {
+        obj->bound_window_start = start_row;
+        obj->bound_window_end = end_row;
+        volvox_grid_refresh(gid);
+    }
+    volvox_grid_set_redraw(gid, 1);
+    return hr;
+}
+
+static HRESULT vfg_bound_fetch_visible_window(VolvoxGridObject *obj) {
+    int32_t out_len = 0;
+    int32_t top;
+    int32_t bottom;
+    if (!obj || !obj->bound_virtual_active) return S_OK;
+    top = volvox_grid_get_top_row(obj->grid_id);
+    if (top < VFG_BOUND_HEADER_ROWS) top = VFG_BOUND_HEADER_ROWS;
+    bottom = vfg_take_i32_response(
+        volvox_grid_get_bottom_row(obj->grid_id, &out_len),
+        out_len,
+        top + 50);
+    if (bottom < top) bottom = top;
+    return vfg_bound_fetch_window(obj, top, bottom - top + 1);
+}
+
 static HRESULT vfg_recordset_get_current_key(IDispatch *pRS, BSTR *pText) {
     VARIANT vFields, vField, vValue;
     HRESULT hr;
@@ -6099,6 +6966,8 @@ static void vfg_bound_apply_visible_state(
         ignore = vfg_native_set_left_col(obj->grid_id, left_engine_col, &ignore_len);
         if (ignore) volvox_grid_free(ignore, ignore_len);
     }
+    obj->row_sel_cached = row_sel;
+    obj->col_sel_cached = prop_col_sel;
 }
 
 static HRESULT vfg_bound_sync_cursor(VolvoxGridObject *obj) {
@@ -6143,7 +7012,7 @@ static HRESULT vfg_bound_sync_cursor(VolvoxGridObject *obj) {
     if (rows <= 0 || target_row < 0) return S_OK;
 
     target_row = vfg_clamp_cached_index(target_row, rows, VFG_BOUND_HEADER_ROWS);
-    target_prop_col = obj->bound_col_width_uses_data_offset ? 0 : obj->bound_data_col_offset;
+    target_prop_col = vfg_get_col_cached(obj->grid_id);
     if (target_prop_col < 0) target_prop_col = 0;
 
     {
@@ -6157,6 +7026,8 @@ static HRESULT vfg_bound_sync_cursor(VolvoxGridObject *obj) {
         ignore = vfg_native_set_col_sel(obj->grid_id, target_prop_col, &ignore_len);
         if (ignore) volvox_grid_free(ignore, ignore_len);
     }
+    obj->row_sel_cached = target_row;
+    obj->col_sel_cached = target_prop_col;
     return S_OK;
 }
 
@@ -6396,6 +7267,51 @@ static HRESULT vfg_utf8_bytes_to_variant_bstr(VARIANT *pVarResult, uint8_t *utf8
         if (utf8) volvox_grid_free(utf8, out_len);
     }
     return V_BSTR(pVarResult) || (!utf8 || out_len == 0) ? S_OK : E_OUTOFMEMORY;
+}
+
+static HRESULT vfg_utf8_clip_to_variant_bstr(VARIANT *pVarResult, uint8_t *utf8, int32_t out_len) {
+    BSTR bstr;
+    if (!pVarResult) return E_POINTER;
+    V_VT(pVarResult) = VT_BSTR;
+    if (!utf8 || out_len <= 0) {
+        V_BSTR(pVarResult) = SysAllocString(L"");
+        if (utf8) volvox_grid_free(utf8, out_len);
+        return V_BSTR(pVarResult) ? S_OK : E_OUTOFMEMORY;
+    }
+    {
+        int wlen = MultiByteToWideChar(CP_UTF8, 0, (const char *)utf8, out_len, NULL, 0);
+        bstr = SysAllocStringLen(NULL, wlen);
+        if (!bstr) {
+            volvox_grid_free(utf8, out_len);
+            return E_OUTOFMEMORY;
+        }
+        MultiByteToWideChar(CP_UTF8, 0, (const char *)utf8, out_len, bstr, wlen);
+        for (int i = 0; i < wlen; ++i) {
+            if (bstr[i] == L'\n') bstr[i] = L'\r';
+        }
+    }
+    volvox_grid_free(utf8, out_len);
+    V_BSTR(pVarResult) = bstr;
+    return S_OK;
+}
+
+static int32_t vfg_first_number_in_utf8(const uint8_t *utf8, int32_t len) {
+    int32_t i = 0;
+    while (i < len) {
+        while (i < len && (utf8[i] < '0' || utf8[i] > '9')) i++;
+        if (i >= len) return 0;
+        if (i > 0 && utf8[i - 1] == '-') {
+            while (i < len && utf8[i] >= '0' && utf8[i] <= '9') i++;
+            continue;
+        }
+        int32_t value = 0;
+        while (i < len && utf8[i] >= '0' && utf8[i] <= '9') {
+            value = value * 10 + (int32_t)(utf8[i] - '0');
+            i++;
+        }
+        return value;
+    }
+    return 0;
 }
 
 static HRESULT vfg_set_utf8_payload_status(
@@ -6896,6 +7812,41 @@ static HRESULT vfg_set_cell_picture_alignment_range_compat(
     return vfg_take_status_response(resp) == 0 ? S_OK : E_FAIL;
 }
 
+static HRESULT vfg_set_cell_button_picture_range_compat(
+    int64_t gid,
+    int32_t row1,
+    int32_t col1,
+    int32_t row2,
+    int32_t col2,
+    const uint8_t *picture,
+    int32_t picture_len)
+{
+    int32_t out_len = 0;
+    uint8_t *resp = volvox_grid_set_cell_button_picture_range_native(
+        gid,
+        row1,
+        col1,
+        row2,
+        col2,
+        picture,
+        picture_len,
+        &out_len);
+    return vfg_take_status_response(resp) == 0 ? S_OK : E_FAIL;
+}
+
+static HRESULT vfg_set_native_picture_compat(
+    uint8_t *(*set_fn)(int64_t, const uint8_t*, int32_t, int32_t*),
+    int64_t gid,
+    const uint8_t *picture,
+    int32_t picture_len)
+{
+    int32_t out_len = 0;
+    uint8_t *resp;
+    if (!set_fn) return E_POINTER;
+    resp = set_fn(gid, picture, picture_len, &out_len);
+    return vfg_take_status_response(resp) == 0 ? S_OK : E_FAIL;
+}
+
 static BSTR *vfg_split_field_list(BSTR list, int32_t *pCount) {
     BSTR *items = NULL;
     int32_t count = 0;
@@ -7255,6 +8206,10 @@ static void vfg_clear_ado_binding(VolvoxGridObject *obj) {
     obj->bound_fixed_cols = 0;
     obj->bound_data_col_offset = 0;
     obj->bound_col_width_uses_data_offset = 0;
+    obj->bound_virtual_active = 0;
+    obj->bound_record_count = -1;
+    obj->bound_window_start = 0;
+    obj->bound_window_end = 0;
     obj->suppress_bound_cursor_sync = 0;
     obj->suppress_bound_text_writes = 0;
 }
@@ -7270,6 +8225,7 @@ static HRESULT vfg_populate_from_recordset(VolvoxGridObject *obj, IDispatch *pRS
     int32_t fixedRows = VFG_BOUND_HEADER_ROWS;
     int32_t totalCols = 0;
     int32_t priorCols = 0;
+    int32_t priorRows = 0;
     int32_t priorDataColOffset = 0;
     int32_t preserve_visible_state = 0;
     int32_t saved_row = 0;
@@ -7279,7 +8235,9 @@ static HRESULT vfg_populate_from_recordset(VolvoxGridObject *obj, IDispatch *pRS
     int32_t saved_top_row = 0;
     int32_t saved_left_col = 0;
     long saved_record_pos = -1;
+    int32_t use_virtual_bind = 0;
     int32_t *preservedWidths = NULL;
+    int32_t *preservedRowHeights = NULL;
     int64_t gid;
 
     if (!obj) return E_POINTER;
@@ -7294,6 +8252,10 @@ static HRESULT vfg_populate_from_recordset(VolvoxGridObject *obj, IDispatch *pRS
         obj->bound_fixed_cols = 0;
         obj->bound_data_col_offset = 0;
         obj->bound_col_width_uses_data_offset = 0;
+        obj->bound_virtual_active = 0;
+        obj->bound_record_count = -1;
+        obj->bound_window_start = 0;
+        obj->bound_window_end = 0;
         vfg_sync_selection_cache_from_cursor(obj);
         return S_OK;
     }
@@ -7324,8 +8286,13 @@ static HRESULT vfg_populate_from_recordset(VolvoxGridObject *obj, IDispatch *pRS
         (void)vfg_recordset_get_absolute_position(pRS, &saved_record_pos);
     }
 
+    priorRows = volvox_grid_get_rows(gid);
+    priorCols = volvox_grid_get_cols(gid);
+    if (priorRows > VFG_BOUND_HEADER_ROWS) {
+        preservedRowHeights = vfg_capture_row_heights(gid, priorRows);
+    }
+
     if (obj->has_bound_layout) {
-        priorCols = volvox_grid_get_cols(gid);
         priorDataColOffset = obj->bound_data_col_offset;
         preserve_visible_state = 1;
         saved_row = volvox_grid_get_row(gid);
@@ -7385,7 +8352,6 @@ static HRESULT vfg_populate_from_recordset(VolvoxGridObject *obj, IDispatch *pRS
         VariantClear(&vField);
     }
 
-    hr = vfg_dispatch_call(pRS, L"MoveFirst");
     VariantInit(&vCount);
     hr = vfg_dispatch_get(pRS, L"RecordCount", &vCount);
     if (SUCCEEDED(hr)) {
@@ -7394,11 +8360,36 @@ static HRESULT vfg_populate_from_recordset(VolvoxGridObject *obj, IDispatch *pRS
         else variant_to_i4(&vCount, (int32_t *)&recordCount);
     }
     VariantClear(&vCount);
+    use_virtual_bind = obj->virtual_data || obj->data_mode == 2 ||
+        recordCount > VFG_BOUND_VIRTUAL_RECORD_THRESHOLD;
     if (recordCount > 0) {
-        volvox_grid_set_rows(gid, (int32_t)recordCount + VFG_BOUND_HEADER_ROWS);
+        int32_t targetRows = recordCount > 2147483646L
+            ? 2147483647
+            : (int32_t)recordCount + VFG_BOUND_HEADER_ROWS;
+        volvox_grid_set_rows(gid, targetRows);
+    } else if (use_virtual_bind && recordCount < 0) {
+        volvox_grid_set_rows(gid, VFG_BOUND_HEADER_ROWS + 50);
     }
 
-    while (1) {
+    if (!use_virtual_bind) {
+        (void)vfg_dispatch_call(pRS, L"MoveFirst");
+    }
+
+    if (preservedRowHeights) {
+        int32_t currentRows = volvox_grid_get_rows(gid);
+        int32_t last = priorRows < currentRows ? priorRows : currentRows;
+        for (int32_t restoreRow = VFG_BOUND_HEADER_ROWS; restoreRow < last; ++restoreRow) {
+            int32_t ignore_len = 0;
+            uint8_t *ignore = vfg_native_set_row_height(
+                gid,
+                restoreRow,
+                preservedRowHeights[restoreRow],
+                &ignore_len);
+            if (ignore) volvox_grid_free(ignore, ignore_len);
+        }
+    }
+
+    while (!use_virtual_bind) {
         VariantInit(&vEOF);
         hr = vfg_dispatch_get(pRS, L"EOF", &vEOF);
         if (FAILED(hr) || vfg_variant_is_true(&vEOF)) {
@@ -7449,7 +8440,7 @@ static HRESULT vfg_populate_from_recordset(VolvoxGridObject *obj, IDispatch *pRS
         if (FAILED(vfg_dispatch_call(pRS, L"MoveNext"))) break;
     }
 
-    if (recordCount > 0 && row != recordCount + VFG_BOUND_HEADER_ROWS) {
+    if (!use_virtual_bind && recordCount > 0 && row != recordCount + VFG_BOUND_HEADER_ROWS) {
         volvox_grid_set_rows(gid, (int32_t)row);
     }
 
@@ -7466,7 +8457,8 @@ static HRESULT vfg_populate_from_recordset(VolvoxGridObject *obj, IDispatch *pRS
     }
     volvox_grid_set_fixed_rows(gid, fixedRows);
     volvox_grid_set_fixed_cols(gid, fixedCols);
-    if (((!preservedWidths) || vfg_engine_auto_resize_enabled(gid, obj->auto_resize)) &&
+    if (((!preservedWidths) ||
+         (obj->data_mode == 0 && vfg_engine_auto_resize_enabled(gid, obj->auto_resize))) &&
         totalCols > dataColOffset) {
         volvox_grid_auto_size(gid, dataColOffset, totalCols - 1, 0, 0);
         vfg_apply_bound_autosize_compat_widths(gid, dataColOffset, 0, totalCols - 1);
@@ -7476,9 +8468,17 @@ static HRESULT vfg_populate_from_recordset(VolvoxGridObject *obj, IDispatch *pRS
         HeapFree(GetProcessHeap(), 0, preservedWidths);
         preservedWidths = NULL;
     }
+    if (preservedRowHeights) {
+        HeapFree(GetProcessHeap(), 0, preservedRowHeights);
+        preservedRowHeights = NULL;
+    }
     obj->has_bound_layout = 1;
     obj->bound_fixed_cols = fixedCols;
     obj->bound_data_col_offset = dataColOffset;
+    obj->bound_virtual_active = use_virtual_bind ? 1 : 0;
+    obj->bound_record_count = recordCount > 0 ? (int32_t)recordCount : -1;
+    obj->bound_window_start = 0;
+    obj->bound_window_end = 0;
     obj->suppress_bound_cursor_sync = 0;
     if (dataColOffset <= 0 || !obj->has_bound_layout) {
         obj->bound_col_width_uses_data_offset = 0;
@@ -7492,7 +8492,15 @@ static HRESULT vfg_populate_from_recordset(VolvoxGridObject *obj, IDispatch *pRS
         saved_col_sel,
         saved_top_row,
         saved_left_col);
-    if (obj->data_mode != 0) {
+    if (use_virtual_bind) {
+        hr = vfg_bound_fetch_visible_window(obj);
+        if (FAILED(hr)) {
+            volvox_grid_set_redraw(gid, 1);
+            VariantClear(&vFields);
+            return hr;
+        }
+    }
+    if (obj->data_mode != 0 && !use_virtual_bind) {
         hr = vfg_bound_sync_cursor(obj);
         if (FAILED(hr)) {
             if (preservedWidths) {
@@ -7519,6 +8527,10 @@ static HRESULT vfg_rebind_ado_source(VolvoxGridObject *obj) {
         obj->bound_fixed_cols = 0;
         obj->bound_data_col_offset = 0;
         obj->bound_col_width_uses_data_offset = 0;
+        obj->bound_virtual_active = 0;
+        obj->bound_record_count = -1;
+        obj->bound_window_start = 0;
+        obj->bound_window_end = 0;
         obj->suppress_bound_cursor_sync = 0;
         obj->suppress_bound_text_writes = 0;
         vfg_sync_selection_cache_from_cursor(obj);
@@ -7529,7 +8541,52 @@ static HRESULT vfg_rebind_ado_source(VolvoxGridObject *obj) {
     if (FAILED(hr)) return hr;
     obj->recordset = resolved;
     hr = vfg_populate_from_recordset(obj, obj->recordset);
+    if (FAILED(hr)) {
+        vfg_release_dispatch(&obj->recordset);
+        obj->has_bound_layout = 0;
+        obj->bound_fixed_cols = 0;
+        obj->bound_data_col_offset = 0;
+        obj->bound_col_width_uses_data_offset = 0;
+        obj->bound_virtual_active = 0;
+        obj->bound_record_count = -1;
+        obj->bound_window_start = 0;
+        obj->bound_window_end = 0;
+        obj->suppress_bound_cursor_sync = 0;
+        obj->suppress_bound_text_writes = 0;
+        vfg_sync_selection_cache_from_cursor(obj);
+    }
     return hr;
+}
+
+int32_t volvox_grid_ado_attach_native(int64_t id, void *dispatch) {
+    VolvoxGridObject *obj = vfg_find_object_by_grid_id(id);
+    IDispatch *source = (IDispatch *)dispatch;
+    HRESULT hr;
+    if (!obj) return E_INVALIDARG;
+    if (source) {
+        hr = vfg_require_datasource_iface(source);
+        if (FAILED(hr)) return hr;
+        IDispatch_AddRef(source);
+    }
+    vfg_release_dispatch(&obj->data_source);
+    obj->data_source = source;
+    return vfg_rebind_ado_source(obj);
+}
+
+int32_t volvox_grid_ado_detach_native(int64_t id) {
+    return volvox_grid_ado_attach_native(id, NULL);
+}
+
+int32_t volvox_grid_ado_pump_row_native(int64_t id, int32_t row) {
+    VolvoxGridObject *obj = vfg_find_object_by_grid_id(id);
+    if (!obj) return E_INVALIDARG;
+    return vfg_bound_fetch_window(obj, row, 1);
+}
+
+int32_t volvox_grid_ado_fetch_window_native(int64_t id, int32_t start, int32_t count) {
+    VolvoxGridObject *obj = vfg_find_object_by_grid_id(id);
+    if (!obj) return E_INVALIDARG;
+    return vfg_bound_fetch_window(obj, start, count);
 }
 
 /* ActiveX ColDataType constants -> engine ColDataType enum. */
@@ -7756,6 +8813,13 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
     int64_t gid = obj->grid_id;
     HRESULT hr = S_OK;
 
+    if (obj && gid >= 0) {
+        vfg_pump_engine_events(obj);
+    }
+    if (obj && (wFlags & (DISPATCH_METHOD | DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF))) {
+        obj->dirty = 1;
+    }
+
     {
         HRESULT hr = vfg_sync_bound_state(obj, dispIdMember, wFlags);
         if (FAILED(hr)) return hr;
@@ -7840,11 +8904,8 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
             if (pDispParams->cArgs >= 1) variant_to_i4(ARG(0), &col);
             V_VT(pVarResult) = VT_BSTR;
             V_BSTR(pVarResult) = vfg_copy_cached_indexed_bstr(obj->col_key_cache, obj->col_key_cache_len, col);
-            if (V_BSTR(pVarResult) && SysStringLen(V_BSTR(pVarResult)) == 0) {
-                SysFreeString(V_BSTR(pVarResult));
-                V_BSTR(pVarResult) = NULL;
-            }
-            if (!V_BSTR(pVarResult) && obj->recordset) {
+            if (V_BSTR(pVarResult)) return S_OK;
+            if (obj->recordset) {
                 VARIANT vFields, vField, vName;
                 int32_t fieldCol = col - vfg_bound_physical_col_offset(obj);
                 VariantInit(&vFields);
@@ -7866,12 +8927,7 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
                 VariantClear(&vFields);
             }
             if (!V_BSTR(pVarResult)) {
-                int32_t out_len = 0;
-                uint8_t *utf8 = volvox_grid_get_text_matrix(gid, 0, col, &out_len);
-                V_BSTR(pVarResult) = utf8 && out_len > 0
-                    ? utf8_to_bstr((const char *)utf8, out_len)
-                    : SysAllocString(L"");
-                if (utf8) volvox_grid_free(utf8, out_len);
+                V_BSTR(pVarResult) = SysAllocString(L"");
             }
             return V_BSTR(pVarResult) ? S_OK : E_OUTOFMEMORY;
         }
@@ -7930,19 +8986,16 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
 
     case DISPID_VG_FORMATSTRING_COMPAT:
         if (wFlags & DISPATCH_PROPERTYGET) {
+            int32_t out_len = 0;
+            uint8_t *utf8 = volvox_grid_get_format_string_native(gid, &out_len);
             if (!pVarResult) return E_POINTER;
-            V_VT(pVarResult) = VT_BSTR;
-            V_BSTR(pVarResult) = obj->format_string_cached
-                ? SysAllocStringLen(obj->format_string_cached, SysStringLen(obj->format_string_cached))
-                : SysAllocString(L"");
-            return V_BSTR(pVarResult) || !obj->format_string_cached ? S_OK : E_OUTOFMEMORY;
+            return vfg_utf8_bytes_to_variant_bstr(pVarResult, utf8, out_len);
         }
         if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
             VARIANT vtmp;
             BSTR value = NULL;
             VariantInit(&vtmp);
             if (pDispParams->cArgs >= 1) value = variant_to_bstr(ARG(0), &vtmp);
-            vfg_set_bstr_copy(&obj->format_string_cached, value);
             hr = vfg_set_utf8_payload_status(volvox_grid_set_format_string, gid, value);
             VariantClear(&vtmp);
             return hr;
@@ -7968,21 +9021,73 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
 
     case DISPID_VG_EDITMAXLENGTH_COMPAT:
         if (wFlags & DISPATCH_PROPERTYGET) {
+            int32_t value;
             if (!pVarResult) return E_POINTER;
+            if (obj->edit_max_length_empty) {
+                V_VT(pVarResult) = VT_EMPTY;
+                return S_OK;
+            }
+            value = volvox_grid_get_edit_max_length(gid);
             V_VT(pVarResult) = VT_I4;
-            V_I4(pVarResult) = 0;
+            V_I4(pVarResult) = value >= 0 ? value : 0;
             return S_OK;
         }
         if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
-            return S_OK;
+            int32_t value = 0;
+            if (pDispParams->cArgs >= 1) {
+                VARIANT *arg = ARG(0);
+                VARTYPE vt = V_VT(arg);
+                if (vt == VT_I8 || vt == VT_UI8 ||
+                    vt == (VT_BYREF | VT_I8) || vt == (VT_BYREF | VT_UI8)) {
+                    obj->edit_max_length_empty = 1;
+                    return S_OK;
+                }
+                obj->edit_max_length_empty = 0;
+                variant_to_i4(arg, &value);
+            } else {
+                obj->edit_max_length_empty = 0;
+            }
+            return volvox_grid_set_edit_max_length(gid, value) == 0 ? S_OK : E_FAIL;
+        }
+        break;
+
+    case DISPID_VG_COMBOLIST_COMPAT:
+        if (wFlags & DISPATCH_PROPERTYGET) {
+            int32_t out_len = 0;
+            uint8_t *utf8 = volvox_grid_get_combo_list_native(gid, &out_len);
+            if (!pVarResult) return E_POINTER;
+            return vfg_utf8_bytes_to_variant_bstr(pVarResult, utf8, out_len);
+        }
+        if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
+            VARIANT vtmp;
+            BSTR value = NULL;
+            int utf8len = 0;
+            char *utf8 = NULL;
+            VariantInit(&vtmp);
+            if (pDispParams->cArgs >= 1) value = variant_to_bstr(ARG(0), &vtmp);
+            utf8 = bstr_to_utf8(value, &utf8len);
+            hr = volvox_grid_set_combo_list(
+                    gid,
+                    (const uint8_t *)(utf8 ? utf8 : ""),
+                    utf8 ? utf8len : 0) == 0
+                ? S_OK
+                : E_FAIL;
+            if (utf8) HeapFree(GetProcessHeap(), 0, utf8);
+            if (!obj->show_combo_button_explicit) {
+                volvox_grid_set_show_combo_button(gid, 0);
+            }
+            VariantClear(&vtmp);
+            return hr;
         }
         break;
 
     case DISPID_VG_COMBOCOUNT_COMPAT:
         if (wFlags & (DISPATCH_PROPERTYGET | DISPATCH_METHOD)) {
+            int32_t count;
             if (!pVarResult) return E_POINTER;
             V_VT(pVarResult) = VT_I4;
-            V_I4(pVarResult) = volvox_grid_get_combo_count_compat(gid);
+            count = volvox_grid_get_combo_count_compat(gid);
+            V_I4(pVarResult) = count > 0 ? count : -1;
             return S_OK;
         }
         break;
@@ -8054,6 +9159,32 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
         }
         break;
 
+    case DISPID_VG_HEIGHT_COMPAT:
+    case DISPID_VG_WIDTH_COMPAT:
+        if (wFlags & DISPATCH_PROPERTYGET) {
+            VARIANT *cached = dispIdMember == DISPID_VG_HEIGHT_COMPAT
+                ? &obj->height_cached
+                : &obj->width_cached;
+            if (!pVarResult) return E_POINTER;
+            if (V_VT(cached) != VT_EMPTY) {
+                return VariantCopy(pVarResult, cached);
+            }
+            V_VT(pVarResult) = VT_I4;
+            V_I4(pVarResult) = dispIdMember == DISPID_VG_HEIGHT_COMPAT
+                ? obj->pos_rect.bottom - obj->pos_rect.top
+                : obj->pos_rect.right - obj->pos_rect.left;
+            return S_OK;
+        }
+        if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
+            VARIANT *cached = dispIdMember == DISPID_VG_HEIGHT_COMPAT
+                ? &obj->height_cached
+                : &obj->width_cached;
+            VariantClear(cached);
+            if (!pDispParams || pDispParams->cArgs < 1) return DISP_E_PARAMNOTOPTIONAL;
+            return VariantCopy(cached, NAMED_ARG(0));
+        }
+        break;
+
     case DISPID_VG_SELECTEDROW_COMPAT:
         if (wFlags & DISPATCH_PROPERTYGET) {
             int32_t index = 0;
@@ -8071,7 +9202,7 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
         if (wFlags & DISPATCH_PROPERTYGET) {
             int32_t out_len = 0;
             uint8_t *utf8 = volvox_grid_get_clip(gid, &out_len);
-            return vfg_utf8_bytes_to_variant_bstr(pVarResult, utf8, out_len);
+            return vfg_utf8_clip_to_variant_bstr(pVarResult, utf8, out_len);
         }
         if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
             VARIANT vtmp;
@@ -8129,32 +9260,6 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
         }
         break;
 
-    case DISPID_VG_ID_COMPAT:
-        if (wFlags & DISPATCH_PROPERTYGET) {
-            UINT len = obj->id_cached ? SysStringLen(obj->id_cached) : 0;
-            if (!pVarResult) return E_POINTER;
-            VariantInit(pVarResult);
-            V_VT(pVarResult) = VT_BSTR;
-            V_BSTR(pVarResult) = SysAllocStringLen(obj->id_cached ? obj->id_cached : L"", len);
-            return V_BSTR(pVarResult) || len == 0 ? S_OK : E_OUTOFMEMORY;
-        }
-        if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
-            VARIANT vtmp;
-            BSTR value = NULL;
-            BSTR copy = NULL;
-            UINT len = 0;
-            VariantInit(&vtmp);
-            if (pDispParams->cArgs >= 1) value = variant_to_bstr(ARG(0), &vtmp);
-            len = value ? SysStringLen(value) : 0;
-            copy = SysAllocStringLen(value ? value : L"", len);
-            VariantClear(&vtmp);
-            if (!copy && len > 0) return E_OUTOFMEMORY;
-            if (obj->id_cached) SysFreeString(obj->id_cached);
-            obj->id_cached = copy;
-            return S_OK;
-        }
-        break;
-
     case DISPID_VG_MOUSEPOINTER_COMPAT:
         if (wFlags & DISPATCH_PROPERTYGET) {
             if (!pVarResult) return E_POINTER;
@@ -8173,17 +9278,15 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
     case DISPID_VG_APPEARANCE_COMPAT:
         if (wFlags & DISPATCH_PROPERTYGET) {
             if (!pVarResult) return E_POINTER;
-            obj->appearance_cached = volvox_grid_get_appearance_native(gid);
             VariantInit(pVarResult);
             V_VT(pVarResult) = VT_I4;
-            V_I4(pVarResult) = obj->appearance_cached;
+            V_I4(pVarResult) = volvox_grid_get_appearance_native(gid);
             return S_OK;
         }
         if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
             int32_t value = 0;
             if (pDispParams->cArgs >= 1) variant_to_i4(ARG(0), &value);
             if (volvox_grid_set_appearance_native(gid, value) != 0) return E_FAIL;
-            obj->appearance_cached = value;
             return S_OK;
         }
         break;
@@ -8191,11 +9294,10 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
     case DISPID_VG_SHEETBORDER_COMPAT:
         if (wFlags & DISPATCH_PROPERTYGET) {
             if (!pVarResult) return E_POINTER;
-            obj->sheet_border_cached =
-                (int32_t)argb_to_olecolor(volvox_grid_get_sheet_border_native(gid));
             VariantInit(pVarResult);
             V_VT(pVarResult) = VT_I4;
-            V_I4(pVarResult) = obj->sheet_border_cached;
+            V_I4(pVarResult) = (int32_t)argb_to_olecolor(
+                volvox_grid_get_sheet_border_native(gid));
             return S_OK;
         }
         if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
@@ -8205,7 +9307,6 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
             if (volvox_grid_set_sheet_border_native(gid, olecolor_to_argb(value)) != 0) {
                 return E_FAIL;
             }
-            obj->sheet_border_cached = (int32_t)value;
             return S_OK;
         }
         break;
@@ -8219,16 +9320,12 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
             if (!pVarResult) return E_POINTER;
             if (dispIdMember == DISPID_VG_FONTBOLD_COMPAT) {
                 enabled = volvox_grid_get_font_bold_native(gid);
-                obj->font_bold_cached = enabled;
             } else if (dispIdMember == DISPID_VG_FONTITALIC_COMPAT) {
                 enabled = volvox_grid_get_font_italic_native(gid);
-                obj->font_italic_cached = enabled;
             } else if (dispIdMember == DISPID_VG_FONTSTRIKETHRU_COMPAT) {
                 enabled = volvox_grid_get_font_strikethrough_native(gid);
-                obj->font_strikethru_cached = enabled;
             } else {
                 enabled = volvox_grid_get_font_underline_native(gid);
-                obj->font_underline_cached = enabled;
             }
             VariantInit(pVarResult);
             V_VT(pVarResult) = VT_BOOL;
@@ -8240,16 +9337,12 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
             int32_t rc = 0;
             if (dispIdMember == DISPID_VG_FONTBOLD_COMPAT) {
                 rc = volvox_grid_set_font_bold_native(gid, enabled);
-                obj->font_bold_cached = enabled;
             } else if (dispIdMember == DISPID_VG_FONTITALIC_COMPAT) {
                 rc = volvox_grid_set_font_italic_native(gid, enabled);
-                obj->font_italic_cached = enabled;
             } else if (dispIdMember == DISPID_VG_FONTSTRIKETHRU_COMPAT) {
                 rc = volvox_grid_set_font_strikethrough_native(gid, enabled);
-                obj->font_strikethru_cached = enabled;
             } else {
                 rc = volvox_grid_set_font_underline_native(gid, enabled);
-                obj->font_underline_cached = enabled;
             }
             return rc == 0 ? S_OK : E_FAIL;
         }
@@ -8258,17 +9351,15 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
     case DISPID_VG_FONTWIDTH_COMPAT:
         if (wFlags & DISPATCH_PROPERTYGET) {
             if (!pVarResult) return E_POINTER;
-            obj->font_width_cached = volvox_grid_get_font_width_native(gid);
             VariantInit(pVarResult);
             V_VT(pVarResult) = VT_I4;
-            V_I4(pVarResult) = obj->font_width_cached;
+            V_I4(pVarResult) = volvox_grid_get_font_width_native(gid);
             return S_OK;
         }
         if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
             int32_t value = 0;
             if (pDispParams->cArgs >= 1) variant_to_i4(ARG(0), &value);
             if (volvox_grid_set_font_width_native(gid, value) != 0) return E_FAIL;
-            obj->font_width_cached = value;
             return S_OK;
         }
         break;
@@ -8280,55 +9371,73 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
     case DISPID_VG_ROWHEIGHTMIN_COMPAT:
     case DISPID_VG_GRIDLINEWIDTH_COMPAT:
         {
-            int32_t *slot = NULL;
-            if (dispIdMember == DISPID_VG_ALLOWUSERFREEZING_COMPAT) slot = &obj->allow_user_freezing_cached;
-            else if (dispIdMember == DISPID_VG_EXPLORERBAR_COMPAT) slot = &obj->explorer_bar_cached;
-            else if (dispIdMember == DISPID_VG_TABBEHAVIOR_COMPAT) slot = &obj->tab_behavior_cached;
-            else if (dispIdMember == DISPID_VG_COLWIDTHMIN_COMPAT) slot = &obj->col_width_min_cached;
-            else if (dispIdMember == DISPID_VG_ROWHEIGHTMIN_COMPAT) slot = &obj->row_height_min_cached;
-            else if (dispIdMember == DISPID_VG_GRIDLINEWIDTH_COMPAT) slot = &obj->grid_line_width_cached;
+            int32_t current = 0;
+            if (dispIdMember == DISPID_VG_ALLOWUSERFREEZING_COMPAT) {
+                current = volvox_grid_get_allow_user_freezing_native(gid);
+            } else if (dispIdMember == DISPID_VG_EXPLORERBAR_COMPAT) {
+                current = volvox_grid_get_explorer_bar_native(gid);
+            } else if (dispIdMember == DISPID_VG_TABBEHAVIOR_COMPAT) {
+                current = volvox_grid_get_tab_behavior_native(gid);
+            } else if (dispIdMember == DISPID_VG_COLWIDTHMIN_COMPAT) {
+                current = obj ? obj->col_width_min_twips
+                              : vfg_px_to_twips_x(volvox_grid_get_col_width_min_default_native(gid));
+            } else if (dispIdMember == DISPID_VG_ROWHEIGHTMIN_COMPAT) {
+                current = obj ? obj->row_height_min_twips
+                              : vfg_px_to_twips_y(volvox_grid_get_row_height_min_native(gid));
+            } else if (dispIdMember == DISPID_VG_GRIDLINEWIDTH_COMPAT) {
+                current = volvox_grid_get_grid_line_width_native(gid);
+            }
             if (wFlags & DISPATCH_PROPERTYGET) {
                 if (!pVarResult) return E_POINTER;
-                if (dispIdMember == DISPID_VG_GRIDLINEWIDTH_COMPAT) {
-                    obj->grid_line_width_cached = volvox_grid_get_grid_line_width_native(gid);
-                }
                 VariantInit(pVarResult);
                 V_VT(pVarResult) = VT_I4;
-                V_I4(pVarResult) = slot ? *slot : 0;
+                V_I4(pVarResult) = current;
                 return S_OK;
             }
             if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
-                if (slot && pDispParams->cArgs >= 1) variant_to_i4(ARG(0), slot);
+                int32_t value = current;
+                if (pDispParams->cArgs >= 1) {
+                    hr = variant_to_i4(ARG(0), &value);
+                    if (FAILED(hr)) return hr;
+                }
                 if (dispIdMember == DISPID_VG_EXPLORERBAR_COMPAT) {
-                    return volvox_grid_set_explorer_bar_compat(gid, obj->explorer_bar_cached) == 0 ? S_OK : E_FAIL;
+                    if (volvox_grid_set_explorer_bar_native(gid, value) != 0) return E_FAIL;
+                    return S_OK;
                 }
                 if (dispIdMember == DISPID_VG_TABBEHAVIOR_COMPAT) {
-                    return volvox_grid_set_tab_behavior_compat(gid, obj->tab_behavior_cached) == 0 ? S_OK : E_FAIL;
+                    if (volvox_grid_set_tab_behavior_native(gid, value) != 0) return E_FAIL;
+                    return S_OK;
                 }
                 if (dispIdMember == DISPID_VG_ALLOWUSERFREEZING_COMPAT) {
-                    return volvox_grid_set_allow_user_freezing_native(
-                        gid, obj->allow_user_freezing_cached) == 0 ? S_OK : E_FAIL;
+                    if (volvox_grid_set_allow_user_freezing_native(
+                            gid, value) != 0) {
+                        return E_FAIL;
+                    }
+                    return S_OK;
                 }
                 if (dispIdMember == DISPID_VG_COLWIDTHMIN_COMPAT) {
-                    int32_t cols = volvox_grid_get_cols(gid);
-                    for (int32_t col = 0; col < cols; ++col) {
-                        if (volvox_grid_set_col_width_min_compat(
-                                gid,
-                                col,
-                                vfg_twips_to_px_x(obj->col_width_min_cached)) != 0) {
-                            return E_FAIL;
-                        }
+                    if (obj) obj->col_width_min_twips = value;
+                    if (volvox_grid_set_col_width_min_default_native(
+                            gid, vfg_twips_to_px_x(value)) != 0) {
+                        return E_FAIL;
                     }
+                    return S_OK;
                 }
                 if (dispIdMember == DISPID_VG_ROWHEIGHTMIN_COMPAT) {
-                    return volvox_grid_set_row_height_min_compat(
-                        gid,
-                        vfg_twips_to_px_y(obj->row_height_min_cached)) == 0 ? S_OK : E_FAIL;
+                    if (obj) obj->row_height_min_twips = value;
+                    if (volvox_grid_set_row_height_min_native(
+                            gid, vfg_twips_to_px_y(value)) != 0) {
+                        return E_FAIL;
+                    }
+                    return S_OK;
                 }
                 if (dispIdMember == DISPID_VG_GRIDLINEWIDTH_COMPAT) {
-                    return volvox_grid_set_grid_line_width_native(
-                        gid,
-                        obj->grid_line_width_cached) == 0 ? S_OK : E_FAIL;
+                    if (volvox_grid_set_grid_line_width_native(
+                            gid,
+                            value) != 0) {
+                        return E_FAIL;
+                    }
+                    return S_OK;
                 }
                 return S_OK;
             }
@@ -8354,136 +9463,106 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
 
     case DISPID_VG_CLIPSEPARATORS_COMPAT:
         if (wFlags & DISPATCH_PROPERTYGET) {
+            int32_t out_len = 0;
+            uint8_t *utf8 = volvox_grid_get_clip_separators_native(gid, &out_len);
             if (!pVarResult) return E_POINTER;
-            V_VT(pVarResult) = VT_BSTR;
-            V_BSTR(pVarResult) = obj->clip_separators_cached
-                ? SysAllocStringLen(obj->clip_separators_cached, SysStringLen(obj->clip_separators_cached))
-                : SysAllocString(L"\t\r");
-            return V_BSTR(pVarResult) ? S_OK : E_OUTOFMEMORY;
+            return vfg_utf8_bytes_to_variant_bstr(pVarResult, utf8, out_len);
         }
         if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
             VARIANT vtmp;
             BSTR value = NULL;
-            int32_t out_len = 0;
-            int utf8len = 0;
-            char *utf8 = NULL;
             VariantInit(&vtmp);
             if (pDispParams->cArgs >= 1) value = variant_to_bstr(ARG(0), &vtmp);
-            vfg_set_bstr_copy(&obj->clip_separators_cached, value);
-            utf8 = bstr_to_utf8(value, &utf8len);
-            hr = vfg_take_status_response(volvox_grid_set_clip_separators(
+            hr = vfg_set_utf8_payload_status(
+                volvox_grid_set_clip_separators_compat_native,
                 gid,
-                (const uint8_t *)(utf8 ? utf8 : ""),
-                utf8 ? utf8len : 0,
-                (const uint8_t *)(utf8 ? utf8 : ""),
-                utf8 ? utf8len : 0,
-                &out_len)) == 0 ? S_OK : E_FAIL;
-            if (utf8) HeapFree(GetProcessHeap(), 0, utf8);
+                value);
             VariantClear(&vtmp);
             return hr;
+        }
+        break;
+
+    case DISPID_VG_PICTURETYPE_COMPAT:
+        if (wFlags & DISPATCH_PROPERTYGET) {
+            int32_t value = volvox_grid_get_picture_type_compat(gid);
+            if (!pVarResult) return E_POINTER;
+            VariantInit(pVarResult);
+            V_VT(pVarResult) = VT_I4;
+            V_I4(pVarResult) = value;
+            return S_OK;
+        }
+        if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
+            int32_t value = 0;
+            if (pDispParams->cArgs >= 1) variant_to_i4(ARG(0), &value);
+            if (volvox_grid_set_picture_type_compat(gid, value) != 0) return E_FAIL;
+            return S_OK;
         }
         break;
 
     case DISPID_VG_SCROLLTIPS_COMPAT:
     case DISPID_VG_COMBOSEARCH_COMPAT:
     case DISPID_VG_OWNERDRAW_COMPAT:
-    case DISPID_VG_PICTURETYPE_COMPAT:
     case DISPID_VG_MERGECELLSFIXED_COMPAT:
     case DISPID_VG_GROUPCOMPARE_COMPAT:
         {
-            int32_t *slot = NULL;
+            int32_t current = 0;
             VARTYPE vt = VT_I4;
             if (dispIdMember == DISPID_VG_SCROLLTIPS_COMPAT) {
-                slot = &obj->scroll_tips_cached;
+                current = volvox_grid_get_scroll_tips_compat(gid);
                 vt = VT_BOOL;
             } else if (dispIdMember == DISPID_VG_COMBOSEARCH_COMPAT) {
-                slot = &obj->combo_search_cached;
+                current = volvox_grid_get_combo_search_compat(gid);
                 vt = VT_I4;
             } else if (dispIdMember == DISPID_VG_OWNERDRAW_COMPAT) {
-                slot = &obj->owner_draw_cached;
-            } else if (dispIdMember == DISPID_VG_PICTURETYPE_COMPAT) {
-                slot = &obj->picture_type_cached;
+                current = volvox_grid_get_owner_draw_compat(gid);
             } else if (dispIdMember == DISPID_VG_MERGECELLSFIXED_COMPAT) {
-                slot = &obj->merge_cells_fixed_cached;
+                current = volvox_grid_get_merge_cells_fixed_native(gid);
             } else if (dispIdMember == DISPID_VG_GROUPCOMPARE_COMPAT) {
-                slot = &obj->group_compare_cached;
+                current = volvox_grid_get_group_compare_compat(gid);
             }
             if (wFlags & DISPATCH_PROPERTYGET) {
                 if (!pVarResult) return E_POINTER;
                 VariantInit(pVarResult);
                 V_VT(pVarResult) = vt;
                 if (vt == VT_BOOL) {
-                    V_BOOL(pVarResult) = (slot && *slot) ? VARIANT_TRUE : VARIANT_FALSE;
+                    V_BOOL(pVarResult) = current ? VARIANT_TRUE : VARIANT_FALSE;
                 } else {
-                    V_I4(pVarResult) = slot ? *slot : 0;
+                    V_I4(pVarResult) = current;
                 }
                 return S_OK;
-            }
-            if ((wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) && slot) {
-                int32_t value = 0;
-                if (pDispParams->cArgs >= 1) variant_to_i4(ARG(0), &value);
-                *slot = value;
-                if (dispIdMember == DISPID_VG_SCROLLTIPS_COMPAT) {
-                    return volvox_grid_set_scroll_tips_native(gid, value) == 0 ? S_OK : E_FAIL;
-                }
-                return S_OK;
-            }
-        }
-        break;
-
-    case DISPID_VG_ACCESSIBLENAME_COMPAT:
-    case DISPID_VG_ACCESSIBLEDESCRIPTION_COMPAT:
-    case DISPID_VG_ACCESSIBLEVALUE_COMPAT:
-        {
-            BSTR *slot = NULL;
-            if (dispIdMember == DISPID_VG_ACCESSIBLENAME_COMPAT) slot = &obj->accessible_name_cached;
-            else if (dispIdMember == DISPID_VG_ACCESSIBLEDESCRIPTION_COMPAT) slot = &obj->accessible_description_cached;
-            else slot = &obj->accessible_value_cached;
-            if (wFlags & DISPATCH_PROPERTYGET) {
-                if (!pVarResult) return E_POINTER;
-                V_VT(pVarResult) = VT_BSTR;
-                V_BSTR(pVarResult) = *slot
-                    ? SysAllocStringLen(*slot, SysStringLen(*slot))
-                    : SysAllocString(L"");
-                return V_BSTR(pVarResult) ? S_OK : E_OUTOFMEMORY;
             }
             if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
-                VARIANT vtmp;
-                BSTR value = NULL;
-                VariantInit(&vtmp);
-                if (pDispParams->cArgs >= 1) value = variant_to_bstr(ARG(0), &vtmp);
-                vfg_set_bstr_copy(slot, value);
-                VariantClear(&vtmp);
+                int32_t value = 0;
+                if (pDispParams->cArgs >= 1) variant_to_i4(ARG(0), &value);
+                if (dispIdMember == DISPID_VG_SCROLLTIPS_COMPAT) {
+                    if (volvox_grid_set_scroll_tips_compat(gid, value) != 0) return E_FAIL;
+                }
+                if (dispIdMember == DISPID_VG_COMBOSEARCH_COMPAT) {
+                    if (volvox_grid_set_combo_search_compat(gid, value) != 0) return E_FAIL;
+                }
+                if (dispIdMember == DISPID_VG_OWNERDRAW_COMPAT) {
+                    if (volvox_grid_set_owner_draw_compat(gid, value) != 0) return E_FAIL;
+                }
+                if (dispIdMember == DISPID_VG_MERGECELLSFIXED_COMPAT) {
+                    if (volvox_grid_set_merge_cells_fixed_compat(gid, value) != 0) return E_FAIL;
+                }
+                if (dispIdMember == DISPID_VG_GROUPCOMPARE_COMPAT) {
+                    if (volvox_grid_set_group_compare_compat(gid, value) != 0) return E_FAIL;
+                }
                 return S_OK;
             }
-        }
-        break;
-
-    case DISPID_VG_ACCESSIBLEROLE_COMPAT:
-        if (wFlags & DISPATCH_PROPERTYGET) {
-            if (!pVarResult) return E_POINTER;
-            return VariantCopy(pVarResult, &obj->accessible_role_cached);
-        }
-        if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
-            VariantClear(&obj->accessible_role_cached);
-            if (pDispParams->cArgs >= 1) {
-                return VariantCopy(&obj->accessible_role_cached, ARG(0));
-            }
-            return S_OK;
         }
         break;
 
     case DISPID_VG_COLIMAGELIST_COMPAT:
-    case DISPID_VG_COLINDENT_COMPAT:
         if (wFlags & DISPATCH_PROPERTYGET) {
             int32_t col = 0;
+            int32_t value = 0;
             if (!pVarResult) return E_POINTER;
             if (pDispParams->cArgs >= 1) variant_to_i4(ARG(0), &col);
+            value = volvox_grid_get_col_image_list_native(gid, col);
             V_VT(pVarResult) = VT_I4;
-            V_I4(pVarResult) =
-                dispIdMember == DISPID_VG_COLIMAGELIST_COMPAT
-                    ? vfg_get_cached_indexed_i32(obj->col_image_list_cache, obj->col_image_list_cache_len, col, 0)
-                    : vfg_get_cached_indexed_i32(obj->col_indent_cache, obj->col_indent_cache_len, col, 0);
+            V_I4(pVarResult) = value;
             return S_OK;
         }
         if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
@@ -8493,11 +9572,32 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
                 variant_to_i4(ARG(0), &col);
                 variant_to_i4(ARG(1), &value);
             }
-            if (dispIdMember == DISPID_VG_COLIMAGELIST_COMPAT) {
-                vfg_set_cached_indexed_i32(&obj->col_image_list_cache, &obj->col_image_list_cache_len, col, value);
-            } else {
-                vfg_set_cached_indexed_i32(&obj->col_indent_cache, &obj->col_indent_cache_len, col, value);
+            if (volvox_grid_set_col_image_list_native(gid, col, value) != 0) return E_FAIL;
+            return S_OK;
+        }
+        break;
+
+    case DISPID_VG_COLINDENT_COMPAT:
+        if (wFlags & DISPATCH_PROPERTYGET) {
+            int32_t col = 0;
+            int32_t value = 0;
+            if (!pVarResult) return E_POINTER;
+            if (pDispParams->cArgs >= 1) variant_to_i4(ARG(0), &col);
+            value = volvox_grid_get_col_indent_native(gid, col);
+            vfg_set_cached_indexed_i32(&obj->col_indent_cache, &obj->col_indent_cache_len, col, value);
+            V_VT(pVarResult) = VT_I4;
+            V_I4(pVarResult) = value;
+            return S_OK;
+        }
+        if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
+            int32_t col = 0;
+            int32_t value = 0;
+            if (pDispParams->cArgs >= 2) {
+                variant_to_i4(ARG(0), &col);
+                variant_to_i4(ARG(1), &value);
             }
+            if (volvox_grid_set_col_indent_native(gid, col, value) != 0) return E_FAIL;
+            vfg_set_cached_indexed_i32(&obj->col_indent_cache, &obj->col_indent_cache_len, col, value);
             return S_OK;
         }
         break;
@@ -8528,6 +9628,35 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
                 return SUCCEEDED(vfg_pump_engine_events(obj)) ? S_OK : E_FAIL;
             }
             return S_OK;
+        }
+        break;
+
+    case DISPID_VG_TEXT:
+        if (wFlags & DISPATCH_PROPERTYGET) {
+            int32_t row = volvox_grid_get_row(gid);
+            int32_t col = volvox_grid_get_col(gid);
+            int32_t engine_row = vfg_row_engine_from_display_property(gid, row);
+            int32_t engine_col = vfg_col_engine_from_display_property(obj, col);
+            int32_t out_len = 0;
+            uint8_t *utf8;
+            if (!pVarResult) return E_POINTER;
+            utf8 = volvox_grid_get_text_matrix(gid, engine_row, engine_col, &out_len);
+            return vfg_utf8_bytes_to_variant_bstr(pVarResult, utf8, out_len);
+        }
+        if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
+            int32_t row = volvox_grid_get_row(gid);
+            int32_t col = volvox_grid_get_col(gid);
+            int32_t engine_row = vfg_row_engine_from_display_property(gid, row);
+            int32_t engine_col = vfg_col_engine_from_display_property(obj, col);
+            VARIANT vtmp;
+            BSTR value = NULL;
+            VariantInit(&vtmp);
+            if (pDispParams->cArgs >= 1) {
+                value = variant_to_bstr(ARG(0), &vtmp);
+            }
+            hr = vfg_set_text_matrix_bstr(gid, engine_row, engine_col, value);
+            VariantClear(&vtmp);
+            return hr;
         }
         break;
 
@@ -8575,24 +9704,42 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
     case DISPID_VG_FORECOLORFROZEN_COMPAT:
     case DISPID_VG_GRIDCOLORFIXED_COMPAT:
         {
-            uint32_t *slot = NULL;
-            if (dispIdMember == DISPID_VG_BACKCOLORBKG_COMPAT) slot = &obj->back_color_bkg_cached;
-            else if (dispIdMember == DISPID_VG_BACKCOLORFROZEN_COMPAT) slot = &obj->back_color_frozen_cached;
-            else if (dispIdMember == DISPID_VG_FLOODCOLOR_COMPAT) slot = &obj->flood_color_cached_global;
-            else if (dispIdMember == DISPID_VG_FORECOLORFROZEN_COMPAT) slot = &obj->fore_color_frozen_cached;
-            else if (dispIdMember == DISPID_VG_GRIDCOLORFIXED_COMPAT) slot = &obj->grid_color_fixed_cached;
+            uint32_t current = 0;
+            if (dispIdMember == DISPID_VG_BACKCOLORBKG_COMPAT) {
+                current = volvox_grid_get_back_color_bkg_native(gid);
+            } else if (dispIdMember == DISPID_VG_BACKCOLORFROZEN_COMPAT) {
+                current = volvox_grid_get_back_color_frozen_native(gid);
+            } else if (dispIdMember == DISPID_VG_FLOODCOLOR_COMPAT) {
+                current = volvox_grid_get_flood_color_native(gid);
+            } else if (dispIdMember == DISPID_VG_FORECOLORFROZEN_COMPAT) {
+                current = volvox_grid_get_fore_color_frozen_native(gid);
+            } else if (dispIdMember == DISPID_VG_GRIDCOLORFIXED_COMPAT) {
+                current = volvox_grid_get_grid_color_fixed(gid);
+            }
             if (wFlags & DISPATCH_PROPERTYGET) {
                 if (!pVarResult) return E_POINTER;
                 V_VT(pVarResult) = VT_I4;
-                V_I4(pVarResult) = (LONG)argb_to_olecolor(slot ? *slot : 0);
+                V_I4(pVarResult) = (LONG)argb_to_olecolor(current);
                 return S_OK;
             }
             if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
                 uint32_t value = 0;
-                if (pDispParams->cArgs >= 1) variant_to_u32(ARG(0), &value);
-                if (slot) *slot = olecolor_to_argb(value);
-                if (dispIdMember == DISPID_VG_GRIDCOLORFIXED_COMPAT) {
-                    volvox_grid_set_grid_color_fixed(gid, obj->grid_color_fixed_cached);
+                uint32_t engine_value = 0;
+                if (pDispParams->cArgs >= 1) {
+                    hr = variant_to_u32(ARG(0), &value);
+                    if (FAILED(hr)) return hr;
+                }
+                engine_value = olecolor_to_argb(value);
+                if (dispIdMember == DISPID_VG_BACKCOLORBKG_COMPAT) {
+                    if (volvox_grid_set_back_color_bkg_native(gid, engine_value) != 0) return E_FAIL;
+                } else if (dispIdMember == DISPID_VG_BACKCOLORFROZEN_COMPAT) {
+                    if (volvox_grid_set_back_color_frozen_native(gid, engine_value) != 0) return E_FAIL;
+                } else if (dispIdMember == DISPID_VG_FLOODCOLOR_COMPAT) {
+                    if (volvox_grid_set_flood_color_native(gid, engine_value) != 0) return E_FAIL;
+                } else if (dispIdMember == DISPID_VG_FORECOLORFROZEN_COMPAT) {
+                    if (volvox_grid_set_fore_color_frozen_native(gid, engine_value) != 0) return E_FAIL;
+                } else if (dispIdMember == DISPID_VG_GRIDCOLORFIXED_COMPAT) {
+                    if (volvox_grid_set_grid_color_fixed(gid, engine_value) != 0) return E_FAIL;
                 }
                 return S_OK;
             }
@@ -8620,23 +9767,82 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
         }
         break;
 
-    case DISPID_VG_VALUEMATRIX_COMPAT:
+    case DISPID_VG_TEXTARRAY:
         if (wFlags & DISPATCH_PROPERTYGET) {
+            int32_t index = 0;
             int32_t row = 0;
             int32_t col = 0;
+            int32_t cols = volvox_grid_get_cols(gid);
             int32_t out_len = 0;
             uint8_t *utf8;
             if (!pVarResult) return E_POINTER;
-            if (pDispParams->cArgs >= 2) {
-                variant_to_i4(ARG(0), &row);
-                variant_to_i4(ARG(1), &col);
+            if (pDispParams->cArgs >= 1) variant_to_i4(ARG(0), &index);
+            if (cols > 0) {
+                row = index / cols;
+                col = index % cols;
             }
             utf8 = volvox_grid_get_text_matrix(gid, row, col, &out_len);
             return vfg_utf8_bytes_to_variant_bstr(pVarResult, utf8, out_len);
         }
         if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
+            int32_t index = 0;
             int32_t row = 0;
             int32_t col = 0;
+            int32_t cols = volvox_grid_get_cols(gid);
+            VARIANT vtmp;
+            BSTR value = NULL;
+            VariantInit(&vtmp);
+            if (pDispParams->cArgs >= 2) {
+                variant_to_i4(ARG(0), &index);
+                value = variant_to_bstr(ARG(1), &vtmp);
+            }
+            if (cols > 0) {
+                row = index / cols;
+                col = index % cols;
+            }
+            hr = vfg_set_text_matrix_bstr(gid, row, col, value);
+            VariantClear(&vtmp);
+            return hr;
+        }
+        break;
+
+    case DISPID_VG_VALUEMATRIX_COMPAT:
+        if (wFlags & DISPATCH_PROPERTYGET) {
+            int32_t row = 0;
+            int32_t col = 0;
+            int32_t engine_row = 0;
+            int32_t engine_col = 0;
+            int32_t out_len = 0;
+            uint8_t *value_utf8;
+            if (!pVarResult) return E_POINTER;
+            if (pDispParams->cArgs >= 2) {
+                variant_to_i4(ARG(0), &row);
+                variant_to_i4(ARG(1), &col);
+            }
+            engine_row = vfg_row_engine_from_display_property(gid, row);
+            engine_col = vfg_col_engine_from_display_property(obj, col);
+            value_utf8 = volvox_grid_get_value_matrix_compat_text(gid, engine_row, engine_col, &out_len);
+            if (value_utf8 && out_len > 0) {
+                HRESULT ret = vfg_utf8_bytes_to_variant_bstr(pVarResult, value_utf8, out_len);
+                return ret;
+            }
+            if (value_utf8) volvox_grid_free(value_utf8, out_len);
+            {
+                int32_t text_len = 0;
+                uint8_t *text = volvox_grid_get_text_matrix(gid, engine_row, engine_col, &text_len);
+                V_VT(pVarResult) = VT_I4;
+                V_I4(pVarResult) = text && text_len > 0
+                    ? vfg_first_number_in_utf8(text, text_len)
+                    : 0;
+                if (text) volvox_grid_free(text, text_len);
+            }
+            return S_OK;
+        }
+        if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
+            int32_t row = 0;
+            int32_t col = 0;
+            int32_t engine_row = 0;
+            int32_t engine_col = 0;
             int32_t out_len = 0;
             VARIANT vtmp;
             BSTR value = NULL;
@@ -8649,11 +9855,13 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
                 variant_to_i4(ARG(1), &col);
                 value = variant_to_bstr(ARG(2), &vtmp);
             }
+            engine_row = vfg_row_engine_from_display_property(gid, row);
+            engine_col = vfg_col_engine_from_display_property(obj, col);
             utf8 = bstr_to_utf8(value, &utf8len);
             out = volvox_grid_set_value_matrix(
                 gid,
-                row,
-                col,
+                engine_row,
+                engine_col,
                 (const uint8_t *)(utf8 ? utf8 : ""),
                 utf8 ? utf8len : 0,
                 &out_len);
@@ -8700,8 +9908,8 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
         if (wFlags & DISPATCH_PROPERTYGET) {
             if (!pVarResult) return E_POINTER;
             VariantInit(pVarResult);
-            V_VT(pVarResult) = VT_DISPATCH;
-            V_DISPATCH(pVarResult) = obj->data_source;
+            V_VT(pVarResult) = VT_UNKNOWN;
+            V_UNKNOWN(pVarResult) = (IUnknown *)obj->data_source;
             if (obj->data_source) {
                 IDispatch_AddRef(obj->data_source);
             }
@@ -8730,18 +9938,55 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
                     return hr;
                 }
             }
-            vfg_release_dispatch(&obj->data_source);
-            obj->data_source = newSource;
             if (obj->data_mode != 0) {
                 VARIANT_BOOL cancel = VARIANT_FALSE;
                 vfg_fire_before_data_refresh_event(obj, &cancel);
-                if (cancel != VARIANT_FALSE) return S_OK;
+                if (cancel != VARIANT_FALSE) {
+                    vfg_release_dispatch(&obj->data_source);
+                    obj->data_source = newSource;
+                    return S_OK;
+                }
             }
-            hr = vfg_rebind_ado_source(obj);
+            hr = (HRESULT)volvox_grid_ado_attach_native(obj->grid_id, newSource);
+            if (newSource) IDispatch_Release(newSource);
             if (SUCCEEDED(hr) && obj->data_mode != 0) {
                 vfg_fire_simple_event(obj, DISPID_VFG_EVT_AFTERDATAREFRESH);
+            } else if (FAILED(hr) && obj->data_mode != 0) {
+                vfg_fire_ado_data_error_event(obj, hr);
             }
             return FAILED(hr) ? hr : S_OK;
+        }
+        break;
+
+    case DISPID_VG_OLEDRAGMODE_COMPAT:
+        if (wFlags & DISPATCH_PROPERTYGET) {
+            if (!pVarResult) return E_POINTER;
+            V_VT(pVarResult) = VT_I4;
+            V_I4(pVarResult) = obj->ole_drag_mode_cached;
+            return S_OK;
+        }
+        if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
+            int32_t mode = 0;
+            if (pDispParams->cArgs >= 1) variant_to_i4(NAMED_ARG(0), &mode);
+            if (mode < 0) mode = 0;
+            obj->ole_drag_mode_cached = mode;
+            return S_OK;
+        }
+        break;
+
+    case DISPID_VG_OLEDROPMODE_COMPAT:
+        if (wFlags & DISPATCH_PROPERTYGET) {
+            if (!pVarResult) return E_POINTER;
+            V_VT(pVarResult) = VT_I4;
+            V_I4(pVarResult) = obj->ole_drop_mode_cached;
+            return S_OK;
+        }
+        if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
+            int32_t mode = 0;
+            if (pDispParams->cArgs >= 1) variant_to_i4(NAMED_ARG(0), &mode);
+            if (mode < 0) mode = 0;
+            obj->ole_drop_mode_cached = mode;
+            return S_OK;
         }
         break;
 
@@ -8788,6 +10033,9 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
                 HRESULT hr = vfg_rebind_ado_source(obj);
                 if (SUCCEEDED(hr) && obj->data_mode != 0) {
                     vfg_fire_simple_event(obj, DISPID_VFG_EVT_AFTERDATAREFRESH);
+                }
+                if (FAILED(hr) && obj->data_mode != 0) {
+                    vfg_fire_ado_data_error_event(obj, hr);
                 }
                 if (FAILED(hr)) return hr;
             }
@@ -8846,6 +10094,9 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
             }
             if (obj->data_source) {
                 HRESULT hr = vfg_rebind_ado_source(obj);
+                if (FAILED(hr) && obj->data_mode != 0) {
+                    vfg_fire_ado_data_error_event(obj, hr);
+                }
                 if (FAILED(hr)) return hr;
             }
             return S_OK;
@@ -8863,8 +10114,31 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
             hr = obj->data_source ? vfg_rebind_ado_source(obj) : S_OK;
             if (SUCCEEDED(hr) && obj->data_source && obj->data_mode != 0) {
                 vfg_fire_simple_event(obj, DISPID_VFG_EVT_AFTERDATAREFRESH);
+            } else if (FAILED(hr) && obj->data_source && obj->data_mode != 0) {
+                vfg_fire_ado_data_error_event(obj, hr);
             }
             return FAILED(hr) ? hr : S_OK;
+        }
+        break;
+
+    case DISPID_VG_OLEDRAG_COMPAT:
+        if (wFlags & DISPATCH_METHOD) {
+            LONG allowed = DROPEFFECT_COPY | DROPEFFECT_MOVE;
+            int32_t effect = DROPEFFECT_NONE;
+            HRESULT ole_hr;
+            if (pDispParams->cArgs >= 1) {
+                int32_t requested = 0;
+                if (SUCCEEDED(variant_to_i4(ARG(0), &requested)) && requested != 0) {
+                    allowed = requested;
+                }
+            }
+            ole_hr = (HRESULT)volvox_grid_ole_begin_drag_native(gid, allowed, &effect);
+            if (FAILED(ole_hr)) return ole_hr;
+            if (pVarResult) {
+                V_VT(pVarResult) = VT_I4;
+                V_I4(pVarResult) = (LONG)effect;
+            }
+            return S_OK;
         }
         break;
 
@@ -9008,7 +10282,7 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
         if (wFlags & DISPATCH_PROPERTYGET) {
             if (!pVarResult) return E_POINTER;
             V_VT(pVarResult) = VT_I4;
-            V_I4(pVarResult) = volvox_grid_get_editable_cached(gid);
+            V_I4(pVarResult) = volvox_grid_get_editable_native(gid);
             return S_OK;
         }
         if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
@@ -9061,6 +10335,7 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
     case DISPID_VG_TEXTMATRIX:
         if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
             int32_t row = 0, col = 0;
+            int32_t engine_row = 0, engine_col = 0;
             BSTR text = NULL;
             VARIANT vtmp; VariantInit(&vtmp);
             if (pDispParams->cArgs >= 3) {
@@ -9068,22 +10343,35 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
                 variant_to_i4(&pDispParams->rgvarg[1], &col);
                 text = variant_to_bstr(&pDispParams->rgvarg[0], &vtmp);
             }
+            engine_row = vfg_row_engine_from_display_property(gid, row);
+            engine_col = vfg_col_engine_from_display_property(obj, col);
             if (text) {
                 if (vfg_should_preserve_blank_bound_header(obj, row, col, text)) {
                     VariantClear(&vtmp);
                     return S_OK;
                 }
                 if (obj->data_source &&
-                    (obj->editable_cached != 0 || obj->suppress_bound_text_writes) &&
+                    obj->suppress_bound_text_writes &&
                     row >= obj->fixed_rows_cached &&
                     col >= obj->bound_data_col_offset) {
                     VariantClear(&vtmp);
                     return S_OK;
                 }
+                if (obj->data_source &&
+                    obj->recordset &&
+                    obj->data_mode != 0 &&
+                    row >= obj->fixed_rows_cached &&
+                    col >= obj->bound_data_col_offset) {
+                    HRESULT hr_put = vfg_bound_put_cell_value(obj, row, col, text);
+                    if (FAILED(hr_put)) {
+                        VariantClear(&vtmp);
+                        return hr_put;
+                    }
+                }
                 int utf8len = 0;
                 char *utf8 = bstr_to_utf8(text, &utf8len);
                 if (utf8) {
-                    volvox_grid_set_text_matrix(gid, row, col,
+                    volvox_grid_set_text_matrix(gid, engine_row, engine_col,
                         (const uint8_t *)utf8, utf8len);
                     HeapFree(GetProcessHeap(), 0, utf8);
                 }
@@ -9094,12 +10382,24 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
         if (wFlags & DISPATCH_PROPERTYGET) {
             if (!pVarResult) return E_POINTER;
             int32_t row = 0, col = 0;
+            int32_t engine_row = 0, engine_col = 0;
             if (pDispParams->cArgs >= 2) {
                 variant_to_i4(&pDispParams->rgvarg[1], &row);
                 variant_to_i4(&pDispParams->rgvarg[0], &col);
             }
+            engine_row = vfg_row_engine_from_display_property(gid, row);
+            engine_col = vfg_col_engine_from_display_property(obj, col);
+            if (obj->bound_virtual_active &&
+                row >= VFG_BOUND_HEADER_ROWS &&
+                (row < obj->bound_window_start || row >= obj->bound_window_end)) {
+                hr = vfg_bound_fetch_window(obj, row, 1);
+                if (FAILED(hr)) {
+                    vfg_fire_ado_data_error_event(obj, hr);
+                    return hr;
+                }
+            }
             int32_t out_len = 0;
-            uint8_t *utf8 = volvox_grid_get_text_matrix(gid, row, col, &out_len);
+            uint8_t *utf8 = volvox_grid_get_text_matrix(gid, engine_row, engine_col, &out_len);
             if (utf8 && out_len > 0) {
                 int wlen = MultiByteToWideChar(CP_UTF8, 0, (char*)utf8, out_len, NULL, 0);
                 BSTR bstr = SysAllocStringLen(NULL, wlen);
@@ -9110,8 +10410,8 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
                 }
                 volvox_grid_free(utf8, out_len);
             } else {
-                int32_t checked = volvox_grid_get_cell_checked(gid, row, col);
-                int32_t data_type = vfg_get_cached_col_data_type(obj, col);
+                int32_t checked = volvox_grid_get_cell_checked(gid, engine_row, engine_col);
+                int32_t data_type = vfg_get_cached_col_data_type(obj, engine_col);
                 V_VT(pVarResult) = VT_BSTR;
                 if (data_type == 3 && checked == 1) V_BSTR(pVarResult) = SysAllocString(L"-1");
                 else if (data_type == 3 && checked == 3) V_BSTR(pVarResult) = SysAllocString(L"0");
@@ -9131,6 +10431,7 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
             if (!pVarResult) return E_POINTER;
             int32_t idx = 0;
             if (pDispParams->cArgs >= 1) variant_to_i4(&pDispParams->rgvarg[0], &idx);
+            idx = vfg_row_engine_from_display_property(gid, idx);
             int32_t px = volvox_grid_get_row_height(gid, idx);
             V_VT(pVarResult) = VT_I4;
             V_I4(pVarResult) = vfg_px_to_twips_y(px);
@@ -9142,6 +10443,7 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
                 variant_to_i4(&pDispParams->rgvarg[1], &idx);
                 variant_to_i4(&pDispParams->rgvarg[0], &val);
             }
+            idx = vfg_row_engine_from_display_property(gid, idx);
             int32_t px = vfg_twips_to_px_y(val);
             volvox_grid_set_row_height(gid, idx, px);
             return S_OK;
@@ -9153,6 +10455,7 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
             if (!pVarResult) return E_POINTER;
             int32_t idx = 0;
             if (pDispParams->cArgs >= 1) variant_to_i4(&pDispParams->rgvarg[0], &idx);
+            idx = vfg_col_engine_from_display_property(obj, idx);
             int32_t px = volvox_grid_get_col_width(gid, idx);
             V_VT(pVarResult) = VT_I4;
             V_I4(pVarResult) = vfg_px_to_twips_x(px);
@@ -9170,6 +10473,7 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
                 variant_to_i4(&pDispParams->rgvarg[1], &idx);
                 variant_to_i4(&pDispParams->rgvarg[0], &val);
             }
+            idx = vfg_col_engine_from_display_property(obj, idx);
             int32_t px = vfg_twips_to_px_x(val);
             volvox_grid_set_col_width(gid, idx, px);
             return S_OK;
@@ -9233,7 +10537,18 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
             VARIANT v; VariantInit(&v);
             VariantChangeType(&v, &pDispParams->rgvarg[0], 0, VT_R4);
             float pt = v.fltVal;
-            volvox_grid_set_font_size(gid, pt * (float)vfg_get_screen_dpi_y() / 72.0f);
+            float px = pt * (float)vfg_get_screen_dpi_y() / 72.0f;
+            if (px > 0.0f) px = (float)((int)(px + 0.5f));
+            volvox_grid_set_font_size(gid, px);
+            if (px > 0.0f) {
+                int32_t out_len = 0;
+                int32_t row_height = vfg_compat_default_row_height_px(px);
+                uint8_t *out = volvox_grid_set_default_row_height_native(
+                    gid,
+                    row_height,
+                    &out_len);
+                vfg_take_status_response(out);
+            }
             return S_OK;
         }
         return DISP_E_MEMBERNOTFOUND;
@@ -9398,6 +10713,285 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
         }
         break;
 
+    case 45: /* CellBackColor */
+        if (wFlags & DISPATCH_PROPERTYGET) {
+            int32_t row = volvox_grid_get_row(gid);
+            int32_t col = volvox_grid_get_col(gid);
+            if (!pVarResult) return E_POINTER;
+            V_VT(pVarResult) = VT_I4;
+            V_I4(pVarResult) = (int32_t)argb_to_olecolor(
+                volvox_grid_get_cell_back_color(gid, row, col));
+            return S_OK;
+        }
+        if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
+            int32_t row = volvox_grid_get_row(gid);
+            int32_t col = volvox_grid_get_col(gid);
+            uint32_t color = 0;
+            variant_to_u32(NAMED_ARG(0), &color);
+            return volvox_grid_set_cell_back_color_range(
+                gid, row, col, row, col, olecolor_to_argb(color)) == 0 ? S_OK : E_FAIL;
+        }
+        break;
+
+    case 46: /* CellForeColor */
+        if (wFlags & DISPATCH_PROPERTYGET) {
+            int32_t row = volvox_grid_get_row(gid);
+            int32_t col = volvox_grid_get_col(gid);
+            if (!pVarResult) return E_POINTER;
+            V_VT(pVarResult) = VT_I4;
+            V_I4(pVarResult) = (int32_t)argb_to_olecolor(
+                volvox_grid_get_cell_fore_color_native(gid, row, col));
+            return S_OK;
+        }
+        if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
+            int32_t row = volvox_grid_get_row(gid);
+            int32_t col = volvox_grid_get_col(gid);
+            uint32_t color = 0;
+            int32_t out_len = 0;
+            uint8_t *resp;
+            variant_to_u32(NAMED_ARG(0), &color);
+            resp = volvox_grid_set_cell_fore_color_range_native(
+                gid, row, col, row, col, olecolor_to_argb(color), &out_len);
+            return vfg_take_status_response(resp) == 0 ? S_OK : E_FAIL;
+        }
+        break;
+
+    case 47: /* CellAlignment */
+        if (wFlags & DISPATCH_PROPERTYGET) {
+            int32_t row = volvox_grid_get_row(gid);
+            int32_t col = volvox_grid_get_col(gid);
+            if (!pVarResult) return E_POINTER;
+            V_VT(pVarResult) = VT_I4;
+            V_I4(pVarResult) = volvox_grid_get_cell_alignment_native(gid, row, col);
+            return S_OK;
+        }
+        if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
+            int32_t row = volvox_grid_get_row(gid);
+            int32_t col = volvox_grid_get_col(gid);
+            int32_t alignment = 0;
+            int32_t out_len = 0;
+            uint8_t *resp;
+            variant_to_i4(NAMED_ARG(0), &alignment);
+            resp = volvox_grid_set_cell_alignment_range_native(
+                gid, row, col, row, col, alignment, &out_len);
+            return vfg_take_status_response(resp) == 0 ? S_OK : E_FAIL;
+        }
+        break;
+
+    case DISPID_VG_CELLPICTURE_COMPAT:
+        if (wFlags & DISPATCH_PROPERTYGET) {
+            int32_t row = volvox_grid_get_row(gid);
+            int32_t col = volvox_grid_get_col(gid);
+            int32_t picture_len = 0;
+            uint8_t *picture;
+            HRESULT hrPic;
+            if (!pVarResult) return E_POINTER;
+            picture = volvox_grid_get_cell_picture_native(gid, row, col, &picture_len);
+            hrPic = vfg_variant_from_ui1_bytes(pVarResult, picture, picture_len);
+            if (picture) volvox_grid_free(picture, picture_len);
+            return hrPic;
+        }
+        if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
+            int32_t row = volvox_grid_get_row(gid);
+            int32_t col = volvox_grid_get_col(gid);
+            uint8_t *picture = NULL;
+            int32_t picture_len = 0;
+            HRESULT hrPic = vfg_variant_to_png_picture_bytes(NAMED_ARG(0), &picture, &picture_len);
+            if (FAILED(hrPic)) return hrPic;
+            hr = vfg_set_cell_picture_range_compat(gid, row, col, row, col, picture, picture_len);
+            if (picture) HeapFree(GetProcessHeap(), 0, picture);
+            return hr;
+        }
+        break;
+
+    case DISPID_VG_CELLPICTUREALIGNMENT_COMPAT:
+        if (wFlags & DISPATCH_PROPERTYGET) {
+            int32_t row = volvox_grid_get_row(gid);
+            int32_t col = volvox_grid_get_col(gid);
+            if (!pVarResult) return E_POINTER;
+            V_VT(pVarResult) = VT_I4;
+            V_I4(pVarResult) = volvox_grid_get_cell_picture_alignment_native(gid, row, col);
+            return S_OK;
+        }
+        if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
+            int32_t row = volvox_grid_get_row(gid);
+            int32_t col = volvox_grid_get_col(gid);
+            int32_t alignment = 0;
+            if (SUCCEEDED(variant_to_i4(NAMED_ARG(0), &alignment))) {
+                return vfg_set_cell_picture_alignment_range_compat(
+                    gid, row, col, row, col, alignment);
+            }
+            return DISP_E_TYPEMISMATCH;
+        }
+        break;
+
+    case DISPID_VG_CELLBUTTONPICTURE_COMPAT:
+        if (wFlags & DISPATCH_PROPERTYGET) {
+            int32_t row = volvox_grid_get_row(gid);
+            int32_t col = volvox_grid_get_col(gid);
+            int32_t picture_len = 0;
+            uint8_t *picture;
+            HRESULT hrPic;
+            if (!pVarResult) return E_POINTER;
+            picture = volvox_grid_get_cell_button_picture_native(gid, row, col, &picture_len);
+            hrPic = vfg_variant_from_ui1_bytes(pVarResult, picture, picture_len);
+            if (picture) volvox_grid_free(picture, picture_len);
+            return hrPic;
+        }
+        if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
+            int32_t row = volvox_grid_get_row(gid);
+            int32_t col = volvox_grid_get_col(gid);
+            uint8_t *picture = NULL;
+            int32_t picture_len = 0;
+            HRESULT hrPic = vfg_variant_to_png_picture_bytes(NAMED_ARG(0), &picture, &picture_len);
+            if (FAILED(hrPic)) return hrPic;
+            hr = vfg_set_cell_button_picture_range_compat(
+                gid, row, col, row, col, picture, picture_len);
+            if (picture) HeapFree(GetProcessHeap(), 0, picture);
+            return hr;
+        }
+        break;
+
+    case DISPID_VG_NODEOPENPICTURE_COMPAT:
+    case DISPID_VG_NODECLOSEDPICTURE_COMPAT:
+        if (wFlags & DISPATCH_PROPERTYGET) {
+            int32_t picture_len = 0;
+            uint8_t *picture;
+            HRESULT hrPic;
+            if (!pVarResult) return E_POINTER;
+            picture = dispIdMember == DISPID_VG_NODEOPENPICTURE_COMPAT
+                ? volvox_grid_get_node_open_picture_native(gid, &picture_len)
+                : volvox_grid_get_node_closed_picture_native(gid, &picture_len);
+            hrPic = vfg_variant_from_ui1_bytes(pVarResult, picture, picture_len);
+            if (picture) volvox_grid_free(picture, picture_len);
+            return hrPic;
+        }
+        if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
+            uint8_t *picture = NULL;
+            int32_t picture_len = 0;
+            HRESULT hrPic = vfg_variant_to_png_picture_bytes(NAMED_ARG(0), &picture, &picture_len);
+            if (FAILED(hrPic)) return hrPic;
+            hr = vfg_set_native_picture_compat(
+                dispIdMember == DISPID_VG_NODEOPENPICTURE_COMPAT
+                    ? volvox_grid_set_node_open_picture_native
+                    : volvox_grid_set_node_closed_picture_native,
+                gid,
+                picture,
+                picture_len);
+            if (picture) HeapFree(GetProcessHeap(), 0, picture);
+            return hr;
+        }
+        break;
+
+    case DISPID_VG_SORTASCENDINGPICTURE_COMPAT:
+    case DISPID_VG_SORTDESCENDINGPICTURE_COMPAT:
+        if (wFlags & DISPATCH_PROPERTYGET) {
+            int32_t picture_len = 0;
+            uint8_t *picture;
+            HRESULT hrPic;
+            if (!pVarResult) return E_POINTER;
+            picture = dispIdMember == DISPID_VG_SORTASCENDINGPICTURE_COMPAT
+                ? volvox_grid_get_sort_ascending_picture_native(gid, &picture_len)
+                : volvox_grid_get_sort_descending_picture_native(gid, &picture_len);
+            hrPic = vfg_variant_from_ui1_bytes(pVarResult, picture, picture_len);
+            if (picture) volvox_grid_free(picture, picture_len);
+            return hrPic;
+        }
+        if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
+            uint8_t *picture = NULL;
+            int32_t picture_len = 0;
+            HRESULT hrPic = vfg_variant_to_png_picture_bytes(NAMED_ARG(0), &picture, &picture_len);
+            if (FAILED(hrPic)) return hrPic;
+            hr = vfg_set_native_picture_compat(
+                dispIdMember == DISPID_VG_SORTASCENDINGPICTURE_COMPAT
+                    ? volvox_grid_set_sort_ascending_picture_native
+                    : volvox_grid_set_sort_descending_picture_native,
+                gid,
+                picture,
+                picture_len);
+            if (picture) HeapFree(GetProcessHeap(), 0, picture);
+            return hr;
+        }
+        break;
+
+    case DISPID_VG_PICTURESOVER_COMPAT:
+        if (wFlags & DISPATCH_PROPERTYGET) {
+            int32_t enabled;
+            if (!pVarResult) return E_POINTER;
+            enabled = volvox_grid_get_pictures_over_native(gid);
+            V_VT(pVarResult) = VT_BOOL;
+            V_BOOL(pVarResult) = enabled ? VARIANT_TRUE : VARIANT_FALSE;
+            return S_OK;
+        }
+        if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
+            int32_t enabled = vfg_variant_is_true(NAMED_ARG(0)) ? 1 : 0;
+            return volvox_grid_set_pictures_over_native(gid, enabled) == 0 ? S_OK : E_FAIL;
+        }
+        break;
+
+    case DISPID_VG_WALLPAPER_COMPAT:
+        if (wFlags & DISPATCH_PROPERTYGET) {
+            int32_t picture_len = 0;
+            uint8_t *picture;
+            HRESULT hrPic;
+            if (!pVarResult) return E_POINTER;
+            picture = volvox_grid_get_wallpaper_native(gid, &picture_len);
+            hrPic = vfg_variant_from_ui1_bytes(pVarResult, picture, picture_len);
+            if (picture) volvox_grid_free(picture, picture_len);
+            return hrPic;
+        }
+        if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
+            uint8_t *picture = NULL;
+            int32_t picture_len = 0;
+            HRESULT hrPic = vfg_variant_to_png_picture_bytes(NAMED_ARG(0), &picture, &picture_len);
+            if (FAILED(hrPic)) return hrPic;
+            hr = vfg_set_native_picture_compat(
+                volvox_grid_set_wallpaper_native,
+                gid,
+                picture,
+                picture_len);
+            if (picture) HeapFree(GetProcessHeap(), 0, picture);
+            return hr;
+        }
+        break;
+
+    case DISPID_VG_WALLPAPERALIGNMENT_COMPAT:
+        if (wFlags & DISPATCH_PROPERTYGET) {
+            if (!pVarResult) return E_POINTER;
+            V_VT(pVarResult) = VT_I4;
+            V_I4(pVarResult) = volvox_grid_get_wallpaper_alignment_native(gid);
+            return S_OK;
+        }
+        if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
+            int32_t alignment = 0;
+            if (SUCCEEDED(variant_to_i4(NAMED_ARG(0), &alignment))) {
+                return volvox_grid_set_wallpaper_alignment_native(gid, alignment) == 0
+                    ? S_OK
+                    : E_FAIL;
+            }
+            return DISP_E_TYPEMISMATCH;
+        }
+        break;
+
+    case 53: /* CellFontBold */
+        if (wFlags & DISPATCH_PROPERTYGET) {
+            int32_t row = volvox_grid_get_row(gid);
+            int32_t col = volvox_grid_get_col(gid);
+            if (!pVarResult) return E_POINTER;
+            V_VT(pVarResult) = VT_BOOL;
+            V_BOOL(pVarResult) =
+                volvox_grid_get_cell_font_bold(gid, row, col) ? VARIANT_TRUE : VARIANT_FALSE;
+            return S_OK;
+        }
+        if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
+            int32_t row = volvox_grid_get_row(gid);
+            int32_t col = volvox_grid_get_col(gid);
+            int32_t bold = vfg_variant_is_true(NAMED_ARG(0)) ? 1 : 0;
+            return volvox_grid_set_cell_font_bold_range(
+                gid, row, col, row, col, bold) == 0 ? S_OK : E_FAIL;
+        }
+        break;
+
     /* IsSubtotal(row) behaves like a VB boolean (-1 for True, 0 for False). */
     case DISPID_VG_ISSUBTOTAL:
         if (wFlags & DISPATCH_PROPERTYGET) {
@@ -9406,8 +11000,9 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
             if (pDispParams->cArgs >= 1) {
                 variant_to_i4(&pDispParams->rgvarg[0], &row);
             }
-            V_VT(pVarResult) = VT_I4;
-            V_I4(pVarResult) = volvox_grid_get_is_subtotal(gid, row) ? -1 : 0;
+            V_VT(pVarResult) = VT_BOOL;
+            V_BOOL(pVarResult) =
+                volvox_grid_get_is_subtotal(gid, row) ? VARIANT_TRUE : VARIANT_FALSE;
             return S_OK;
         }
         if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
@@ -9433,17 +11028,42 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
             }
             /* GET does not walk to parent node for non-subtotal rows. */
             V_VT(pVarResult) = VT_I4;
-            V_I4(pVarResult) = engine_collapsed_to_activex_outline_state(
-                volvox_grid_get_is_collapsed(gid, row));
+            if (obj && row >= 0 && row < obj->is_collapsed_cache_len) {
+                V_I4(pVarResult) = obj->is_collapsed_cache[row];
+            } else {
+                V_I4(pVarResult) = engine_collapsed_to_activex_outline_state(
+                    volvox_grid_get_is_collapsed(gid, row));
+            }
             return S_OK;
         }
         if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
             int32_t row = 0, state = 0;
+            int32_t requested_row = 0;
             if (pDispParams->cArgs >= 2) {
                 variant_to_i4(&pDispParams->rgvarg[1], &row);
                 variant_to_i4(&pDispParams->rgvarg[0], &state);
             }
+            requested_row = row;
             row = vfg_resolve_outline_node_row(gid, row);
+            if (obj) {
+                vfg_set_cached_indexed_i32(
+                    &obj->is_collapsed_cache,
+                    &obj->is_collapsed_cache_len,
+                    row,
+                    state);
+                vfg_set_cached_indexed_i32(
+                    &obj->is_collapsed_cache,
+                    &obj->is_collapsed_cache_len,
+                    requested_row,
+                    state);
+                if (requested_row > 0) {
+                    vfg_set_cached_indexed_i32(
+                        &obj->is_collapsed_cache,
+                        &obj->is_collapsed_cache_len,
+                        requested_row - 1,
+                        state);
+                }
+            }
             volvox_grid_set_is_collapsed(
                 gid,
                 row,
@@ -9586,12 +11206,14 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
     case DISPID_VG_CELLCHECKED:
         if (wFlags & DISPATCH_PROPERTYGET) {
             if (!pVarResult) return E_POINTER;
+            if (pDispParams->cArgs > 0) {
+                return vfg_raise_vb_error(
+                    pExcepInfo,
+                    451,
+                    L"Property let procedure not defined and property get procedure did not return an object.");
+            }
             int32_t row = volvox_grid_get_row(gid);
             int32_t col = volvox_grid_get_col(gid);
-            if (pDispParams->cArgs >= 2) {
-                variant_to_i4(&pDispParams->rgvarg[1], &row);
-                variant_to_i4(&pDispParams->rgvarg[0], &col);
-            }
             V_VT(pVarResult) = VT_I4;
             V_I4(pVarResult) = engine_checked_to_activex(volvox_grid_get_cell_checked(gid, row, col));
             return S_OK;
@@ -9601,10 +11223,12 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
             int32_t col = volvox_grid_get_col(gid);
             int32_t state = 0;
             if (pDispParams->cArgs >= 3) {
-                variant_to_i4(&pDispParams->rgvarg[2], &row);
-                variant_to_i4(&pDispParams->rgvarg[1], &col);
-                variant_to_i4(&pDispParams->rgvarg[0], &state);
-            } else if (pDispParams->cArgs >= 1) {
+                return vfg_raise_vb_error(
+                    pExcepInfo,
+                    451,
+                    L"Property let procedure not defined and property get procedure did not return an object.");
+            }
+            if (pDispParams->cArgs >= 1) {
                 variant_to_i4(&pDispParams->rgvarg[0], &state);
             }
             volvox_grid_set_cell_checked(gid, row, col, activex_checked_to_engine(state));
@@ -9689,9 +11313,13 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
             return S_OK;
         }
         if (wFlags & DISPATCH_PROPERTYGET) {
+            int32_t row = volvox_grid_get_row(gid);
+            int32_t col = volvox_grid_get_col(gid);
+            float percent;
             if (!pVarResult) return E_POINTER;
             V_VT(pVarResult) = VT_I4;
-            V_I4(pVarResult) = 0;
+            percent = volvox_grid_get_cell_flood_percent_native(gid, row, col);
+            V_I4(pVarResult) = (int32_t)(percent * 100.0f + (percent >= 0.0f ? 0.5f : -0.5f));
             return S_OK;
         }
         break;
@@ -9699,6 +11327,15 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
     /* ══════════════════════════════════════════════════════════ */
     /* Methods (DISPATCH_METHOD)                                   */
     /* ══════════════════════════════════════════════════════════ */
+
+    case DISPID_VG_OUTLINE_COMPAT:
+        if (wFlags & DISPATCH_METHOD) {
+            int32_t level = -1;
+            if (pDispParams->cArgs >= 1) variant_to_i4(ARG(0), &level);
+            if (volvox_grid_outline(gid, level) != 0) return E_FAIL;
+            return vfg_invalidate_control(obj);
+        }
+        break;
 
     case DISPID_VG_PRINTGRID_COMPAT:
         if (wFlags & DISPATCH_METHOD) {
@@ -9848,6 +11485,9 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
             int32_t total_only = 0;
             int32_t compat_fixed_group_subtotal = 0;
             int32_t original_fixed_cols = 0;
+            int32_t preserved_cols = 0;
+            int32_t *preserved_col_widths = NULL;
+            int32_t compat_subtotal_height = 0;
             BSTR fmt = NULL;
             BSTR caption = NULL;  /* 8th argument */
             VARIANT vfmt, vcap;
@@ -9868,6 +11508,21 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
             (void)match_from;
             (void)total_only;
 
+            preserved_cols = volvox_grid_get_cols(gid);
+            if (preserved_cols > 0) {
+                preserved_col_widths = (int32_t *)HeapAlloc(
+                    GetProcessHeap(),
+                    HEAP_ZERO_MEMORY,
+                    sizeof(int32_t) * preserved_cols);
+                if (preserved_col_widths) {
+                    for (int32_t col = 0; col < preserved_cols; ++col) {
+                        preserved_col_widths[col] = volvox_grid_get_col_width(gid, col);
+                    }
+                }
+            }
+            compat_subtotal_height =
+                vfg_compat_default_row_height_px(volvox_grid_get_font_size(gid));
+
             compat_fixed_group_subtotal =
                 obj && obj->data_source && obj->recordset &&
                 group_col >= 0 && group_col < obj->fixed_cols_cached;
@@ -9883,6 +11538,41 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
             volvox_grid_subtotal(gid, aggregate, group_col, agg_col,
                 (const uint8_t *)(utf8 ? utf8 : ""), utf8 ? utf8len : 0,
                 olecolor_to_argb(bcolor), olecolor_to_argb(fcolor), 1);
+            if (preserved_col_widths) {
+                int32_t cols_after = volvox_grid_get_cols(gid);
+                int32_t restore_cols = cols_after < preserved_cols ? cols_after : preserved_cols;
+                for (int32_t col = 0; col < restore_cols; ++col) {
+                    if (preserved_col_widths[col] > 0 &&
+                        volvox_grid_get_col_width(gid, col) != preserved_col_widths[col]) {
+                        int32_t ignore_len = 0;
+                        uint8_t *ignore = vfg_native_set_col_width(
+                            gid,
+                            col,
+                            preserved_col_widths[col],
+                            &ignore_len);
+                        if (ignore) volvox_grid_free(ignore, ignore_len);
+                    }
+                }
+                HeapFree(GetProcessHeap(), 0, preserved_col_widths);
+            }
+            if (compat_subtotal_height > 0) {
+                int32_t rows = volvox_grid_get_rows(gid);
+                for (int32_t subtotal_row = obj ? obj->fixed_rows_cached : 0;
+                     subtotal_row < rows;
+                     ++subtotal_row) {
+                    if (!volvox_grid_get_is_subtotal(gid, subtotal_row)) continue;
+                    if (volvox_grid_get_row_height(gid, subtotal_row) != compat_subtotal_height) {
+                        int32_t ignore_len = 0;
+                        uint8_t *ignore = vfg_native_set_row_height(
+                            gid,
+                            subtotal_row,
+                            compat_subtotal_height,
+                            &ignore_len);
+                        if (ignore) volvox_grid_free(ignore, ignore_len);
+                    }
+                    break;
+                }
+            }
             if (compat_fixed_group_subtotal && original_fixed_cols != group_col) {
                 volvox_grid_set_fixed_cols(gid, original_fixed_cols);
             }
@@ -9933,7 +11623,12 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
                 }
                 return S_OK;
             }
-            volvox_grid_auto_size(gid, from, to, equal, max_w);
+            {
+                int32_t total_cols = volvox_grid_get_cols(gid);
+                if (total_cols > 0) {
+                    vfg_apply_unbound_autosize_compat_widths(gid, from, to, equal, max_w);
+                }
+            }
             return S_OK;
         }
         break;
@@ -9991,6 +11686,10 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
             int32_t scope = 0, region = 0;
             if (pDispParams->cArgs >= 1) variant_to_i4(ARG(0), &scope);
             if (pDispParams->cArgs >= 2) variant_to_i4(ARG(1), &region);
+            if (scope == 0) {
+                vfg_clear_flood_color_cache(obj);
+                vfg_clear_is_collapsed_cache(obj);
+            }
             volvox_grid_clear(gid, scope, region);
             return S_OK;
         }
@@ -10023,7 +11722,10 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
     case DISPID_VG_FINISHEDITING_COMPAT:
         if (wFlags & DISPATCH_METHOD) {
             int32_t out_len = 0;
-            return vfg_take_status_response(volvox_grid_finish_editing(gid, &out_len)) == 0
+            if (vfg_take_status_response(volvox_grid_finish_editing(gid, &out_len)) != 0) {
+                return E_FAIL;
+            }
+            return SUCCEEDED(vfg_pump_engine_events(obj))
                 ? S_OK
                 : E_FAIL;
         }
@@ -10393,7 +12095,14 @@ static HRESULT STDMETHODCALLTYPE VFG_VO_Draw(
         return DV_E_DVASPECT;
     if (!lprcBounds || !hdcDraw)
         return E_INVALIDARG;
-    return vfg_draw_to_dc(OBJ_FROM_VIEWOBJECT(This), hdcDraw, (const RECT *)lprcBounds);
+    return volvox_grid_paint_to_hdc_native(
+        OBJ_FROM_VIEWOBJECT(This)->grid_id,
+        hdcDraw,
+        lprcBounds->left,
+        lprcBounds->top,
+        lprcBounds->right - lprcBounds->left,
+        lprcBounds->bottom - lprcBounds->top,
+        (int32_t)dwDrawAspect);
 }
 
 static HRESULT STDMETHODCALLTYPE VFG_VO_GetColorSet(
@@ -10430,6 +12139,111 @@ static HRESULT STDMETHODCALLTYPE VFG_VO_GetAdvise(
 {
     (void)This;(void)a;(void)b;(void)c;
     return E_NOTIMPL;
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_VO2_QueryInterface(
+    IViewObject2 *This, REFIID riid, void **ppv)
+{
+    VolvoxGridObject *obj = OBJ_FROM_VIEWOBJECT2(This);
+    return VFG_QueryInterface((IDispatch *)obj, riid, ppv);
+}
+
+static ULONG STDMETHODCALLTYPE VFG_VO2_AddRef(IViewObject2 *This) {
+    VolvoxGridObject *obj = OBJ_FROM_VIEWOBJECT2(This);
+    return InterlockedIncrement(&obj->cRef);
+}
+
+static ULONG STDMETHODCALLTYPE VFG_VO2_Release(IViewObject2 *This) {
+    VolvoxGridObject *obj = OBJ_FROM_VIEWOBJECT2(This);
+    return VFG_Release((IDispatch *)obj);
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_VO2_Draw(
+    IViewObject2 *This,
+    DWORD dwDrawAspect,
+    LONG lindex,
+    void *pvAspect,
+    DVTARGETDEVICE *ptd,
+    HDC hdcTargetDev,
+    HDC hdcDraw,
+    LPCRECTL lprcBounds,
+    LPCRECTL lprcWBounds,
+    BOOL (STDMETHODCALLTYPE *pfnContinue)(ULONG_PTR dwContinue),
+    ULONG_PTR dwContinue)
+{
+    (void)lindex; (void)pvAspect; (void)ptd; (void)hdcTargetDev;
+    (void)lprcWBounds; (void)pfnContinue; (void)dwContinue;
+
+    if (dwDrawAspect != DVASPECT_CONTENT)
+        return DV_E_DVASPECT;
+    if (!lprcBounds || !hdcDraw)
+        return E_INVALIDARG;
+    return volvox_grid_paint_to_hdc_native(
+        OBJ_FROM_VIEWOBJECT2(This)->grid_id,
+        hdcDraw,
+        lprcBounds->left,
+        lprcBounds->top,
+        lprcBounds->right - lprcBounds->left,
+        lprcBounds->bottom - lprcBounds->top,
+        (int32_t)dwDrawAspect);
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_VO2_GetColorSet(
+    IViewObject2 *This, DWORD a, LONG b, void *c, DVTARGETDEVICE *d,
+    HDC e, LOGPALETTE **f)
+{
+    (void)This;(void)a;(void)b;(void)c;(void)d;(void)e;(void)f;
+    return E_NOTIMPL;
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_VO2_Freeze(
+    IViewObject2 *This, DWORD a, LONG b, void *c, DWORD *d)
+{
+    (void)This;(void)a;(void)b;(void)c;(void)d;
+    return E_NOTIMPL;
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_VO2_Unfreeze(
+    IViewObject2 *This, DWORD a)
+{
+    (void)This;(void)a;
+    return E_NOTIMPL;
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_VO2_SetAdvise(
+    IViewObject2 *This, DWORD a, DWORD b, IAdviseSink *c)
+{
+    (void)This;(void)a;(void)b;(void)c;
+    return E_NOTIMPL;
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_VO2_GetAdvise(
+    IViewObject2 *This, DWORD *a, DWORD *b, IAdviseSink **c)
+{
+    (void)This;(void)a;(void)b;(void)c;
+    return E_NOTIMPL;
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_VO2_GetExtent(
+    IViewObject2 *This,
+    DWORD dwDrawAspect,
+    LONG lindex,
+    DVTARGETDEVICE *ptd,
+    LPSIZEL lpsizel)
+{
+    VolvoxGridObject *obj = OBJ_FROM_VIEWOBJECT2(This);
+    int32_t cx = 0;
+    int32_t cy = 0;
+    (void)lindex; (void)ptd;
+    if (!lpsizel) return E_POINTER;
+    if (dwDrawAspect != DVASPECT_CONTENT) return DV_E_DVASPECT;
+    if (volvox_grid_get_extent_himetric_native(obj->grid_id, &cx, &cy) == S_OK) {
+        lpsizel->cx = cx;
+        lpsizel->cy = cy;
+    } else {
+        *lpsizel = obj->extent_himetric;
+    }
+    return S_OK;
 }
 
 /* ── IOleObject / In-Place / Control / Persist ──────────────── */
@@ -10477,8 +12291,8 @@ static HRESULT STDMETHODCALLTYPE VFG_OO_SetHostNames(
     IOleObject *This, LPCOLESTR szContainerApp, LPCOLESTR szContainerObj)
 {
     VolvoxGridObject *obj = OBJ_FROM_OLEOBJECT(This);
-    vfg_set_bstr_copy(&obj->host_app_name, (BSTR)szContainerApp);
-    vfg_set_bstr_copy(&obj->host_obj_name, (BSTR)szContainerObj);
+    vfg_set_olestr_copy(&obj->host_app_name, szContainerApp);
+    vfg_set_olestr_copy(&obj->host_obj_name, szContainerObj);
     return S_OK;
 }
 
@@ -10505,16 +12319,19 @@ static HRESULT STDMETHODCALLTYPE VFG_OO_GetMoniker(
 static HRESULT STDMETHODCALLTYPE VFG_OO_InitFromData(
     IOleObject *This, IDataObject *pDataObject, BOOL fCreation, DWORD dwReserved)
 {
-    (void)This; (void)pDataObject; (void)fCreation; (void)dwReserved;
-    return E_NOTIMPL;
+    (void)fCreation; (void)dwReserved;
+    return vfg_paste_unicode_data_object(OBJ_FROM_OLEOBJECT(This), pDataObject);
 }
 
 static HRESULT STDMETHODCALLTYPE VFG_OO_GetClipboardData(
     IOleObject *This, DWORD dwReserved, IDataObject **ppDataObject)
 {
-    (void)This; (void)dwReserved;
-    if (ppDataObject) *ppDataObject = NULL;
-    return E_NOTIMPL;
+    VolvoxGridObject *obj = OBJ_FROM_OLEOBJECT(This);
+    (void)dwReserved;
+    if (!ppDataObject) return E_POINTER;
+    *ppDataObject = (IDataObject *)&obj->lpVtblDataObject;
+    VFG_AddRef((IDispatch *)obj);
+    return S_OK;
 }
 
 static HRESULT STDMETHODCALLTYPE VFG_OO_DoVerb(
@@ -10719,7 +12536,7 @@ static HRESULT STDMETHODCALLTYPE VFG_IPAO_TranslateAccelerator(IOleInPlaceActive
     msg = lpmsg->message;
     if ((msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN) &&
         lpmsg->wParam == VK_TAB &&
-        obj->tab_behavior_cached == 1) {
+        volvox_grid_get_tab_behavior_native(obj->grid_id) == 1) {
         SendMessageW(obj->hwnd_ctrl, WM_KEYDOWN, lpmsg->wParam, lpmsg->lParam);
         return S_OK;
     }
@@ -10806,30 +12623,337 @@ static HRESULT STDMETHODCALLTYPE VFG_PSI_GetClassID(IPersistStreamInit *This, CL
     return S_OK;
 }
 
+static HRESULT vfg_stream_write_exact(IStream *stream, const void *data, ULONG len) {
+    ULONG written = 0;
+    HRESULT hr;
+    if (!stream) return E_POINTER;
+    hr = IStream_Write(stream, data, len, &written);
+    if (FAILED(hr)) return hr;
+    return written == len ? S_OK : STG_E_WRITEFAULT;
+}
+
+static HRESULT vfg_stream_read_exact(IStream *stream, void *data, ULONG len) {
+    ULONG read = 0;
+    HRESULT hr;
+    if (!stream) return E_POINTER;
+    hr = IStream_Read(stream, data, len, &read);
+    if (FAILED(hr)) return hr;
+    return read == len ? S_OK : STG_E_READFAULT;
+}
+
+static HRESULT vfg_stream_write_u32(IStream *stream, uint32_t value) {
+    return vfg_stream_write_exact(stream, &value, sizeof(value));
+}
+
+static HRESULT vfg_stream_read_u32(IStream *stream, uint32_t *value) {
+    if (!value) return E_POINTER;
+    return vfg_stream_read_exact(stream, value, sizeof(*value));
+}
+
+static HRESULT vfg_stream_write_i32(IStream *stream, int32_t value) {
+    return vfg_stream_write_exact(stream, &value, sizeof(value));
+}
+
+static HRESULT vfg_stream_read_i32(IStream *stream, int32_t *value) {
+    if (!value) return E_POINTER;
+    return vfg_stream_read_exact(stream, value, sizeof(*value));
+}
+
+static HRESULT vfg_persist_write_text_cell(
+    VolvoxGridObject *obj, IStream *stream, int32_t row, int32_t col)
+{
+    int32_t len = 0;
+    uint8_t *utf8 = volvox_grid_get_text_matrix(obj->grid_id, row, col, &len);
+    uint32_t ulen = (utf8 && len > 0) ? (uint32_t)len : 0;
+    HRESULT hr = vfg_stream_write_u32(stream, ulen);
+    if (SUCCEEDED(hr) && ulen > 0) {
+        hr = vfg_stream_write_exact(stream, utf8, ulen);
+    }
+    if (utf8) volvox_grid_free(utf8, len);
+    return hr;
+}
+
+static HRESULT vfg_persist_save(VolvoxGridObject *obj, IStream *stream) {
+    static const char magic[4] = { 'V', 'F', 'G', '1' };
+    int32_t rows;
+    int32_t cols;
+    uint32_t cell_count;
+    HRESULT hr;
+
+    if (!obj || !stream) return E_POINTER;
+    rows = volvox_grid_get_rows(obj->grid_id);
+    cols = volvox_grid_get_cols(obj->grid_id);
+    if (rows < 0) rows = 0;
+    if (cols < 0) cols = 0;
+    cell_count = (uint32_t)((uint64_t)(uint32_t)rows * (uint64_t)(uint32_t)cols);
+
+    hr = vfg_stream_write_exact(stream, magic, sizeof(magic));
+    if (FAILED(hr)) return hr;
+    if (FAILED(hr = vfg_stream_write_u32(stream, 1))) return hr;
+    if (FAILED(hr = vfg_stream_write_i32(stream, rows))) return hr;
+    if (FAILED(hr = vfg_stream_write_i32(stream, cols))) return hr;
+    if (FAILED(hr = vfg_stream_write_i32(stream, obj->fixed_rows_cached))) return hr;
+    if (FAILED(hr = vfg_stream_write_i32(stream, obj->fixed_cols_cached))) return hr;
+    if (FAILED(hr = vfg_stream_write_i32(stream, obj->frozen_rows_cached))) return hr;
+    if (FAILED(hr = vfg_stream_write_i32(stream, obj->frozen_cols_cached))) return hr;
+    if (FAILED(hr = vfg_stream_write_i32(stream, volvox_grid_get_row(obj->grid_id)))) return hr;
+    if (FAILED(hr = vfg_stream_write_i32(stream, vfg_get_col_cached(obj->grid_id)))) return hr;
+    if (FAILED(hr = vfg_stream_write_i32(stream, obj->row_sel_cached))) return hr;
+    if (FAILED(hr = vfg_stream_write_i32(stream, obj->col_sel_cached))) return hr;
+    if (FAILED(hr = vfg_stream_write_i32(stream, volvox_grid_get_top_row(obj->grid_id)))) return hr;
+    if (FAILED(hr = vfg_stream_write_i32(stream, vfg_get_left_col_cached(obj->grid_id)))) return hr;
+    if (FAILED(hr = vfg_stream_write_u32(stream, cell_count))) return hr;
+
+    for (int32_t r = 0; r < rows; ++r) {
+        for (int32_t c = 0; c < cols; ++c) {
+            hr = vfg_persist_write_text_cell(obj, stream, r, c);
+            if (FAILED(hr)) return hr;
+        }
+    }
+    return S_OK;
+}
+
+static HRESULT vfg_persist_load_text_cell(
+    VolvoxGridObject *obj, IStream *stream, int32_t row, int32_t col)
+{
+    uint32_t len = 0;
+    uint8_t *buf = NULL;
+    HRESULT hr = vfg_stream_read_u32(stream, &len);
+    if (FAILED(hr)) return hr;
+    if (len > 16 * 1024 * 1024) return STG_E_INVALIDHEADER;
+    if (len > 0) {
+        buf = (uint8_t *)HeapAlloc(GetProcessHeap(), 0, len);
+        if (!buf) return E_OUTOFMEMORY;
+        hr = vfg_stream_read_exact(stream, buf, len);
+        if (FAILED(hr)) {
+            HeapFree(GetProcessHeap(), 0, buf);
+            return hr;
+        }
+    }
+    volvox_grid_set_text_matrix(
+        obj->grid_id, row, col, buf ? buf : (const uint8_t *)"", (int32_t)len);
+    if (buf) HeapFree(GetProcessHeap(), 0, buf);
+    return S_OK;
+}
+
+static HRESULT vfg_persist_load(VolvoxGridObject *obj, IStream *stream) {
+    char magic[4];
+    uint32_t version = 0;
+    uint32_t cell_count = 0;
+    uint64_t expected_count;
+    int32_t rows = 0;
+    int32_t cols = 0;
+    int32_t fixed_rows = 0;
+    int32_t fixed_cols = 0;
+    int32_t frozen_rows = 0;
+    int32_t frozen_cols = 0;
+    int32_t row = 0;
+    int32_t col = 0;
+    int32_t row_sel = 0;
+    int32_t col_sel = 0;
+    int32_t top_row = 0;
+    int32_t left_col = 0;
+    HRESULT hr;
+
+    if (!obj || !stream) return E_POINTER;
+    if (FAILED(hr = vfg_stream_read_exact(stream, magic, sizeof(magic)))) return hr;
+    if (memcmp(magic, "VFG1", 4) != 0) return STG_E_INVALIDHEADER;
+    if (FAILED(hr = vfg_stream_read_u32(stream, &version))) return hr;
+    if (version != 1) return STG_E_INVALIDHEADER;
+    if (FAILED(hr = vfg_stream_read_i32(stream, &rows))) return hr;
+    if (FAILED(hr = vfg_stream_read_i32(stream, &cols))) return hr;
+    if (rows < 0 || cols < 0 || rows > 1000000 || cols > 100000) return STG_E_INVALIDHEADER;
+    expected_count = (uint64_t)(uint32_t)rows * (uint64_t)(uint32_t)cols;
+    if (expected_count > 10000000ULL) return STG_E_INVALIDHEADER;
+
+    if (FAILED(hr = vfg_stream_read_i32(stream, &fixed_rows))) return hr;
+    if (FAILED(hr = vfg_stream_read_i32(stream, &fixed_cols))) return hr;
+    if (FAILED(hr = vfg_stream_read_i32(stream, &frozen_rows))) return hr;
+    if (FAILED(hr = vfg_stream_read_i32(stream, &frozen_cols))) return hr;
+    if (FAILED(hr = vfg_stream_read_i32(stream, &row))) return hr;
+    if (FAILED(hr = vfg_stream_read_i32(stream, &col))) return hr;
+    if (FAILED(hr = vfg_stream_read_i32(stream, &row_sel))) return hr;
+    if (FAILED(hr = vfg_stream_read_i32(stream, &col_sel))) return hr;
+    if (FAILED(hr = vfg_stream_read_i32(stream, &top_row))) return hr;
+    if (FAILED(hr = vfg_stream_read_i32(stream, &left_col))) return hr;
+    if (FAILED(hr = vfg_stream_read_u32(stream, &cell_count))) return hr;
+    if ((uint64_t)cell_count != expected_count) return STG_E_INVALIDHEADER;
+
+    volvox_grid_set_rows(obj->grid_id, rows);
+    volvox_grid_set_cols(obj->grid_id, cols);
+    volvox_grid_set_fixed_rows(obj->grid_id, fixed_rows);
+    volvox_grid_set_fixed_cols(obj->grid_id, fixed_cols);
+    obj->fixed_rows_cached = fixed_rows;
+    obj->fixed_cols_cached = fixed_cols;
+    volvox_grid_set_frozen_rows(obj->grid_id, frozen_rows);
+    volvox_grid_set_frozen_cols(obj->grid_id, frozen_cols);
+    obj->frozen_rows_cached = frozen_rows;
+    obj->frozen_cols_cached = frozen_cols;
+
+    for (int32_t r = 0; r < rows; ++r) {
+        for (int32_t c = 0; c < cols; ++c) {
+            hr = vfg_persist_load_text_cell(obj, stream, r, c);
+            if (FAILED(hr)) return hr;
+        }
+    }
+
+    volvox_grid_set_row(obj->grid_id, row);
+    volvox_grid_set_col(obj->grid_id, col);
+    volvox_grid_set_row_sel(obj->grid_id, row_sel);
+    volvox_grid_set_col_sel(obj->grid_id, col_sel);
+    obj->row_sel_cached = row_sel;
+    obj->col_sel_cached = col_sel;
+    volvox_grid_set_top_row(obj->grid_id, top_row);
+    volvox_grid_set_left_col(obj->grid_id, left_col);
+    obj->dirty = 0;
+    return S_OK;
+}
+
+int32_t volvox_grid_save_ole_stream_native(
+    int64_t id,
+    volvox_grid_stream_write_fn write_fn,
+    void *ctx)
+{
+    VolvoxGridObject *obj = vfg_find_object_by_grid_id(id);
+    IStream *stream = NULL;
+    HGLOBAL hglobal = NULL;
+    STATSTG statstg;
+    void *bytes = NULL;
+    HRESULT hr;
+    if (!obj || !write_fn) return E_POINTER;
+    memset(&statstg, 0, sizeof(statstg));
+    hr = CreateStreamOnHGlobal(NULL, TRUE, &stream);
+    if (FAILED(hr)) return hr;
+    hr = vfg_persist_save(obj, stream);
+    if (FAILED(hr)) goto done;
+    hr = IStream_Stat(stream, &statstg, STATFLAG_NONAME);
+    if (FAILED(hr)) goto done;
+    if (statstg.cbSize.HighPart != 0 || statstg.cbSize.LowPart > INT32_MAX) {
+        hr = STG_E_MEDIUMFULL;
+        goto done;
+    }
+    hr = GetHGlobalFromStream(stream, &hglobal);
+    if (FAILED(hr)) goto done;
+    if (statstg.cbSize.LowPart > 0) {
+        bytes = GlobalLock(hglobal);
+        if (!bytes) {
+            hr = E_OUTOFMEMORY;
+            goto done;
+        }
+        if (write_fn(ctx, (const uint8_t *)bytes, (int32_t)statstg.cbSize.LowPart) !=
+            (int32_t)statstg.cbSize.LowPart) {
+            hr = STG_E_WRITEFAULT;
+        }
+    }
+
+done:
+    if (bytes) GlobalUnlock(hglobal);
+    if (stream) IStream_Release(stream);
+    return hr;
+}
+
+int32_t volvox_grid_load_ole_stream_native(
+    int64_t id,
+    volvox_grid_stream_read_fn read_fn,
+    void *ctx)
+{
+    VolvoxGridObject *obj = vfg_find_object_by_grid_id(id);
+    IStream *stream = NULL;
+    LARGE_INTEGER zero;
+    uint8_t buf[4096];
+    HRESULT hr;
+    if (!obj || !read_fn) return E_POINTER;
+    memset(&zero, 0, sizeof(zero));
+    hr = CreateStreamOnHGlobal(NULL, TRUE, &stream);
+    if (FAILED(hr)) return hr;
+    for (;;) {
+        int32_t n = read_fn(ctx, buf, (int32_t)sizeof(buf));
+        if (n < 0 || n > (int32_t)sizeof(buf)) {
+            hr = STG_E_READFAULT;
+            goto done;
+        }
+        if (n == 0) break;
+        hr = vfg_stream_write_exact(stream, buf, (ULONG)n);
+        if (FAILED(hr)) goto done;
+    }
+    hr = IStream_Seek(stream, zero, STREAM_SEEK_SET, NULL);
+    if (FAILED(hr)) goto done;
+    hr = vfg_persist_load(obj, stream);
+
+done:
+    if (stream) IStream_Release(stream);
+    return hr;
+}
+
+static int32_t vfg_ole_stream_write_cb(void *ctx, const uint8_t *data, int32_t len) {
+    IStream *stream = (IStream *)ctx;
+    ULONG written = 0;
+    HRESULT hr;
+    if (!stream || len < 0) return -1;
+    hr = IStream_Write(stream, data, (ULONG)len, &written);
+    if (FAILED(hr)) return -1;
+    return (int32_t)written;
+}
+
+static int32_t vfg_ole_stream_read_cb(void *ctx, uint8_t *data, int32_t cap) {
+    IStream *stream = (IStream *)ctx;
+    ULONG read = 0;
+    HRESULT hr;
+    if (!stream || !data || cap < 0) return -1;
+    hr = IStream_Read(stream, data, (ULONG)cap, &read);
+    if (FAILED(hr)) return -1;
+    return (int32_t)read;
+}
+
 static HRESULT STDMETHODCALLTYPE VFG_PSI_IsDirty(IPersistStreamInit *This) {
-    (void)This;
-    return S_FALSE;
+    VolvoxGridObject *obj = OBJ_FROM_PERSISTSTREAMINIT(This);
+    return obj->dirty ? S_OK : S_FALSE;
 }
 
 static HRESULT STDMETHODCALLTYPE VFG_PSI_Load(IPersistStreamInit *This, IStream *pStm) {
-    (void)This; (void)pStm;
-    return S_OK;
+    VolvoxGridObject *obj = OBJ_FROM_PERSISTSTREAMINIT(This);
+    return (HRESULT)volvox_grid_load_ole_stream_native(
+        obj->grid_id,
+        vfg_ole_stream_read_cb,
+        pStm);
 }
 
 static HRESULT STDMETHODCALLTYPE VFG_PSI_Save(IPersistStreamInit *This, IStream *pStm, BOOL fClearDirty) {
-    (void)This; (void)pStm; (void)fClearDirty;
-    return S_OK;
+    VolvoxGridObject *obj = OBJ_FROM_PERSISTSTREAMINIT(This);
+    HRESULT hr = (HRESULT)volvox_grid_save_ole_stream_native(
+        obj->grid_id,
+        vfg_ole_stream_write_cb,
+        pStm);
+    if (SUCCEEDED(hr) && fClearDirty) obj->dirty = 0;
+    return hr;
 }
 
 static HRESULT STDMETHODCALLTYPE VFG_PSI_GetSizeMax(IPersistStreamInit *This, ULARGE_INTEGER *pcbSize) {
-    (void)This;
+    VolvoxGridObject *obj = OBJ_FROM_PERSISTSTREAMINIT(This);
+    int32_t rows;
+    int32_t cols;
+    uint64_t size;
     if (!pcbSize) return E_POINTER;
-    pcbSize->QuadPart = 0;
+    rows = obj ? volvox_grid_get_rows(obj->grid_id) : 0;
+    cols = obj ? volvox_grid_get_cols(obj->grid_id) : 0;
+    if (rows < 0) rows = 0;
+    if (cols < 0) cols = 0;
+    size = 4 + 4 + (uint64_t)12 * sizeof(int32_t) + sizeof(uint32_t);
+    for (int32_t r = 0; r < rows; ++r) {
+        for (int32_t c = 0; c < cols; ++c) {
+            int32_t len = 0;
+            uint8_t *utf8 = volvox_grid_get_text_matrix(obj->grid_id, r, c, &len);
+            size += sizeof(uint32_t) + (utf8 && len > 0 ? (uint32_t)len : 0);
+            if (utf8) volvox_grid_free(utf8, len);
+        }
+    }
+    pcbSize->QuadPart = size;
     return S_OK;
 }
 
 static HRESULT STDMETHODCALLTYPE VFG_PSI_InitNew(IPersistStreamInit *This) {
-    (void)This;
+    VolvoxGridObject *obj = OBJ_FROM_PERSISTSTREAMINIT(This);
+    if (obj) obj->dirty = 0;
     return S_OK;
 }
 
@@ -10847,12 +12971,110 @@ static ULONG STDMETHODCALLTYPE VFG_CPC_Release(IConnectionPointContainer *This) 
     return VFG_Release((IDispatch *)OBJ_FROM_CPCONTAINER(This));
 }
 
+static VFGConnectionPointsEnum *vfg_connection_points_enum_create(
+    VolvoxGridObject *obj, ULONG index)
+{
+    VFGConnectionPointsEnum *en;
+    if (!obj) return NULL;
+    en = (VFGConnectionPointsEnum *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(*en));
+    if (!en) return NULL;
+    en->lpVtbl = &g_VFGConnectionPointsEnumVtbl;
+    en->ref = 1;
+    en->obj = obj;
+    en->index = index <= 1 ? index : 1;
+    VFG_AddRef((IDispatch *)obj);
+    return en;
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_CPE_QueryInterface(
+    IEnumConnectionPoints *This, REFIID riid, void **ppv)
+{
+    if (!ppv) return E_POINTER;
+    if (IsEqualIID(riid, &IID_IUnknown) || IsEqualIID(riid, &IID_IEnumConnectionPoints)) {
+        *ppv = This;
+        IEnumConnectionPoints_AddRef(This);
+        return S_OK;
+    }
+    *ppv = NULL;
+    return E_NOINTERFACE;
+}
+
+static ULONG STDMETHODCALLTYPE VFG_CPE_AddRef(IEnumConnectionPoints *This) {
+    VFGConnectionPointsEnum *en = (VFGConnectionPointsEnum *)This;
+    return (ULONG)InterlockedIncrement(&en->ref);
+}
+
+static ULONG STDMETHODCALLTYPE VFG_CPE_Release(IEnumConnectionPoints *This) {
+    VFGConnectionPointsEnum *en = (VFGConnectionPointsEnum *)This;
+    LONG refs = InterlockedDecrement(&en->ref);
+    if (refs == 0) {
+        if (en->obj) VFG_Release((IDispatch *)en->obj);
+        HeapFree(GetProcessHeap(), 0, en);
+    }
+    return (ULONG)refs;
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_CPE_Next(
+    IEnumConnectionPoints *This,
+    ULONG celt,
+    IConnectionPoint **rgelt,
+    ULONG *pceltFetched)
+{
+    VFGConnectionPointsEnum *en = (VFGConnectionPointsEnum *)This;
+    ULONG fetched = 0;
+    if (!rgelt) return E_POINTER;
+    if (celt > 1 && !pceltFetched) return E_POINTER;
+    while (fetched < celt && en->index < 1) {
+        rgelt[fetched] = (IConnectionPoint *)&en->obj->lpVtblConnectionPoint;
+        VFG_AddRef((IDispatch *)en->obj);
+        fetched++;
+        en->index++;
+    }
+    if (pceltFetched) *pceltFetched = fetched;
+    return fetched == celt ? S_OK : S_FALSE;
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_CPE_Skip(IEnumConnectionPoints *This, ULONG celt) {
+    VFGConnectionPointsEnum *en = (VFGConnectionPointsEnum *)This;
+    ULONG remaining = en->index < 1 ? 1 - en->index : 0;
+    if (celt > remaining) {
+        en->index = 1;
+        return S_FALSE;
+    }
+    en->index += celt;
+    return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_CPE_Reset(IEnumConnectionPoints *This) {
+    VFGConnectionPointsEnum *en = (VFGConnectionPointsEnum *)This;
+    en->index = 0;
+    return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_CPE_Clone(
+    IEnumConnectionPoints *This, IEnumConnectionPoints **ppenum)
+{
+    VFGConnectionPointsEnum *en = (VFGConnectionPointsEnum *)This;
+    VFGConnectionPointsEnum *clone;
+    if (!ppenum) return E_POINTER;
+    *ppenum = NULL;
+    clone = vfg_connection_points_enum_create(en->obj, en->index);
+    if (!clone) return E_OUTOFMEMORY;
+    *ppenum = (IEnumConnectionPoints *)clone;
+    return S_OK;
+}
+
 static HRESULT STDMETHODCALLTYPE VFG_CPC_EnumConnectionPoints(
     IConnectionPointContainer *This, IEnumConnectionPoints **ppEnum)
 {
-    (void)This;
-    if (ppEnum) *ppEnum = NULL;
-    return E_NOTIMPL;
+    VolvoxGridObject *obj = OBJ_FROM_CPCONTAINER(This);
+    VFGConnectionPointsEnum *en;
+    if (!ppEnum) return E_POINTER;
+    *ppEnum = NULL;
+    en = vfg_connection_points_enum_create(obj, 0);
+    if (!en) return E_OUTOFMEMORY;
+    *ppEnum = (IEnumConnectionPoints *)en;
+    return S_OK;
 }
 
 static HRESULT STDMETHODCALLTYPE VFG_CPC_FindConnectionPoint(
@@ -10948,60 +13170,858 @@ static HRESULT STDMETHODCALLTYPE VFG_CP_Unadvise(IConnectionPoint *This, DWORD d
     return CONNECT_E_NOCONNECTION;
 }
 
-static HRESULT STDMETHODCALLTYPE VFG_CP_EnumConnections(IConnectionPoint *This, IEnumConnections **ppEnum) {
-    (void)This;
-    if (ppEnum) *ppEnum = NULL;
-    return E_NOTIMPL;
+static void vfg_connections_enum_release_items(VFGConnectionsEnum *en) {
+    ULONG i;
+    if (!en || !en->items) return;
+    for (i = 0; i < en->count; ++i) {
+        if (en->items[i].pUnk) IUnknown_Release(en->items[i].pUnk);
+    }
+    HeapFree(GetProcessHeap(), 0, en->items);
+    en->items = NULL;
+    en->count = 0;
 }
 
-static HRESULT STDMETHODCALLTYPE VFG_CI_QueryInterface(
-    IProvideClassInfo *This, REFIID riid, void **ppv)
+static VFGConnectionsEnum *vfg_connections_enum_create(VolvoxGridObject *obj, ULONG index) {
+    VFGConnectionsEnum *en;
+    UINT i;
+    en = (VFGConnectionsEnum *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(*en));
+    if (!en) return NULL;
+    en->lpVtbl = &g_VFGConnectionsEnumVtbl;
+    en->ref = 1;
+    if (obj && obj->sink_count > 0) {
+        en->items = (CONNECTDATA *)HeapAlloc(
+            GetProcessHeap(), HEAP_ZERO_MEMORY, obj->sink_count * sizeof(CONNECTDATA));
+        if (!en->items) {
+            HeapFree(GetProcessHeap(), 0, en);
+            return NULL;
+        }
+        for (i = 0; i < obj->sink_count; ++i) {
+            en->items[i].dwCookie = obj->sinks[i].cookie;
+            en->items[i].pUnk = (IUnknown *)obj->sinks[i].dispatch;
+            if (en->items[i].pUnk) IUnknown_AddRef(en->items[i].pUnk);
+        }
+        en->count = obj->sink_count;
+    }
+    en->index = index <= en->count ? index : en->count;
+    return en;
+}
+
+static VFGConnectionsEnum *vfg_connections_enum_clone_from(VFGConnectionsEnum *src) {
+    VFGConnectionsEnum *clone;
+    ULONG i;
+    clone = (VFGConnectionsEnum *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(*clone));
+    if (!clone) return NULL;
+    clone->lpVtbl = &g_VFGConnectionsEnumVtbl;
+    clone->ref = 1;
+    clone->index = src->index;
+    clone->count = src->count;
+    if (src->count > 0) {
+        clone->items = (CONNECTDATA *)HeapAlloc(
+            GetProcessHeap(), HEAP_ZERO_MEMORY, src->count * sizeof(CONNECTDATA));
+        if (!clone->items) {
+            HeapFree(GetProcessHeap(), 0, clone);
+            return NULL;
+        }
+        for (i = 0; i < src->count; ++i) {
+            clone->items[i] = src->items[i];
+            if (clone->items[i].pUnk) IUnknown_AddRef(clone->items[i].pUnk);
+        }
+    }
+    return clone;
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_CE_QueryInterface(
+    IEnumConnections *This, REFIID riid, void **ppv)
 {
-    return VFG_QueryInterface((IDispatch *)OBJ_FROM_CLASSINFO(This), riid, ppv);
-}
-
-static ULONG STDMETHODCALLTYPE VFG_CI_AddRef(IProvideClassInfo *This) {
-    return VFG_AddRef((IDispatch *)OBJ_FROM_CLASSINFO(This));
-}
-
-static ULONG STDMETHODCALLTYPE VFG_CI_Release(IProvideClassInfo *This) {
-    return VFG_Release((IDispatch *)OBJ_FROM_CLASSINFO(This));
-}
-
-static HRESULT STDMETHODCALLTYPE VFG_CI_GetClassInfo(IProvideClassInfo *This, ITypeInfo **ppTI) {
-    (void)This;
-    return vfg_load_typeinfo(&CLSID_VolvoxGrid, ppTI);
-}
-
-static HRESULT STDMETHODCALLTYPE VFG_CI2_QueryInterface(
-    IProvideClassInfo2 *This, REFIID riid, void **ppv)
-{
-    return VFG_QueryInterface((IDispatch *)OBJ_FROM_CLASSINFO2(This), riid, ppv);
-}
-
-static ULONG STDMETHODCALLTYPE VFG_CI2_AddRef(IProvideClassInfo2 *This) {
-    return VFG_AddRef((IDispatch *)OBJ_FROM_CLASSINFO2(This));
-}
-
-static ULONG STDMETHODCALLTYPE VFG_CI2_Release(IProvideClassInfo2 *This) {
-    return VFG_Release((IDispatch *)OBJ_FROM_CLASSINFO2(This));
-}
-
-static HRESULT STDMETHODCALLTYPE VFG_CI2_GetClassInfo(IProvideClassInfo2 *This, ITypeInfo **ppTI) {
-    (void)This;
-    return vfg_load_typeinfo(&CLSID_VolvoxGrid, ppTI);
-}
-
-static HRESULT STDMETHODCALLTYPE VFG_CI2_GetGUID(
-    IProvideClassInfo2 *This, DWORD dwGuidKind, GUID *pGUID)
-{
-    (void)This;
-    if (!pGUID) return E_POINTER;
-    if (dwGuidKind == GUIDKIND_DEFAULT_SOURCE_DISP_IID) {
-        *pGUID = DIID__DVolvoxGridEvents;
+    if (!ppv) return E_POINTER;
+    if (IsEqualIID(riid, &IID_IUnknown) || IsEqualIID(riid, &IID_IEnumConnections)) {
+        *ppv = This;
+        IEnumConnections_AddRef(This);
         return S_OK;
     }
-    return E_INVALIDARG;
+    *ppv = NULL;
+    return E_NOINTERFACE;
+}
+
+static ULONG STDMETHODCALLTYPE VFG_CE_AddRef(IEnumConnections *This) {
+    VFGConnectionsEnum *en = (VFGConnectionsEnum *)This;
+    return (ULONG)InterlockedIncrement(&en->ref);
+}
+
+static ULONG STDMETHODCALLTYPE VFG_CE_Release(IEnumConnections *This) {
+    VFGConnectionsEnum *en = (VFGConnectionsEnum *)This;
+    LONG refs = InterlockedDecrement(&en->ref);
+    if (refs == 0) {
+        vfg_connections_enum_release_items(en);
+        HeapFree(GetProcessHeap(), 0, en);
+    }
+    return (ULONG)refs;
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_CE_Next(
+    IEnumConnections *This, ULONG celt, CONNECTDATA *rgcd, ULONG *pceltFetched)
+{
+    VFGConnectionsEnum *en = (VFGConnectionsEnum *)This;
+    ULONG fetched = 0;
+    if (!rgcd) return E_POINTER;
+    if (celt > 1 && !pceltFetched) return E_POINTER;
+    while (fetched < celt && en->index < en->count) {
+        rgcd[fetched] = en->items[en->index];
+        if (rgcd[fetched].pUnk) IUnknown_AddRef(rgcd[fetched].pUnk);
+        fetched++;
+        en->index++;
+    }
+    if (pceltFetched) *pceltFetched = fetched;
+    return fetched == celt ? S_OK : S_FALSE;
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_CE_Skip(IEnumConnections *This, ULONG celt) {
+    VFGConnectionsEnum *en = (VFGConnectionsEnum *)This;
+    ULONG remaining = en->count > en->index ? en->count - en->index : 0;
+    if (celt > remaining) {
+        en->index = en->count;
+        return S_FALSE;
+    }
+    en->index += celt;
+    return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_CE_Reset(IEnumConnections *This) {
+    VFGConnectionsEnum *en = (VFGConnectionsEnum *)This;
+    en->index = 0;
+    return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_CE_Clone(IEnumConnections *This, IEnumConnections **ppenum) {
+    VFGConnectionsEnum *en = (VFGConnectionsEnum *)This;
+    VFGConnectionsEnum *clone;
+    if (!ppenum) return E_POINTER;
+    *ppenum = NULL;
+    clone = vfg_connections_enum_clone_from(en);
+    if (!clone) return E_OUTOFMEMORY;
+    *ppenum = (IEnumConnections *)clone;
+    return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_CP_EnumConnections(IConnectionPoint *This, IEnumConnections **ppEnum) {
+    VolvoxGridObject *obj = OBJ_FROM_CONNECTIONPOINT(This);
+    VFGConnectionsEnum *en;
+    if (!ppEnum) return E_POINTER;
+    *ppEnum = NULL;
+    en = vfg_connections_enum_create(obj, 0);
+    if (!en) return E_OUTOFMEMORY;
+    *ppEnum = (IEnumConnections *)en;
+    return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_DO_QueryInterface(
+    IDataObject *This, REFIID riid, void **ppv)
+{
+    if (!ppv) return E_POINTER;
+    if (IsEqualIID(riid, &IID_IUnknown) || IsEqualIID(riid, &IID_IDataObject)) {
+        *ppv = This;
+        VFG_AddRef((IDispatch *)OBJ_FROM_DATAOBJECT(This));
+        return S_OK;
+    }
+    return VFG_QueryInterface((IDispatch *)OBJ_FROM_DATAOBJECT(This), riid, ppv);
+}
+
+static ULONG STDMETHODCALLTYPE VFG_DO_AddRef(IDataObject *This) {
+    return VFG_AddRef((IDispatch *)OBJ_FROM_DATAOBJECT(This));
+}
+
+static ULONG STDMETHODCALLTYPE VFG_DO_Release(IDataObject *This) {
+    return VFG_Release((IDispatch *)OBJ_FROM_DATAOBJECT(This));
+}
+
+static CLIPFORMAT vfg_clip_format_html(void) {
+    static CLIPFORMAT cf_html = 0;
+    if (!cf_html) cf_html = (CLIPFORMAT)RegisterClipboardFormatA("HTML Format");
+    return cf_html;
+}
+
+static CLIPFORMAT vfg_clip_format_cells(void) {
+    static CLIPFORMAT cf_cells = 0;
+    if (!cf_cells) cf_cells = (CLIPFORMAT)RegisterClipboardFormatA("CF_VFG_CELLS");
+    return cf_cells;
+}
+
+static HGLOBAL vfg_hglobal_from_bytes(const void *data, SIZE_T len) {
+    SIZE_T alloc_len = len < (SIZE_T)-1 ? len + 1 : len;
+    HGLOBAL hmem = GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, alloc_len);
+    void *dst = NULL;
+    if (!hmem) return NULL;
+    dst = GlobalLock(hmem);
+    if (!dst) {
+        GlobalFree(hmem);
+        return NULL;
+    }
+    if (data && len > 0) memcpy(dst, data, len);
+    GlobalUnlock(hmem);
+    return hmem;
+}
+
+static void vfg_init_formatetc(FORMATETC *fmt, CLIPFORMAT cf) {
+    memset(fmt, 0, sizeof(*fmt));
+    fmt->cfFormat = cf;
+    fmt->ptd = NULL;
+    fmt->dwAspect = DVASPECT_CONTENT;
+    fmt->lindex = -1;
+    fmt->tymed = TYMED_HGLOBAL;
+}
+
+static VFGFormatEtcEnum *vfg_formatetc_enum_create(ULONG index) {
+    VFGFormatEtcEnum *en =
+        (VFGFormatEtcEnum *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(*en));
+    CLIPFORMAT cf_html;
+    CLIPFORMAT cf_cells;
+    if (!en) return NULL;
+    en->lpVtbl = &g_VFGFormatEtcEnumVtbl;
+    en->ref = 1;
+    vfg_init_formatetc(&en->formats[en->count++], CF_UNICODETEXT);
+    cf_html = vfg_clip_format_html();
+    if (cf_html) vfg_init_formatetc(&en->formats[en->count++], cf_html);
+    cf_cells = vfg_clip_format_cells();
+    if (cf_cells) vfg_init_formatetc(&en->formats[en->count++], cf_cells);
+    en->index = index <= en->count ? index : en->count;
+    return en;
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_FE_QueryInterface(
+    IEnumFORMATETC *This, REFIID riid, void **ppv)
+{
+    if (!ppv) return E_POINTER;
+    if (IsEqualIID(riid, &IID_IUnknown) || IsEqualIID(riid, &IID_IEnumFORMATETC)) {
+        *ppv = This;
+        IEnumFORMATETC_AddRef(This);
+        return S_OK;
+    }
+    *ppv = NULL;
+    return E_NOINTERFACE;
+}
+
+static ULONG STDMETHODCALLTYPE VFG_FE_AddRef(IEnumFORMATETC *This) {
+    VFGFormatEtcEnum *en = (VFGFormatEtcEnum *)This;
+    return (ULONG)InterlockedIncrement(&en->ref);
+}
+
+static ULONG STDMETHODCALLTYPE VFG_FE_Release(IEnumFORMATETC *This) {
+    VFGFormatEtcEnum *en = (VFGFormatEtcEnum *)This;
+    LONG refs = InterlockedDecrement(&en->ref);
+    if (refs == 0) HeapFree(GetProcessHeap(), 0, en);
+    return (ULONG)refs;
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_FE_Next(
+    IEnumFORMATETC *This, ULONG celt, FORMATETC *rgelt, ULONG *pceltFetched)
+{
+    VFGFormatEtcEnum *en = (VFGFormatEtcEnum *)This;
+    ULONG fetched = 0;
+    if (!rgelt) return E_POINTER;
+    if (celt > 1 && !pceltFetched) return E_POINTER;
+    while (fetched < celt && en->index < en->count) {
+        rgelt[fetched] = en->formats[en->index];
+        rgelt[fetched].ptd = NULL;
+        fetched++;
+        en->index++;
+    }
+    if (pceltFetched) *pceltFetched = fetched;
+    return fetched == celt ? S_OK : S_FALSE;
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_FE_Skip(IEnumFORMATETC *This, ULONG celt) {
+    VFGFormatEtcEnum *en = (VFGFormatEtcEnum *)This;
+    ULONG remaining = en->count > en->index ? en->count - en->index : 0;
+    if (celt > remaining) {
+        en->index = en->count;
+        return S_FALSE;
+    }
+    en->index += celt;
+    return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_FE_Reset(IEnumFORMATETC *This) {
+    VFGFormatEtcEnum *en = (VFGFormatEtcEnum *)This;
+    en->index = 0;
+    return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_FE_Clone(
+    IEnumFORMATETC *This, IEnumFORMATETC **ppenum)
+{
+    VFGFormatEtcEnum *en = (VFGFormatEtcEnum *)This;
+    VFGFormatEtcEnum *clone;
+    if (!ppenum) return E_POINTER;
+    *ppenum = NULL;
+    clone = vfg_formatetc_enum_create(en->index);
+    if (!clone) return E_OUTOFMEMORY;
+    *ppenum = (IEnumFORMATETC *)clone;
+    return S_OK;
+}
+
+static int vfg_append_html_escaped(char **buf, int *len, int *cap, const char *src, int n) {
+    int i;
+    for (i = 0; i < n; ++i) {
+        unsigned char ch = (unsigned char)src[i];
+        if (ch == '&') {
+            if (!utf8_append_bytes(buf, len, cap, "&amp;", 5)) return 0;
+        } else if (ch == '<') {
+            if (!utf8_append_bytes(buf, len, cap, "&lt;", 4)) return 0;
+        } else if (ch == '>') {
+            if (!utf8_append_bytes(buf, len, cap, "&gt;", 4)) return 0;
+        } else if (ch == '"') {
+            if (!utf8_append_bytes(buf, len, cap, "&quot;", 6)) return 0;
+        } else {
+            if (!utf8_append_bytes(buf, len, cap, (const char *)&src[i], 1)) return 0;
+        }
+    }
+    return 1;
+}
+
+static char *vfg_build_clip_html_utf8(const char *clip, int clip_len, int *out_len) {
+    static const char prefix[] = "<html><body><!--StartFragment-->";
+    static const char suffix[] = "<!--EndFragment--></body></html>";
+    char header[128];
+    char *fragment = NULL;
+    char *html = NULL;
+    int frag_len = 0;
+    int frag_cap = 0;
+    int pos = 0;
+    int header_len;
+    int prefix_len = (int)strlen(prefix);
+    int suffix_len = (int)strlen(suffix);
+    int start_html;
+    int start_fragment;
+    int end_fragment;
+    int end_html;
+    int total_len;
+
+    if (out_len) *out_len = 0;
+    if (!clip || clip_len < 0) clip_len = 0;
+    if (!utf8_append_bytes(&fragment, &frag_len, &frag_cap, "<table>", 7)) goto fail;
+    while (pos < clip_len) {
+        if (!utf8_append_bytes(&fragment, &frag_len, &frag_cap, "<tr><td>", 8)) goto fail;
+        for (;;) {
+            int start = pos;
+            while (pos < clip_len && clip[pos] != '\t' && clip[pos] != '\r' && clip[pos] != '\n') {
+                pos++;
+            }
+            if (!vfg_append_html_escaped(&fragment, &frag_len, &frag_cap, clip + start, pos - start)) goto fail;
+            if (!utf8_append_bytes(&fragment, &frag_len, &frag_cap, "</td>", 5)) goto fail;
+            if (pos < clip_len && clip[pos] == '\t') {
+                pos++;
+                if (!utf8_append_bytes(&fragment, &frag_len, &frag_cap, "<td>", 4)) goto fail;
+                continue;
+            }
+            break;
+        }
+        if (!utf8_append_bytes(&fragment, &frag_len, &frag_cap, "</tr>", 5)) goto fail;
+        if (pos < clip_len && clip[pos] == '\r') {
+            pos++;
+            if (pos < clip_len && clip[pos] == '\n') pos++;
+        } else if (pos < clip_len && clip[pos] == '\n') {
+            pos++;
+        }
+    }
+    if (!utf8_append_bytes(&fragment, &frag_len, &frag_cap, "</table>", 8)) goto fail;
+
+    header_len = snprintf(
+        header,
+        sizeof(header),
+        "Version:0.9\r\nStartHTML:%010u\r\nEndHTML:%010u\r\nStartFragment:%010u\r\nEndFragment:%010u\r\n",
+        0u,
+        0u,
+        0u,
+        0u);
+    if (header_len <= 0 || header_len >= (int)sizeof(header)) goto fail;
+    start_html = header_len;
+    start_fragment = start_html + prefix_len;
+    end_fragment = start_fragment + frag_len;
+    end_html = end_fragment + suffix_len;
+    header_len = snprintf(
+        header,
+        sizeof(header),
+        "Version:0.9\r\nStartHTML:%010u\r\nEndHTML:%010u\r\nStartFragment:%010u\r\nEndFragment:%010u\r\n",
+        (unsigned)start_html,
+        (unsigned)end_html,
+        (unsigned)start_fragment,
+        (unsigned)end_fragment);
+    if (header_len <= 0 || header_len >= (int)sizeof(header)) goto fail;
+    total_len = header_len + prefix_len + frag_len + suffix_len;
+    html = (char *)HeapAlloc(GetProcessHeap(), 0, (SIZE_T)total_len + 1);
+    if (!html) goto fail;
+    memcpy(html, header, (size_t)header_len);
+    memcpy(html + header_len, prefix, (size_t)prefix_len);
+    memcpy(html + header_len + prefix_len, fragment, (size_t)frag_len);
+    memcpy(html + header_len + prefix_len + frag_len, suffix, (size_t)suffix_len);
+    html[total_len] = '\0';
+    HeapFree(GetProcessHeap(), 0, fragment);
+    if (out_len) *out_len = total_len;
+    return html;
+
+fail:
+    if (fragment) HeapFree(GetProcessHeap(), 0, fragment);
+    if (html) HeapFree(GetProcessHeap(), 0, html);
+    return NULL;
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_DO_QueryGetData(IDataObject *This, FORMATETC *pformatetc) {
+    VolvoxGridObject *obj = OBJ_FROM_DATAOBJECT(This);
+    CLIPFORMAT cf_html = vfg_clip_format_html();
+    CLIPFORMAT cf_cells = vfg_clip_format_cells();
+    if (!pformatetc) return E_POINTER;
+    if (pformatetc->cfFormat != CF_UNICODETEXT &&
+        (!cf_html || pformatetc->cfFormat != cf_html) &&
+        (!cf_cells || pformatetc->cfFormat != cf_cells) &&
+        !vfg_find_stored_data_format(obj, pformatetc->cfFormat)) {
+        return DV_E_FORMATETC;
+    }
+    if (pformatetc->dwAspect != DVASPECT_CONTENT) return DV_E_DVASPECT;
+    if (pformatetc->lindex != -1) return DV_E_LINDEX;
+    if (!(pformatetc->tymed & TYMED_HGLOBAL)) return DV_E_TYMED;
+    return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_DO_GetData(
+    IDataObject *This, FORMATETC *pformatetcIn, STGMEDIUM *pmedium)
+{
+    VolvoxGridObject *obj = OBJ_FROM_DATAOBJECT(This);
+    int32_t utf8_len = 0;
+    uint8_t *utf8 = NULL;
+    int wide_len = 0;
+    SIZE_T bytes;
+    HGLOBAL hmem;
+    WCHAR *wide;
+    HRESULT hr;
+    VFGStoredDataFormat *stored;
+
+    if (!pmedium) return E_POINTER;
+    memset(pmedium, 0, sizeof(*pmedium));
+    hr = VFG_DO_QueryGetData(This, pformatetcIn);
+    if (FAILED(hr)) return hr;
+
+    stored = pformatetcIn
+        ? vfg_find_stored_data_format(obj, pformatetcIn->cfFormat)
+        : NULL;
+    if (stored) {
+        hmem = vfg_hglobal_from_bytes(stored->bytes, stored->len);
+        if (!hmem) return STG_E_MEDIUMFULL;
+        pmedium->tymed = TYMED_HGLOBAL;
+        pmedium->hGlobal = hmem;
+        pmedium->pUnkForRelease = NULL;
+        return S_OK;
+    }
+
+    utf8 = volvox_grid_get_clip(obj->grid_id, &utf8_len);
+    if (pformatetcIn && pformatetcIn->cfFormat == vfg_clip_format_html()) {
+        int html_len = 0;
+        char *html = vfg_build_clip_html_utf8((const char *)utf8, utf8_len, &html_len);
+        if (utf8) volvox_grid_free(utf8, utf8_len);
+        if (!html) return E_OUTOFMEMORY;
+        hmem = vfg_hglobal_from_bytes(html, (SIZE_T)html_len + 1);
+        HeapFree(GetProcessHeap(), 0, html);
+        if (!hmem) return STG_E_MEDIUMFULL;
+        pmedium->tymed = TYMED_HGLOBAL;
+        pmedium->hGlobal = hmem;
+        pmedium->pUnkForRelease = NULL;
+        return S_OK;
+    }
+    if (pformatetcIn && pformatetcIn->cfFormat == vfg_clip_format_cells()) {
+        hmem = vfg_hglobal_from_bytes(utf8, utf8_len > 0 ? (SIZE_T)utf8_len : 0);
+        if (utf8) volvox_grid_free(utf8, utf8_len);
+        if (!hmem) return STG_E_MEDIUMFULL;
+        pmedium->tymed = TYMED_HGLOBAL;
+        pmedium->hGlobal = hmem;
+        pmedium->pUnkForRelease = NULL;
+        return S_OK;
+    }
+    if (utf8 && utf8_len > 0) {
+        wide_len = MultiByteToWideChar(CP_UTF8, 0, (const char *)utf8, utf8_len, NULL, 0);
+        if (wide_len < 0) wide_len = 0;
+    }
+    bytes = ((SIZE_T)wide_len + 1) * sizeof(WCHAR);
+    hmem = GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, bytes);
+    if (!hmem) {
+        if (utf8) volvox_grid_free(utf8, utf8_len);
+        return STG_E_MEDIUMFULL;
+    }
+    wide = (WCHAR *)GlobalLock(hmem);
+    if (!wide) {
+        GlobalFree(hmem);
+        if (utf8) volvox_grid_free(utf8, utf8_len);
+        return E_OUTOFMEMORY;
+    }
+    if (utf8 && utf8_len > 0 && wide_len > 0) {
+        MultiByteToWideChar(CP_UTF8, 0, (const char *)utf8, utf8_len, wide, wide_len);
+    }
+    wide[wide_len] = L'\0';
+    GlobalUnlock(hmem);
+    if (utf8) volvox_grid_free(utf8, utf8_len);
+
+    pmedium->tymed = TYMED_HGLOBAL;
+    pmedium->hGlobal = hmem;
+    pmedium->pUnkForRelease = NULL;
+    return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_DO_GetDataHere(
+    IDataObject *This, FORMATETC *pformatetc, STGMEDIUM *pmedium)
+{
+    (void)This; (void)pformatetc; (void)pmedium;
+    return DATA_E_FORMATETC;
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_DO_GetCanonicalFormatEtc(
+    IDataObject *This, FORMATETC *pformatetcIn, FORMATETC *pformatetcOut)
+{
+    (void)This; (void)pformatetcIn;
+    if (!pformatetcOut) return E_POINTER;
+    memset(pformatetcOut, 0, sizeof(*pformatetcOut));
+    pformatetcOut->ptd = NULL;
+    return DATA_S_SAMEFORMATETC;
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_DO_SetData(
+    IDataObject *This, FORMATETC *pformatetc, STGMEDIUM *pmedium, BOOL fRelease)
+{
+    VolvoxGridObject *obj = OBJ_FROM_DATAOBJECT(This);
+    HRESULT hr = DATA_E_FORMATETC;
+    void *src = NULL;
+    SIZE_T len = 0;
+    if (!pformatetc || !pmedium) return E_POINTER;
+    if ((pformatetc->tymed & TYMED_HGLOBAL) && pmedium->tymed == TYMED_HGLOBAL && pmedium->hGlobal) {
+        len = GlobalSize(pmedium->hGlobal);
+        src = GlobalLock(pmedium->hGlobal);
+        if (src || len == 0) {
+            if (len > INT32_MAX) {
+                hr = STG_E_MEDIUMFULL;
+            } else {
+                hr = (HRESULT)volvox_grid_set_data_format_native(
+                    obj->grid_id,
+                    (uint32_t)pformatetc->cfFormat,
+                    (const uint8_t *)src,
+                    (int32_t)len);
+            }
+        } else {
+            hr = E_OUTOFMEMORY;
+        }
+        if (src) GlobalUnlock(pmedium->hGlobal);
+    }
+    if (fRelease) ReleaseStgMedium(pmedium);
+    return hr;
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_DO_EnumFormatEtc(
+    IDataObject *This, DWORD dwDirection, IEnumFORMATETC **ppenumFormatEtc)
+{
+    VFGFormatEtcEnum *en;
+    (void)This;
+    if (!ppenumFormatEtc) return E_POINTER;
+    *ppenumFormatEtc = NULL;
+    if (dwDirection != DATADIR_GET) return OLE_E_ADVISENOTSUPPORTED;
+    en = vfg_formatetc_enum_create(0);
+    if (!en) return E_OUTOFMEMORY;
+    *ppenumFormatEtc = (IEnumFORMATETC *)en;
+    return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_DO_DAdvise(
+    IDataObject *This, FORMATETC *pformatetc, DWORD advf, IAdviseSink *pAdvSink,
+    DWORD *pdwConnection)
+{
+    (void)This; (void)pformatetc; (void)advf; (void)pAdvSink;
+    if (pdwConnection) *pdwConnection = 0;
+    return OLE_E_ADVISENOTSUPPORTED;
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_DO_DUnadvise(IDataObject *This, DWORD dwConnection) {
+    (void)This; (void)dwConnection;
+    return OLE_E_ADVISENOTSUPPORTED;
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_DO_EnumDAdvise(
+    IDataObject *This, IEnumSTATDATA **ppenumAdvise)
+{
+    (void)This;
+    if (ppenumAdvise) *ppenumAdvise = NULL;
+    return OLE_E_ADVISENOTSUPPORTED;
+}
+
+static DWORD vfg_choose_drop_effect(VolvoxGridObject *obj, DWORD grfKeyState, DWORD allowed) {
+    DWORD want = 0;
+    if (!obj || obj->ole_drop_mode_cached == 0) return DROPEFFECT_NONE;
+    if ((grfKeyState & MK_CONTROL) && (allowed & DROPEFFECT_COPY)) {
+        return DROPEFFECT_COPY;
+    }
+    if ((grfKeyState & MK_SHIFT) && (allowed & DROPEFFECT_MOVE)) {
+        return DROPEFFECT_MOVE;
+    }
+    if (obj->ole_drop_mode_cached == 1) want = DROPEFFECT_MOVE;
+    else if (obj->ole_drop_mode_cached == 2) want = DROPEFFECT_COPY;
+    else want = allowed & (DROPEFFECT_COPY | DROPEFFECT_MOVE);
+    if ((want & allowed & DROPEFFECT_MOVE) != 0) return DROPEFFECT_MOVE;
+    if ((want & allowed & DROPEFFECT_COPY) != 0) return DROPEFFECT_COPY;
+    return DROPEFFECT_NONE;
+}
+
+static void vfg_fire_ole_start_drag_event(
+    VolvoxGridObject *obj, IDataObject *data_object, LONG *allowed_effects)
+{
+    VARIANT args[2];
+    VariantInit(&args[1]); args[1].vt = VT_UNKNOWN; args[1].punkVal = (IUnknown *)data_object;
+    VariantInit(&args[0]); args[0].vt = VT_BYREF | VT_I4; args[0].plVal = allowed_effects;
+    vfg_fire_event(obj, DISPID_VFG_EVT_OLESTARTDRAG, args, 2);
+}
+
+static void vfg_fire_ole_give_feedback_event(
+    VolvoxGridObject *obj, LONG effect, VARIANT_BOOL *default_cursors)
+{
+    VARIANT args[2];
+    VariantInit(&args[1]); args[1].vt = VT_I4; args[1].lVal = effect;
+    VariantInit(&args[0]); args[0].vt = VT_BYREF | VT_BOOL; args[0].pboolVal = default_cursors;
+    vfg_fire_event(obj, DISPID_VFG_EVT_OLEGIVEFEEDBACK, args, 2);
+}
+
+static void vfg_fire_ole_complete_drag_event(VolvoxGridObject *obj, LONG effect) {
+    VARIANT arg;
+    VariantInit(&arg);
+    arg.vt = VT_I4;
+    arg.lVal = effect;
+    vfg_fire_event(obj, DISPID_VFG_EVT_OLECOMPLETEDRAG, &arg, 1);
+}
+
+static void vfg_fire_ole_drag_over_event(
+    VolvoxGridObject *obj,
+    IDataObject *data_object,
+    LONG *effect,
+    LONG button,
+    LONG shift,
+    float x,
+    float y,
+    LONG state)
+{
+    VARIANT args[7];
+    VariantInit(&args[6]); args[6].vt = VT_UNKNOWN; args[6].punkVal = (IUnknown *)data_object;
+    VariantInit(&args[5]); args[5].vt = VT_BYREF | VT_I4; args[5].plVal = effect;
+    VariantInit(&args[4]); args[4].vt = VT_I4; args[4].lVal = button;
+    VariantInit(&args[3]); args[3].vt = VT_I4; args[3].lVal = shift;
+    VariantInit(&args[2]); args[2].vt = VT_R4; args[2].fltVal = x;
+    VariantInit(&args[1]); args[1].vt = VT_R4; args[1].fltVal = y;
+    VariantInit(&args[0]); args[0].vt = VT_I4; args[0].lVal = state;
+    vfg_fire_event(obj, DISPID_VFG_EVT_OLEDRAGOVER, args, 7);
+}
+
+static void vfg_fire_ole_drag_drop_event(
+    VolvoxGridObject *obj,
+    IDataObject *data_object,
+    LONG *effect,
+    LONG button,
+    LONG shift,
+    float x,
+    float y)
+{
+    VARIANT args[6];
+    VariantInit(&args[5]); args[5].vt = VT_UNKNOWN; args[5].punkVal = (IUnknown *)data_object;
+    VariantInit(&args[4]); args[4].vt = VT_BYREF | VT_I4; args[4].plVal = effect;
+    VariantInit(&args[3]); args[3].vt = VT_I4; args[3].lVal = button;
+    VariantInit(&args[2]); args[2].vt = VT_I4; args[2].lVal = shift;
+    VariantInit(&args[1]); args[1].vt = VT_R4; args[1].fltVal = x;
+    VariantInit(&args[0]); args[0].vt = VT_R4; args[0].fltVal = y;
+    vfg_fire_event(obj, DISPID_VFG_EVT_OLEDRAGDROP, args, 6);
+}
+
+static HRESULT vfg_paste_unicode_data_object(VolvoxGridObject *obj, IDataObject *data_object) {
+    FORMATETC fmt;
+    STGMEDIUM med;
+    WCHAR *wide = NULL;
+    int chars;
+    int utf8_len;
+    char *utf8 = NULL;
+    int32_t out_len = 0;
+    int32_t status;
+    HRESULT hr;
+
+    if (!obj || !data_object) return E_POINTER;
+    vfg_init_formatetc(&fmt, CF_UNICODETEXT);
+    memset(&med, 0, sizeof(med));
+    hr = IDataObject_GetData(data_object, &fmt, &med);
+    if (FAILED(hr)) return hr;
+    if (med.tymed != TYMED_HGLOBAL || !med.hGlobal) {
+        ReleaseStgMedium(&med);
+        return DATA_E_FORMATETC;
+    }
+    wide = (WCHAR *)GlobalLock(med.hGlobal);
+    if (!wide) {
+        ReleaseStgMedium(&med);
+        return E_OUTOFMEMORY;
+    }
+    chars = (int)wcslen(wide);
+    utf8_len = WideCharToMultiByte(CP_UTF8, 0, wide, chars, NULL, 0, NULL, NULL);
+    if (utf8_len > 0) {
+        utf8 = (char *)HeapAlloc(GetProcessHeap(), 0, (SIZE_T)utf8_len);
+        if (!utf8) {
+            GlobalUnlock(med.hGlobal);
+            ReleaseStgMedium(&med);
+            return E_OUTOFMEMORY;
+        }
+        WideCharToMultiByte(CP_UTF8, 0, wide, chars, utf8, utf8_len, NULL, NULL);
+    }
+    GlobalUnlock(med.hGlobal);
+    status = vfg_take_status_response(volvox_grid_set_clip(
+        obj->grid_id,
+        (const uint8_t *)(utf8 ? utf8 : ""),
+        utf8 ? utf8_len : 0,
+        &out_len));
+    if (utf8) HeapFree(GetProcessHeap(), 0, utf8);
+    ReleaseStgMedium(&med);
+    return status == 0 ? S_OK : E_FAIL;
+}
+
+int32_t volvox_grid_ole_begin_drag_native(
+    int64_t id,
+    int32_t allowed_effects,
+    int32_t *out_effect)
+{
+    VolvoxGridObject *obj = vfg_find_object_by_grid_id(id);
+    LONG allowed = allowed_effects != 0
+        ? (LONG)allowed_effects
+        : (LONG)(DROPEFFECT_COPY | DROPEFFECT_MOVE);
+    DWORD effect = DROPEFFECT_NONE;
+    HRESULT hr;
+    if (out_effect) *out_effect = DROPEFFECT_NONE;
+    if (!obj) return E_INVALIDARG;
+    if (obj->ole_drag_mode_cached == 0) return S_OK;
+    if (!obj->ole_initialized) {
+        hr = OleInitialize(NULL);
+        if (SUCCEEDED(hr) || hr == S_FALSE) {
+            obj->ole_initialized = 1;
+        } else {
+            return hr;
+        }
+    }
+    vfg_fire_ole_start_drag_event(
+        obj,
+        (IDataObject *)&obj->lpVtblDataObject,
+        &allowed);
+    if (allowed == 0) {
+        vfg_fire_ole_complete_drag_event(obj, DROPEFFECT_NONE);
+        return S_OK;
+    }
+    hr = DoDragDrop(
+        (IDataObject *)&obj->lpVtblDataObject,
+        (IDropSource *)&obj->lpVtblDropSource,
+        (DWORD)allowed,
+        &effect);
+    if (hr == DRAGDROP_S_CANCEL) effect = DROPEFFECT_NONE;
+    if (FAILED(hr) && hr != DRAGDROP_S_CANCEL) return hr;
+    vfg_fire_ole_complete_drag_event(obj, (LONG)effect);
+    if (out_effect) *out_effect = (int32_t)effect;
+    return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_DS_QueryInterface(
+    IDropSource *This, REFIID riid, void **ppv)
+{
+    if (!ppv) return E_POINTER;
+    if (IsEqualIID(riid, &IID_IUnknown) || IsEqualIID(riid, &IID_IDropSource)) {
+        *ppv = This;
+        VFG_AddRef((IDispatch *)OBJ_FROM_DROPSOURCE(This));
+        return S_OK;
+    }
+    return VFG_QueryInterface((IDispatch *)OBJ_FROM_DROPSOURCE(This), riid, ppv);
+}
+
+static ULONG STDMETHODCALLTYPE VFG_DS_AddRef(IDropSource *This) {
+    return VFG_AddRef((IDispatch *)OBJ_FROM_DROPSOURCE(This));
+}
+
+static ULONG STDMETHODCALLTYPE VFG_DS_Release(IDropSource *This) {
+    return VFG_Release((IDispatch *)OBJ_FROM_DROPSOURCE(This));
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_DS_QueryContinueDrag(
+    IDropSource *This, BOOL fEscapePressed, DWORD grfKeyState)
+{
+    (void)This;
+    if (fEscapePressed) return DRAGDROP_S_CANCEL;
+    if (!(grfKeyState & (MK_LBUTTON | MK_RBUTTON | MK_MBUTTON))) return DRAGDROP_S_DROP;
+    return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_DS_GiveFeedback(IDropSource *This, DWORD dwEffect) {
+    VolvoxGridObject *obj = OBJ_FROM_DROPSOURCE(This);
+    VARIANT_BOOL default_cursors = VARIANT_TRUE;
+    vfg_fire_ole_give_feedback_event(obj, (LONG)dwEffect, &default_cursors);
+    return default_cursors != VARIANT_FALSE ? DRAGDROP_S_USEDEFAULTCURSORS : S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_DT_QueryInterface(
+    IDropTarget *This, REFIID riid, void **ppv)
+{
+    if (!ppv) return E_POINTER;
+    if (IsEqualIID(riid, &IID_IUnknown) || IsEqualIID(riid, &IID_IDropTarget)) {
+        *ppv = This;
+        VFG_AddRef((IDispatch *)OBJ_FROM_DROPTARGET(This));
+        return S_OK;
+    }
+    return VFG_QueryInterface((IDispatch *)OBJ_FROM_DROPTARGET(This), riid, ppv);
+}
+
+static ULONG STDMETHODCALLTYPE VFG_DT_AddRef(IDropTarget *This) {
+    return VFG_AddRef((IDispatch *)OBJ_FROM_DROPTARGET(This));
+}
+
+static ULONG STDMETHODCALLTYPE VFG_DT_Release(IDropTarget *This) {
+    return VFG_Release((IDispatch *)OBJ_FROM_DROPTARGET(This));
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_DT_DragEnter(
+    IDropTarget *This, IDataObject *pDataObj, DWORD grfKeyState, POINTL pt, DWORD *pdwEffect)
+{
+    VolvoxGridObject *obj = OBJ_FROM_DROPTARGET(This);
+    LONG effect;
+    if (!pdwEffect) return E_POINTER;
+    effect = (LONG)vfg_choose_drop_effect(obj, grfKeyState, *pdwEffect);
+    vfg_fire_ole_drag_over_event(
+        obj, pDataObj, &effect, 0, (LONG)vfg_current_modifier_flags(), (float)pt.x, (float)pt.y, 0);
+    *pdwEffect = (DWORD)effect;
+    return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_DT_DragOver(
+    IDropTarget *This, DWORD grfKeyState, POINTL pt, DWORD *pdwEffect)
+{
+    VolvoxGridObject *obj = OBJ_FROM_DROPTARGET(This);
+    LONG effect;
+    if (!pdwEffect) return E_POINTER;
+    effect = (LONG)vfg_choose_drop_effect(obj, grfKeyState, *pdwEffect);
+    vfg_fire_ole_drag_over_event(
+        obj, NULL, &effect, 0, (LONG)vfg_current_modifier_flags(), (float)pt.x, (float)pt.y, 1);
+    *pdwEffect = (DWORD)effect;
+    return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_DT_DragLeave(IDropTarget *This) {
+    VolvoxGridObject *obj = OBJ_FROM_DROPTARGET(This);
+    LONG effect = DROPEFFECT_NONE;
+    vfg_fire_ole_drag_over_event(obj, NULL, &effect, 0, 0, 0.0f, 0.0f, 2);
+    return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE VFG_DT_Drop(
+    IDropTarget *This, IDataObject *pDataObj, DWORD grfKeyState, POINTL pt, DWORD *pdwEffect)
+{
+    VolvoxGridObject *obj = OBJ_FROM_DROPTARGET(This);
+    LONG effect;
+    if (!pdwEffect) return E_POINTER;
+    effect = (LONG)vfg_choose_drop_effect(obj, grfKeyState, *pdwEffect);
+    vfg_fire_ole_drag_drop_event(
+        obj, pDataObj, &effect, 0, (LONG)vfg_current_modifier_flags(), (float)pt.x, (float)pt.y);
+    if (effect != DROPEFFECT_NONE && pDataObj) {
+        (void)vfg_paste_unicode_data_object(obj, pDataObj);
+    }
+    *pdwEffect = (DWORD)effect;
+    return S_OK;
 }
 
 static HRESULT STDMETHODCALLTYPE VFG_OS_QueryInterface(
@@ -11064,6 +14084,19 @@ static IViewObjectVtbl g_VFGViewObjectVtbl = {
     VFG_VO_Unfreeze,
     VFG_VO_SetAdvise,
     VFG_VO_GetAdvise,
+};
+
+static IViewObject2Vtbl g_VFGViewObject2Vtbl = {
+    VFG_VO2_QueryInterface,
+    VFG_VO2_AddRef,
+    VFG_VO2_Release,
+    VFG_VO2_Draw,
+    VFG_VO2_GetColorSet,
+    VFG_VO2_Freeze,
+    VFG_VO2_Unfreeze,
+    VFG_VO2_SetAdvise,
+    VFG_VO2_GetAdvise,
+    VFG_VO2_GetExtent,
 };
 
 static IOleObjectVtbl g_VFGOleObjectVtbl = {
@@ -11159,19 +14192,67 @@ static IConnectionPointVtbl g_VFGConnectionPointVtbl = {
     VFG_CP_EnumConnections,
 };
 
-static IProvideClassInfoVtbl g_VFGProvideClassInfoVtbl = {
-    VFG_CI_QueryInterface,
-    VFG_CI_AddRef,
-    VFG_CI_Release,
-    VFG_CI_GetClassInfo,
+static IEnumConnectionPointsVtbl g_VFGConnectionPointsEnumVtbl = {
+    VFG_CPE_QueryInterface,
+    VFG_CPE_AddRef,
+    VFG_CPE_Release,
+    VFG_CPE_Next,
+    VFG_CPE_Skip,
+    VFG_CPE_Reset,
+    VFG_CPE_Clone,
 };
 
-static IProvideClassInfo2Vtbl g_VFGProvideClassInfo2Vtbl = {
-    VFG_CI2_QueryInterface,
-    VFG_CI2_AddRef,
-    VFG_CI2_Release,
-    VFG_CI2_GetClassInfo,
-    VFG_CI2_GetGUID,
+static IEnumConnectionsVtbl g_VFGConnectionsEnumVtbl = {
+    VFG_CE_QueryInterface,
+    VFG_CE_AddRef,
+    VFG_CE_Release,
+    VFG_CE_Next,
+    VFG_CE_Skip,
+    VFG_CE_Reset,
+    VFG_CE_Clone,
+};
+
+static IDataObjectVtbl g_VFGDataObjectVtbl = {
+    VFG_DO_QueryInterface,
+    VFG_DO_AddRef,
+    VFG_DO_Release,
+    VFG_DO_GetData,
+    VFG_DO_GetDataHere,
+    VFG_DO_QueryGetData,
+    VFG_DO_GetCanonicalFormatEtc,
+    VFG_DO_SetData,
+    VFG_DO_EnumFormatEtc,
+    VFG_DO_DAdvise,
+    VFG_DO_DUnadvise,
+    VFG_DO_EnumDAdvise,
+};
+
+static IEnumFORMATETCVtbl g_VFGFormatEtcEnumVtbl = {
+    VFG_FE_QueryInterface,
+    VFG_FE_AddRef,
+    VFG_FE_Release,
+    VFG_FE_Next,
+    VFG_FE_Skip,
+    VFG_FE_Reset,
+    VFG_FE_Clone,
+};
+
+static IDropSourceVtbl g_VFGDropSourceVtbl = {
+    VFG_DS_QueryInterface,
+    VFG_DS_AddRef,
+    VFG_DS_Release,
+    VFG_DS_QueryContinueDrag,
+    VFG_DS_GiveFeedback,
+};
+
+static IDropTargetVtbl g_VFGDropTargetVtbl = {
+    VFG_DT_QueryInterface,
+    VFG_DT_AddRef,
+    VFG_DT_Release,
+    VFG_DT_DragEnter,
+    VFG_DT_DragOver,
+    VFG_DT_DragLeave,
+    VFG_DT_Drop,
 };
 
 static IObjectSafetyVtbl g_VFGObjectSafetyVtbl = {
@@ -11482,6 +14563,7 @@ HRESULT VolvoxGrid_CreateInstance(IUnknown *pOuter, REFIID riid, void **ppv) {
 
     obj->lpVtblDispatch = &g_VFGDispatchVtbl;
     obj->lpVtblViewObject = &g_VFGViewObjectVtbl;
+    obj->lpVtblViewObject2 = &g_VFGViewObject2Vtbl;
     obj->lpVtblOleObject = &g_VFGOleObjectVtbl;
     obj->lpVtblInPlaceObject = &g_VFGInPlaceObjectVtbl;
     obj->lpVtblInPlaceActiveObject = &g_VFGInPlaceActiveObjectVtbl;
@@ -11489,8 +14571,9 @@ HRESULT VolvoxGrid_CreateInstance(IUnknown *pOuter, REFIID riid, void **ppv) {
     obj->lpVtblPersistStreamInit = &g_VFGPersistStreamInitVtbl;
     obj->lpVtblConnectionPointContainer = &g_VFGConnectionPointContainerVtbl;
     obj->lpVtblConnectionPoint = &g_VFGConnectionPointVtbl;
-    obj->lpVtblProvideClassInfo = &g_VFGProvideClassInfoVtbl;
-    obj->lpVtblProvideClassInfo2 = &g_VFGProvideClassInfo2Vtbl;
+    obj->lpVtblDataObject = &g_VFGDataObjectVtbl;
+    obj->lpVtblDropSource = &g_VFGDropSourceVtbl;
+    obj->lpVtblDropTarget = &g_VFGDropTargetVtbl;
     obj->lpVtblObjectSafety = &g_VFGObjectSafetyVtbl;
     obj->cRef = 1;
     obj->extent_himetric.cx = (640 * 2540) / VFG_DEFAULT_DPI;
@@ -11503,8 +14586,11 @@ HRESULT VolvoxGrid_CreateInstance(IUnknown *pOuter, REFIID riid, void **ppv) {
     obj->bound_fixed_cols = 0;
     obj->bound_data_col_offset = 0;
     obj->bound_col_width_uses_data_offset = 0;
+    obj->bound_virtual_active = 0;
+    obj->bound_record_count = -1;
+    obj->bound_window_start = 0;
+    obj->bound_window_end = 0;
     obj->has_bound_layout = 0;
-    obj->editable_cached = 0;
     obj->frozen_rows_cached = 0;
     obj->frozen_cols_cached = 0;
     obj->row_sel_cached = 1;
@@ -11512,43 +14598,21 @@ HRESULT VolvoxGrid_CreateInstance(IUnknown *pOuter, REFIID riid, void **ppv) {
     obj->data_mode = 0;
     obj->virtual_data = 0;
     obj->auto_resize = 1;
-    obj->mouse_pointer_cached = 0;
-    obj->appearance_cached = 0;
-    obj->back_color_bkg_cached = 0;
-    obj->back_color_frozen_cached = 0;
-    obj->flood_color_cached_global = 0;
-    obj->fore_color_frozen_cached = 0;
-    obj->grid_color_fixed_cached = olecolor_to_argb((uint32_t)GetSysColor(COLOR_BTNFACE));
-    obj->sheet_border_cached = 0;
-    obj->font_bold_cached = 0;
-    obj->font_italic_cached = 0;
-    obj->font_strikethru_cached = 0;
-    obj->font_underline_cached = 0;
-    obj->font_width_cached = 0;
-    obj->allow_user_freezing_cached = 0;
-    obj->explorer_bar_cached = 0;
-    obj->tab_behavior_cached = 1;
-    obj->col_width_min_cached = -1;
-    obj->row_height_min_cached = -1;
-    obj->grid_line_width_cached = 1;
     obj->sort_order_cached = 0;
+    obj->ole_drag_mode_cached = 0;
+    obj->ole_drop_mode_cached = 0;
+    obj->ole_initialized = 0;
+    obj->drop_registered = 0;
     obj->suppress_bound_text_writes = 0;
+    obj->edit_max_length_empty = 0;
+    obj->mouse_pointer_cached = 0;
+    obj->col_width_min_twips = -1;
+    obj->row_height_min_twips = -1;
     obj->data_source = NULL;
     obj->recordset = NULL;
     obj->data_member = NULL;
-    obj->id_cached = NULL;
-    obj->format_string_cached = NULL;
-    obj->clip_separators_cached = NULL;
-    obj->accessible_name_cached = NULL;
-    obj->accessible_description_cached = NULL;
-    obj->accessible_value_cached = NULL;
-    VariantInit(&obj->accessible_role_cached);
-    obj->scroll_tips_cached = 0;
-    obj->combo_search_cached = 0;
-    obj->owner_draw_cached = 0;
-    obj->picture_type_cached = 0;
-    obj->merge_cells_fixed_cached = 0;
-    obj->group_compare_cached = 0;
+    VariantInit(&obj->height_cached);
+    VariantInit(&obj->width_cached);
     SetRectEmpty(&obj->pos_rect);
     SetRectEmpty(&obj->clip_rect);
     obj->registry_next = NULL;
@@ -11584,14 +14648,20 @@ HRESULT VolvoxGrid_CreateInstance(IUnknown *pOuter, REFIID riid, void **ppv) {
     volvox_grid_set_grid_color_fixed(
         obj->grid_id,
         olecolor_to_argb((uint32_t)GetSysColor(COLOR_BTNFACE)));
-    volvox_grid_set_appearance_native(obj->grid_id, obj->appearance_cached);
+    volvox_grid_set_appearance_native(obj->grid_id, 0);
     volvox_grid_set_sheet_border_native(obj->grid_id, 0);
-    volvox_grid_set_font_bold_native(obj->grid_id, obj->font_bold_cached);
-    volvox_grid_set_font_italic_native(obj->grid_id, obj->font_italic_cached);
-    volvox_grid_set_font_underline_native(obj->grid_id, obj->font_underline_cached);
-    volvox_grid_set_font_strikethrough_native(obj->grid_id, obj->font_strikethru_cached);
-    volvox_grid_set_font_width_native(obj->grid_id, obj->font_width_cached);
-    volvox_grid_set_grid_line_width_native(obj->grid_id, obj->grid_line_width_cached);
+    volvox_grid_set_font_bold_native(obj->grid_id, 0);
+    volvox_grid_set_font_italic_native(obj->grid_id, 0);
+    volvox_grid_set_font_underline_native(obj->grid_id, 0);
+    volvox_grid_set_font_strikethrough_native(obj->grid_id, 0);
+    volvox_grid_set_font_width_native(obj->grid_id, 0);
+    volvox_grid_set_grid_line_width_native(obj->grid_id, 1);
+    volvox_grid_set_col_width_min_default_native(
+        obj->grid_id,
+        vfg_twips_to_px_x(-1));
+    volvox_grid_set_row_height_min_native(
+        obj->grid_id,
+        vfg_twips_to_px_y(-1));
     volvox_grid_set_back_color_sel(
         obj->grid_id,
         olecolor_to_argb((uint32_t)GetSysColor(COLOR_HIGHLIGHT)));

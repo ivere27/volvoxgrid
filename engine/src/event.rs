@@ -480,6 +480,11 @@ impl EventQueue {
         self.queue.pop_front()
     }
 
+    /// Inspect the next event without removing it from the queue.
+    pub fn peek(&self) -> Option<&QueuedGridEvent> {
+        self.queue.front()
+    }
+
     /// Drain all pending events into a `Vec`, leaving the queue empty.
     pub fn drain(&mut self) -> Vec<QueuedGridEvent> {
         self.queue.drain(..).collect()

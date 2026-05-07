@@ -19,6 +19,7 @@
  *   --ref-progid ID     ProgID of the reference control to compare against
  *   --only-vv           Skip reference, only render VolvoxGrid
  *   --no-diff           Skip pixel diff generation
+ *   --strict-state      Fail on property or TextMatrix state differences
  *   --test N            Run only one test number
  *   --tests LIST        Run only selected tests (e.g. 1,3,7-9)
  *
@@ -409,10 +410,10 @@ static void format_snapshot_value(int value, char *buf, size_t buf_cap) {
     }
 }
 
-static void print_snapshot_int_diff(const char *name, int lg_value, int vv_value, int *printed) {
+static int print_snapshot_int_diff(const char *name, int lg_value, int vv_value, int *printed) {
     char lg_buf[32];
     char vv_buf[32];
-    if (lg_value == vv_value) return;
+    if (lg_value == vv_value) return 0;
     if (printed && !*printed) {
         printf("  PropertyDiff:\n");
         *printed = 1;
@@ -420,9 +421,10 @@ static void print_snapshot_int_diff(const char *name, int lg_value, int vv_value
     format_snapshot_value(lg_value, lg_buf, sizeof(lg_buf));
     format_snapshot_value(vv_value, vv_buf, sizeof(vv_buf));
     printf("    %s: lg=%s vv=%s\n", name, lg_buf, vv_buf);
+    return 1;
 }
 
-static void print_snapshot_array_diff(
+static int print_snapshot_array_diff(
     const char *name,
     const int *lg_values,
     int lg_count,
@@ -431,46 +433,46 @@ static void print_snapshot_array_diff(
     int *printed)
 {
     int count = lg_count > vv_count ? lg_count : vv_count;
+    int diff_count = 0;
     int i;
     for (i = 0; i < count; i++) {
         int lg_value = i < lg_count && lg_values ? lg_values[i] : SNAP_MISSING_INT;
         int vv_value = i < vv_count && vv_values ? vv_values[i] : SNAP_MISSING_INT;
         char label[64];
         if (lg_value == vv_value) continue;
-        if (printed && !*printed) {
-            printf("  PropertyDiff:\n");
-            *printed = 1;
-        }
         snprintf(label, sizeof(label), "%s[%d]", name, i);
-        print_snapshot_int_diff(label, lg_value, vv_value, printed);
+        diff_count += print_snapshot_int_diff(label, lg_value, vv_value, printed);
     }
+    return diff_count;
 }
 
-static void print_grid_property_diffs(
+static int print_grid_property_diffs(
     int test_no,
     const char *test_name,
     const GridSnapshot *lg,
     const GridSnapshot *vv)
 {
     int printed = 0;
-    if (!lg || !vv) return;
-    print_snapshot_int_diff("Rows", lg->rows, vv->rows, &printed);
-    print_snapshot_int_diff("Cols", lg->cols, vv->cols, &printed);
-    print_snapshot_int_diff("FixedRows", lg->fixed_rows, vv->fixed_rows, &printed);
-    print_snapshot_int_diff("FixedCols", lg->fixed_cols, vv->fixed_cols, &printed);
-    print_snapshot_int_diff("FrozenRows", lg->frozen_rows, vv->frozen_rows, &printed);
-    print_snapshot_int_diff("FrozenCols", lg->frozen_cols, vv->frozen_cols, &printed);
-    print_snapshot_int_diff("Row", lg->row, vv->row, &printed);
-    print_snapshot_int_diff("Col", lg->col, vv->col, &printed);
-    print_snapshot_int_diff("RowSel", lg->row_sel, vv->row_sel, &printed);
-    print_snapshot_int_diff("ColSel", lg->col_sel, vv->col_sel, &printed);
-    print_snapshot_int_diff("TopRow", lg->top_row, vv->top_row, &printed);
-    print_snapshot_int_diff("LeftCol", lg->left_col, vv->left_col, &printed);
-    print_snapshot_array_diff("RowHeight", lg->row_heights, lg->row_heights_count, vv->row_heights, vv->row_heights_count, &printed);
-    print_snapshot_array_diff("ColWidth", lg->col_widths, lg->col_widths_count, vv->col_widths, vv->col_widths_count, &printed);
+    int diff_count = 0;
+    if (!lg || !vv) return 0;
+    diff_count += print_snapshot_int_diff("Rows", lg->rows, vv->rows, &printed);
+    diff_count += print_snapshot_int_diff("Cols", lg->cols, vv->cols, &printed);
+    diff_count += print_snapshot_int_diff("FixedRows", lg->fixed_rows, vv->fixed_rows, &printed);
+    diff_count += print_snapshot_int_diff("FixedCols", lg->fixed_cols, vv->fixed_cols, &printed);
+    diff_count += print_snapshot_int_diff("FrozenRows", lg->frozen_rows, vv->frozen_rows, &printed);
+    diff_count += print_snapshot_int_diff("FrozenCols", lg->frozen_cols, vv->frozen_cols, &printed);
+    diff_count += print_snapshot_int_diff("Row", lg->row, vv->row, &printed);
+    diff_count += print_snapshot_int_diff("Col", lg->col, vv->col, &printed);
+    diff_count += print_snapshot_int_diff("RowSel", lg->row_sel, vv->row_sel, &printed);
+    diff_count += print_snapshot_int_diff("ColSel", lg->col_sel, vv->col_sel, &printed);
+    diff_count += print_snapshot_int_diff("TopRow", lg->top_row, vv->top_row, &printed);
+    diff_count += print_snapshot_int_diff("LeftCol", lg->left_col, vv->left_col, &printed);
+    diff_count += print_snapshot_array_diff("RowHeight", lg->row_heights, lg->row_heights_count, vv->row_heights, vv->row_heights_count, &printed);
+    diff_count += print_snapshot_array_diff("ColWidth", lg->col_widths, lg->col_widths_count, vv->col_widths, vv->col_widths_count, &printed);
     if (printed) {
         printf("  PropertyDiffEnd[%02d] %s\n", test_no, test_name);
     }
+    return diff_count;
 }
 
 
@@ -2359,12 +2361,14 @@ int main(int argc, char *argv[]) {
     int dump_test = 0;
     int only_test = 0;
     int probe_defaults = 0;
+    int strict_state = 0;
     char test_filter[256] = {0};
     /* Keep tests non-interactive/silent on faults in CI/Wine runs. */
     SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
     for (int a = 1; a < argc; a++) {
         if (strcmp(argv[a], "--only-vv") == 0) only_vv = 1;
         else if (strcmp(argv[a], "--no-diff") == 0) skip_diff = 1;
+        else if (strcmp(argv[a], "--strict-state") == 0) strict_state = 1;
         else if (strcmp(argv[a], "--probe-defaults") == 0) probe_defaults = 1;
         else if (strcmp(argv[a], "--test") == 0 && a + 1 < argc) {
             only_test = atoi(argv[++a]);
@@ -2381,6 +2385,12 @@ int main(int argc, char *argv[]) {
         const char *env_dump = getenv("VFG_DUMP_TEST");
         if (env_dump && *env_dump) {
             dump_test = atoi(env_dump);
+        }
+    }
+    {
+        const char *env_strict = getenv("VFG_COMPARE_STRICT_STATE");
+        if (env_strict && *env_strict && strcmp(env_strict, "0") != 0) {
+            strict_state = 1;
         }
     }
     if (!g_ref_progid[0]) only_vv = 1;
@@ -2456,14 +2466,15 @@ int main(int argc, char *argv[]) {
          * shape as the legacy compare path and avoid VolvoxGrid-only APIs. */
         IDispatch *pVV = create_grid(PROGID_VOLVOXGRID, "VV");
         if (pVV) {
+            int state_failed = 0;
             run_vbs(pVV, vbs_code);
             capture_grid_snapshot(pVV, &vv_snapshot);
             if (dump_test == (i + 1)) {
                 dump_grid_rows(pVV, "VV", i + 1);
             }
             if (has_lg_snapshot) {
-                print_grid_property_diffs(i + 1, tc->name, &lg_snapshot, &vv_snapshot);
-                write_grid_cell_diff_file(
+                int property_diffs = print_grid_property_diffs(i + 1, tc->name, &lg_snapshot, &vv_snapshot);
+                int cell_diffs = write_grid_cell_diff_file(
                     i + 1,
                     tc->name,
                     &lg_snapshot,
@@ -2471,10 +2482,19 @@ int main(int argc, char *argv[]) {
                     lg.disp,
                     pVV,
                     cell_diff_txt);
+                if (strict_state && (property_diffs > 0 || cell_diffs != 0)) {
+                    state_failed = 1;
+                    printf("  STRICT_STATE_FAIL: property_diffs=%d cell_diffs=%d\n",
+                           property_diffs, cell_diffs);
+                }
             }
             render_to_bmp(pVV, bmp_vv, tc->width, tc->height);
             pVV->lpVtbl->Release(pVV);
-            pass++;
+            if (state_failed) {
+                fail++;
+            } else {
+                pass++;
+            }
 
             /* Pixel diff */
             if (has_lg && !skip_diff) {

@@ -252,7 +252,7 @@ The native `volvoxgrid` library is still a library dependency.
 
 ## Trademarks
 
-AG Grid is a trademark of AG Grid Ltd. Syncfusion and SfDataGrid are trademarks of Syncfusion, Inc. VSFlexGrid and FlexGrid are trademarks of GrapeCity, Inc. (formerly ComponentOne). All other trademarks are the property of their respective owners. VolvoxGrid is not affiliated with or endorsed by any of these companies. Third-party names are used solely to describe API-level interoperability. All adapter code is an independent, clean-room implementation; no source code, binaries, or proprietary assets from the original frameworks are included.
+AG Grid is a trademark of AG Grid Ltd. Syncfusion and SfDataGrid are trademarks of Syncfusion, Inc. VSFlexGrid and FlexGrid are trademarks of GrapeCity, Inc. (formerly ComponentOne). All other trademarks are the property of their respective owners. VolvoxGrid is not affiliated with or endorsed by any of these companies. Third-party names are used solely to describe API-level interoperability. This repository does not include third-party proprietary source code, binaries, type libraries, or assets.
 
 ## License
 

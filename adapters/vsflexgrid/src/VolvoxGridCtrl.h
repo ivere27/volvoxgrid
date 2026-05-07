@@ -53,7 +53,6 @@ class ATL_NO_VTABLE CVolvoxGridCtrl :
     public ISpecifyPropertyPagesImpl<CVolvoxGridCtrl>,
     public IQuickActivateImpl<CVolvoxGridCtrl>,
     public IDataObjectImpl<CVolvoxGridCtrl>,
-    public IProvideClassInfo2Impl<&CLSID_VolvoxGrid, &DIID__DVolvoxGridEvents, &LIBID_VolvoxGridLib>,
     public CComControl<CVolvoxGridCtrl>
 {
 public:
@@ -80,8 +79,6 @@ public:
         COM_INTERFACE_ENTRY(ISpecifyPropertyPages)
         COM_INTERFACE_ENTRY(IQuickActivate)
         COM_INTERFACE_ENTRY(IDataObject)
-        COM_INTERFACE_ENTRY(IProvideClassInfo)
-        COM_INTERFACE_ENTRY(IProvideClassInfo2)
     END_COM_MAP()
 
     BEGIN_CONNECTION_POINT_MAP(CVolvoxGridCtrl)
