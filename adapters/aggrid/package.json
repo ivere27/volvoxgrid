@@ -6,17 +6,21 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "unpkg": "dist/ag-grid-volvox.min.js",
+  "jsdelivr": "dist/ag-grid-volvox.min.js",
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.json && npm run build:min",
+    "build:min": "esbuild dist/index.js --bundle --minify --format=esm --target=es2020 --outfile=dist/ag-grid-volvox.min.js --sourcemap --external:volvoxgrid --external:volvoxgrid/* --external:ag-grid-community"
   },
   "peerDependencies": {
     "volvoxgrid": "^0.8.5"
   },
   "devDependencies": {
     "ag-grid-community": "^32.0.0",
+    "esbuild": "^0.24.0",
     "puppeteer": "^22.0.0",
     "typescript": "^5.0.0",
     "volvoxgrid": "file:../../web/js"
