@@ -432,6 +432,15 @@ func (s *TerminalSession) SetViewport(originX, originY, width, height int, fulls
 	s.viewportDirty = true
 }
 
+// ForceFullRepaint requests a complete repaint on the next Render call even
+// when the viewport dimensions have not changed.
+func (s *TerminalSession) ForceFullRepaint() {
+	if s == nil || s.closed {
+		return
+	}
+	s.viewportDirty = true
+}
+
 func (s *TerminalSession) SendInputBytes(data []byte) error {
 	if len(data) == 0 {
 		return nil

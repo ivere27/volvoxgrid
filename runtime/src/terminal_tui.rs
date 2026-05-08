@@ -204,8 +204,8 @@ impl TerminalTuiSession {
             fullscreen: viewport.fullscreen,
         };
         let changed = self.viewport != Some(next);
+        self.force_full_repaint = true;
         if changed {
-            self.force_full_repaint = true;
             self.stop_tui_scrollbar_drag();
         }
         self.viewport = Some(next);
