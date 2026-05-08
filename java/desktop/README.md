@@ -13,14 +13,14 @@ native libraries embedded under `native/<platform>/`:
 <dependency>
     <groupId>io.github.ivere27</groupId>
     <artifactId>volvoxgrid-desktop</artifactId>
-    <version>0.8.6</version>
+    <version>0.8.7</version>
 </dependency>
 ```
 
 Gradle (Kotlin):
 
 ```kotlin
-implementation("io.github.ivere27:volvoxgrid-desktop:0.8.6")
+implementation("io.github.ivere27:volvoxgrid-desktop:0.8.7")
 ```
 
 The JAR resolves the right native library at runtime — no manual

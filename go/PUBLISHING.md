@@ -25,7 +25,7 @@ Because the module sits in the `/go/` subdirectory, version tags must be
 **prefixed** with the directory name:
 
 ```
-go/v0.8.6
+go/v0.8.7
 go/v0.8.7
 ```
 

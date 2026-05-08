@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.7
+
+- Added the `VolvoxDataGrid` helper API and refreshed package docs for Maven-backed native binary resolution.
+- Synced wrapper cursor handling and checkbox interaction fixes with the runtime changes.
+
 ## 0.8.6
 
 - Regenerated Flutter protocol bindings for the new semantic `CursorType` enum.

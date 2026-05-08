@@ -2,6 +2,13 @@
 
 All notable changes to VolvoxGrid are documented here. Per-package changelogs may have additional detail (e.g. [flutter/CHANGELOG.md](flutter/CHANGELOG.md)).
 
+## 0.8.7
+
+- Added a Bubble Tea terminal adapter with examples, tests, and TUI demo documentation.
+- Added Android Compose artifact support and Java desktop table-model adapter documentation.
+- Added higher-level Flutter data-grid helpers and expanded semantic cursor support across native wrappers.
+- Fixed row/column resize hit testing and double-click checkbox handling across engine, Web/WASM, sheet, native, and ActiveX paths.
+
 ## 0.8.6
 
 - Expanded the ActiveX/VSFlexGrid compatibility layer with container-contract probing, additional OLE/ADO/owner-draw hooks, persisted-state helpers, image/wallpaper compatibility properties, and MSAA accessibility properties.

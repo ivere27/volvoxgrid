@@ -73,14 +73,14 @@ Useful enums include:
 binaries embedded for the supported runtimes (RIDs):
 
 ```bash
-dotnet add package VolvoxGrid.DotNet --version 0.8.6
+dotnet add package VolvoxGrid.DotNet --version 0.8.7
 ```
 
 Or in your `csproj`:
 
 ```xml
 <ItemGroup>
-  <PackageReference Include="VolvoxGrid.DotNet" Version="0.8.6" />
+  <PackageReference Include="VolvoxGrid.DotNet" Version="0.8.7" />
 </ItemGroup>
 ```
 
