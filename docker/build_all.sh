@@ -40,6 +40,17 @@ run_android() {
         "${SCRIPT_DIR}/build_android_aar.sh"
       ;;
   esac
+
+  if [[ -x "${SCRIPT_DIR}/build_android_compose_aar.sh" ]]; then
+    echo "----------------------------------------"
+    echo "  Building: Android Compose AAR"
+    echo "----------------------------------------"
+    GROUP_ID="${full_group_id}" \
+    ARTIFACT_ID="${AAR_COMPOSE_ARTIFACT_ID:-volvoxgrid-android-compose}" \
+    PARENT_GROUP_ID="${full_group_id}" \
+    PARENT_ARTIFACT_ID="${full_artifact_id}" \
+      "${SCRIPT_DIR}/build_android_compose_aar.sh"
+  fi
 }
 
 run_desktop() {

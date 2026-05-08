@@ -120,6 +120,8 @@ AAR_DEBUG_ARTIFACT_ID ?= $(AAR_ARTIFACT_ID)-debug
 AAR_LITE_GROUP_ID ?= $(AAR_GROUP_ID)
 AAR_LITE_ARTIFACT_ID ?= volvoxgrid-android-lite
 AAR_LITE_DEBUG_ARTIFACT_ID ?= $(AAR_LITE_ARTIFACT_ID)-debug
+AAR_COMPOSE_GROUP_ID ?= $(AAR_GROUP_ID)
+AAR_COMPOSE_ARTIFACT_ID ?= volvoxgrid-android-compose
 AAR_GIT_COMMIT ?= $(shell git -C "$(CURRENT_DIR)" rev-parse --short=12 HEAD 2>/dev/null || echo unknown)
 AAR_BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 AAR_ANDROID_ABIS ?= arm64-v8a,armeabi-v7a
@@ -219,7 +221,8 @@ endif
         docker_android_aar_image docker_android docker_desktop_image docker_desktop \
         docker_web_image docker_web \
         docker_ios_image docker_ios docker_all_image docker_all publish_maven \
-        publish_local publish_github publish_web publish_npm \
+        publish_local publish_github publish_web publish_npm publish_nuget \
+        publish_go publish_go_bubbletea \
         gtk-test gtk-test-release gtk-bench clean clean-all help
 
 # =============================================================================
@@ -315,11 +318,14 @@ help:
 	@echo "  docker_ios                Build iOS XCFramework via Docker"
 	@echo "  docker_all_image          Build unified Docker image (all toolchains)"
 	@echo "  docker_all                Build all platform artifacts via unified Docker image (Android full+lite, .NET WinForms x64+x86), auto-install SNAPSHOT to mavenLocal"
-	@echo "  publish_maven             Upload Android AAR + Android lite AAR + desktop JAR to Maven Central"
+	@echo "  publish_maven             Upload Android AAR + Android lite AAR + Android Compose AAR + desktop JAR to Maven Central"
 	@echo "  publish_github            Upload all artifacts (xcframework, AAR, JAR, .NET, ActiveX, web zips) to GitHub release"
 	@echo "  publish_local             Install built SNAPSHOT artifacts from dist/maven into ~/.m2/repository"
 	@echo "  publish_web               Copy dist/web -> public (clean), then run firebase deploy"
 	@echo "  publish_npm               Publish volvoxgrid + adapter npm packages from dist/web zip"
+	@echo "  publish_nuget             Publish VolvoxGrid.DotNet (net8.0;net40) NuGet package to nuget.org"
+	@echo "  publish_go                Tag + push 'go/vX.Y.Z' so the core Go module is fetchable via go get"
+	@echo "  publish_go_bubbletea      Tag + push 'adapters/bubbletea/vX.Y.Z' (requires publish_go to have shipped first)"
 	@echo ""
 	@echo "Example dependency source flags (default is local):"
 	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.8.6"
@@ -700,8 +706,8 @@ codegen: build_codegen_tool
 	@mkdir -p $(WEB_TS_CODEGEN_DIR)
 	@mkdir -p $(GO_PROJECT_DIR)/api/v1
 	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
-		--go_out=$(GO_PROJECT_DIR) --go_opt=module=github.com/ivere27/volvoxgrid \
-		--go-grpc_out=$(GO_PROJECT_DIR) --go-grpc_opt=module=github.com/ivere27/volvoxgrid \
+		--go_out=$(GO_PROJECT_DIR) --go_opt=module=github.com/ivere27/volvoxgrid/go \
+		--go-grpc_out=$(GO_PROJECT_DIR) --go-grpc_opt=module=github.com/ivere27/volvoxgrid/go \
 		proto/volvoxgrid.proto
 	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
 		$(PROTOC_GEN_SYNURANG_FFI_FLAG) \
@@ -1278,7 +1284,25 @@ docker_android: docker_android_aar_image
 		-e ANDROID_ABIS="$(AAR_ANDROID_ABIS)" \
 		-e LIBRARY_BUILD_MODE=lite \
 		"$(AAR_DOCKER_IMAGE)"
-	@echo "Android AAR artifacts (default + lite): dist/maven/"
+	docker run --rm \
+		--entrypoint /opt/volvoxgrid/build_android_compose_aar.sh \
+		-u "$$(id -u):$$(id -g)" \
+		-v "$(CURRENT_DIR):/workspace/volvoxgrid" \
+		-v "$(DOCKER_GO_BUILD_CACHE_VOLUME):$(DOCKER_GO_BUILD_CACHE_DIR)" \
+		-v "$(DOCKER_GRADLE_BUILD_CACHE_VOLUME):$(DOCKER_GRADLE_CACHE_DIR)" \
+		-w /workspace/volvoxgrid \
+		-e BUILD_JOBS="$(BUILD_JOBS)" \
+		-e GRADLE_MAX_WORKERS="$(GRADLE_MAX_WORKERS)" \
+		-e GRADLE_USER_HOME="$(DOCKER_GRADLE_CACHE_DIR)" \
+		-e VERSION="$(AAR_VERSION)" \
+		-e GROUP_ID="$(AAR_COMPOSE_GROUP_ID)" \
+		-e ARTIFACT_ID="$(AAR_COMPOSE_ARTIFACT_ID)" \
+		-e PARENT_GROUP_ID="$(AAR_GROUP_ID)" \
+		-e PARENT_ARTIFACT_ID="$(AAR_ARTIFACT_ID)" \
+		-e GIT_COMMIT="$(AAR_GIT_COMMIT)" \
+		-e BUILD_DATE="$(AAR_BUILD_DATE)" \
+		"$(AAR_DOCKER_IMAGE)"
+	@echo "Android AAR artifacts (default + lite + compose): dist/maven/"
 	@if echo "$(AAR_VERSION)" | grep -q -- '-SNAPSHOT$$'; then \
 		$(MAKE) publish_local; \
 	else \
@@ -1516,6 +1540,7 @@ publish_maven:
 	}; \
 	upload_bundle "$(AAR_ARTIFACT_ID)" "$(AAR_VERSION)" "aar" "$(AAR_GROUP_ID)"; \
 	upload_bundle "$(AAR_LITE_ARTIFACT_ID)" "$(AAR_VERSION)" "aar" "$(AAR_LITE_GROUP_ID)"; \
+	upload_bundle "$(AAR_COMPOSE_ARTIFACT_ID)" "$(AAR_VERSION)" "aar" "$(AAR_COMPOSE_GROUP_ID)"; \
 	upload_bundle "$(DESKTOP_ARTIFACT_ID)" "$(DESKTOP_VERSION)" "jar" "$(DESKTOP_GROUP_ID)"
 
 publish_local:
@@ -1563,6 +1588,7 @@ publish_local:
 	if is_snapshot "$(DESKTOP_VERSION)"; then SNAPSHOT_REQUESTED=$$((SNAPSHOT_REQUESTED+1)); fi; \
 	if install_artifact "$(AAR_ARTIFACT_ID)" "$(AAR_VERSION)" "aar" "$(AAR_GROUP_ID)"; then INSTALLED=$$((INSTALLED+1)); fi; \
 	if install_artifact "$(AAR_LITE_ARTIFACT_ID)" "$(AAR_VERSION)" "aar" "$(AAR_LITE_GROUP_ID)"; then INSTALLED=$$((INSTALLED+1)); fi; \
+	if install_artifact "$(AAR_COMPOSE_ARTIFACT_ID)" "$(AAR_VERSION)" "aar" "$(AAR_COMPOSE_GROUP_ID)"; then INSTALLED=$$((INSTALLED+1)); fi; \
 	if install_artifact "$(DESKTOP_ARTIFACT_ID)" "$(DESKTOP_VERSION)" "jar" "$(DESKTOP_GROUP_ID)"; then INSTALLED=$$((INSTALLED+1)); fi; \
 	if [ "$$INSTALLED" -eq 0 ]; then \
 		if [ "$$SNAPSHOT_REQUESTED" -eq 0 ]; then \
@@ -1755,6 +1781,196 @@ publish_npm:
 		fi; \
 	done; \
 	echo "npm publish complete."
+
+# -----------------------------------------------------------------------------
+# NuGet publish (VolvoxGrid.DotNet)
+#
+# Stages cross-platform native binaries into target/dotnet/native/<RID>/, then
+# `dotnet pack` produces a single .nupkg containing both managed assemblies
+# (net8.0 + net40) and runtimes/<RID>/native/* assets. Push goes to nuget.org
+# unless NUGET_SOURCE is overridden.
+#
+# Inputs (any may be missing — Condition="Exists(...)" in the csproj skips the
+# absent RIDs gracefully, so a partial pack is valid):
+#   dist/dotnet/winforms_release/volvoxgrid.dll      -> win-x64    (`make docker_all`)
+#   dist/dotnet/winforms_release_x86/volvoxgrid.dll  -> win-x86    (`make docker_all`)
+#   target/release/libvolvoxgrid.so                  -> linux-x64  (`cargo build --release`)
+# Backfill from desktop fat JAR (`dist/maven/volvoxgrid-desktop-<v>.jar`):
+#   native/linux-x86_64/  -> linux-x64    (only used if not already staged)
+#   native/linux-aarch64/ -> linux-arm64
+#   native/macos-x86_64/  -> osx-x64
+#   native/macos-aarch64/ -> osx-arm64
+#   native/windows-x86_64/-> win-x64       (only used if not already staged)
+#   native/windows-x86/   -> win-x86       (only used if not already staged)
+#
+# Full RID coverage requires `make docker_all` (produces the desktop JAR with
+# linux-arm64 + macOS via cross-compilers + zig in the unified Docker image).
+#
+# Required env: NUGET_API_KEY (https://www.nuget.org/account/apikeys).
+# -----------------------------------------------------------------------------
+DOTNET_NUGET_PROJECT  := dotnet/src/VolvoxGrid.DotNet.csproj
+DOTNET_NUGET_PACKAGE  := VolvoxGrid.DotNet
+DOTNET_NUGET_OUT      ?= dist/nuget
+DOTNET_NATIVE_STAGE   ?= target/dotnet/native
+NUGET_SOURCE          ?= https://api.nuget.org/v3/index.json
+
+publish_nuget:
+	@command -v dotnet >/dev/null 2>&1 || { echo "Error: dotnet SDK not found in PATH."; exit 1; }
+	@if [ -z "$$NUGET_API_KEY" ] && [ -f "$$HOME/.nuget-env" ]; then \
+		echo "Loading NUGET_API_KEY from $$HOME/.nuget-env"; \
+	fi
+	@if [ -f "$$HOME/.nuget-env" ]; then . "$$HOME/.nuget-env"; fi; \
+	if [ -z "$$NUGET_API_KEY" ]; then \
+		echo "Error: NUGET_API_KEY not set."; \
+		echo "Get an API key at https://www.nuget.org/account/apikeys and either:"; \
+		echo "  - export NUGET_API_KEY=oy2... && make publish_nuget"; \
+		echo "  - put 'export NUGET_API_KEY=oy2...' in ~/.nuget-env (auto-loaded)"; \
+		exit 1; \
+	fi
+	@echo "Staging native binaries into $(DOTNET_NATIVE_STAGE)/..."
+	@mkdir -p "$(DOTNET_NATIVE_STAGE)/win-x64" \
+	          "$(DOTNET_NATIVE_STAGE)/win-x86" \
+	          "$(DOTNET_NATIVE_STAGE)/linux-x64" \
+	          "$(DOTNET_NATIVE_STAGE)/linux-arm64" \
+	          "$(DOTNET_NATIVE_STAGE)/osx-x64" \
+	          "$(DOTNET_NATIVE_STAGE)/osx-arm64"
+	@WIN64="$(CURRENT_DIR)/dist/dotnet/winforms_release/volvoxgrid.dll"; \
+	WIN86="$(CURRENT_DIR)/dist/dotnet/winforms_release_x86/volvoxgrid.dll"; \
+	LIN64="$(CURRENT_DIR)/target/release/libvolvoxgrid.so"; \
+	if [ -f "$$WIN64" ]; then cp -f "$$WIN64" "$(DOTNET_NATIVE_STAGE)/win-x64/volvoxgrid.dll";     echo "  win-x64    <- $$WIN64"; fi; \
+	if [ -f "$$WIN86" ]; then cp -f "$$WIN86" "$(DOTNET_NATIVE_STAGE)/win-x86/volvoxgrid.dll";     echo "  win-x86    <- $$WIN86"; fi; \
+	if [ -f "$$LIN64" ]; then cp -f "$$LIN64" "$(DOTNET_NATIVE_STAGE)/linux-x64/libvolvoxgrid.so"; echo "  linux-x64  <- $$LIN64"; fi; \
+	JAR=$$(ls -t "$(CURRENT_DIR)/dist/maven/volvoxgrid-desktop-"*.jar 2>/dev/null | grep -vE -- '-sources\.jar$$|-javadoc\.jar$$' | head -n1); \
+	if [ -n "$$JAR" ] && [ -f "$$JAR" ]; then \
+	  echo "Backfilling missing RIDs from $$(basename "$$JAR")..."; \
+	  for entry in \
+	    "linux-x86_64|linux-x64|libvolvoxgrid.so" \
+	    "linux-aarch64|linux-arm64|libvolvoxgrid.so" \
+	    "macos-x86_64|osx-x64|libvolvoxgrid.dylib" \
+	    "macos-aarch64|osx-arm64|libvolvoxgrid.dylib" \
+	    "windows-x86_64|win-x64|volvoxgrid.dll" \
+	    "windows-x86|win-x86|volvoxgrid.dll"; \
+	  do \
+	    plat=$$(echo "$$entry" | cut -d'|' -f1); \
+	    rid=$$(echo "$$entry" | cut -d'|' -f2); \
+	    libname=$$(echo "$$entry" | cut -d'|' -f3); \
+	    dest="$(DOTNET_NATIVE_STAGE)/$$rid/$$libname"; \
+	    if [ -f "$$dest" ]; then continue; fi; \
+	    tmpdir=$$(mktemp -d); \
+	    unzip -q -j "$$JAR" "native/$$plat/*" -d "$$tmpdir" 2>/dev/null || true; \
+	    src=$$(ls "$$tmpdir"/* 2>/dev/null | head -n1); \
+	    if [ -n "$$src" ] && [ -f "$$src" ]; then \
+	      cp -f "$$src" "$$dest"; \
+	      echo "  $$rid    <- $$(basename "$$JAR")!native/$$plat/"; \
+	    fi; \
+	    rm -rf "$$tmpdir"; \
+	  done; \
+	fi; \
+	echo "Final RID coverage:"; \
+	staged=0; \
+	for entry in "win-x64|volvoxgrid.dll" "win-x86|volvoxgrid.dll" "linux-x64|libvolvoxgrid.so" "linux-arm64|libvolvoxgrid.so" "osx-x64|libvolvoxgrid.dylib" "osx-arm64|libvolvoxgrid.dylib"; do \
+	  rid=$${entry%%|*}; libname=$${entry##*|}; \
+	  if [ -f "$(DOTNET_NATIVE_STAGE)/$$rid/$$libname" ]; then \
+	    echo "  $$rid    OK"; staged=$$((staged+1)); \
+	  else \
+	    echo "  $$rid    MISSING (run 'make docker_all' to cross-build)"; \
+	  fi; \
+	done; \
+	if [ "$$staged" -eq 0 ]; then \
+	  echo "Error: no native binaries available — refusing to publish a managed-only package."; \
+	  exit 1; \
+	fi
+	@echo "Building NuGet package $(DOTNET_NUGET_PACKAGE).$(VOLVOXGRID_VERSION).nupkg..."
+	@mkdir -p "$(DOTNET_NUGET_OUT)"
+	dotnet pack "$(DOTNET_NUGET_PROJECT)" \
+	    -c Release \
+	    -p:Version=$(VOLVOXGRID_VERSION) \
+	    -p:VolvoxGridNativeRoot="$(CURRENT_DIR)/$(DOTNET_NATIVE_STAGE)/" \
+	    -o "$(DOTNET_NUGET_OUT)"
+	@if [ -f "$$HOME/.nuget-env" ]; then . "$$HOME/.nuget-env"; fi; \
+	NUPKG="$(DOTNET_NUGET_OUT)/$(DOTNET_NUGET_PACKAGE).$(VOLVOXGRID_VERSION).nupkg"; \
+	if [ ! -f "$$NUPKG" ]; then \
+	  echo "Error: $$NUPKG not produced by 'dotnet pack'."; \
+	  exit 1; \
+	fi; \
+	echo "Pushing $$NUPKG to $(NUGET_SOURCE)..."; \
+	dotnet nuget push "$$NUPKG" \
+	    --api-key "$$NUGET_API_KEY" \
+	    --source "$(NUGET_SOURCE)" \
+	    --skip-duplicate
+	@echo "NuGet publish complete: $(DOTNET_NUGET_PACKAGE) $(VOLVOXGRID_VERSION)"
+
+# -----------------------------------------------------------------------------
+# Go module tagging
+#
+# Submodule modules (`go/` and `adapters/bubbletea/`) live in subdirectories of
+# the repo, so the Go module proxy expects path-prefixed semver tags rather
+# than the bare `vX.Y.Z` tags the rest of the project uses (see
+# go/PUBLISHING.md).
+#
+# Both targets default to dry-run: they print the `git tag` / `git push`
+# commands they would run. Re-invoke with CONFIRM_PUBLISH_GO=1 to execute.
+#
+# Order matters — `go/v$(VOLVOXGRID_VERSION)` must be reachable from origin
+# before `adapters/bubbletea/v$(VOLVOXGRID_VERSION)` is tagged, otherwise the
+# adapter's `require github.com/ivere27/volvoxgrid/go v$(VOLVOXGRID_VERSION)`
+# cannot resolve for end users.
+# -----------------------------------------------------------------------------
+GO_TAG          := go/v$(VOLVOXGRID_VERSION)
+BUBBLETEA_TAG   := adapters/bubbletea/v$(VOLVOXGRID_VERSION)
+GIT_REMOTE      ?= origin
+
+publish_go:
+	@command -v git >/dev/null 2>&1 || { echo "Error: git not found in PATH."; exit 1; }
+	@if git rev-parse -q --verify "refs/tags/$(GO_TAG)" >/dev/null; then \
+		echo "Tag $(GO_TAG) already exists locally. Skipping creation."; \
+	else \
+		if [ "$(CONFIRM_PUBLISH_GO)" = "1" ]; then \
+			echo "Creating tag $(GO_TAG) at HEAD..."; \
+			git tag "$(GO_TAG)"; \
+		else \
+			echo "[dry-run] git tag $(GO_TAG)"; \
+		fi; \
+	fi
+	@if [ "$(CONFIRM_PUBLISH_GO)" = "1" ]; then \
+		echo "Pushing $(GO_TAG) to $(GIT_REMOTE)..."; \
+		git push "$(GIT_REMOTE)" "$(GO_TAG)"; \
+		echo "Verify: GOPROXY=https://proxy.golang.org go get github.com/ivere27/volvoxgrid/go@v$(VOLVOXGRID_VERSION)"; \
+	else \
+		echo "[dry-run] git push $(GIT_REMOTE) $(GO_TAG)"; \
+		echo "Re-run with CONFIRM_PUBLISH_GO=1 to actually create + push the tag."; \
+	fi
+
+publish_go_bubbletea:
+	@command -v git >/dev/null 2>&1 || { echo "Error: git not found in PATH."; exit 1; }
+	@if ! grep -qE '^[[:space:]]+github\.com/ivere27/volvoxgrid/go[[:space:]]+v$(VOLVOXGRID_VERSION)([[:space:]]|$$)' adapters/bubbletea/go.mod; then \
+		echo "Error: adapters/bubbletea/go.mod does not pin github.com/ivere27/volvoxgrid/go v$(VOLVOXGRID_VERSION)."; \
+		echo "Update the require line before tagging the adapter."; \
+		exit 1; \
+	fi
+	@if ! git ls-remote --tags "$(GIT_REMOTE)" "refs/tags/$(GO_TAG)" 2>/dev/null | grep -q "$(GO_TAG)"; then \
+		echo "Warning: $(GO_TAG) not found on $(GIT_REMOTE). End users will not be able to resolve the adapter's core dependency."; \
+		echo "Run 'make publish_go CONFIRM_PUBLISH_GO=1' first."; \
+		if [ "$(CONFIRM_PUBLISH_GO)" != "1" ]; then exit 1; fi; \
+	fi
+	@if git rev-parse -q --verify "refs/tags/$(BUBBLETEA_TAG)" >/dev/null; then \
+		echo "Tag $(BUBBLETEA_TAG) already exists locally. Skipping creation."; \
+	else \
+		if [ "$(CONFIRM_PUBLISH_GO)" = "1" ]; then \
+			echo "Creating tag $(BUBBLETEA_TAG) at HEAD..."; \
+			git tag "$(BUBBLETEA_TAG)"; \
+		else \
+			echo "[dry-run] git tag $(BUBBLETEA_TAG)"; \
+		fi; \
+	fi
+	@if [ "$(CONFIRM_PUBLISH_GO)" = "1" ]; then \
+		echo "Pushing $(BUBBLETEA_TAG) to $(GIT_REMOTE)..."; \
+		git push "$(GIT_REMOTE)" "$(BUBBLETEA_TAG)"; \
+		echo "Verify: GOPROXY=https://proxy.golang.org go get github.com/ivere27/volvoxgrid/adapters/bubbletea@v$(VOLVOXGRID_VERSION)"; \
+	else \
+		echo "[dry-run] git push $(GIT_REMOTE) $(BUBBLETEA_TAG)"; \
+		echo "Re-run with CONFIRM_PUBLISH_GO=1 to actually create + push the tag."; \
+	fi
 
 # =============================================================================
 # Flutter

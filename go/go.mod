@@ -1,6 +1,6 @@
-module github.com/ivere27/volvoxgrid
+module github.com/ivere27/volvoxgrid/go
 
-go 1.22.2
+go 1.24.0
 
 require (
 	github.com/ivere27/synurang v0.5.10
@@ -10,7 +10,7 @@ require (
 
 require (
 	golang.org/x/net v0.32.0 // indirect
-	golang.org/x/sys v0.28.0 // indirect
+	golang.org/x/sys v0.36.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241216192217-9240e9c98484 // indirect
 )

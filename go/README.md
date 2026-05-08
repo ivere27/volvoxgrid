@@ -22,6 +22,15 @@ go/
     └── terminal.go
 ```
 
+The core module is intentionally minimal — only `synurang`, `grpc`, and
+`protobuf`. Framework-specific adapters live in their own modules so the core
+wrapper does not inherit their dependencies.
+
+| Module | Purpose |
+|---|---|
+| `github.com/ivere27/volvoxgrid/go` | Core wrapper (this module) |
+| `github.com/ivere27/volvoxgrid/adapters/bubbletea` | Bubble Tea typed-row adapter |
+
 ## Quick Start
 
 ```go
@@ -30,7 +39,7 @@ package main
 import (
     "log"
 
-    "github.com/ivere27/volvoxgrid/pkg/volvoxgrid"
+    "github.com/ivere27/volvoxgrid/go/pkg/volvoxgrid"
 )
 
 func main() {
@@ -53,6 +62,55 @@ func main() {
 ```
 
 For an interactive terminal app, create a `tui.Terminal`, implement `tui.Controller`, and call `tui.Run(...)`. See `go/examples/tui` for a complete sample controller and host setup.
+
+## Bubble Tea adapter (typed, data-first)
+
+For an Elm-architecture TUI, use the [Bubble Tea](https://github.com/charmbracelet/bubbletea)
+adapter — it ships in a sibling module so the core wrapper above stays free of
+charm dependencies:
+
+```sh
+go get github.com/ivere27/volvoxgrid/adapters/bubbletea
+```
+
+```go
+package main
+
+import (
+    "fmt"
+    "log"
+    "os"
+
+    tea "github.com/charmbracelet/bubbletea"
+    "github.com/ivere27/volvoxgrid/adapters/bubbletea"
+)
+
+type Product struct {
+    Name  string
+    Price float64
+}
+
+func main() {
+    products := []Product{{"Coffee", 3.50}, {"Tea", 2.75}}
+    cols := []bubbletea.Column[Product]{
+        {Field: "name",  Header: "Name",  Value: func(p Product) string { return p.Name }},
+        {Field: "price", Header: "Price",
+            Value: func(p Product) string { return fmt.Sprintf("%.2f", p.Price) },
+            Editable: true},
+    }
+
+    m, err := bubbletea.New(os.Getenv("VOLVOXGRID_LIB"), cols, products)
+    if err != nil { log.Fatal(err) }
+    defer m.Close()
+
+    if _, err := tea.NewProgram(m, tea.WithAltScreen()).Run(); err != nil {
+        log.Fatal(err)
+    }
+}
+```
+
+See [`adapters/bubbletea/`](../adapters/bubbletea/) for the full API
+(`Column[T]`, `CellEdit[T]`, `Options[T]`, `Model[T].SetRows`, etc.).
 
 ## Running the Example
 
@@ -80,7 +138,7 @@ The `Grid` struct provides convenience wrappers for common data operations.
 Parse CSV or JSON bytes into the grid:
 
 ```go
-import pb "github.com/ivere27/volvoxgrid/api/v1"
+import pb "github.com/ivere27/volvoxgrid/go/api/v1"
 
 // CSV
 if _, err := grid.LoadData(

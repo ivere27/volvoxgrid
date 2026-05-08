@@ -17,5 +17,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "VolvoxGridAndroid"
 include(":volvoxgrid-android")
+include(":volvoxgrid-android-compose")
 include(":example")
 includeBuild("../java/common")

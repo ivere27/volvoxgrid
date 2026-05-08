@@ -66,7 +66,31 @@ Useful enums include:
 
 ## Installation
 
-### Option A: Reference the project directly
+### Option A: NuGet package (recommended)
+
+`VolvoxGrid.DotNet` is published on
+[nuget.org](https://www.nuget.org/packages/VolvoxGrid.DotNet/) with native
+binaries embedded for the supported runtimes (RIDs):
+
+```bash
+dotnet add package VolvoxGrid.DotNet --version 0.8.6
+```
+
+Or in your `csproj`:
+
+```xml
+<ItemGroup>
+  <PackageReference Include="VolvoxGrid.DotNet" Version="0.8.6" />
+</ItemGroup>
+```
+
+When the package targets a supported RID, NuGet drops the matching native
+library into `runtimes/<rid>/native/` automatically — no `LibraryPath` setup
+required. Currently shipped RIDs: `win-x64`, `win-x86`, `linux-x64`. Other
+platforms (linux-arm64, osx-x64, osx-arm64) need the local-pack flow below
+or a manually-deployed native library until the next release.
+
+### Option B: Reference the project directly
 
 ```xml
 <ItemGroup>
@@ -74,7 +98,7 @@ Useful enums include:
 </ItemGroup>
 ```
 
-### Option B: Pack a local NuGet package
+### Option C: Pack a local NuGet package
 
 ```bash
 dotnet pack dotnet/src/VolvoxGrid.DotNet.csproj -c Release
@@ -88,7 +112,9 @@ Package ID:
 
 - `VolvoxGrid.DotNet`
 
-No matter how you reference the managed wrapper, you still need to deploy the native library with your application.
+If you reference the project directly (Option B) or pack locally without
+embedded natives, you still need to deploy the native library with your
+application — see the next section.
 
 ## Deploy the Native Library
 

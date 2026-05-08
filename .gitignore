@@ -4,6 +4,8 @@ target/
 
 # Golang
 go/tui
+go.work
+go.work.sum
 
 # Flutter
 .dart_tool/
@@ -32,10 +34,12 @@ android/volvoxgrid-android/.cxx/
 android/volvoxgrid-android/build/
 java/common/bin/
 java/desktop/bin/
+android/volvoxgrid-android-compose/build/
 
 # .NET adapter build artifacts and local IDE state
 dotnet/**/bin/
 dotnet/**/obj/
+dist/nuget/
 adapters/xtragrid/test/runner/obj/
 adapters/xtragrid/test/runner/bin/
 .vs/

@@ -8,8 +8,8 @@ import (
 	"syscall"
 	"time"
 
-	pb "github.com/ivere27/volvoxgrid/api/v1"
-	"github.com/ivere27/volvoxgrid/pkg/volvoxgrid"
+	pb "github.com/ivere27/volvoxgrid/go/api/v1"
+	"github.com/ivere27/volvoxgrid/go/pkg/volvoxgrid"
 )
 
 const ActionToggleDebugPanel = "toggle-debug-panel"

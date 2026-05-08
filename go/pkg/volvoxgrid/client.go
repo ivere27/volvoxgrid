@@ -10,14 +10,14 @@ import (
 	"unsafe"
 
 	synurang "github.com/ivere27/synurang/pkg/synurang"
-	pb "github.com/ivere27/volvoxgrid/api/v1"
+	pb "github.com/ivere27/volvoxgrid/go/api/v1"
 )
 
 const defaultTerminalBufferCapacity = 32 * 1024
 
 type Client struct {
 	runtime *synurang.Plugin
-	client pb.VolvoxGridServiceClient
+	client  pb.VolvoxGridServiceClient
 }
 
 func NewClient(libraryPath string) (*Client, error) {
@@ -29,7 +29,7 @@ func NewClient(libraryPath string) (*Client, error) {
 	conn := synurang.NewPluginClientConn(runtime, "VolvoxGridService")
 	return &Client{
 		runtime: runtime,
-		client: pb.NewVolvoxGridServiceClient(conn),
+		client:  pb.NewVolvoxGridServiceClient(conn),
 	}, nil
 }
 
@@ -314,6 +314,31 @@ func (g *Grid) OpenTerminalSession() (*TerminalSession, error) {
 	return newTerminalSession(g.client.client, g.ID)
 }
 
+// EventStream subscribes to the engine's semantic grid event stream.
+// The returned [EventStream] is bound to ctx; cancel ctx to stop the stream.
+//
+// Cancelable events (BeforeEdit, BeforeSort, etc.) carry a non-zero event_id;
+// reply via [TerminalSession.SendEventDecision] on the same grid's
+// [TerminalSession] to allow or veto. The engine allows by default after a
+// short deadline if no decision is sent.
+func (g *Grid) EventStream(ctx context.Context) (*EventStream, error) {
+	stream, err := g.client.client.EventStream(ctx, &pb.EventStreamRequest{GridId: g.ID})
+	if err != nil {
+		return nil, err
+	}
+	return &EventStream{stream: stream}, nil
+}
+
+// EventStream is a typed handle on the engine's GridEvent server stream.
+type EventStream struct {
+	stream pb.VolvoxGridService_EventStreamClient
+}
+
+// Recv blocks until the next event arrives or the stream is closed.
+func (e *EventStream) Recv() (*pb.GridEvent, error) {
+	return e.stream.Recv()
+}
+
 func (g *Grid) Destroy() error {
 	if g == nil || g.destroyed {
 		return nil
@@ -416,6 +441,22 @@ func (s *TerminalSession) SendInputBytes(data []byte) error {
 		Input: &pb.RenderInput_TerminalInput{
 			TerminalInput: &pb.TerminalInputBytes{
 				Data: append([]byte(nil), data...),
+			},
+		},
+	})
+}
+
+// SendEventDecision allows or vetoes a cancelable event delivered on the
+// grid's [EventStream]. eventID must match the event_id of the event being
+// answered (the engine ignores stale or unknown IDs).
+func (s *TerminalSession) SendEventDecision(eventID int64, cancel bool) error {
+	return s.sendInput(&pb.RenderInput{
+		GridId: s.gridID,
+		Input: &pb.RenderInput_EventDecision{
+			EventDecision: &pb.EventDecision{
+				GridId:  s.gridID,
+				EventId: eventID,
+				Cancel:  cancel,
 			},
 		},
 	})

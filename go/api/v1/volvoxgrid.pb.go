@@ -26690,8 +26690,8 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\bLoadDemo\x12\x1e.volvoxgrid.v1.LoadDemoRequest\x1a\x1f.volvoxgrid.v1.LoadDemoResponse\x12T\n" +
 	"\vGetDemoData\x12!.volvoxgrid.v1.GetDemoDataRequest\x1a\".volvoxgrid.v1.GetDemoDataResponse\x12L\n" +
 	"\rRenderSession\x12\x1a.volvoxgrid.v1.RenderInput\x1a\x1b.volvoxgrid.v1.RenderOutput(\x010\x01\x12L\n" +
-	"\vEventStream\x12!.volvoxgrid.v1.EventStreamRequest\x1a\x18.volvoxgrid.v1.GridEvent0\x01BF\n" +
-	"\x1cio.github.ivere27.volvoxgridP\x01Z$github.com/ivere27/volvoxgrid/api/v1b\x06proto3"
+	"\vEventStream\x12!.volvoxgrid.v1.EventStreamRequest\x1a\x18.volvoxgrid.v1.GridEvent0\x01BI\n" +
+	"\x1cio.github.ivere27.volvoxgridP\x01Z'github.com/ivere27/volvoxgrid/go/api/v1b\x06proto3"
 
 var (
 	file_volvoxgrid_proto_rawDescOnce sync.Once

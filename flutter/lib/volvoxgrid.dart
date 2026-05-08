@@ -35,6 +35,7 @@ import 'src/generated/volvoxgrid.pb.dart' as pb;
 
 export 'volvoxgrid_controller.dart';
 export 'volvoxgrid_ffi.dart';
+export 'volvox_data_grid.dart';
 
 void _debugLog(String Function() messageBuilder) {
   if (kDebugMode) {

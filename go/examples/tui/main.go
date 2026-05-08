@@ -5,8 +5,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/ivere27/volvoxgrid/pkg/volvoxgrid"
-	vgterm "github.com/ivere27/volvoxgrid/pkg/volvoxgrid/tui"
+	"github.com/ivere27/volvoxgrid/go/pkg/volvoxgrid"
+	vgterm "github.com/ivere27/volvoxgrid/go/pkg/volvoxgrid/tui"
 )
 
 func main() {

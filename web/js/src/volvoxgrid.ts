@@ -15,6 +15,46 @@ import {
 
 export { DropdownItemLayout } from "./generated/volvoxgrid_ffi.js";
 
+/**
+ * Options for the data-first `new VolvoxGrid(host, options)` form.
+ *
+ * `host` may be any HTMLElement: pass a `<canvas>` to render into it directly,
+ * or any container (e.g. a `<div>`) to have VolvoxGrid create a child canvas
+ * that fills it. The grid resolves its own WebAssembly module from `wasmUrl`.
+ *
+ * Construction is asynchronous in this form. Await `grid.loaded` before
+ * calling other methods:
+ *
+ * ```ts
+ * const grid = new VolvoxGrid(document.getElementById("grid"), {
+ *   rowCount: 100,
+ *   colCount: 5,
+ * });
+ * await grid.loaded;
+ * grid.setCellText(0, 0, "Hello");
+ * ```
+ */
+export interface VolvoxGridOptions {
+  /**
+   * URL of the wasm-bindgen JS glue file produced by
+   * `wasm-pack build --target web`.
+   *
+   * When omitted, defaults to the `wasm/volvoxgrid_wasm.js` shipped alongside
+   * this module in the published npm package — resolved via
+   * `new URL("../wasm/volvoxgrid_wasm.js", import.meta.url)`. That works for
+   * CDN/unbundled ESM consumers (the package layout has `dist/` and `wasm/`
+   * as siblings). For bundled apps where the JS is inlined and `import.meta.url`
+   * no longer points at the package, pass an explicit URL — typically built
+   * with your bundler's asset URL helper, e.g.
+   * `new URL('volvoxgrid/wasm/volvoxgrid_wasm.js', import.meta.url).href`.
+   */
+  wasmUrl?: string;
+  /** Initial row count for the grid body. Defaults to 10. */
+  rowCount?: number;
+  /** Initial column count for the grid body. Defaults to 5. */
+  colCount?: number;
+}
+
 export interface VolvoxGridCellRange {
   row1: number;
   col1: number;
@@ -2339,8 +2379,15 @@ export class VolvoxGrid {
     }
   }
 
-  private wasm: any;
-  private gridId: number;
+  /**
+   * Resolves to the grid instance once the WebAssembly engine has loaded
+   * and the grid is ready to receive method calls. For the legacy
+   * `(canvas, wasmModule, rows, cols)` constructor form this is already
+   * resolved by the time the constructor returns.
+   */
+  readonly loaded: Promise<this>;
+  private wasm!: any;
+  private gridId!: number;
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D | null = null;
   private useGpu: boolean = false;
@@ -2413,10 +2460,10 @@ export class VolvoxGrid {
   private presentCssHeight: number = 0;
 
   // Host-side editors for full caret/IME/text-selection UX.
-  private editInput: HTMLInputElement;
-  private editSelect: HTMLSelectElement;
-  private editDataList: HTMLDataListElement;
-  private editDataListId: string;
+  private editInput!: HTMLInputElement;
+  private editSelect!: HTMLSelectElement;
+  private editDataList!: HTMLDataListElement;
+  private editDataListId!: string;
   private activeEditor: "none" | "text" | "combo-input" | "combo-select" = "none";
   private editorCellKey: string = "";
   private suppressEditorInput: boolean = false;
@@ -2530,21 +2577,137 @@ export class VolvoxGrid {
   }
 
   /**
-   * Create a VolvoxGrid instance.
+   * Data-first constructor: pass any HTMLElement and a `VolvoxGridOptions`
+   * object describing the WASM module URL and initial dimensions. After
+   * construction, await `grid.loaded` before calling other methods.
    *
-   * @param canvas  The canvas element to render into.
-   * @param wasm    The initialised wasm-bindgen module (the default export
-   *                from the wasm-pack generated JS glue).
-   * @param rows    Initial row count for the grid body and any true fixed panes.
-   * @param cols    Initial column count.
+   * ```ts
+   * const grid = new VolvoxGrid(document.getElementById("grid"), {
+   *   wasmUrl: "./wasm/volvoxgrid_wasm.js",
+   *   rowCount: 100,
+   *   colCount: 5,
+   * });
+   * await grid.loaded;
+   * grid.setCellText(0, 0, "Hello");
+   * ```
+   */
+  constructor(host: HTMLElement, options?: VolvoxGridOptions);
+  /**
+   * Low-level constructor: pass an already-loaded wasm-bindgen module
+   * directly. `grid.loaded` resolves on the next microtask.
+   *
+   * @param canvas The canvas element to render into.
+   * @param wasm   The initialised wasm-bindgen module (the default export
+   *               from the wasm-pack generated JS glue).
+   * @param rows   Initial row count.
+   * @param cols   Initial column count.
    */
   constructor(
     canvas: HTMLCanvasElement,
     wasm: any,
+    rows?: number,
+    cols?: number,
+  );
+  constructor(
+    host: HTMLElement,
+    optionsOrWasm?: VolvoxGridOptions | any,
     rows: number = 10,
     cols: number = 5,
   ) {
-    this.canvas = canvas;
+    this.canvas = VolvoxGrid.resolveHostCanvas(host);
+
+    if (VolvoxGrid.isOptionsForm(optionsOrWasm)) {
+      const opts = (optionsOrWasm ?? {}) as VolvoxGridOptions;
+      const r = opts.rowCount ?? 10;
+      const c = opts.colCount ?? 5;
+      const wasmUrl = opts.wasmUrl ?? VolvoxGrid.defaultWasmUrl();
+      this.loaded = (async () => {
+        const wasm = await VolvoxGrid.loadWasm(wasmUrl);
+        this.initEngine(wasm, r, c);
+        return this;
+      })();
+    } else {
+      this.initEngine(optionsOrWasm, rows, cols);
+      this.loaded = Promise.resolve(this);
+    }
+  }
+
+  /**
+   * Distinguish the data-first options form from the legacy wasm-module form.
+   *
+   * Wasm-bindgen modules expose `create_grid` / `create_grid_scaled` as
+   * functions; an options object never does. Treat anything else (including
+   * `undefined`) as the options form.
+   */
+  private static isOptionsForm(arg: unknown): arg is VolvoxGridOptions | undefined {
+    if (arg == null) return true;
+    if (typeof arg !== "object") return false;
+    const a = arg as { create_grid?: unknown; create_grid_scaled?: unknown };
+    if (typeof a.create_grid === "function") return false;
+    if (typeof a.create_grid_scaled === "function") return false;
+    return true;
+  }
+
+  /**
+   * If `host` is already a `<canvas>`, use it. Otherwise create a child canvas
+   * that fills the host and reuse it on subsequent constructions of the same
+   * host.
+   */
+  private static resolveHostCanvas(host: HTMLElement): HTMLCanvasElement {
+    if (host instanceof HTMLCanvasElement) return host;
+    const existing = host.querySelector(":scope > canvas");
+    if (existing instanceof HTMLCanvasElement) return existing;
+    const canvas = document.createElement("canvas");
+    canvas.style.display = "block";
+    canvas.style.width = "100%";
+    canvas.style.height = "100%";
+    canvas.style.outline = "none";
+    if (typeof window !== "undefined" && window.getComputedStyle) {
+      const pos = window.getComputedStyle(host).position;
+      if (!pos || pos === "static") {
+        host.style.position = "relative";
+      }
+    }
+    host.appendChild(canvas);
+    return canvas;
+  }
+
+  /**
+   * Resolve the default wasm URL relative to *this* module so that npm/CDN
+   * consumers find the package's sibling `wasm/` directory. The published
+   * layout is `<pkg>/dist/index.js` + `<pkg>/wasm/volvoxgrid_wasm.js`, so
+   * `../wasm/...` from `dist/index.js` lands on the right file.
+   *
+   * Falls back to a plain relative string when `import.meta.url` is not
+   * available (older non-ESM hosts) — that path is unlikely to resolve, but
+   * it preserves the previous behaviour rather than throwing.
+   */
+  private static defaultWasmUrl(): string {
+    try {
+      return new URL("../wasm/volvoxgrid_wasm.js", import.meta.url).href;
+    } catch {
+      return "./wasm/volvoxgrid_wasm.js";
+    }
+  }
+
+  /**
+   * Dynamically import the wasm-bindgen JS glue at `wasmUrl` and run its
+   * default initializer. Returns the imported namespace object, which is
+   * the same shape the legacy constructor expects.
+   */
+  private static async loadWasm(wasmUrl: string): Promise<any> {
+    const wasmModule = await import(/* @vite-ignore */ /* webpackIgnore: true */ wasmUrl);
+    if (typeof wasmModule.default === "function") {
+      await wasmModule.default();
+    }
+    return wasmModule;
+  }
+
+  /**
+   * Synchronous engine bring-up. Runs once `wasm` is available — either
+   * passed directly via the legacy constructor or resolved by `loadWasm`.
+   */
+  private initEngine(wasm: any, rows: number, cols: number): void {
     this.wasm = wasm;
     const rawDpr = window.devicePixelRatio || 1;
     this.dpr = Number.isFinite(rawDpr) && rawDpr > 0 ? rawDpr : 1;
