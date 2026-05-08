@@ -599,6 +599,7 @@ export class VolvoxSheet implements VolvoxSheetApi {
     }
     const modifier = (e.shiftKey ? 1 : 0) | ((e.ctrlKey || e.metaKey) ? 2 : 0) | (e.altKey ? 4 : 0);
     this.wasm.handle_key_down(this.grid.id, e.keyCode, modifier);
+    (this.grid as any).syncCursorFromEngine?.();
     this.grid.invalidate();
   };
 

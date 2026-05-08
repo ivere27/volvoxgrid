@@ -16,7 +16,7 @@ use crate::control::CellControl;
 use crate::drag::DragState;
 use crate::edit::EditState;
 use crate::event::{EventQueue, EventTarget};
-use crate::indicator::{ColIndicatorRowDefState, IndicatorBandsState};
+use crate::indicator::{ColIndicatorRowDefState, IndicatorBandsState, RowIndicatorState};
 use crate::layout::LayoutCache;
 use crate::outline::OutlineState;
 use crate::proto::volvoxgrid::v1 as pb;
@@ -562,6 +562,14 @@ pub struct VolvoxGrid {
     pub resize_start_pos: f32,
     /// Original column width or row height at drag start.
     pub resize_start_size: i32,
+    /// Column width overrides before the active resize began.
+    pub resize_start_col_widths: HashMap<i32, i32>,
+    /// Row height overrides before the active resize began.
+    pub resize_start_row_heights: HashMap<i32, i32>,
+    /// Row-start indicator state before an indicator-width resize began.
+    pub resize_start_row_indicator: Option<RowIndicatorState>,
+    /// Suppresses the pointer-up/click that follows Escape-canceling a resize.
+    pub resize_cancel_pending: bool,
 
     // ── Column Drag/Reorder Tracking ─────────────────────────────────────
     /// Whether a column drag/reorder is in progress.
@@ -953,6 +961,10 @@ impl VolvoxGrid {
             resize_index: -1,
             resize_start_pos: 0.0,
             resize_start_size: 0,
+            resize_start_col_widths: HashMap::new(),
+            resize_start_row_heights: HashMap::new(),
+            resize_start_row_indicator: None,
+            resize_cancel_pending: false,
 
             // Column drag/reorder tracking
             col_drag_active: false,
@@ -1118,6 +1130,8 @@ impl VolvoxGrid {
         bytes += heap_hash_map_bytes(&self.col_widths);
         bytes += heap_hash_map_bytes(&self.col_width_min);
         bytes += heap_hash_map_bytes(&self.col_width_max);
+        bytes += heap_hash_map_bytes(&self.resize_start_col_widths);
+        bytes += heap_hash_map_bytes(&self.resize_start_row_heights);
 
         bytes += heap_vec_bytes(&self.row_positions);
         bytes += heap_vec_bytes(&self.col_positions);

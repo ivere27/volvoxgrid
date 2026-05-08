@@ -19,6 +19,7 @@ export interface DefaultInputGrid {
   pinRow(row: number, mode: number): void;
   setRowSticky(row: number, edge: number): void;
   setColSticky(col: number, edge: number): void;
+  syncCursorFromEngine?(): void;
   /** When true, syncInputEditor skips select() so the first typed char isn't selected. */
   suppressEditorSelect?: boolean;
 }
@@ -77,6 +78,7 @@ export function setupDefaultKeyboard(
         wasm.handle_key_press(gridId, charCode);
       }
     }
+    grid.syncCursorFromEngine?.();
     grid.invalidate();
   };
 
