@@ -1665,15 +1665,23 @@ publish_github:
 	fi; \
 	DIST="$(CURRENT_DIR)/dist/maven"; \
 	for entry in \
-	  "$(AAR_VERSION):$$DIST/$(AAR_ARTIFACT_ID)-$(AAR_VERSION).aar" \
-	  "$(AAR_VERSION):$$DIST/$(AAR_LITE_ARTIFACT_ID)-$(AAR_VERSION).aar" \
-	  "$(DESKTOP_VERSION):$$DIST/$(DESKTOP_ARTIFACT_ID)-$(DESKTOP_VERSION).jar"; \
+	  "native:$(AAR_VERSION):$$DIST/$(AAR_ARTIFACT_ID)-$(AAR_VERSION).aar" \
+	  "native:$(AAR_VERSION):$$DIST/$(AAR_LITE_ARTIFACT_ID)-$(AAR_VERSION).aar" \
+	  "thin:$(AAR_VERSION):$$DIST/$(AAR_COMPOSE_ARTIFACT_ID)-$(AAR_VERSION).aar" \
+	  "thin:$(AAR_VERSION):$$DIST/$(AAR_COMPOSE_LITE_ARTIFACT_ID)-$(AAR_VERSION).aar" \
+	  "native:$(DESKTOP_VERSION):$$DIST/$(DESKTOP_ARTIFACT_ID)-$(DESKTOP_VERSION).jar"; \
 	do \
-	  expected="$${entry%%:*}"; \
-	  f="$${entry#*:}"; \
+	  mode="$${entry%%:*}"; \
+	  rest="$${entry#*:}"; \
+	  expected="$${rest%%:*}"; \
+	  f="$${rest#*:}"; \
 		  if [ -f "$$f" ]; then \
-		    echo "Verifying embedded version for $$(basename "$$f") (expected $$expected)..."; \
-		    bash "$$VERIFY_SCRIPT" "$$expected" "$$f" || exit 1; \
+		    if [ "$$mode" = "native" ]; then \
+		      echo "Verifying embedded version for $$(basename "$$f") (expected $$expected)..."; \
+		      bash "$$VERIFY_SCRIPT" "$$expected" "$$f" || exit 1; \
+		    else \
+		      echo "Skipping native embedded-version verification for $$(basename "$$f") ($$mode)."; \
+		    fi; \
 		    echo "Uploading $$(basename $$f) to $$TAG..."; \
 	    gh release upload "$$TAG" "$$f" --repo "$(IOS_GITHUB_REPO)" --clobber; \
 	  fi; \
