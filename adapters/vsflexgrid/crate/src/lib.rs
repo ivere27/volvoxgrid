@@ -7951,7 +7951,7 @@ fn handle_pointer_down_after_before_mouse(
                 .map_or(false, |rp| rp.is_collapsed);
             request_before_node_toggle(grid_id, g, hit.row, collapsing);
         }
-        if area == HitArea::CheckBox && !dbl_click {
+        if area == HitArea::CheckBox {
             request_before_checkbox_toggle(grid_id, g, hit.row, hit.col);
         }
 
@@ -8010,7 +8010,11 @@ pub extern "C" fn volvox_grid_pointer_down_native(
         ensure_layout(g);
         if decision_channel_enabled(id) {
             let hit = input::hit_test(g, x, y);
-            if dbl_click == 0 && hit.row >= 0 && hit.col >= 0 && hit.area != HitArea::DropdownList {
+            if (dbl_click == 0 || hit.area == HitArea::CheckBox)
+                && hit.row >= 0
+                && hit.col >= 0
+                && hit.area != HitArea::DropdownList
+            {
                 request_before_mouse_down(id, g, hit.row, hit.col, x, y, button, modifier, false);
             } else {
                 handle_pointer_down_after_before_mouse(

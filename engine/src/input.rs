@@ -3241,14 +3241,22 @@ pub fn handle_pointer_down_with_behavior(
     {
         grid.mark_dirty();
     }
-    if dbl_click && !is_background_target(&event_target) && hit.area != HitArea::DropdownList {
+    let treat_as_double_click = dbl_click && hit.area != HitArea::CheckBox;
+
+    if treat_as_double_click
+        && !is_background_target(&event_target)
+        && hit.area != HitArea::DropdownList
+    {
         grid.events.push(GridEventData::DblClick {
             row: hit.row,
             col: hit.col,
             target: event_target.clone(),
         });
     }
-    if !dbl_click && !is_background_target(&event_target) && hit.area != HitArea::DropdownList {
+    if !treat_as_double_click
+        && !is_background_target(&event_target)
+        && hit.area != HitArea::DropdownList
+    {
         if behavior.allow_before_mouse_down {
             grid.events.push(GridEventData::BeforeMouseDown {
                 row: hit.row,
@@ -3257,7 +3265,7 @@ pub fn handle_pointer_down_with_behavior(
             });
         }
     }
-    if !dbl_click && hit.row >= 0 && hit.col >= 0 && hit.area != HitArea::DropdownList {
+    if !treat_as_double_click && hit.row >= 0 && hit.col >= 0 && hit.area != HitArea::DropdownList {
         grid.events.push(GridEventData::MouseDown {
             button: _button,
             modifier,
@@ -3362,9 +3370,7 @@ pub fn handle_pointer_down_with_behavior(
                     new_col: hit.col,
                 });
 
-                if dbl_click
-                    || !(behavior.allow_begin_edit && toggle_checkbox_cell(grid, hit.row, hit.col))
-                {
+                if !(behavior.allow_begin_edit && toggle_checkbox_cell(grid, hit.row, hit.col)) {
                     grid.mark_dirty();
                 }
             }
@@ -3622,7 +3628,7 @@ pub fn handle_pointer_down_with_behavior(
                 let is_dropdown = !grid.active_dropdown_list(hit.row, hit.col).is_empty();
 
                 if behavior.allow_begin_edit && grid.edit_trigger_mode >= 2 {
-                    if dbl_click {
+                    if treat_as_double_click {
                         begin_edit_from_pointer_double_click(grid, hit.row, hit.col, hit.x_in_cell);
                     } else if is_dropdown {
                         begin_edit_from_input(grid, hit.row, hit.col);
@@ -6250,13 +6256,31 @@ mod tests {
         assert!(!grid.is_editing());
         assert_eq!(
             grid.cells.get(1, 0).map(|cell| cell.checked()),
-            Some(pb::CheckedState::CheckedChecked as i32)
+            Some(pb::CheckedState::CheckedUnchecked as i32)
         );
+        assert_eq!(grid.cells.get_text(1, 0), "No");
 
         let events = grid.events.drain();
         assert!(!events
             .iter()
             .any(|e| matches!(e.data, GridEventData::StartEdit { .. })));
+        assert!(!events
+            .iter()
+            .any(|e| matches!(e.data, GridEventData::DblClick { .. })));
+        assert_eq!(
+            events
+                .iter()
+                .filter(|e| matches!(e.data, GridEventData::MouseDown { .. }))
+                .count(),
+            2,
+        );
+        assert_eq!(
+            events
+                .iter()
+                .filter(|e| matches!(e.data, GridEventData::BeforeMouseDown { .. }))
+                .count(),
+            2,
+        );
     }
 
     #[test]

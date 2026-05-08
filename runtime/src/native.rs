@@ -482,7 +482,8 @@ fn handle_pointer_render_input(
                     if manual_edit_policy {
                         let queued_before_mouse_down = decision_enabled
                             && hit.as_ref().map_or(false, |hit| {
-                                !pe.dbl_click
+                                (!pe.dbl_click
+                                    || hit.area == volvoxgrid_engine::input::HitArea::CheckBox)
                                     && hit.row >= 0
                                     && hit.col >= 0
                                     && hit.area != volvoxgrid_engine::input::HitArea::DropdownList
@@ -562,9 +563,7 @@ fn handle_pointer_render_input(
                                 }
 
                                 if hit.row >= 0 && hit.col >= 0 {
-                                    if hit.area == volvoxgrid_engine::input::HitArea::CheckBox
-                                        && !pe.dbl_click
-                                    {
+                                    if hit.area == volvoxgrid_engine::input::HitArea::CheckBox {
                                         runtime.request_before_checkbox_toggle(
                                             grid_id, grid, hit.row, hit.col,
                                         );
@@ -1789,9 +1788,10 @@ fn apply_zoom_scale(
 #[cfg(test)]
 mod tests {
     use super::{
-        apply_zoom_scale, capture_zoom_state, should_request_pointer_header_sort,
-        with_tui_pointer_geometry, RuntimeStream, RuntimeStreamBidi, RuntimeStreamReceiver,
-        RuntimeStreamSender, VolvoxGridRuntime, VolvoxGridServiceRuntime,
+        apply_zoom_scale, capture_zoom_state, cell_screen_rect, ensure_layout,
+        should_request_pointer_header_sort, with_tui_pointer_geometry, RuntimeStream,
+        RuntimeStreamBidi, RuntimeStreamReceiver, RuntimeStreamSender, VolvoxGridRuntime,
+        VolvoxGridServiceRuntime,
     };
     use std::collections::{HashMap, HashSet};
     use std::sync::{
@@ -2753,6 +2753,47 @@ mod tests {
                 assert!(!events
                     .iter()
                     .any(|event| matches!(event.data, GridEventData::StartEdit { .. })));
+            })
+            .unwrap();
+
+        destroy_test_grid(&runtime, grid_id);
+    }
+
+    #[test]
+    fn event_decision_pointer_double_click_on_checkbox_queues_toggle() {
+        let (runtime, grid_id) = runtime_with_decision_grid(3, 2);
+
+        let event_id = runtime
+            .with_grid(grid_id, |grid| {
+                configure_checkbox_cell(grid, 1, 0, false);
+                grid.columns[0].alignment = pb::Align::CenterCenter as i32;
+                ensure_layout(grid);
+                let (x, y, w, h) = cell_screen_rect(grid, 1, 0).expect("cell rect");
+                let click_x = x as f32 + w as f32 * 0.5;
+                let click_y = y as f32 + h as f32 * 0.5;
+                assert_eq!(
+                    volvoxgrid_engine::input::hit_test(grid, click_x, click_y).area,
+                    volvoxgrid_engine::input::HitArea::CheckBox
+                );
+
+                runtime.handle_pointer_down_after_before_mouse(
+                    grid_id, grid, click_x, click_y, 0, 0, true,
+                );
+                take_pending_event_id(grid, |event| {
+                    matches!(event, GridEventData::BeforeEdit { row: 1, col: 0 })
+                })
+            })
+            .expect("grid exists");
+
+        let _ = runtime.resolve_event_decision(grid_id, event_id, false);
+        runtime
+            .with_grid(grid_id, |grid| {
+                assert!(!grid.is_editing());
+                assert_eq!(grid.cells.get_text(1, 0), "Yes");
+                assert_eq!(
+                    grid.cells.get(1, 0).map(|cell| cell.checked()),
+                    Some(pb::CheckedState::CheckedChecked as i32)
+                );
             })
             .unwrap();
 
@@ -4730,7 +4771,7 @@ impl VolvoxGridRuntime {
         }
 
         if hit.row >= 0 && hit.col >= 0 {
-            if hit.area == volvoxgrid_engine::input::HitArea::CheckBox && !dbl_click {
+            if hit.area == volvoxgrid_engine::input::HitArea::CheckBox {
                 self.request_before_checkbox_toggle(grid_id, grid, hit.row, hit.col);
             }
 
