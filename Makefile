@@ -122,6 +122,8 @@ AAR_LITE_ARTIFACT_ID ?= volvoxgrid-android-lite
 AAR_LITE_DEBUG_ARTIFACT_ID ?= $(AAR_LITE_ARTIFACT_ID)-debug
 AAR_COMPOSE_GROUP_ID ?= $(AAR_GROUP_ID)
 AAR_COMPOSE_ARTIFACT_ID ?= volvoxgrid-android-compose
+AAR_COMPOSE_LITE_GROUP_ID ?= $(AAR_COMPOSE_GROUP_ID)
+AAR_COMPOSE_LITE_ARTIFACT_ID ?= volvoxgrid-android-compose-lite
 AAR_GIT_COMMIT ?= $(shell git -C "$(CURRENT_DIR)" rev-parse --short=12 HEAD 2>/dev/null || echo unknown)
 AAR_BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 AAR_ANDROID_ABIS ?= arm64-v8a,armeabi-v7a
@@ -318,7 +320,7 @@ help:
 	@echo "  docker_ios                Build iOS XCFramework via Docker"
 	@echo "  docker_all_image          Build unified Docker image (all toolchains)"
 	@echo "  docker_all                Build all platform artifacts via unified Docker image (Android full+lite, .NET WinForms x64+x86), auto-install SNAPSHOT to mavenLocal"
-	@echo "  publish_maven             Upload Android AAR + Android lite AAR + Android Compose AAR + desktop JAR to Maven Central"
+	@echo "  publish_maven             Upload Android, Android lite, Compose, Compose lite AARs + desktop JAR to Maven Central"
 	@echo "  publish_github            Upload all artifacts (xcframework, AAR, JAR, .NET, ActiveX, web zips) to GitHub release"
 	@echo "  publish_local             Install built SNAPSHOT artifacts from dist/maven into ~/.m2/repository"
 	@echo "  publish_web               Copy dist/web -> public (clean), then run firebase deploy"
@@ -1238,7 +1240,7 @@ docker_android_aar_image:
 	docker build -t "$(AAR_DOCKER_IMAGE)" -f Dockerfile.android .
 
 docker_android: docker_android_aar_image
-	@echo "Packaging Android AAR + Android lite AAR (version $(AAR_VERSION), ABIs $(AAR_ANDROID_ABIS))..."
+	@echo "Packaging Android AAR + Android lite AAR + Compose AAR + Compose lite AAR (version $(AAR_VERSION), ABIs $(AAR_ANDROID_ABIS))..."
 	@echo "Using BUILD_JOBS=$(BUILD_JOBS) (cargo=$(CARGO_BUILD_JOBS), gradle=$(GRADLE_MAX_WORKERS))"
 	@mkdir -p dist/maven
 	docker run --rm \
@@ -1302,7 +1304,25 @@ docker_android: docker_android_aar_image
 		-e GIT_COMMIT="$(AAR_GIT_COMMIT)" \
 		-e BUILD_DATE="$(AAR_BUILD_DATE)" \
 		"$(AAR_DOCKER_IMAGE)"
-	@echo "Android AAR artifacts (default + lite + compose): dist/maven/"
+	docker run --rm \
+		--entrypoint /opt/volvoxgrid/build_android_compose_aar.sh \
+		-u "$$(id -u):$$(id -g)" \
+		-v "$(CURRENT_DIR):/workspace/volvoxgrid" \
+		-v "$(DOCKER_GO_BUILD_CACHE_VOLUME):$(DOCKER_GO_BUILD_CACHE_DIR)" \
+		-v "$(DOCKER_GRADLE_BUILD_CACHE_VOLUME):$(DOCKER_GRADLE_CACHE_DIR)" \
+		-w /workspace/volvoxgrid \
+		-e BUILD_JOBS="$(BUILD_JOBS)" \
+		-e GRADLE_MAX_WORKERS="$(GRADLE_MAX_WORKERS)" \
+		-e GRADLE_USER_HOME="$(DOCKER_GRADLE_CACHE_DIR)" \
+		-e VERSION="$(AAR_VERSION)" \
+		-e GROUP_ID="$(AAR_COMPOSE_LITE_GROUP_ID)" \
+		-e ARTIFACT_ID="$(AAR_COMPOSE_LITE_ARTIFACT_ID)" \
+		-e PARENT_GROUP_ID="$(AAR_LITE_GROUP_ID)" \
+		-e PARENT_ARTIFACT_ID="$(AAR_LITE_ARTIFACT_ID)" \
+		-e GIT_COMMIT="$(AAR_GIT_COMMIT)" \
+		-e BUILD_DATE="$(AAR_BUILD_DATE)" \
+		"$(AAR_DOCKER_IMAGE)"
+	@echo "Android AAR artifacts (default + lite + compose + compose-lite): dist/maven/"
 	@if echo "$(AAR_VERSION)" | grep -q -- '-SNAPSHOT$$'; then \
 		$(MAKE) publish_local; \
 	else \
@@ -1450,6 +1470,10 @@ docker_all: docker_all_image
 		-e ARTIFACT_ID="$(AAR_ARTIFACT_ID)" \
 		-e AAR_LITE_GROUP_ID="$(AAR_LITE_GROUP_ID)" \
 		-e AAR_LITE_ARTIFACT_ID="$(AAR_LITE_ARTIFACT_ID)" \
+		-e AAR_COMPOSE_GROUP_ID="$(AAR_COMPOSE_GROUP_ID)" \
+		-e AAR_COMPOSE_ARTIFACT_ID="$(AAR_COMPOSE_ARTIFACT_ID)" \
+		-e AAR_COMPOSE_LITE_GROUP_ID="$(AAR_COMPOSE_LITE_GROUP_ID)" \
+		-e AAR_COMPOSE_LITE_ARTIFACT_ID="$(AAR_COMPOSE_LITE_ARTIFACT_ID)" \
 		-e DESKTOP_GROUP_ID="$(DESKTOP_GROUP_ID)" \
 		-e DESKTOP_ARTIFACT_ID="$(DESKTOP_ARTIFACT_ID)" \
 		-e DESKTOP_VERSION="$(DESKTOP_VERSION)" \
@@ -1488,7 +1512,7 @@ publish_maven:
 		exit 1; \
 	fi; \
 	upload_bundle() { \
-		local ARTIFACT="$$1" VERSION="$$2" EXT="$$3" GROUP="$$4"; \
+		local ARTIFACT="$$1" VERSION="$$2" EXT="$$3" GROUP="$$4" VERIFY_MODE="$${5:-native}"; \
 		local FILE="$$DIST/$$ARTIFACT-$$VERSION.$$EXT"; \
 		local POM="$$DIST/$$ARTIFACT-$$VERSION.pom"; \
 		local GROUP_PATH=$$(echo "$$GROUP" | tr '.' '/'); \
@@ -1498,8 +1522,12 @@ publish_maven:
 			echo "Run 'make docker_android docker_desktop' first."; \
 			exit 1; \
 		fi; \
-		echo "Verifying embedded version for $$ARTIFACT-$$VERSION..."; \
-		bash "$$VERIFY_SCRIPT" "$$VERSION" "$$FILE" || exit 1; \
+		if [ "$$VERIFY_MODE" = "native" ]; then \
+			echo "Verifying embedded version for $$ARTIFACT-$$VERSION..."; \
+			bash "$$VERIFY_SCRIPT" "$$VERSION" "$$FILE" || exit 1; \
+		else \
+			echo "Skipping native embedded-version verification for $$ARTIFACT-$$VERSION ($$VERIFY_MODE)."; \
+		fi; \
 		echo "Creating bundle for $$ARTIFACT-$$VERSION..."; \
 		BUNDLE_DIR=$$(mktemp -d); \
 		BUNDLE_ZIP="/tmp/volvoxgrid-bundle-$$$$.zip"; \
@@ -1540,7 +1568,8 @@ publish_maven:
 	}; \
 	upload_bundle "$(AAR_ARTIFACT_ID)" "$(AAR_VERSION)" "aar" "$(AAR_GROUP_ID)"; \
 	upload_bundle "$(AAR_LITE_ARTIFACT_ID)" "$(AAR_VERSION)" "aar" "$(AAR_LITE_GROUP_ID)"; \
-	upload_bundle "$(AAR_COMPOSE_ARTIFACT_ID)" "$(AAR_VERSION)" "aar" "$(AAR_COMPOSE_GROUP_ID)"; \
+	upload_bundle "$(AAR_COMPOSE_ARTIFACT_ID)" "$(AAR_VERSION)" "aar" "$(AAR_COMPOSE_GROUP_ID)" "thin-aar"; \
+	upload_bundle "$(AAR_COMPOSE_LITE_ARTIFACT_ID)" "$(AAR_VERSION)" "aar" "$(AAR_COMPOSE_LITE_GROUP_ID)" "thin-aar"; \
 	upload_bundle "$(DESKTOP_ARTIFACT_ID)" "$(DESKTOP_VERSION)" "jar" "$(DESKTOP_GROUP_ID)"
 
 publish_local:
@@ -1589,6 +1618,7 @@ publish_local:
 	if install_artifact "$(AAR_ARTIFACT_ID)" "$(AAR_VERSION)" "aar" "$(AAR_GROUP_ID)"; then INSTALLED=$$((INSTALLED+1)); fi; \
 	if install_artifact "$(AAR_LITE_ARTIFACT_ID)" "$(AAR_VERSION)" "aar" "$(AAR_LITE_GROUP_ID)"; then INSTALLED=$$((INSTALLED+1)); fi; \
 	if install_artifact "$(AAR_COMPOSE_ARTIFACT_ID)" "$(AAR_VERSION)" "aar" "$(AAR_COMPOSE_GROUP_ID)"; then INSTALLED=$$((INSTALLED+1)); fi; \
+	if install_artifact "$(AAR_COMPOSE_LITE_ARTIFACT_ID)" "$(AAR_VERSION)" "aar" "$(AAR_COMPOSE_LITE_GROUP_ID)"; then INSTALLED=$$((INSTALLED+1)); fi; \
 	if install_artifact "$(DESKTOP_ARTIFACT_ID)" "$(DESKTOP_VERSION)" "jar" "$(DESKTOP_GROUP_ID)"; then INSTALLED=$$((INSTALLED+1)); fi; \
 	if [ "$$INSTALLED" -eq 0 ]; then \
 		if [ "$$SNAPSHOT_REQUESTED" -eq 0 ]; then \

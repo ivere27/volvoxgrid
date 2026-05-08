@@ -3,12 +3,12 @@ set -euo pipefail
 
 # Android Compose AAR packaging script — runs inside Docker (Dockerfile.android).
 #
-# Builds the volvoxgrid-android-compose AAR (a thin Kotlin/Compose wrapper
-# around volvoxgrid-android) and produces Maven-ready artifacts: AAR, POM,
-# sources.jar, javadoc.jar.
+# Builds a thin Kotlin/Compose wrapper AAR and produces Maven-ready artifacts:
+# AAR, POM, sources.jar, javadoc.jar. Set ARTIFACT_ID and PARENT_ARTIFACT_ID
+# to publish variants such as volvoxgrid-android-compose-lite.
 #
 # This module does NOT bundle native code — its POM declares a runtime
-# dependency on volvoxgrid-android (which carries the JNI .so files).
+# dependency on PARENT_ARTIFACT_ID (which carries the JNI .so files).
 #
 # Usage (inside Docker): VERSION=0.8.6 /opt/volvoxgrid/build_android_compose_aar.sh
 

@@ -23,6 +23,10 @@ run_android() {
   local include_lite="${BUILD_ANDROID_INCLUDE_LITE:-0}"
   local lite_group_id="${AAR_LITE_GROUP_ID:-${full_group_id}}"
   local lite_artifact_id="${AAR_LITE_ARTIFACT_ID:-volvoxgrid-android-lite}"
+  local compose_group_id="${AAR_COMPOSE_GROUP_ID:-${full_group_id}}"
+  local compose_artifact_id="${AAR_COMPOSE_ARTIFACT_ID:-volvoxgrid-android-compose}"
+  local compose_lite_group_id="${AAR_COMPOSE_LITE_GROUP_ID:-${compose_group_id}}"
+  local compose_lite_artifact_id="${AAR_COMPOSE_LITE_ARTIFACT_ID:-volvoxgrid-android-compose-lite}"
 
   GROUP_ID="${full_group_id}" \
   ARTIFACT_ID="${full_artifact_id}" \
@@ -45,11 +49,24 @@ run_android() {
     echo "----------------------------------------"
     echo "  Building: Android Compose AAR"
     echo "----------------------------------------"
-    GROUP_ID="${full_group_id}" \
-    ARTIFACT_ID="${AAR_COMPOSE_ARTIFACT_ID:-volvoxgrid-android-compose}" \
+    GROUP_ID="${compose_group_id}" \
+    ARTIFACT_ID="${compose_artifact_id}" \
     PARENT_GROUP_ID="${full_group_id}" \
     PARENT_ARTIFACT_ID="${full_artifact_id}" \
       "${SCRIPT_DIR}/build_android_compose_aar.sh"
+
+    case "${include_lite}" in
+      1|true|TRUE|yes|YES|on|ON)
+        echo "----------------------------------------"
+        echo "  Building: Android Compose AAR (lite)"
+        echo "----------------------------------------"
+        GROUP_ID="${compose_lite_group_id}" \
+        ARTIFACT_ID="${compose_lite_artifact_id}" \
+        PARENT_GROUP_ID="${lite_group_id}" \
+        PARENT_ARTIFACT_ID="${lite_artifact_id}" \
+          "${SCRIPT_DIR}/build_android_compose_aar.sh"
+        ;;
+    esac
   fi
 }
 

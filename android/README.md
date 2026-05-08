@@ -125,12 +125,20 @@ class MainActivity : AppCompatActivity() {
 
 ### Compose
 
-For Compose apps, add the `volvoxgrid-android-compose` module (Compose
-compiler isolated to that module — pure-View consumers don't pay for it):
+For Compose apps, add the `volvoxgrid-android-compose` module. Compose compiler
+setup stays isolated to that module, so pure-View consumers do not pay for it:
 
 ```kotlin
 dependencies {
     implementation("io.github.ivere27:volvoxgrid-android-compose:0.8.6")
+}
+```
+
+Use `volvoxgrid-android-compose-lite` when you want the lite native runtime:
+
+```kotlin
+dependencies {
+    implementation("io.github.ivere27:volvoxgrid-android-compose-lite:0.8.7")
 }
 ```
 
