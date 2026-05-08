@@ -336,12 +336,14 @@ The repo includes ready-to-run example hosts.
 Interactive examples:
 
 - `make go-tui-run`
+- `cd adapters/bubbletea && make tui-run`
 - `make dotnet-tui-run`
 - `make java-tui-run`
 
 Non-interactive smoke checks:
 
 - `make go-tui-smoke`
+- `cd adapters/bubbletea && make tui-smoke`
 - `make dotnet-tui-smoke`
 - `make java-tui-smoke`
 

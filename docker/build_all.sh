@@ -23,6 +23,10 @@ run_android() {
   local include_lite="${BUILD_ANDROID_INCLUDE_LITE:-0}"
   local lite_group_id="${AAR_LITE_GROUP_ID:-${full_group_id}}"
   local lite_artifact_id="${AAR_LITE_ARTIFACT_ID:-volvoxgrid-android-lite}"
+  local compose_group_id="${AAR_COMPOSE_GROUP_ID:-${full_group_id}}"
+  local compose_artifact_id="${AAR_COMPOSE_ARTIFACT_ID:-volvoxgrid-android-compose}"
+  local compose_lite_group_id="${AAR_COMPOSE_LITE_GROUP_ID:-${compose_group_id}}"
+  local compose_lite_artifact_id="${AAR_COMPOSE_LITE_ARTIFACT_ID:-volvoxgrid-android-compose-lite}"
 
   GROUP_ID="${full_group_id}" \
   ARTIFACT_ID="${full_artifact_id}" \
@@ -40,6 +44,30 @@ run_android() {
         "${SCRIPT_DIR}/build_android_aar.sh"
       ;;
   esac
+
+  if [[ -x "${SCRIPT_DIR}/build_android_compose_aar.sh" ]]; then
+    echo "----------------------------------------"
+    echo "  Building: Android Compose AAR"
+    echo "----------------------------------------"
+    GROUP_ID="${compose_group_id}" \
+    ARTIFACT_ID="${compose_artifact_id}" \
+    PARENT_GROUP_ID="${full_group_id}" \
+    PARENT_ARTIFACT_ID="${full_artifact_id}" \
+      "${SCRIPT_DIR}/build_android_compose_aar.sh"
+
+    case "${include_lite}" in
+      1|true|TRUE|yes|YES|on|ON)
+        echo "----------------------------------------"
+        echo "  Building: Android Compose AAR (lite)"
+        echo "----------------------------------------"
+        GROUP_ID="${compose_lite_group_id}" \
+        ARTIFACT_ID="${compose_lite_artifact_id}" \
+        PARENT_GROUP_ID="${lite_group_id}" \
+        PARENT_ARTIFACT_ID="${lite_artifact_id}" \
+          "${SCRIPT_DIR}/build_android_compose_aar.sh"
+        ;;
+    esac
+  fi
 }
 
 run_desktop() {
@@ -48,7 +76,7 @@ run_desktop() {
   echo "========================================"
   local desktop_group_id="${DESKTOP_GROUP_ID:-io.github.ivere27}"
   local desktop_artifact_id="${DESKTOP_ARTIFACT_ID:-volvoxgrid-desktop}"
-  local desktop_version="${DESKTOP_VERSION:-${VERSION:-0.8.6}}"
+  local desktop_version="${DESKTOP_VERSION:-${VERSION:-0.8.7}}"
   local desktop_git_commit="${DESKTOP_GIT_COMMIT:-${GIT_COMMIT:-unknown}}"
   local desktop_build_date="${DESKTOP_BUILD_DATE:-${BUILD_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}}"
 
@@ -75,7 +103,7 @@ run_wasm() {
   local dist_lite_dir="${DIST_LITE_DIR:-${REPO_ROOT}/dist/wasm-lite}"
   local web_target="${WEB_DOCKER_TARGET:-all}"
   WEB_DIST_DIR="${WEB_DIST_DIR:-${REPO_ROOT}/dist/web}"
-  WEB_BUNDLE_VERSION="${WEB_BUNDLE_VERSION:-${VERSION:-0.8.6}}"
+  WEB_BUNDLE_VERSION="${WEB_BUNDLE_VERSION:-${VERSION:-0.8.7}}"
   if [[ -z "${WEB_DOCKER_TARGET:-}" && "${BUILD_TARGET}" == "wasm" ]]; then
     web_target="bundle"
   fi

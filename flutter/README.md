@@ -17,7 +17,7 @@ A high-performance, pixel-rendered data grid widget for Flutter. The native Rust
 
 ```yaml
 dependencies:
-  volvoxgrid: ^0.8.6
+  volvoxgrid: ^0.8.7
 ```
 
 Native binaries are resolved automatically from Maven Central at build time. No manual downloads required.
@@ -29,13 +29,24 @@ By default, `VOLVOXGRID_SOURCE=maven` pulls pre-built binaries from Maven Centra
 | Variable | Default | Description |
 |---|---|---|
 | `VOLVOXGRID_SOURCE` | `maven` | `maven` or `local` |
-| `VOLVOXGRID_VERSION` | `0.8.6` | Maven artifact version |
+| `VOLVOXGRID_VERSION` | `0.8.7` | Maven artifact version |
 
 ## Quick Start
+
+The fastest way to display tabular data is with `VolvoxDataGrid<T>` — a typed,
+data-first widget that takes your domain rows and column accessors and hides
+the controller, protobuf, and engine plumbing entirely.
 
 ```dart
 import 'package:flutter/material.dart';
 import 'package:volvoxgrid/volvoxgrid.dart';
+
+class Product {
+  final String name;
+  final double price;
+  final int qty;
+  Product(this.name, this.price, this.qty);
+}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -45,11 +56,62 @@ Future<void> main() async {
 
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
-
   @override
   State<MyApp> createState() => _MyAppState();
 }
 
+class _MyAppState extends State<MyApp> {
+  List<Product> products = [
+    Product('Widget A', 29.99, 150),
+    Product('Widget B', 19.50, 80),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: Scaffold(
+        appBar: AppBar(title: const Text('VolvoxGrid')),
+        body: VolvoxDataGrid<Product>(
+          rows: products,
+          columns: [
+            VolvoxColumn(field: 'name',  header: 'Name',  value: (p) => p.name),
+            VolvoxColumn(
+              field: 'price',
+              header: 'Price',
+              value: (p) => p.price.toStringAsFixed(2),
+              editable: true,
+            ),
+            VolvoxColumn(field: 'qty',   header: 'Qty',   value: (p) => '${p.qty}'),
+          ],
+          onCellEdit: (edit) {
+            // edit.row is the typed Product, edit.field is 'price', etc.
+            setState(() {
+              final p = products[edit.rowIndex];
+              products[edit.rowIndex] = Product(
+                p.name,
+                double.tryParse(edit.newText) ?? p.price,
+                p.qty,
+              );
+            });
+          },
+        ),
+      ),
+    );
+  }
+}
+```
+
+Pass a **new** list reference (e.g. via `setState`) to refresh — mutating in
+place will not trigger a reload, matching the convention of other Flutter data
+widgets.
+
+### Low-level: `VolvoxGridWidget` + `VolvoxGridController`
+
+For full control over the engine — partial cell updates, custom dropdown
+sources, programmatic sort, merged cells — drop down to the controller form.
+This is what `VolvoxDataGrid` itself uses internally.
+
+```dart
 class _MyAppState extends State<MyApp> {
   final controller = VolvoxGridController();
 
@@ -61,13 +123,9 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> _initGrid() async {
     await controller.create(rows: 100, cols: 5);
-
-    // Set column headers in the top indicator band.
     await controller.setColumnCaption(0, 'Name');
     await controller.setColumnCaption(1, 'Price');
     await controller.setColumnCaption(2, 'Qty');
-
-    // Set data
     await controller.setCellText(0, 0, 'Widget A');
     await controller.setCellText(0, 1, '29.99');
     await controller.setCellText(0, 2, '150');

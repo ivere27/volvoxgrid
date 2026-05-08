@@ -63,7 +63,8 @@ RUN yes | sdkmanager --licenses >/dev/null && \
 ENV ANDROID_NDK_HOME=/opt/android-sdk/ndk/28.2.13676358
 
 COPY docker/build_android_aar.sh /opt/volvoxgrid/build_android_aar.sh
-RUN chmod +x /opt/volvoxgrid/build_android_aar.sh
+COPY docker/build_android_compose_aar.sh /opt/volvoxgrid/build_android_compose_aar.sh
+RUN chmod +x /opt/volvoxgrid/build_android_aar.sh /opt/volvoxgrid/build_android_compose_aar.sh
 
 # Allow non-root users (docker run -u) to write to caches
 RUN chmod -R a+w /opt/cargo /opt/rustup /opt/android-sdk

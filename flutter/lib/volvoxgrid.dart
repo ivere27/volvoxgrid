@@ -35,6 +35,7 @@ import 'src/generated/volvoxgrid.pb.dart' as pb;
 
 export 'volvoxgrid_controller.dart';
 export 'volvoxgrid_ffi.dart';
+export 'volvox_data_grid.dart';
 
 void _debugLog(String Function() messageBuilder) {
   if (kDebugMode) {
@@ -362,6 +363,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
 
   /// Focus node for keyboard events on the grid itself.
   final FocusNode _gridFocusNode = FocusNode();
+  MouseCursor _engineCursor = SystemMouseCursors.basic;
   int? _lastGpuTextureId;
 
   /// Touch-scroll gesture tracking.
@@ -1456,6 +1458,9 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
         widget.onSelectionChanged?.call(selection);
       }
     }
+    if (output.hasCursor()) {
+      _applyEngineCursor(output.cursor.cursor);
+    }
     if (output.hasEditRequest() && output.editRequest.width > 0) {
       if (_deferOverlayWhileImeProxyActive) {
         _deferredEditRequest = pb.EditRequest()
@@ -1474,6 +1479,52 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     if (output.rendered) {
       _sendBufferReady();
     }
+  }
+
+  void _applyEngineCursor(pb.CursorType cursorType) {
+    final cursor = _mouseCursorFor(cursorType);
+    if (_engineCursor == cursor) {
+      return;
+    }
+    if (!mounted) {
+      _engineCursor = cursor;
+      return;
+    }
+    setState(() {
+      _engineCursor = cursor;
+    });
+  }
+
+  static MouseCursor _mouseCursorFor(pb.CursorType cursorType) {
+    if (cursorType == pb.CursorType.CURSOR_RESIZE_COL) {
+      return SystemMouseCursors.resizeColumn;
+    }
+    if (cursorType == pb.CursorType.CURSOR_RESIZE_ROW) {
+      return SystemMouseCursors.resizeRow;
+    }
+    if (cursorType == pb.CursorType.CURSOR_MOVE_COL ||
+        cursorType == pb.CursorType.CURSOR_MOVE_ROW) {
+      return SystemMouseCursors.move;
+    }
+    if (cursorType == pb.CursorType.CURSOR_TEXT) {
+      return SystemMouseCursors.text;
+    }
+    if (cursorType == pb.CursorType.CURSOR_HAND) {
+      return SystemMouseCursors.click;
+    }
+    if (cursorType == pb.CursorType.CURSOR_WAIT) {
+      return SystemMouseCursors.wait;
+    }
+    if (cursorType == pb.CursorType.CURSOR_NOT_ALLOWED) {
+      return SystemMouseCursors.forbidden;
+    }
+    if (cursorType == pb.CursorType.CURSOR_CROSSHAIR) {
+      return SystemMouseCursors.precise;
+    }
+    if (cursorType == pb.CursorType.CURSOR_COPY) {
+      return SystemMouseCursors.copy;
+    }
+    return SystemMouseCursors.basic;
   }
 
   void _handleCompareRequest(pb.CompareEvent request) {
@@ -2957,139 +3008,142 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
             width: constraints.maxWidth,
             height: constraints.maxHeight,
             child: ClipRect(
-              child: Listener(
-                onPointerDown: _onPointerDown,
-                onPointerUp: _onPointerUp,
-                onPointerMove: _onPointerMove,
-                onPointerHover: _onPointerHover,
-                onPointerCancel: _onPointerCancel,
-                onPointerSignal: _onPointerSignal,
-                onPointerPanZoomStart: _onPointerPanZoomStart,
-                onPointerPanZoomUpdate: _onPointerPanZoomUpdate,
-                onPointerPanZoomEnd: _onPointerPanZoomEnd,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Positioned(
-                      left: -1000,
-                      top: -1000,
-                      width: 1,
-                      height: 1,
-                      child: IgnorePointer(
-                        ignoring: true,
-                        child: Opacity(
-                          opacity: 0,
-                          child: TextField(
-                            controller: _imeProxyController,
-                            focusNode: _imeProxyFocusNode,
-                            decoration:
-                                const InputDecoration.collapsed(hintText: ''),
-                            style: const TextStyle(
-                              fontSize: 1,
-                              color: Colors.transparent,
+              child: MouseRegion(
+                cursor: _engineCursor,
+                child: Listener(
+                  onPointerDown: _onPointerDown,
+                  onPointerUp: _onPointerUp,
+                  onPointerMove: _onPointerMove,
+                  onPointerHover: _onPointerHover,
+                  onPointerCancel: _onPointerCancel,
+                  onPointerSignal: _onPointerSignal,
+                  onPointerPanZoomStart: _onPointerPanZoomStart,
+                  onPointerPanZoomUpdate: _onPointerPanZoomUpdate,
+                  onPointerPanZoomEnd: _onPointerPanZoomEnd,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Positioned(
+                        left: -1000,
+                        top: -1000,
+                        width: 1,
+                        height: 1,
+                        child: IgnorePointer(
+                          ignoring: true,
+                          child: Opacity(
+                            opacity: 0,
+                            child: TextField(
+                              controller: _imeProxyController,
+                              focusNode: _imeProxyFocusNode,
+                              decoration:
+                                  const InputDecoration.collapsed(hintText: ''),
+                              style: const TextStyle(
+                                fontSize: 1,
+                                color: Colors.transparent,
+                              ),
+                              cursorColor: Colors.transparent,
+                              autocorrect: false,
+                              enableSuggestions: false,
+                              enableInteractiveSelection: false,
+                              maxLines: 1,
                             ),
-                            cursorColor: Colors.transparent,
-                            autocorrect: false,
-                            enableSuggestions: false,
-                            enableInteractiveSelection: false,
-                            maxLines: 1,
                           ),
                         ),
                       ),
-                    ),
 
-                    // Current Flutter path: decode native RGBA frames and
-                    // show via RawImage.  A platform texture path can be
-                    // added separately.
-                    SizedBox(
-                      width: constraints.maxWidth,
-                      height: constraints.maxHeight,
-                      child: ClipRect(
-                        child: _gesturePreviewActive
-                            ? Transform(
-                                transform: Matrix4.identity()
-                                  ..translateByDouble(
-                                    _gesturePreviewPan.dx +
-                                        _gesturePreviewFocal.dx,
-                                    _gesturePreviewPan.dy +
-                                        _gesturePreviewFocal.dy,
-                                    0,
-                                    1,
-                                  )
-                                  ..scaleByDouble(
-                                    _gesturePreviewScale,
-                                    _gesturePreviewScale,
-                                    1,
-                                    1,
-                                  )
-                                  ..translateByDouble(
-                                    -_gesturePreviewFocal.dx,
-                                    -_gesturePreviewFocal.dy,
-                                    0,
-                                    1,
-                                  ),
-                                filterQuality: FilterQuality.none,
-                                child: _buildSurface(constraints),
-                              )
-                            : _buildSurface(constraints),
+                      // Current Flutter path: decode native RGBA frames and
+                      // show via RawImage.  A platform texture path can be
+                      // added separately.
+                      SizedBox(
+                        width: constraints.maxWidth,
+                        height: constraints.maxHeight,
+                        child: ClipRect(
+                          child: _gesturePreviewActive
+                              ? Transform(
+                                  transform: Matrix4.identity()
+                                    ..translateByDouble(
+                                      _gesturePreviewPan.dx +
+                                          _gesturePreviewFocal.dx,
+                                      _gesturePreviewPan.dy +
+                                          _gesturePreviewFocal.dy,
+                                      0,
+                                      1,
+                                    )
+                                    ..scaleByDouble(
+                                      _gesturePreviewScale,
+                                      _gesturePreviewScale,
+                                      1,
+                                      1,
+                                    )
+                                    ..translateByDouble(
+                                      -_gesturePreviewFocal.dx,
+                                      -_gesturePreviewFocal.dy,
+                                      0,
+                                      1,
+                                    ),
+                                  filterQuality: FilterQuality.none,
+                                  child: _buildSurface(constraints),
+                                )
+                              : _buildSurface(constraints),
+                        ),
                       ),
-                    ),
 
-                    // Overlay edit TextField.
-                    if (_editing)
-                      Positioned(
-                        left: _editRect.left,
-                        top: _editRect.top,
-                        width: _editRect.width,
-                        height: _editRect.height,
-                        child: IgnorePointer(
-                          ignoring: !_editOverlayVisible,
-                          child: Opacity(
-                            opacity: _editOverlayVisible ? 1 : 0,
-                            child: Material(
-                              elevation: 2,
-                              child: Focus(
-                                onKeyEvent: _onEditOverlayKeyEvent,
-                                child: TextField(
-                                  controller: _editTextController,
-                                  focusNode: _editFocusNode,
-                                  decoration: InputDecoration(
-                                    isDense: true,
-                                    contentPadding: _editPadding,
-                                    border: InputBorder.none,
-                                  ),
-                                  style: TextStyle(
-                                    fontSize: _editFontSize,
-                                    height: 1.0,
-                                    fontFamily: _editFontFamily,
-                                    fontWeight: _editFontBold
-                                        ? FontWeight.bold
-                                        : FontWeight.normal,
-                                    fontStyle: _editFontItalic
-                                        ? FontStyle.italic
-                                        : FontStyle.normal,
-                                  ),
-                                  textAlignVertical: TextAlignVertical.center,
-                                  maxLines: 1,
-                                  onSubmitted: (_) =>
-                                      _commitEditIfSessionCurrent(
-                                    currentEditSessionToken,
-                                    currentEditRow,
-                                    currentEditCol,
-                                  ),
-                                  onTapOutside: (_) =>
-                                      _commitEditIfSessionCurrent(
-                                    currentEditSessionToken,
-                                    currentEditRow,
-                                    currentEditCol,
+                      // Overlay edit TextField.
+                      if (_editing)
+                        Positioned(
+                          left: _editRect.left,
+                          top: _editRect.top,
+                          width: _editRect.width,
+                          height: _editRect.height,
+                          child: IgnorePointer(
+                            ignoring: !_editOverlayVisible,
+                            child: Opacity(
+                              opacity: _editOverlayVisible ? 1 : 0,
+                              child: Material(
+                                elevation: 2,
+                                child: Focus(
+                                  onKeyEvent: _onEditOverlayKeyEvent,
+                                  child: TextField(
+                                    controller: _editTextController,
+                                    focusNode: _editFocusNode,
+                                    decoration: InputDecoration(
+                                      isDense: true,
+                                      contentPadding: _editPadding,
+                                      border: InputBorder.none,
+                                    ),
+                                    style: TextStyle(
+                                      fontSize: _editFontSize,
+                                      height: 1.0,
+                                      fontFamily: _editFontFamily,
+                                      fontWeight: _editFontBold
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                      fontStyle: _editFontItalic
+                                          ? FontStyle.italic
+                                          : FontStyle.normal,
+                                    ),
+                                    textAlignVertical: TextAlignVertical.center,
+                                    maxLines: 1,
+                                    onSubmitted: (_) =>
+                                        _commitEditIfSessionCurrent(
+                                      currentEditSessionToken,
+                                      currentEditRow,
+                                      currentEditCol,
+                                    ),
+                                    onTapOutside: (_) =>
+                                        _commitEditIfSessionCurrent(
+                                      currentEditSessionToken,
+                                      currentEditRow,
+                                      currentEditCol,
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),

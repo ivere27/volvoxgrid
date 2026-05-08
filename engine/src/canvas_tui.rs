@@ -246,6 +246,7 @@ pub fn render_grid_tui_with_background_mode(
         return ((0, 0, 0, 0), [0.0; layer::COUNT], [0; 4]);
     }
 
+    grid.span.clear_span_cache();
     grid.ensure_layout();
 
     let default_fg = resolve_tui_terminal_color(background_mode, grid.style.fore_color);
@@ -2901,6 +2902,35 @@ mod tests {
         assert!(first_row.contains("Seoul"));
         assert!(!second_row.contains("Q1"));
         assert!(second_row.contains("Busan"));
+    }
+
+    #[test]
+    fn render_grid_tui_recomputes_span_ranges_between_frames() {
+        let mut grid = VolvoxGrid::new(1, 24, 4, 3, 2, 1, 0);
+        grid.set_renderer_mode(pb::RendererMode::RendererTui as i32);
+        grid.columns[0].caption = "Q".to_string();
+        grid.columns[1].caption = "City".to_string();
+        grid.set_col_width(0, 6);
+        grid.set_col_width(1, 10);
+
+        grid.cells.set_text(1, 0, "Q1".to_string());
+        grid.cells.set_text(1, 1, "Seoul".to_string());
+        grid.cells.set_text(2, 0, "Q1".to_string());
+        grid.cells.set_text(2, 1, "Busan".to_string());
+
+        let mut buffer = vec![TuiCell::default(); 24 * 4];
+        render_grid_tui(&mut grid, &mut buffer, 24, 4, 24);
+        let unspanned_row = row_text(&buffer, 24, 2, 24);
+        assert!(unspanned_row.contains("Q1"));
+
+        grid.span.mode = pb::CellSpanMode::CellSpanByRow as i32;
+        grid.span.span_cols.insert(0, true);
+        grid.span.span_compare = pb::SpanCompareMode::SpanCompareNoCase as i32;
+
+        render_grid_tui(&mut grid, &mut buffer, 24, 4, 24);
+        let spanned_row = row_text(&buffer, 24, 2, 24);
+        assert!(!spanned_row.contains("Q1"));
+        assert!(spanned_row.contains("Busan"));
     }
 
     #[test]

@@ -599,6 +599,7 @@ export class VolvoxSheet implements VolvoxSheetApi {
     }
     const modifier = (e.shiftKey ? 1 : 0) | ((e.ctrlKey || e.metaKey) ? 2 : 0) | (e.altKey ? 4 : 0);
     this.wasm.handle_key_down(this.grid.id, e.keyCode, modifier);
+    (this.grid as any).syncCursorFromEngine?.();
     this.grid.invalidate();
   };
 
@@ -753,6 +754,11 @@ export class VolvoxSheet implements VolvoxSheetApi {
     }
     const { x } = this.pointerToGridPixels(e);
     return x - Number(this.wasm.get_cell_screen_x(this.grid.id, row, col));
+  }
+
+  private isBooleanCheckboxCell(row: number, col: number): boolean {
+    return typeof this.wasm.is_boolean_checkbox_cell === "function"
+      && Number(this.wasm.is_boolean_checkbox_cell(this.grid.id, row, col)) !== 0;
   }
 
   private syncHostEditSelectionFromEngine(): void {
@@ -1116,6 +1122,7 @@ export class VolvoxSheet implements VolvoxSheetApi {
     const master = this.resolveMergedMaster(row, col);
     const masterDataRow = master.row;
     const masterDataCol = master.col;
+    if (this.isBooleanCheckboxCell(masterDataRow, masterDataCol)) return;
 
     (this.grid as any).suppressEditorSelect = true;
     const engineEditing = this.wasm.is_editing(this.grid.id) !== 0;

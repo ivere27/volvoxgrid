@@ -5,6 +5,7 @@ import io.github.ivere27.volvoxgrid.BeforeDropdownOpenEvent;
 import io.github.ivere27.volvoxgrid.ConfigureRequest;
 import io.github.ivere27.volvoxgrid.CreateRequest;
 import io.github.ivere27.volvoxgrid.CreateResponse;
+import io.github.ivere27.volvoxgrid.CursorType;
 import io.github.ivere27.volvoxgrid.CellRange;
 import io.github.ivere27.volvoxgrid.ClipboardResponse;
 import io.github.ivere27.volvoxgrid.CompareResponse;
@@ -40,6 +41,7 @@ import io.github.ivere27.volvoxgrid.SelectionState;
 import io.github.ivere27.volvoxgrid.common.VolvoxGridHost;
 import io.github.ivere27.volvoxgrid.common.RendererBackend;
 import java.awt.Color;
+import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Toolkit;
@@ -363,6 +365,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     private volatile EditRequestListener editRequestListener;
     private volatile boolean decisionChannelEnabled = false;
     private volatile boolean engineEditing = false;
+    private volatile CursorType engineCursor = CursorType.CURSOR_DEFAULT;
     private volatile int editSelectionAnchor = -1;
     private volatile int editSelectionRow = -1;
     private volatile int editSelectionCol = -1;
@@ -2717,6 +2720,8 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
             if (listener != null) {
                 SwingUtilities.invokeLater(() -> listener.onEditRequest(request));
             }
+        } else if (output.hasCursor()) {
+            applyEngineCursor(output.getCursor().getCursor());
         } else if (output.hasDropdownRequest()) {
             SwingUtilities.invokeLater(() -> hideEditOverlay(false));
         } else if (output.hasTooltipRequest()) {
@@ -2732,6 +2737,49 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
             } else if (renderedFrame) {
                 scheduleFollowupFrame();
             }
+        }
+    }
+
+    private void applyEngineCursor(CursorType cursorType) {
+        if (cursorType == null || cursorType == CursorType.UNRECOGNIZED) {
+            cursorType = CursorType.CURSOR_DEFAULT;
+        }
+        if (engineCursor == cursorType) {
+            return;
+        }
+        engineCursor = cursorType;
+        final CursorType requestedCursorType = cursorType;
+        final Cursor cursor = swingCursorFor(requestedCursorType);
+        SwingUtilities.invokeLater(() -> {
+            if (engineCursor == requestedCursorType) {
+                setCursor(cursor);
+            }
+        });
+    }
+
+    private static Cursor swingCursorFor(CursorType cursorType) {
+        switch (cursorType) {
+            case CURSOR_RESIZE_COL:
+                return Cursor.getPredefinedCursor(Cursor.E_RESIZE_CURSOR);
+            case CURSOR_RESIZE_ROW:
+                return Cursor.getPredefinedCursor(Cursor.N_RESIZE_CURSOR);
+            case CURSOR_MOVE_COL:
+            case CURSOR_MOVE_ROW:
+                return Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR);
+            case CURSOR_TEXT:
+                return Cursor.getPredefinedCursor(Cursor.TEXT_CURSOR);
+            case CURSOR_HAND:
+            case CURSOR_COPY:
+                return Cursor.getPredefinedCursor(Cursor.HAND_CURSOR);
+            case CURSOR_WAIT:
+                return Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR);
+            case CURSOR_CROSSHAIR:
+                return Cursor.getPredefinedCursor(Cursor.CROSSHAIR_CURSOR);
+            case CURSOR_NOT_ALLOWED:
+            case CURSOR_DEFAULT:
+            case UNRECOGNIZED:
+            default:
+                return Cursor.getDefaultCursor();
         }
     }
 

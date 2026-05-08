@@ -117,10 +117,12 @@ RUN chmod +x /opt/volvoxgrid/zig-cc-wrapper.sh && \
     ln -s /opt/volvoxgrid/zig-cc-wrapper.sh /opt/volvoxgrid/zig-cc-aarch64-macos.sh
 
 COPY docker/build_android_aar.sh /opt/volvoxgrid/build_android_aar.sh
+COPY docker/build_android_compose_aar.sh /opt/volvoxgrid/build_android_compose_aar.sh
 COPY docker/build_desktop_jar.sh /opt/volvoxgrid/build_desktop_jar.sh
 COPY docker/build_ios.sh /opt/volvoxgrid/build_ios.sh
 COPY docker/build_all.sh /opt/volvoxgrid/build_all.sh
 RUN chmod +x /opt/volvoxgrid/build_android_aar.sh \
+             /opt/volvoxgrid/build_android_compose_aar.sh \
              /opt/volvoxgrid/build_desktop_jar.sh \
              /opt/volvoxgrid/build_ios.sh \
              /opt/volvoxgrid/build_all.sh

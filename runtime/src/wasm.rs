@@ -3154,6 +3154,18 @@ pub fn hit_test_col(id: i32, x: f32, y: f32) -> i32 {
     .unwrap_or(-1)
 }
 
+#[wasm_bindgen]
+pub fn is_boolean_checkbox_cell(id: i32, row: i32, col: i32) -> i32 {
+    with_grid(id, |grid| {
+        if input::is_boolean_checkbox_cell(grid, row, col) {
+            1
+        } else {
+            0
+        }
+    })
+    .unwrap_or(0)
+}
+
 // ---------------------------------------------------------------------------
 // Cell text
 // ---------------------------------------------------------------------------
@@ -4103,7 +4115,7 @@ fn handle_pointer_down_after_before_mouse(
                 .map_or(false, |rp| rp.is_collapsed);
             request_before_node_toggle(grid_id, grid, hit.row, collapsing);
         }
-        if area == input::HitArea::CheckBox && !dbl_click {
+        if area == input::HitArea::CheckBox {
             request_before_checkbox_toggle(grid_id, grid, hit.row, hit.col);
         }
         let is_cell_like = area == input::HitArea::Cell
@@ -4163,7 +4175,7 @@ pub fn handle_pointer_down(id: i32, x: f32, y: f32, button: i32, modifier: i32, 
         ensure_layout(grid);
         if decision_channel_enabled(grid_id) {
             let hit = input::hit_test(grid, x, y);
-            if !dbl_click
+            if (!dbl_click || hit.area == input::HitArea::CheckBox)
                 && hit.row >= 0
                 && hit.col >= 0
                 && hit.area != input::HitArea::DropdownList

@@ -126,7 +126,7 @@ Or use the `<volvox-grid>` custom element:
 
 ```yaml
 dependencies:
-  volvoxgrid: ^0.8.6
+  volvoxgrid: ^0.8.7
 ```
 
 ```dart
@@ -148,7 +148,7 @@ VolvoxGridWidget(controller: controller)
 
 ```kotlin
 dependencies {
-    implementation("io.github.ivere27:volvoxgrid-desktop:0.8.6")
+    implementation("io.github.ivere27:volvoxgrid-desktop:0.8.7")
 }
 ```
 
@@ -164,7 +164,7 @@ ctrl.setCellText(0, 0, "Widget A");
 
 ## Packages
 
-Examples below use `0.8.6`. Replace it with the release you want to consume.
+Examples below use `0.8.7`. Replace it with the release you want to consume.
 
 ### Maven / Gradle
 
@@ -172,8 +172,8 @@ Android:
 
 ```kotlin
 dependencies {
-    implementation("io.github.ivere27:volvoxgrid-android:0.8.6")
-    // or: implementation("io.github.ivere27:volvoxgrid-android-lite:0.8.6")
+    implementation("io.github.ivere27:volvoxgrid-android:0.8.7")
+    // or: implementation("io.github.ivere27:volvoxgrid-android-lite:0.8.7")
 }
 ```
 
@@ -185,7 +185,7 @@ repositories {
 }
 
 dependencies {
-    implementation("io.github.ivere27:volvoxgrid-desktop:0.8.6")
+    implementation("io.github.ivere27:volvoxgrid-desktop:0.8.7")
 }
 ```
 
@@ -198,7 +198,7 @@ Platform docs:
 
 ```yaml
 dependencies:
-  volvoxgrid: ^0.8.6
+  volvoxgrid: ^0.8.7
 ```
 
 The Flutter package resolves Android and desktop native binaries from Maven Central at build time. See [flutter/README.md](flutter/README.md).

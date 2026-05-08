@@ -6,9 +6,9 @@ import (
 	"time"
 	"unicode/utf8"
 
-	pb "github.com/ivere27/volvoxgrid/api/v1"
-	"github.com/ivere27/volvoxgrid/pkg/volvoxgrid"
-	vgterm "github.com/ivere27/volvoxgrid/pkg/volvoxgrid/tui"
+	pb "github.com/ivere27/volvoxgrid/go/api/v1"
+	"github.com/ivere27/volvoxgrid/go/pkg/volvoxgrid"
+	vgterm "github.com/ivere27/volvoxgrid/go/pkg/volvoxgrid/tui"
 )
 
 const (

@@ -8,9 +8,9 @@ Add the Maven dependency to your `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("io.github.ivere27:volvoxgrid-android:0.8.6")
+    implementation("io.github.ivere27:volvoxgrid-android:0.8.7")
     // or lite variant:
-    // implementation("io.github.ivere27:volvoxgrid-android-lite:0.8.6")
+    // implementation("io.github.ivere27:volvoxgrid-android-lite:0.8.7")
 }
 ```
 
@@ -18,9 +18,9 @@ Or `build.gradle`:
 
 ```groovy
 dependencies {
-    implementation 'io.github.ivere27:volvoxgrid-android:0.8.6'
+    implementation 'io.github.ivere27:volvoxgrid-android:0.8.7'
     // or lite variant:
-    // implementation 'io.github.ivere27:volvoxgrid-android-lite:0.8.6'
+    // implementation 'io.github.ivere27:volvoxgrid-android-lite:0.8.7'
 }
 ```
 
@@ -52,7 +52,7 @@ For the Android example app (`make android-run`), use:
 
 - Normal (default): `make android-run`
 - Lite (local build): `make android-run VOLVOXGRID_VARIANT=lite`
-- Lite (Maven): `make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.8.6`
+- Lite (Maven): `make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.8.7`
 
 `VOLVOXGRID_VARIANT` only treats `lite` as special. Any other value falls back to normal.
 
@@ -67,8 +67,16 @@ The Android example has a `Cache` dropdown (`8192`, `4096`, `1024`, `256`, `0`).
 
 ## Quick Start
 
-### 1. Add the view to your layout
+The fastest path is `VolvoxGridAdapter<T>` (View) or the `VolvoxGrid<T>`
+composable (Compose) — typed, data-first wrappers that take your domain rows
+and column accessors and hide the controller and protobuf plumbing entirely.
 
+### View-based (Kotlin)
+
+`VolvoxGridAdapter<T>` ships in `volvoxgrid-android` and pairs with
+`VolvoxGridView`:
+
+Layout:
 ```xml
 <io.github.ivere27.volvoxgrid.VolvoxGridView
     android:id="@+id/gridView"
@@ -76,7 +84,104 @@ The Android example has a `Cache` dropdown (`8192`, `4096`, `1024`, `256`, `0`).
     android:layout_height="match_parent" />
 ```
 
-### 2. Initialize and populate
+Activity:
+```kotlin
+import io.github.ivere27.volvoxgrid.*
+
+data class Product(val name: String, val price: Double, val qty: Int)
+
+class MainActivity : AppCompatActivity() {
+    private lateinit var adapter: VolvoxGridAdapter<Product>
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        val gridView: VolvoxGridView = findViewById(R.id.gridView)
+        adapter = VolvoxGridAdapter(
+            view = gridView,
+            columns = listOf(
+                VolvoxColumn(field = "name",  header = "Name",  value = { it.name }),
+                VolvoxColumn(field = "price", header = "Price",
+                             value = { "%.2f".format(it.price) }, editable = true),
+                VolvoxColumn(field = "qty",   header = "Qty",   value = { "${it.qty}" }),
+            ),
+        )
+        adapter.onCellEdit = { edit ->
+            // edit.row is the typed Product
+        }
+        adapter.submitList(listOf(
+            Product("Widget A", 29.99, 150),
+            Product("Widget B", 19.50, 80),
+        ))
+    }
+
+    override fun onDestroy() {
+        adapter.detach()
+        super.onDestroy()
+    }
+}
+```
+
+### Compose
+
+For Compose apps, add the `volvoxgrid-android-compose` module. Compose compiler
+setup stays isolated to that module, so pure-View consumers do not pay for it:
+
+```kotlin
+dependencies {
+    implementation("io.github.ivere27:volvoxgrid-android-compose:0.8.7")
+}
+```
+
+Use `volvoxgrid-android-compose-lite` when you want the lite native runtime:
+
+```kotlin
+dependencies {
+    implementation("io.github.ivere27:volvoxgrid-android-compose-lite:0.8.7")
+}
+```
+
+```kotlin
+import io.github.ivere27.volvoxgrid.*
+import io.github.ivere27.volvoxgrid.compose.VolvoxGrid
+
+@Composable
+fun ProductGrid() {
+    var products by remember { mutableStateOf(listOf(
+        Product("Widget A", 29.99, 150),
+        Product("Widget B", 19.50, 80),
+    )) }
+
+    VolvoxGrid(
+        rows = products,
+        columns = listOf(
+            VolvoxColumn(field = "name",  header = "Name",  value = { it.name }),
+            VolvoxColumn(field = "price", header = "Price",
+                         value = { "%.2f".format(it.price) }, editable = true),
+            VolvoxColumn(field = "qty",   header = "Qty",   value = { "${it.qty}" }),
+        ),
+        onCellEdit = { edit ->
+            products = products.toMutableList().also { rows ->
+                val p = rows[edit.rowIndex]
+                rows[edit.rowIndex] = p.copy(
+                    price = edit.newText.toDoubleOrNull() ?: p.price,
+                )
+            }
+        },
+        modifier = Modifier.fillMaxSize(),
+    )
+}
+```
+
+Pass a **new** list reference to refresh — mutating in place won't trigger a
+reload.
+
+### Low-level: `VolvoxGridView` + `VolvoxGridController`
+
+For full control over the engine (partial cell updates, dropdown sources,
+custom event handling), drop down to the controller form. This is what
+`VolvoxGridAdapter` itself uses internally.
 
 ```java
 import io.github.ivere27.volvoxgrid.*;
@@ -90,20 +195,12 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         gridView = findViewById(R.id.gridView);
-
-        // Initialize: auto-detects bundled native library (standard or lite)
         gridView.initialize(100, 5);
-        //                  rows cols
 
-        // Get a controller for grid operations
         VolvoxGridController ctrl = gridView.createController();
-
-        // Set column headers in the top indicator band
         ctrl.setColumnCaption(0, "Name");
         ctrl.setColumnCaption(1, "Price");
         ctrl.setColumnCaption(2, "Qty");
-
-        // Set data
         ctrl.setCellText(0, 0, "Widget A");
         ctrl.setCellText(0, 1, "29.99");
         ctrl.setCellText(0, 2, "150");

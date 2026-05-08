@@ -324,12 +324,20 @@ pub fn begin_user_resize_after_before(grid: &mut VolvoxGrid, row: i32, col: i32,
         grid.resize_index = col;
         grid.resize_start_pos = start_pos;
         grid.resize_start_size = grid.get_col_width(col);
+        grid.resize_start_col_widths = grid.col_widths.clone();
+        grid.resize_start_row_heights.clear();
+        grid.resize_start_row_indicator = None;
+        grid.resize_cancel_pending = false;
     } else if row >= 0 && row < grid.rows && row_resize_enabled(grid) {
         grid.resize_active = true;
         grid.resize_is_col = false;
         grid.resize_index = row;
         grid.resize_start_pos = start_pos;
         grid.resize_start_size = grid.get_row_height(row);
+        grid.resize_start_col_widths.clear();
+        grid.resize_start_row_heights = grid.row_heights.clone();
+        grid.resize_start_row_indicator = None;
+        grid.resize_cancel_pending = false;
     }
 }
 
@@ -342,6 +350,10 @@ pub fn begin_row_start_indicator_width_resize(grid: &mut VolvoxGrid, start_pos: 
     grid.resize_index = -1;
     grid.resize_start_pos = start_pos;
     grid.resize_start_size = grid.indicator_bands.row_start.resolved_width_px();
+    grid.resize_start_col_widths.clear();
+    grid.resize_start_row_heights.clear();
+    grid.resize_start_row_indicator = Some(grid.indicator_bands.row_start.clone());
+    grid.resize_cancel_pending = false;
 }
 
 fn set_row_start_indicator_width(grid: &mut VolvoxGrid, width_px: i32) {
@@ -2045,6 +2057,97 @@ fn emit_pointer_move_and_hover(
     }
 }
 
+fn handle_active_resize_drag(grid: &mut VolvoxGrid, x: f32, y: f32) -> bool {
+    if !grid.resize_active {
+        return false;
+    }
+
+    grid.cursor_hint = if grid.resize_is_col { 1 } else { 2 };
+    if grid.resize_is_col {
+        let delta = (x - grid.resize_start_pos) as i32;
+        let new_width = (grid.resize_start_size + delta).max(0);
+        if grid.resize_index < 0 {
+            set_row_start_indicator_width(grid, new_width);
+        } else if matches!(grid.allow_user_resizing, 4 | 6) {
+            // Uniform mode: must rebuild full layout
+            grid.set_col_width(-1, new_width);
+        } else {
+            // Single column: use incremental layout patch (avoids O(rows) rebuild)
+            let col = grid.resize_index;
+            let w = grid.clamp_col_width(col, new_width);
+            grid.col_widths.insert(col, w);
+            grid.layout.patch_col_width(col, w);
+        }
+    } else {
+        let delta = (y - grid.resize_start_pos) as i32;
+        let new_height = (grid.resize_start_size + delta).max(0);
+        let is_uniform = matches!(grid.allow_user_resizing, 5 | 6);
+        if is_uniform {
+            grid.set_row_height(-1, new_height);
+        } else {
+            // Single row: use incremental layout patch
+            let row = grid.resize_index;
+            let h = new_height.max(0);
+            grid.row_heights.insert(row, h);
+            grid.layout.patch_row_height(row, h);
+        }
+    }
+    grid.mark_dirty();
+    true
+}
+
+fn resize_event_axes(grid: &VolvoxGrid) -> (i32, i32) {
+    let row = if grid.resize_is_col {
+        -1
+    } else {
+        grid.resize_index
+    };
+    let col = if grid.resize_is_col && grid.resize_index >= 0 {
+        grid.resize_index
+    } else {
+        -1
+    };
+    (row, col)
+}
+
+fn clear_resize_tracking(grid: &mut VolvoxGrid) {
+    grid.resize_active = false;
+    grid.resize_index = -1;
+    grid.resize_start_col_widths.clear();
+    grid.resize_start_row_heights.clear();
+    grid.resize_start_row_indicator = None;
+}
+
+fn cancel_active_resize(grid: &mut VolvoxGrid) -> bool {
+    if !grid.resize_active {
+        return false;
+    }
+
+    let (row, col) = resize_event_axes(grid);
+    if grid.resize_is_col {
+        if grid.resize_index < 0 {
+            if let Some(row_indicator) = grid.resize_start_row_indicator.take() {
+                grid.indicator_bands.row_start = row_indicator;
+            } else {
+                set_row_start_indicator_width(grid, grid.resize_start_size);
+            }
+        } else {
+            grid.col_widths = std::mem::take(&mut grid.resize_start_col_widths);
+        }
+    } else {
+        grid.row_heights = std::mem::take(&mut grid.resize_start_row_heights);
+    }
+
+    grid.layout.invalidate();
+    clear_resize_tracking(grid);
+    grid.resize_cancel_pending = true;
+    grid.cursor_hint = 0;
+    grid.events
+        .push(GridEventData::AfterUserResize { row, col });
+    grid.mark_dirty();
+    true
+}
+
 fn first_visible_row_indicator_slot(grid: &VolvoxGrid) -> i32 {
     grid.indicator_bands
         .row_start
@@ -3174,6 +3277,7 @@ pub fn handle_pointer_down_with_behavior(
     behavior: InputBehavior,
 ) {
     grid.scroll.stop_fling();
+    grid.resize_cancel_pending = false;
     clear_col_drag_pending(grid);
     grid.edit_pointer_select_active = false;
     if grid.type_ahead_mode != pb::TypeAheadMode::TypeAheadNone as i32 {
@@ -3241,14 +3345,22 @@ pub fn handle_pointer_down_with_behavior(
     {
         grid.mark_dirty();
     }
-    if dbl_click && !is_background_target(&event_target) && hit.area != HitArea::DropdownList {
+    let treat_as_double_click = dbl_click && hit.area != HitArea::CheckBox;
+
+    if treat_as_double_click
+        && !is_background_target(&event_target)
+        && hit.area != HitArea::DropdownList
+    {
         grid.events.push(GridEventData::DblClick {
             row: hit.row,
             col: hit.col,
             target: event_target.clone(),
         });
     }
-    if !dbl_click && !is_background_target(&event_target) && hit.area != HitArea::DropdownList {
+    if !treat_as_double_click
+        && !is_background_target(&event_target)
+        && hit.area != HitArea::DropdownList
+    {
         if behavior.allow_before_mouse_down {
             grid.events.push(GridEventData::BeforeMouseDown {
                 row: hit.row,
@@ -3257,7 +3369,7 @@ pub fn handle_pointer_down_with_behavior(
             });
         }
     }
-    if !dbl_click && hit.row >= 0 && hit.col >= 0 && hit.area != HitArea::DropdownList {
+    if !treat_as_double_click && hit.row >= 0 && hit.col >= 0 && hit.area != HitArea::DropdownList {
         grid.events.push(GridEventData::MouseDown {
             button: _button,
             modifier,
@@ -3362,9 +3474,7 @@ pub fn handle_pointer_down_with_behavior(
                     new_col: hit.col,
                 });
 
-                if dbl_click
-                    || !(behavior.allow_begin_edit && toggle_checkbox_cell(grid, hit.row, hit.col))
-                {
+                if !(behavior.allow_begin_edit && toggle_checkbox_cell(grid, hit.row, hit.col)) {
                     grid.mark_dirty();
                 }
             }
@@ -3622,7 +3732,7 @@ pub fn handle_pointer_down_with_behavior(
                 let is_dropdown = !grid.active_dropdown_list(hit.row, hit.col).is_empty();
 
                 if behavior.allow_begin_edit && grid.edit_trigger_mode >= 2 {
-                    if dbl_click {
+                    if treat_as_double_click {
                         begin_edit_from_pointer_double_click(grid, hit.row, hit.col, hit.x_in_cell);
                     } else if is_dropdown {
                         begin_edit_from_input(grid, hit.row, hit.col);
@@ -3868,6 +3978,13 @@ pub fn handle_pointer_move(grid: &mut VolvoxGrid, x: f32, y: f32, button: i32, m
         grid.edit_pointer_select_active = false;
     }
 
+    // During row/column resizing, pointer movement changes geometry under the
+    // cursor. App-facing hover events would describe that geometry shift rather
+    // than user intent, so resize moves update size only.
+    if handle_active_resize_drag(grid, x, y) {
+        return;
+    }
+
     let event_hit = hit_test(grid, x, y);
     emit_pointer_move_and_hover(grid, &event_hit, button, modifier, x, y);
 
@@ -3907,42 +4024,6 @@ pub fn handle_pointer_move(grid: &mut VolvoxGrid, x: f32, y: f32, button: i32, m
             scroll_to_with_events(grid, grid.scroll.scroll_x, new_scroll);
         }
         grid.mark_dirty_visual();
-        return;
-    }
-
-    // Handle active resize drag
-    if grid.resize_active {
-        grid.cursor_hint = if grid.resize_is_col { 1 } else { 2 };
-        if grid.resize_is_col {
-            let delta = (x - grid.resize_start_pos) as i32;
-            let new_width = (grid.resize_start_size + delta).max(0);
-            if grid.resize_index < 0 {
-                set_row_start_indicator_width(grid, new_width);
-            } else if matches!(grid.allow_user_resizing, 4 | 6) {
-                // Uniform mode: must rebuild full layout
-                grid.set_col_width(-1, new_width);
-            } else {
-                // Single column: use incremental layout patch (avoids O(rows) rebuild)
-                let col = grid.resize_index;
-                let w = grid.clamp_col_width(col, new_width);
-                grid.col_widths.insert(col, w);
-                grid.layout.patch_col_width(col, w);
-            }
-        } else {
-            let delta = (y - grid.resize_start_pos) as i32;
-            let new_height = (grid.resize_start_size + delta).max(0);
-            let is_uniform = matches!(grid.allow_user_resizing, 5 | 6);
-            if is_uniform {
-                grid.set_row_height(-1, new_height);
-            } else {
-                // Single row: use incremental layout patch
-                let row = grid.resize_index;
-                let h = new_height.max(0);
-                grid.row_heights.insert(row, h);
-                grid.layout.patch_row_height(row, h);
-            }
-        }
-        grid.mark_dirty();
         return;
     }
 
@@ -4088,6 +4169,11 @@ pub fn handle_pointer_up_with_behavior(
     // Clear scrollbar auto-repeat on any pointer up
     grid.scrollbar_repeat_active = false;
 
+    if grid.resize_cancel_pending {
+        grid.resize_cancel_pending = false;
+        return;
+    }
+
     // Complete fast scroll gesture
     if grid.fast_scroll_active {
         grid.fast_scroll_active = false;
@@ -4145,22 +4231,13 @@ pub fn handle_pointer_up_with_behavior(
     // incremental patching during drag doesn't update scroll bounds.
     if grid.resize_active {
         grid.layout.invalidate();
-        let row_ev = if grid.resize_is_col {
-            -1
-        } else {
-            grid.resize_index
-        };
-        let col_ev = if grid.resize_is_col && grid.resize_index >= 0 {
-            grid.resize_index
-        } else {
-            -1
-        };
+        let (row_ev, col_ev) = resize_event_axes(grid);
         grid.events.push(GridEventData::AfterUserResize {
             row: row_ev,
             col: col_ev,
         });
-        grid.resize_active = false;
-        grid.resize_index = -1;
+        clear_resize_tracking(grid);
+        grid.resize_cancel_pending = false;
         grid.mark_dirty();
         return;
     }
@@ -4254,6 +4331,11 @@ pub fn handle_key_down_with_behavior(
         if matches!(key_code, 27 | 33 | 34 | 35 | 36 | 37 | 38 | 39 | 40) {
             clear_type_ahead_buffer(grid, true);
         }
+    }
+
+    // Escape cancels an active resize and restores the pre-drag geometry.
+    if key_code == 27 && cancel_active_resize(grid) {
+        return;
     }
 
     // Escape cancels an in-progress/pending header drag without sort/reorder.
@@ -5210,11 +5292,22 @@ mod tests {
         );
         assert!(grid.resize_is_col);
         assert_eq!(grid.resize_index, 0);
+        let events = grid.events.drain();
+        assert!(events
+            .iter()
+            .any(|e| matches!(e.data, GridEventData::BeforeUserResize { row: -1, col: 0 })));
 
         // Drag right by 30px
         let start_width = grid.get_col_width(0);
         handle_pointer_move(&mut grid, click_x + 30.0, 5.0, 1, 0);
         assert_eq!(grid.get_col_width(0), start_width + 30);
+        let events = grid.events.drain();
+        assert!(!events.iter().any(|e| matches!(
+            e.data,
+            GridEventData::MouseMove { .. }
+                | GridEventData::EnterCell { .. }
+                | GridEventData::LeaveCell { .. }
+        )));
 
         // Release
         handle_pointer_up(&mut grid, click_x + 30.0, 5.0, 0, 0);
@@ -5223,6 +5316,56 @@ mod tests {
         assert!(events
             .iter()
             .any(|e| matches!(e.data, GridEventData::AfterUserResize { row: -1, col: 0 })));
+    }
+
+    #[test]
+    fn escape_cancels_active_col_resize() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 3, 1, 0);
+        grid.allow_user_resizing = 1; // cols only
+        prime_layout(&mut grid);
+
+        let col0_right = grid.layout.col_positions[1];
+        let click_x = col0_right as f32;
+        let start_width = grid.get_col_width(0);
+        let start_widths = grid.col_widths.clone();
+
+        handle_pointer_down(&mut grid, click_x, 5.0, 0, 0, false);
+        assert!(grid.resize_active);
+        let _ = grid.events.drain();
+
+        handle_pointer_move(&mut grid, click_x + 30.0, 5.0, 1, 0);
+        assert_eq!(grid.get_col_width(0), start_width + 30);
+        let events = grid.events.drain();
+        assert!(!events.iter().any(|e| matches!(
+            e.data,
+            GridEventData::MouseMove { .. }
+                | GridEventData::EnterCell { .. }
+                | GridEventData::LeaveCell { .. }
+        )));
+
+        handle_key_down(&mut grid, 27, 0);
+        assert!(!grid.resize_active);
+        assert_eq!(grid.cursor_hint, 0);
+        assert_eq!(grid.get_col_width(0), start_width);
+        assert_eq!(grid.col_widths, start_widths);
+
+        let events = grid.events.drain();
+        assert!(events
+            .iter()
+            .any(|e| matches!(e.data, GridEventData::AfterUserResize { row: -1, col: 0 })));
+        assert!(!events.iter().any(|e| matches!(
+            e.data,
+            GridEventData::MouseMove { .. }
+                | GridEventData::EnterCell { .. }
+                | GridEventData::LeaveCell { .. }
+        )));
+
+        handle_pointer_up(&mut grid, click_x + 30.0, 5.0, 0, 0);
+        let events = grid.events.drain();
+        assert!(!events.iter().any(|e| matches!(
+            e.data,
+            GridEventData::Click { .. } | GridEventData::AfterUserResize { .. }
+        )));
     }
 
     #[test]
@@ -6250,13 +6393,31 @@ mod tests {
         assert!(!grid.is_editing());
         assert_eq!(
             grid.cells.get(1, 0).map(|cell| cell.checked()),
-            Some(pb::CheckedState::CheckedChecked as i32)
+            Some(pb::CheckedState::CheckedUnchecked as i32)
         );
+        assert_eq!(grid.cells.get_text(1, 0), "No");
 
         let events = grid.events.drain();
         assert!(!events
             .iter()
             .any(|e| matches!(e.data, GridEventData::StartEdit { .. })));
+        assert!(!events
+            .iter()
+            .any(|e| matches!(e.data, GridEventData::DblClick { .. })));
+        assert_eq!(
+            events
+                .iter()
+                .filter(|e| matches!(e.data, GridEventData::MouseDown { .. }))
+                .count(),
+            2,
+        );
+        assert_eq!(
+            events
+                .iter()
+                .filter(|e| matches!(e.data, GridEventData::BeforeMouseDown { .. }))
+                .count(),
+            2,
+        );
     }
 
     #[test]

@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	pb "github.com/ivere27/volvoxgrid/api/v1"
+	pb "github.com/ivere27/volvoxgrid/go/api/v1"
 )
 
 func TestHandleHostInputInsertTogglesAutoStartEdit(t *testing.T) {

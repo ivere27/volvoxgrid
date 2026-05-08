@@ -66,4 +66,46 @@
   <ItemGroup Condition="'$(TargetFramework)' != 'net8.0' and '$(TargetFramework)' != 'net40'">
     <Compile Include="common/**/*.cs" Exclude="common/obj/**/*.cs" />
   </ItemGroup>
+
+  <!--
+    NuGet native asset packaging.
+
+    On `dotnet pack`, the project picks up shared libraries built into
+    $(VolvoxGridNativeRoot) and ships them under runtimes/<RID>/native/* in the
+    package, so consumers automatically receive the correct native binary for
+    their target RID without setting LD_LIBRARY_PATH or copying files manually.
+
+    Layout expected at pack time (override $(VolvoxGridNativeRoot) on the
+    command line, default: ../target/dotnet/native/):
+
+      $(VolvoxGridNativeRoot)win-x64/volvoxgrid.dll
+      $(VolvoxGridNativeRoot)win-x86/volvoxgrid.dll
+      $(VolvoxGridNativeRoot)linux-x64/libvolvoxgrid.so
+      $(VolvoxGridNativeRoot)linux-arm64/libvolvoxgrid.so
+      $(VolvoxGridNativeRoot)osx-x64/libvolvoxgrid.dylib
+      $(VolvoxGridNativeRoot)osx-arm64/libvolvoxgrid.dylib
+
+    Missing files for a given RID are silently skipped (Condition="Exists(...)"),
+    so dev `dotnet build` works on a single host without all 6 binaries present.
+  -->
+  <PropertyGroup>
+    <VolvoxGridNativeRoot Condition="'$(VolvoxGridNativeRoot)' == ''">$(MSBuildThisFileDirectory)../../target/dotnet/native/</VolvoxGridNativeRoot>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <_VolvoxNative Include="$(VolvoxGridNativeRoot)win-x64/volvoxgrid.dll"     RID="win-x64"     Condition="Exists('$(VolvoxGridNativeRoot)win-x64/volvoxgrid.dll')" />
+    <_VolvoxNative Include="$(VolvoxGridNativeRoot)win-x86/volvoxgrid.dll"     RID="win-x86"     Condition="Exists('$(VolvoxGridNativeRoot)win-x86/volvoxgrid.dll')" />
+    <_VolvoxNative Include="$(VolvoxGridNativeRoot)linux-x64/libvolvoxgrid.so" RID="linux-x64"   Condition="Exists('$(VolvoxGridNativeRoot)linux-x64/libvolvoxgrid.so')" />
+    <_VolvoxNative Include="$(VolvoxGridNativeRoot)linux-arm64/libvolvoxgrid.so" RID="linux-arm64" Condition="Exists('$(VolvoxGridNativeRoot)linux-arm64/libvolvoxgrid.so')" />
+    <_VolvoxNative Include="$(VolvoxGridNativeRoot)osx-x64/libvolvoxgrid.dylib" RID="osx-x64"   Condition="Exists('$(VolvoxGridNativeRoot)osx-x64/libvolvoxgrid.dylib')" />
+    <_VolvoxNative Include="$(VolvoxGridNativeRoot)osx-arm64/libvolvoxgrid.dylib" RID="osx-arm64" Condition="Exists('$(VolvoxGridNativeRoot)osx-arm64/libvolvoxgrid.dylib')" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="@(_VolvoxNative)">
+      <Pack>true</Pack>
+      <PackagePath>runtimes/%(RID)/native/%(Filename)%(Extension)</PackagePath>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
 </Project>

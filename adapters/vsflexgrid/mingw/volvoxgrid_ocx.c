@@ -5818,11 +5818,16 @@ static void vfg_update_host_cursor(VolvoxGridObject *obj) {
 static HRESULT vfg_handle_key_down(
     VolvoxGridObject *obj, int32_t key_code, int32_t modifier)
 {
+    HRESULT hr;
     if (!obj) return E_POINTER;
     if (volvox_grid_key_down_native(obj->grid_id, key_code, modifier) != 0) {
         return E_FAIL;
     }
-    return vfg_pump_engine_events(obj);
+    hr = vfg_pump_engine_events(obj);
+    if (SUCCEEDED(hr)) {
+        vfg_update_host_cursor(obj);
+    }
+    return hr;
 }
 
 static HRESULT vfg_handle_key_press(
