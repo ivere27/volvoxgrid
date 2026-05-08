@@ -321,6 +321,15 @@ fn handle_tui_terminal_pointer_event(
     }
 }
 
+fn cursor_change_output(cursor_hint: i32) -> RenderOutput {
+    RenderOutput {
+        rendered: false,
+        event: Some(render_output::Event::Cursor(CursorChange {
+            cursor: cursor_hint,
+        })),
+    }
+}
+
 fn should_request_pointer_header_sort(
     grid: &volvoxgrid_engine::grid::VolvoxGrid,
     hit: &volvoxgrid_engine::input::HitTestResult,
@@ -352,6 +361,7 @@ fn handle_pointer_render_input(
         }
 
         with_tui_pointer_geometry(grid, |grid| {
+            let prev_cursor_hint = grid.cursor_hint;
             let mut terminal_session = terminal_session;
             if let Some(session) = terminal_session.as_deref_mut() {
                 if handle_tui_terminal_pointer_event(grid, &pe, session) {
@@ -361,6 +371,8 @@ fn handle_pointer_render_input(
                         grid.selection.col,
                         shared::selection_ranges_proto(grid),
                         None,
+                        grid.cursor_hint != prev_cursor_hint,
+                        grid.cursor_hint,
                     );
                 }
             }
@@ -414,6 +426,8 @@ fn handle_pointer_render_input(
                     grid.selection.col,
                     shared::selection_ranges_proto(grid),
                     None,
+                    grid.cursor_hint != prev_cursor_hint,
+                    grid.cursor_hint,
                 );
             }
             let hit = if pe.r#type == pb::pointer_event::Type::Down as i32 {
@@ -702,6 +716,8 @@ fn handle_pointer_render_input(
                 shared::selection_range_tuples(grid),
             );
             let selection_changed = next_sel != prev_sel;
+            let cursor_hint = grid.cursor_hint;
+            let cursor_changed = cursor_hint != prev_cursor_hint;
 
             (
                 selection_changed,
@@ -709,13 +725,20 @@ fn handle_pointer_render_input(
                 grid.selection.col,
                 shared::selection_ranges_proto(grid),
                 editor_output,
+                cursor_changed,
+                cursor_hint,
             )
         })
     });
     if !emit_aux_outputs {
         return;
     }
-    if let Ok((selection_changed, row, col, ranges, editor_output)) = sel_and_editor {
+    if let Ok((selection_changed, row, col, ranges, editor_output, cursor_changed, cursor_hint)) =
+        sel_and_editor
+    {
+        if cursor_changed {
+            stream.send(cursor_change_output(cursor_hint));
+        }
         if pe.r#type != pb::pointer_event::Type::Move as i32 || selection_changed {
             stream.send(RenderOutput {
                 rendered: false,
@@ -745,6 +768,7 @@ fn handle_key_render_input(
         if !grid.layout.valid {
             ensure_layout(grid);
         }
+        let prev_cursor_hint = grid.cursor_hint;
         let decision_enabled = runtime.decision_channel_enabled(grid_id);
         if let Some(session) = terminal_session.as_deref_mut() {
             let compose_default = if grid.engine_compose_configured {
@@ -999,12 +1023,17 @@ fn handle_key_render_input(
             grid.selection.col,
             shared::selection_ranges_proto(grid),
             editor_output,
+            grid.cursor_hint != prev_cursor_hint,
+            grid.cursor_hint,
         )
     });
     if !emit_aux_outputs {
         return;
     }
-    if let Ok((row, col, ranges, editor_output)) = sel_and_editor {
+    if let Ok((row, col, ranges, editor_output, cursor_changed, cursor_hint)) = sel_and_editor {
+        if cursor_changed {
+            stream.send(cursor_change_output(cursor_hint));
+        }
         stream.send(RenderOutput {
             rendered: false,
             event: Some(render_output::Event::Selection(SelectionUpdate {
@@ -1874,6 +1903,13 @@ mod tests {
 
     impl RuntimeStreamBidi<pb::RenderInput, pb::RenderOutput> for TestRenderStream {}
 
+    impl TestRenderStream {
+        fn take_outputs(&self) -> Vec<pb::RenderOutput> {
+            let mut outputs = self.outputs.lock().unwrap_or_else(|e| e.into_inner());
+            std::mem::take(&mut *outputs)
+        }
+    }
+
     impl RuntimeStream for AutoCompareEventStream {
         fn is_cancelled(&self) -> bool {
             self.cancelled.load(Ordering::SeqCst)
@@ -1971,6 +2007,19 @@ mod tests {
         runtime.manager().destroy_grid(grid_id);
     }
 
+    fn runtime_with_resize_grid() -> (VolvoxGridRuntime, i64, f32, i32) {
+        let runtime = VolvoxGridRuntime::new();
+        let grid_id = runtime.manager().create_grid(320, 160, 3, 3, 1, 0, 1.0);
+        let (border_x, start_width) = runtime
+            .with_grid(grid_id, |grid| {
+                grid.allow_user_resizing = 1;
+                ensure_layout(grid);
+                (grid.col_pos(1) as f32, grid.get_col_width(0))
+            })
+            .expect("grid exists");
+        (runtime, grid_id, border_x, start_width)
+    }
+
     fn wait_for_grid<F>(runtime: &VolvoxGridRuntime, grid_id: i64, mut pred: F)
     where
         F: FnMut(&mut VolvoxGrid) -> bool,
@@ -1989,6 +2038,113 @@ mod tests {
             );
             std::thread::sleep(Duration::from_millis(10));
         }
+    }
+
+    #[test]
+    fn pointer_render_input_emits_resize_cursor_change() {
+        let (runtime, grid_id, border_x, _) = runtime_with_resize_grid();
+        let stream = TestRenderStream::default();
+        let mut sent_edit_requests = HashMap::new();
+
+        super::handle_pointer_render_input(
+            &runtime,
+            &stream,
+            &mut sent_edit_requests,
+            grid_id,
+            pb::PointerEvent {
+                r#type: pb::pointer_event::Type::Move as i32,
+                x: border_x,
+                y: 5.0,
+                button: 0,
+                modifier: 0,
+                dbl_click: false,
+            },
+            None,
+            true,
+        );
+
+        let outputs = stream.take_outputs();
+        assert!(outputs.iter().any(|output| matches!(
+            output.event,
+            Some(pb::render_output::Event::Cursor(pb::CursorChange {
+                cursor,
+            })) if cursor == pb::CursorType::CursorResizeCol as i32
+        )));
+
+        destroy_test_grid(&runtime, grid_id);
+    }
+
+    #[test]
+    fn key_render_input_emits_default_cursor_when_escape_cancels_resize() {
+        let (runtime, grid_id, border_x, start_width) = runtime_with_resize_grid();
+        let stream = TestRenderStream::default();
+        let mut sent_edit_requests = HashMap::new();
+
+        super::handle_pointer_render_input(
+            &runtime,
+            &stream,
+            &mut sent_edit_requests,
+            grid_id,
+            pb::PointerEvent {
+                r#type: pb::pointer_event::Type::Down as i32,
+                x: border_x,
+                y: 5.0,
+                button: 0,
+                modifier: 0,
+                dbl_click: false,
+            },
+            None,
+            true,
+        );
+        super::handle_pointer_render_input(
+            &runtime,
+            &stream,
+            &mut sent_edit_requests,
+            grid_id,
+            pb::PointerEvent {
+                r#type: pb::pointer_event::Type::Move as i32,
+                x: border_x + 30.0,
+                y: 5.0,
+                button: 1,
+                modifier: 0,
+                dbl_click: false,
+            },
+            None,
+            true,
+        );
+        let _ = stream.take_outputs();
+
+        super::handle_key_render_input(
+            &runtime,
+            &stream,
+            &mut sent_edit_requests,
+            grid_id,
+            pb::KeyEvent {
+                r#type: pb::key_event::Type::KeyDown as i32,
+                key_code: 27,
+                modifier: 0,
+                character: String::new(),
+            },
+            true,
+            None,
+        );
+
+        let outputs = stream.take_outputs();
+        assert!(outputs.iter().any(|output| matches!(
+            output.event,
+            Some(pb::render_output::Event::Cursor(pb::CursorChange {
+                cursor,
+            })) if cursor == pb::CursorType::CursorDefault as i32
+        )));
+        runtime
+            .with_grid(grid_id, |grid| {
+                assert!(!grid.resize_active);
+                assert_eq!(grid.cursor_hint, pb::CursorType::CursorDefault as i32);
+                assert_eq!(grid.get_col_width(0), start_width);
+            })
+            .unwrap();
+
+        destroy_test_grid(&runtime, grid_id);
     }
 
     #[test]

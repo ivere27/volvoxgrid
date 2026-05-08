@@ -77,6 +77,7 @@ namespace VolvoxGrid.DotNet.Internal
         private readonly TextBox _editOverlay;
         private Volvoxgrid.V1.SelectionMode _selectionMode = Volvoxgrid.V1.SelectionMode.SELECTION_FREE;
         private bool _engineEditing;
+        private CursorType _engineCursorType = CursorType.CURSOR_DEFAULT;
         private bool _suppressEditOverlayTextChanged;
         private bool _suppressEditOverlayCommit;
         private int _editOverlayRow = -1;
@@ -858,6 +859,10 @@ namespace VolvoxGrid.DotNet.Internal
             {
                 BeginInvokeShowEditOverlay(output.EditRequest);
             }
+            else if (output.Cursor != null)
+            {
+                BeginInvokeApplyEngineCursor(output.Cursor.Cursor);
+            }
             else if (output.DropdownRequest != null)
             {
                 BeginInvokeHideEditOverlay(false);
@@ -1588,6 +1593,64 @@ namespace VolvoxGrid.DotNet.Internal
             else
             {
                 HideEditOverlay(focusHost);
+            }
+        }
+
+        private void BeginInvokeApplyEngineCursor(CursorType cursorType)
+        {
+            if (_engineCursorType == cursorType)
+            {
+                return;
+            }
+
+            _engineCursorType = cursorType;
+            var cursor = WinFormsCursorFor(cursorType);
+            if (!IsHandleCreated)
+            {
+                return;
+            }
+
+            if (InvokeRequired)
+            {
+                BeginInvoke(new MethodInvoker(() =>
+                {
+                    if (_engineCursorType == cursorType)
+                    {
+                        Cursor = cursor;
+                    }
+                }));
+            }
+            else
+            {
+                Cursor = cursor;
+            }
+        }
+
+        private static System.Windows.Forms.Cursor WinFormsCursorFor(CursorType cursorType)
+        {
+            switch (cursorType)
+            {
+                case CursorType.CURSOR_RESIZE_COL:
+                    return Cursors.SizeWE;
+                case CursorType.CURSOR_RESIZE_ROW:
+                    return Cursors.SizeNS;
+                case CursorType.CURSOR_MOVE_COL:
+                case CursorType.CURSOR_MOVE_ROW:
+                    return Cursors.SizeAll;
+                case CursorType.CURSOR_TEXT:
+                    return Cursors.IBeam;
+                case CursorType.CURSOR_HAND:
+                case CursorType.CURSOR_COPY:
+                    return Cursors.Hand;
+                case CursorType.CURSOR_WAIT:
+                    return Cursors.WaitCursor;
+                case CursorType.CURSOR_NOT_ALLOWED:
+                    return Cursors.No;
+                case CursorType.CURSOR_CROSSHAIR:
+                    return Cursors.Cross;
+                case CursorType.CURSOR_DEFAULT:
+                default:
+                    return Cursors.Default;
             }
         }
 
