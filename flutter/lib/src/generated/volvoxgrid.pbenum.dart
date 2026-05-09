@@ -192,6 +192,28 @@ class TextHintingMode extends $pb.ProtobufEnum {
   const TextHintingMode._(super.value, super.name);
 }
 
+class TextBaseline extends $pb.ProtobufEnum {
+  static const TextBaseline TEXT_BASELINE_NORMAL =
+      TextBaseline._(0, _omitEnumNames ? '' : 'TEXT_BASELINE_NORMAL');
+  static const TextBaseline TEXT_BASELINE_SUPERSCRIPT =
+      TextBaseline._(1, _omitEnumNames ? '' : 'TEXT_BASELINE_SUPERSCRIPT');
+  static const TextBaseline TEXT_BASELINE_SUBSCRIPT =
+      TextBaseline._(2, _omitEnumNames ? '' : 'TEXT_BASELINE_SUBSCRIPT');
+
+  static const $core.List<TextBaseline> values = <TextBaseline>[
+    TEXT_BASELINE_NORMAL,
+    TEXT_BASELINE_SUPERSCRIPT,
+    TEXT_BASELINE_SUBSCRIPT,
+  ];
+
+  static final $core.List<TextBaseline?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static TextBaseline? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const TextBaseline._(super.value, super.name);
+}
+
 /// Cell text alignment: "horizontal_vertical".
 /// ALIGN_GENERAL (9) is the engine default for data cells. It renders as
 /// left-center for text and right-center for numeric-looking values.

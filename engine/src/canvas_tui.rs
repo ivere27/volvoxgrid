@@ -1223,6 +1223,17 @@ fn render_data_row(
             && !is_editing
             && grid.resolved_cell_control(style_row, style_col) == CellControl::DropdownButton;
         let text_column = text_render_column(render_column, show_dropdown);
+        let rich_text = if !is_editing && show_text {
+            grid.cells.get(style_row, style_col).and_then(|cell| {
+                if cell.display_text() == text {
+                    cell.rich_text()
+                } else {
+                    None
+                }
+            })
+        } else {
+            None
+        };
 
         if let Some(fitted) = fitted_edit_text.as_ref() {
             write_fitted_cell_text(surface, text_column, y, &fitted.text, fg, bg, attr);
@@ -1235,6 +1246,18 @@ fn render_data_row(
                 grid.edit.sel_start,
                 grid.edit.sel_length,
                 attr | TUI_ATTR_REVERSE,
+            );
+        } else if let Some(rich_text) = rich_text {
+            write_rich_cell_text(
+                surface,
+                text_column,
+                y,
+                &text,
+                rich_text,
+                fg,
+                bg,
+                attr,
+                halign,
             );
         } else {
             write_cell_text(surface, text_column, y, &text, fg, bg, attr, halign);
@@ -2067,6 +2090,173 @@ fn write_cell_text(
     write_fitted_cell_text(surface, column, y, &fitted, fg, bg, attr);
 }
 
+#[derive(Clone, Copy)]
+struct TuiRichGlyph {
+    ch: char,
+    fg: u32,
+    attr: u8,
+}
+
+fn apply_tui_rich_run_style(
+    base_fg: u32,
+    base_attr: u8,
+    style: Option<&pb::TextRunStyle>,
+) -> (u32, u8) {
+    let mut fg = base_fg;
+    let mut attr = base_attr;
+    let Some(style) = style else {
+        return (fg, attr);
+    };
+
+    if let Some(color) = style.foreground {
+        fg = rgb24(color);
+    }
+    if let Some(font) = &style.font {
+        if let Some(v) = font.bold {
+            if v {
+                attr |= TUI_ATTR_BOLD;
+            } else {
+                attr &= !TUI_ATTR_BOLD;
+            }
+        }
+        if let Some(v) = font.italic {
+            if v {
+                attr |= TUI_ATTR_ITALIC;
+            } else {
+                attr &= !TUI_ATTR_ITALIC;
+            }
+        }
+        if let Some(v) = font.underline {
+            if v {
+                attr |= TUI_ATTR_UNDERLINE;
+            } else {
+                attr &= !TUI_ATTR_UNDERLINE;
+            }
+        }
+    }
+
+    (fg, attr)
+}
+
+fn rich_run_style_for_utf16_index<'a>(
+    rich_text: &'a pb::RichText,
+    utf16_index: u32,
+) -> Option<&'a pb::TextRunStyle> {
+    let mut active = None;
+    for run in &rich_text.runs {
+        if run.start_index > utf16_index {
+            break;
+        }
+        active = run.style.as_ref();
+    }
+    active
+}
+
+fn fit_rich_text_glyphs(
+    text: &str,
+    rich_text: &pb::RichText,
+    width: i32,
+    halign: i32,
+    base_fg: u32,
+    base_attr: u8,
+) -> Vec<TuiRichGlyph> {
+    if width <= 0 {
+        return Vec::new();
+    }
+
+    let mut glyphs = Vec::new();
+    let mut text_width = 0usize;
+    let max_width = width as usize;
+    let mut utf16_index = 0u32;
+    for ch in text.chars() {
+        let ch = sanitize_char(ch);
+        let char_width = display_width_char(ch);
+        if text_width + char_width > max_width {
+            break;
+        }
+        let (fg, attr) = apply_tui_rich_run_style(
+            base_fg,
+            base_attr,
+            rich_run_style_for_utf16_index(rich_text, utf16_index),
+        );
+        glyphs.push(TuiRichGlyph { ch, fg, attr });
+        text_width += char_width;
+        utf16_index = utf16_index.saturating_add(ch.len_utf16() as u32);
+    }
+
+    let pad = max_width.saturating_sub(text_width);
+    let left_pad = match halign {
+        1 => pad / 2,
+        2 => pad,
+        _ => 0,
+    };
+    let right_pad = pad.saturating_sub(left_pad);
+    let pad_glyph = TuiRichGlyph {
+        ch: ' ',
+        fg: base_fg,
+        attr: base_attr,
+    };
+    let mut fitted = Vec::with_capacity(left_pad + glyphs.len() + right_pad);
+    fitted.extend(std::iter::repeat(pad_glyph).take(left_pad));
+    fitted.extend(glyphs);
+    fitted.extend(std::iter::repeat(pad_glyph).take(right_pad));
+    fitted
+}
+
+fn write_rich_cell_text(
+    surface: &mut Surface<'_>,
+    column: RenderColumn,
+    y: i32,
+    text: &str,
+    rich_text: &pb::RichText,
+    fg: u32,
+    bg: u32,
+    attr: u8,
+    halign: i32,
+) {
+    let glyphs = fit_rich_text_glyphs(text, rich_text, column.full_width, halign, fg, attr);
+    let skip = column.crop.max(0);
+    let take = column.width.max(0);
+    let mut display_offset = 0i32;
+    let mut written = 0i32;
+
+    for glyph in glyphs {
+        if written >= take {
+            break;
+        }
+        let char_width = display_width_char(glyph.ch).max(1) as i32;
+        let next_offset = display_offset + char_width;
+        if next_offset <= skip {
+            display_offset = next_offset;
+            continue;
+        }
+
+        if display_offset < skip || written + char_width > take {
+            let partial = (take - written).min(char_width);
+            for _ in 0..partial {
+                surface.put(column.x + written, y, ' ', glyph.fg, bg, glyph.attr);
+                written += 1;
+            }
+        } else {
+            surface.put(column.x + written, y, glyph.ch, glyph.fg, bg, glyph.attr);
+            for dx in 1..char_width {
+                surface.put_cell(
+                    column.x + written + dx,
+                    y,
+                    TuiCell::continuation(glyph.fg, bg, glyph.attr),
+                );
+            }
+            written += char_width;
+        }
+        display_offset = next_offset;
+    }
+
+    while written < column.width {
+        surface.put(column.x + written, y, ' ', fg, bg, attr);
+        written += 1;
+    }
+}
+
 fn write_fitted_cell_text(
     surface: &mut Surface<'_>,
     column: RenderColumn,
@@ -2640,6 +2830,65 @@ mod tests {
         render_grid_tui(&mut grid, &mut buffer, 8, 3, 8);
 
         assert_eq!(row_text(&buffer, 8, 1, 8), "abcdef  ");
+    }
+
+    #[test]
+    fn render_grid_tui_applies_rich_text_foreground_and_attrs() {
+        let mut grid = VolvoxGrid::new(1, 8, 3, 1, 1, 0, 0);
+        grid.set_renderer_mode(pb::RendererMode::RendererTui as i32);
+        grid.set_col_width(0, 4);
+        grid.update_cells(&[pb::CellUpdate {
+            row: 0,
+            col: 0,
+            value: Some(pb::CellValue {
+                value: Some(pb::cell_value::Value::Text("abc".to_string())),
+            }),
+            rich_text: Some(pb::RichText {
+                runs: vec![
+                    pb::TextFormatRun {
+                        start_index: 0,
+                        style: Some(pb::TextRunStyle {
+                            foreground: Some(0xFFFF0000),
+                            font: Some(pb::Font {
+                                bold: Some(true),
+                                ..Default::default()
+                            }),
+                            ..Default::default()
+                        }),
+                    },
+                    pb::TextFormatRun {
+                        start_index: 1,
+                        style: Some(pb::TextRunStyle {
+                            foreground: Some(0xFF00AA00),
+                            font: Some(pb::Font {
+                                italic: Some(true),
+                                underline: Some(true),
+                                ..Default::default()
+                            }),
+                            ..Default::default()
+                        }),
+                    },
+                ],
+            }),
+            ..Default::default()
+        }]);
+
+        let mut buffer = vec![TuiCell::default(); 8 * 3];
+        render_grid_tui(&mut grid, &mut buffer, 8, 3, 8);
+
+        let a = buffer[8];
+        let b = buffer[9];
+        let a_fg = a.fg;
+        let a_attr = a.attr;
+        let b_fg = b.fg;
+        let b_attr = b.attr;
+        assert_eq!(a.ch(), 'a');
+        assert_eq!(a_fg, 0x00FF0000);
+        assert!(a_attr & TUI_ATTR_BOLD != 0);
+        assert_eq!(b.ch(), 'b');
+        assert_eq!(b_fg, 0x0000AA00);
+        assert!(b_attr & TUI_ATTR_ITALIC != 0);
+        assert!(b_attr & TUI_ATTR_UNDERLINE != 0);
     }
 
     #[test]

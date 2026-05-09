@@ -76,6 +76,7 @@ import {
   RenderLayerBit,
   RendererMode,
   ResizePolicyFields,
+  RichTextFields,
   RowDefFields,
   RowIndicatorConfigFields,
   RowIndicatorSlotKind,
@@ -89,7 +90,10 @@ import {
   SpanCompareMode,
   StyleConfigFields,
   TabBehavior,
+  TextBaseline,
+  TextFormatRunFields,
   TreeIndicatorStyle,
+  TextRunStyleFields,
   UpdateCellsRequestFields,
 } from "../js/src/generated/volvoxgrid_ffi.js";
 import {
@@ -112,13 +116,14 @@ type DoomTouchActionCode = "ControlLeft" | "Space" | "Enter";
 const STRESS_ROWS = 1_000_000;
 const STRESS_COLS = 12;
 const SALES_COLS = 10;
-const HIERARCHY_COLS = 7;
+const HIERARCHY_COLS = 8;
 const BARCODE_COLS = 6;
 const SALES_STATUS_ITEMS = "Active|Pending|Shipped|Returned|Cancelled";
 const HIERARCHY_NAME_COL = 0;
 const HIERARCHY_TYPE_COL = 1;
-const HIERARCHY_ACTION_COL = 5;
-const HIERARCHY_ICON_COL = 6;
+const HIERARCHY_DETAILS_COL = 5;
+const HIERARCHY_ACTION_COL = 6;
+const HIERARCHY_ICON_COL = 7;
 const HIERARCHY_FOLDER_ICON = "\uE2C7";
 enum NodeChildrenState {
   NODE_LEAF = 1,
@@ -129,6 +134,7 @@ const NodeCellUpdateFields = {
   col: 2,
   value: 3,
   style: 4,
+  rich_text: 9,
 } as const;
 const TreeNodeFields = {
   node_id: 1,
@@ -199,6 +205,7 @@ const HIERARCHY_COLUMN_SETUP = [
   { caption: "Size", key: "Size", width: 80, align: Align.ALIGN_RIGHT_CENTER, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined },
   { caption: "Modified", key: "Modified", width: 120, align: undefined, dataType: ColumnDataType.COLUMN_DATA_DATE, format: "short date", dropdownItems: undefined, interaction: undefined },
   { caption: "Permissions", key: "Permissions", width: 100, align: Align.ALIGN_CENTER_CENTER, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined },
+  { caption: "Details", key: "Details", width: 180, align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined },
   { caption: "Action", key: "Action", width: 92, align: Align.ALIGN_CENTER_CENTER, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: CellInteraction.CELL_INTERACTION_TEXT_LINK },
   { caption: "Icon", key: "Icon", width: 24, align: Align.ALIGN_CENTER_CENTER, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined, hidden: true },
 ] as const;
@@ -225,6 +232,41 @@ type DemoColumnSetup = {
 type DemoFontAsset = {
   label: string;
   url: string;
+  family?: string;
+  aliases?: string[];
+  weight?: string;
+  style?: string;
+};
+type HierarchyRichTextRunStyle = {
+  foreground?: string | number;
+  color?: string | number;
+  fg?: string | number;
+  family?: string;
+  families?: string[];
+  size?: number;
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  strikethrough?: boolean;
+  strike?: boolean;
+  stretch?: number;
+  baseline?: string | number;
+  linkUrl?: string;
+  link_url?: string;
+  href?: string;
+  font?: HierarchyRichTextRunStyle;
+};
+type HierarchyRichTextRun = HierarchyRichTextRunStyle & {
+  start?: number;
+  startIndex?: number;
+  start_index?: number;
+  style?: HierarchyRichTextRunStyle;
+};
+type HierarchyRichTextCell = {
+  text?: string;
+  value?: string;
+  richText?: HierarchyRichTextRun[] | { runs?: HierarchyRichTextRun[] };
+  rich_text?: HierarchyRichTextRun[] | { runs?: HierarchyRichTextRun[] };
 };
 type HierarchyDemoRow = {
   Id: string;
@@ -234,6 +276,7 @@ type HierarchyDemoRow = {
   Size: string;
   Modified: string;
   Permissions: string;
+  Details?: string | HierarchyRichTextCell | null;
   Action: string;
 };
 type BarcodeJsonRow = {
@@ -250,8 +293,14 @@ type DemoRowSetup = {
   isSubtotal?: boolean;
 };
 type DemoFontSpec = {
+  family?: string;
+  families?: string[];
   size?: number;
   bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  strikethrough?: boolean;
+  stretch?: number;
 };
 type DemoCellStyleSpec = {
   background?: number;
@@ -352,12 +401,14 @@ function appendDemoFontIfMissing(
   seenUrls: Set<string>,
   label: string,
   url: string,
+  family?: string,
+  aliases?: string[],
 ): void {
   if (seenUrls.has(url)) {
     return;
   }
   seenUrls.add(url);
-  fonts.push({ label, url });
+  fonts.push({ label, url, family, aliases });
 }
 
 function appendDemoFontsForLocale(
@@ -514,14 +565,21 @@ function demoFontAssetsForLocales(locales: readonly string[]): DemoFontAsset[] {
     {
       label: "Material Icons",
       url: MATERIAL_ICONS_FONT_URL,
+      family: "Material Icons",
+      aliases: ["MaterialIcons"],
+      weight: "400",
     },
     {
       label: "Roboto (Latin)",
       url: "https://cdn.jsdelivr.net/gh/googlefonts/roboto-2@main/src/hinted/Roboto-Regular.ttf",
+      family: DEMO_DEFAULT_FONT_FAMILY,
+      weight: "400",
     },
     {
       label: "Roboto Bold (Latin)",
       url: "https://cdn.jsdelivr.net/gh/googlefonts/roboto-2@main/src/hinted/Roboto-Bold.ttf",
+      family: DEMO_DEFAULT_FONT_FAMILY,
+      weight: "700",
     },
   ];
   const seenUrls = new Set<string>(fonts.map((font) => font.url));
@@ -529,6 +587,46 @@ function demoFontAssetsForLocales(locales: readonly string[]): DemoFontAsset[] {
     appendDemoFontsForLocale(locale, fonts, seenUrls);
   }
   return fonts;
+}
+
+function browserFontFamilies(font: DemoFontAsset): string[] {
+  const primary = font.family ?? font.label.replace(/\s*\([^)]*\)\s*$/, "").trim();
+  return [primary, ...(font.aliases ?? [])]
+    .map((value) => value.trim())
+    .filter((value, index, values) => value !== "" && values.indexOf(value) === index);
+}
+
+async function loadBrowserFontFaces(font: DemoFontAsset, fontData: Uint8Array): Promise<boolean> {
+  if (typeof FontFace === "undefined" || document.fonts == null) {
+    return false;
+  }
+
+  const families = browserFontFamilies(font);
+  if (families.length === 0) {
+    return false;
+  }
+
+  const source = fontData.buffer.slice(
+    fontData.byteOffset,
+    fontData.byteOffset + fontData.byteLength,
+  );
+  const loaded = await Promise.all(
+    families.map(async (family) => {
+      try {
+        const face = new FontFace(family, source, {
+          weight: font.weight ?? "400",
+          style: font.style ?? "normal",
+        });
+        await face.load();
+        document.fonts.add(face);
+        return true;
+      } catch (err) {
+        console.warn(`Could not register browser font ${family}:`, err);
+        return false;
+      }
+    }),
+  );
+  return loaded.some(Boolean);
 }
 
 function loadDemoFontsInBackground(
@@ -541,6 +639,7 @@ function loadDemoFontsInBackground(
       const fontData = await fetchFontWithTimeout(font.url);
       if (fontData) {
         wasmModule.load_font(fontData);
+        await loadBrowserFontFaces(font, fontData);
         console.info(`Loaded demo font: ${font.label}`);
         return true;
       } else {
@@ -723,11 +822,33 @@ function pbEncodeBordersAll(style: number, color: number): Uint8Array {
 
 function pbEncodeFontPayload(font: DemoFontSpec): Uint8Array {
   const out: number[] = [];
+  if (font.family != null && font.family !== "") {
+    out.push(...pbEncodeStringField(FontFields.family, font.family));
+  }
+  if (font.families != null) {
+    for (const family of font.families) {
+      if (family !== "") {
+        out.push(...pbEncodeStringField(FontFields.families, family));
+      }
+    }
+  }
   if (font.size != null) {
     out.push(...pbEncodeFloatField(FontFields.size, font.size));
   }
   if (font.bold != null) {
     out.push(...pbEncodeTag(FontFields.bold, 0), ...pbEncodeBool(font.bold));
+  }
+  if (font.italic != null) {
+    out.push(...pbEncodeTag(FontFields.italic, 0), ...pbEncodeBool(font.italic));
+  }
+  if (font.underline != null) {
+    out.push(...pbEncodeTag(FontFields.underline, 0), ...pbEncodeBool(font.underline));
+  }
+  if (font.strikethrough != null) {
+    out.push(...pbEncodeTag(FontFields.strikethrough, 0), ...pbEncodeBool(font.strikethrough));
+  }
+  if (font.stretch != null) {
+    out.push(...pbEncodeFloatField(FontFields.stretch, font.stretch));
   }
   return new Uint8Array(out);
 }
@@ -780,6 +901,131 @@ function pbEncodeCellStylePayload(style: DemoCellStyleSpec): Uint8Array {
 
 function pbEncodeCellValueText(text: string): Uint8Array {
   return new Uint8Array(pbEncodeStringField(CellValueFields.text, text));
+}
+
+function parseArgb(value: string | number | undefined): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value >>> 0;
+  }
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const raw = value.trim();
+  if (raw === "") {
+    return undefined;
+  }
+  const hex = raw.replace(/^#|^0x/i, "");
+  if (/^[0-9a-fA-F]{6}$/.test(hex)) {
+    return (0xFF000000 | Number.parseInt(hex, 16)) >>> 0;
+  }
+  if (/^[0-9a-fA-F]{8}$/.test(hex)) {
+    return Number.parseInt(hex, 16) >>> 0;
+  }
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed >>> 0 : undefined;
+}
+
+function parseTextBaseline(value: string | number | undefined): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.trunc(value);
+  }
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  switch (value.trim().toLowerCase()) {
+    case "normal":
+      return TextBaseline.TEXT_BASELINE_NORMAL;
+    case "superscript":
+    case "super":
+      return TextBaseline.TEXT_BASELINE_SUPERSCRIPT;
+    case "subscript":
+    case "sub":
+      return TextBaseline.TEXT_BASELINE_SUBSCRIPT;
+    default:
+      return undefined;
+  }
+}
+
+function pbEncodeRichTextRunStylePayload(run: HierarchyRichTextRun): Uint8Array {
+  const style = run.style ?? run;
+  const out: number[] = [];
+  const foreground = parseArgb(style.foreground ?? style.color ?? style.fg);
+  if (foreground != null) {
+    out.push(...pbEncodeUint32Field(TextRunStyleFields.foreground, foreground));
+  }
+
+  const fontSource = style.font ?? style;
+  const font = pbEncodeFontPayload({
+    family: fontSource.family,
+    families: fontSource.families,
+    size: fontSource.size,
+    bold: fontSource.bold,
+    italic: fontSource.italic,
+    underline: fontSource.underline,
+    strikethrough: fontSource.strikethrough ?? fontSource.strike,
+    stretch: fontSource.stretch,
+  });
+  if (font.length > 0) {
+    out.push(...pbEncodeMessageField(TextRunStyleFields.font, font));
+  }
+
+  const baseline = parseTextBaseline(style.baseline);
+  if (baseline != null) {
+    out.push(...pbEncodeInt32Field(TextRunStyleFields.baseline, baseline));
+  }
+  const linkUrl = style.linkUrl ?? style.link_url ?? style.href;
+  if (linkUrl != null && linkUrl !== "") {
+    out.push(...pbEncodeStringField(TextRunStyleFields.link_url, linkUrl));
+  }
+  return new Uint8Array(out);
+}
+
+function pbEncodeRichTextRun(run: HierarchyRichTextRun): Uint8Array {
+  const start = run.start ?? run.startIndex ?? run.start_index;
+  if (start == null || !Number.isFinite(start) || start < 0) {
+    return new Uint8Array();
+  }
+  const out: number[] = [];
+  out.push(...pbEncodeUint32Field(TextFormatRunFields.start_index, Math.trunc(start)));
+  const style = pbEncodeRichTextRunStylePayload(run);
+  if (style.length > 0) {
+    out.push(...pbEncodeMessageField(TextFormatRunFields.style, style));
+  }
+  return new Uint8Array(out);
+}
+
+function hierarchyRichTextRuns(
+  richText: HierarchyRichTextCell["richText"] | HierarchyRichTextCell["rich_text"],
+): HierarchyRichTextRun[] {
+  if (Array.isArray(richText)) {
+    return richText;
+  }
+  return richText?.runs ?? [];
+}
+
+function hierarchyDetailsCell(details: HierarchyDemoRow["Details"]): {
+  text: string;
+  richText?: Uint8Array;
+} {
+  if (typeof details === "string") {
+    return { text: details };
+  }
+  if (details == null) {
+    return { text: "" };
+  }
+
+  const text = details.text ?? details.value ?? "";
+  const runs = hierarchyRichTextRuns(details.richText ?? details.rich_text);
+  const encodedRuns = runs.map(pbEncodeRichTextRun).filter((run) => run.length > 0);
+  if (text === "" || encodedRuns.length === 0) {
+    return { text };
+  }
+
+  const out: number[] = [];
+  for (const run of encodedRuns) {
+    out.push(...pbEncodeMessageField(RichTextFields.runs, run));
+  }
+  return { text, richText: new Uint8Array(out) };
 }
 
 function pbEncodeBarcodeEncodingOptions(plan: BarcodeDemoPlan): Uint8Array {
@@ -894,6 +1140,7 @@ function pbEncodeTreeNodeCell(options: {
   col: number;
   text: string;
   style?: DemoCellStyleSpec;
+  richText?: Uint8Array;
 }): Uint8Array {
   const out: number[] = [];
   out.push(...pbEncodeStringField(NodeCellUpdateFields.node_id, options.nodeId));
@@ -904,6 +1151,9 @@ function pbEncodeTreeNodeCell(options: {
     if (style.length > 0) {
       out.push(...pbEncodeMessageField(NodeCellUpdateFields.style, style));
     }
+  }
+  if (options.richText != null && options.richText.length > 0) {
+    out.push(...pbEncodeMessageField(NodeCellUpdateFields.rich_text, options.richText));
   }
   return new Uint8Array(out);
 }
@@ -917,6 +1167,7 @@ function pbEncodeHierarchyTreeNode(
   if (row.ParentId != null && row.ParentId !== "") {
     out.push(...pbEncodeStringField(TreeNodeFields.parent_id, row.ParentId));
   }
+  const details = hierarchyDetailsCell(row.Details);
   const cells = [
     pbEncodeTreeNodeCell({ nodeId: row.Id, col: HIERARCHY_NAME_COL, text: row.Name }),
     pbEncodeTreeNodeCell({
@@ -928,6 +1179,12 @@ function pbEncodeHierarchyTreeNode(
     pbEncodeTreeNodeCell({ nodeId: row.Id, col: 2, text: row.Size }),
     pbEncodeTreeNodeCell({ nodeId: row.Id, col: 3, text: row.Modified }),
     pbEncodeTreeNodeCell({ nodeId: row.Id, col: 4, text: row.Permissions }),
+    pbEncodeTreeNodeCell({
+      nodeId: row.Id,
+      col: HIERARCHY_DETAILS_COL,
+      text: details.text,
+      richText: details.richText,
+    }),
     pbEncodeTreeNodeCell({
       nodeId: row.Id,
       col: HIERARCHY_ACTION_COL,

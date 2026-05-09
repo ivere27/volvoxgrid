@@ -39,7 +39,7 @@ const DEMO_SALES: &str = "sales";
 const DEMO_HIERARCHY: &str = "hierarchy";
 const DEMO_BARCODES: &str = "barcodes";
 const SALES_DEMO_COLS: i32 = 10;
-const HIERARCHY_DEMO_COLS: i32 = 6;
+const HIERARCHY_DEMO_COLS: i32 = 7;
 const BARCODE_DEMO_COLS: i32 = 5;
 const HIERARCHY_NAME_COL: i32 = 0;
 const SALES_STATUS_ITEMS: &str = "Active|Pending|Shipped|Returned|Cancelled";
@@ -146,6 +146,8 @@ struct HierarchyJsonRow {
     modified: String,
     #[serde(rename = "Permissions")]
     permissions: String,
+    #[serde(rename = "Details")]
+    details: Option<serde_json::Value>,
     #[serde(rename = "Action")]
     action: String,
 }
@@ -195,6 +197,8 @@ struct HierarchyLoadRow<'a> {
     modified: &'a str,
     #[serde(rename = "Permissions")]
     permissions: &'a str,
+    #[serde(rename = "Details")]
+    details: Option<&'a serde_json::Value>,
     #[serde(rename = "Action")]
     action: &'a str,
 }
@@ -2939,6 +2943,7 @@ fn load_hierarchy_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Resul
             size: &row.size,
             modified: &row.modified,
             permissions: &row.permissions,
+            details: row.details.as_ref(),
             action: &row.action,
         })
         .collect();
@@ -2989,6 +2994,13 @@ fn load_hierarchy_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Resul
             },
             pb::ColumnDef {
                 index: 5,
+                width: Some(180),
+                caption: Some("Details".to_string()),
+                key: Some("Details".to_string()),
+                ..Default::default()
+            },
+            pb::ColumnDef {
+                index: 6,
                 width: Some(92),
                 caption: Some("Action".to_string()),
                 key: Some("Action".to_string()),

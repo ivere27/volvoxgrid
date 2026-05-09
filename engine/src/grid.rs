@@ -20,6 +20,7 @@ use crate::indicator::{ColIndicatorRowDefState, IndicatorBandsState, RowIndicato
 use crate::layout::LayoutCache;
 use crate::outline::OutlineState;
 use crate::proto::volvoxgrid::v1 as pb;
+use crate::rich_text::utf16_index_to_byte_index;
 use crate::row::RowProps;
 use crate::scroll::ScrollState;
 use crate::scrollbar::{
@@ -43,6 +44,21 @@ pub const DEFAULT_TUI_ROW_HEIGHT: i32 = 1;
 pub const DEFAULT_TUI_COL_WIDTH: i32 = 15;
 /// Default fixed-rate pacing fallback when no platform frame clock is available.
 pub const DEFAULT_TARGET_FRAME_RATE_HZ: i32 = 30;
+
+#[derive(Clone, Debug)]
+struct TextMeasureStyle {
+    font_name: String,
+    font_size: f32,
+    bold: bool,
+    italic: bool,
+    stretch: f32,
+}
+
+#[derive(Clone, Debug)]
+struct RichTextMeasureSegment {
+    text: String,
+    style: TextMeasureStyle,
+}
 const DEFAULT_PULL_TO_REFRESH_THRESHOLD_PX: f32 = 72.0;
 const DEFAULT_PULL_TO_REFRESH_MAX_REVEAL_PX: f32 = 132.0;
 const DEFAULT_PULL_TO_REFRESH_CANCEL_SNAP_PX: f32 = 18.0;
@@ -1934,7 +1950,11 @@ impl VolvoxGrid {
     }
 
     fn tui_text_width(text: &str) -> i32 {
-        let width = UnicodeWidthStr::width(text);
+        let width = text
+            .split('\n')
+            .map(UnicodeWidthStr::width)
+            .max()
+            .unwrap_or(0);
         if width > i32::MAX as usize {
             i32::MAX
         } else {
@@ -2794,6 +2814,336 @@ impl VolvoxGrid {
         (font_name, font_size, font_bold, font_italic)
     }
 
+    fn resolve_text_measure_style_full(&self, row: i32, col: i32) -> TextMeasureStyle {
+        let style_override = self.cell_styles.get(&(row, col));
+        let font_name = style_override
+            .and_then(|style| style.font_name.clone())
+            .unwrap_or_else(|| self.style.font_name.clone());
+        let font_size = style_override
+            .and_then(|style| style.font_size)
+            .unwrap_or(self.style.font_size);
+        let font_bold = style_override
+            .and_then(|style| style.font_bold)
+            .unwrap_or(self.style.font_bold);
+        let font_italic = style_override
+            .and_then(|style| style.font_italic)
+            .unwrap_or(self.style.font_italic);
+        let font_stretch = style_override
+            .and_then(|style| style.font_stretch)
+            .unwrap_or(self.style.font_stretch);
+        TextMeasureStyle {
+            font_name,
+            font_size: if font_size > 0.0 { font_size } else { 13.0 },
+            bold: font_bold,
+            italic: font_italic,
+            stretch: font_stretch,
+        }
+    }
+
+    fn resolve_rich_text_measure_run_style(
+        base: &TextMeasureStyle,
+        run_style: Option<&pb::TextRunStyle>,
+    ) -> TextMeasureStyle {
+        let mut resolved = base.clone();
+        let Some(run_style) = run_style else {
+            return resolved;
+        };
+
+        if let Some(font) = &run_style.font {
+            if let Some(family) = font
+                .family
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+            {
+                resolved.font_name = family.to_string();
+            } else if let Some(family) = font
+                .families
+                .iter()
+                .map(|value| value.trim())
+                .find(|value| !value.is_empty())
+            {
+                resolved.font_name = family.to_string();
+            }
+            if let Some(size) = font.size.filter(|value| value.is_finite() && *value > 0.0) {
+                resolved.font_size = size;
+            }
+            if let Some(value) = font.bold {
+                resolved.bold = value;
+            }
+            if let Some(value) = font.italic {
+                resolved.italic = value;
+            }
+            if let Some(value) = font
+                .stretch
+                .filter(|value| value.is_finite() && *value > 0.0)
+            {
+                resolved.stretch = value;
+            }
+        }
+        if let Some(baseline) = run_style.baseline {
+            if baseline == pb::TextBaseline::Superscript as i32
+                || baseline == pb::TextBaseline::Subscript as i32
+            {
+                resolved.font_size = (resolved.font_size * 0.75).max(1.0);
+            }
+        }
+
+        resolved
+    }
+
+    fn rich_text_measure_segments(
+        text: &str,
+        rich_text: &pb::RichText,
+        base: &TextMeasureStyle,
+    ) -> Option<Vec<RichTextMeasureSegment>> {
+        if rich_text.runs.is_empty() {
+            return None;
+        }
+
+        let mut segments = Vec::with_capacity(rich_text.runs.len().saturating_add(1));
+        let mut active_style = base.clone();
+        let mut last_byte = 0usize;
+
+        for run in &rich_text.runs {
+            let start_byte = utf16_index_to_byte_index(text, run.start_index)?;
+            if start_byte > last_byte {
+                segments.push(RichTextMeasureSegment {
+                    text: text[last_byte..start_byte].to_string(),
+                    style: active_style.clone(),
+                });
+            }
+            active_style = Self::resolve_rich_text_measure_run_style(base, run.style.as_ref());
+            last_byte = start_byte;
+        }
+
+        if last_byte < text.len() {
+            segments.push(RichTextMeasureSegment {
+                text: text[last_byte..].to_string(),
+                style: active_style,
+            });
+        }
+
+        (!segments.is_empty()).then_some(segments)
+    }
+
+    fn measure_text_stretched_for_autosize(
+        text_engine: &mut TextEngine,
+        text: &str,
+        style: &TextMeasureStyle,
+        max_width: Option<f32>,
+    ) -> (f32, f32) {
+        let scale = crate::canvas::normalize_font_stretch_scale(style.stretch);
+        let (w, h) = text_engine.measure_text(
+            text,
+            &style.font_name,
+            style.font_size,
+            style.bold,
+            style.italic,
+            crate::canvas::adjusted_text_max_width(max_width, style.stretch),
+        );
+        (w * scale, h)
+    }
+
+    fn rich_text_measure_tokens(text: &str) -> Vec<String> {
+        let mut tokens = Vec::new();
+        let mut current = String::new();
+        let mut current_is_ws = None;
+
+        for ch in text.chars() {
+            if ch == '\n' {
+                if !current.is_empty() {
+                    tokens.push(std::mem::take(&mut current));
+                    current_is_ws = None;
+                }
+                tokens.push("\n".to_string());
+                continue;
+            }
+            let is_ws = ch.is_whitespace();
+            if current_is_ws.is_some_and(|value| value != is_ws) {
+                tokens.push(std::mem::take(&mut current));
+            }
+            current_is_ws = Some(is_ws);
+            current.push(ch);
+        }
+
+        if !current.is_empty() {
+            tokens.push(current);
+        }
+        tokens
+    }
+
+    fn finish_rich_text_measure_line(
+        max_width: &mut f32,
+        line_w: &mut f32,
+        line_h: &mut f32,
+        y: &mut f32,
+        default_line_h: f32,
+    ) {
+        *max_width = (*max_width).max(line_w.ceil());
+        *y += (*line_h).max(default_line_h).ceil();
+        *line_w = 0.0;
+        *line_h = 0.0;
+    }
+
+    fn add_rich_text_measure_piece(
+        text_engine: &mut TextEngine,
+        line_w: &mut f32,
+        line_h: &mut f32,
+        text: &str,
+        style: &TextMeasureStyle,
+    ) {
+        if text.is_empty() {
+            return;
+        }
+        let (w, h) = Self::measure_text_stretched_for_autosize(text_engine, text, style, None);
+        *line_w += w;
+        *line_h = (*line_h).max(h);
+    }
+
+    fn measure_rich_text_for_autosize(
+        text_engine: &mut TextEngine,
+        segments: &[RichTextMeasureSegment],
+        wrap_width: Option<f32>,
+        default_line_h: f32,
+    ) -> (f32, f32) {
+        let mut max_width = 0.0f32;
+        let mut line_w = 0.0f32;
+        let mut line_h = 0.0f32;
+        let mut y = 0.0f32;
+
+        for segment in segments {
+            if let Some(wrap_width) = wrap_width {
+                for token in Self::rich_text_measure_tokens(&segment.text) {
+                    if token == "\n" {
+                        Self::finish_rich_text_measure_line(
+                            &mut max_width,
+                            &mut line_w,
+                            &mut line_h,
+                            &mut y,
+                            default_line_h,
+                        );
+                        continue;
+                    }
+
+                    let (token_w, _) = Self::measure_text_stretched_for_autosize(
+                        text_engine,
+                        &token,
+                        &segment.style,
+                        None,
+                    );
+                    if line_w > 0.0 && line_w + token_w > wrap_width {
+                        Self::finish_rich_text_measure_line(
+                            &mut max_width,
+                            &mut line_w,
+                            &mut line_h,
+                            &mut y,
+                            default_line_h,
+                        );
+                    }
+
+                    if token_w > wrap_width && token.chars().count() > 1 {
+                        for ch in token.chars() {
+                            let part = ch.to_string();
+                            let (part_w, _) = Self::measure_text_stretched_for_autosize(
+                                text_engine,
+                                &part,
+                                &segment.style,
+                                None,
+                            );
+                            if line_w > 0.0 && line_w + part_w > wrap_width {
+                                Self::finish_rich_text_measure_line(
+                                    &mut max_width,
+                                    &mut line_w,
+                                    &mut line_h,
+                                    &mut y,
+                                    default_line_h,
+                                );
+                            }
+                            Self::add_rich_text_measure_piece(
+                                text_engine,
+                                &mut line_w,
+                                &mut line_h,
+                                &part,
+                                &segment.style,
+                            );
+                        }
+                    } else {
+                        Self::add_rich_text_measure_piece(
+                            text_engine,
+                            &mut line_w,
+                            &mut line_h,
+                            &token,
+                            &segment.style,
+                        );
+                    }
+                }
+            } else {
+                let mut parts = segment.text.split('\n').peekable();
+                while let Some(part) = parts.next() {
+                    Self::add_rich_text_measure_piece(
+                        text_engine,
+                        &mut line_w,
+                        &mut line_h,
+                        part,
+                        &segment.style,
+                    );
+                    if parts.peek().is_some() {
+                        Self::finish_rich_text_measure_line(
+                            &mut max_width,
+                            &mut line_w,
+                            &mut line_h,
+                            &mut y,
+                            default_line_h,
+                        );
+                    }
+                }
+            }
+        }
+
+        Self::finish_rich_text_measure_line(
+            &mut max_width,
+            &mut line_w,
+            &mut line_h,
+            &mut y,
+            default_line_h,
+        );
+        (max_width.ceil(), y.max(default_line_h).ceil())
+    }
+
+    fn measure_cell_text_for_autosize(
+        &self,
+        row: i32,
+        col: i32,
+        text: &str,
+        max_width: Option<f32>,
+        text_engine: &mut TextEngine,
+    ) -> (f32, f32) {
+        let rich_text = self.cells.get(row, col).and_then(|cell| {
+            if cell.display_text() == text {
+                cell.rich_text().cloned()
+            } else {
+                None
+            }
+        });
+        let base = self.resolve_text_measure_style_full(row, col);
+        if let Some(rich_text) = rich_text {
+            if let Some(segments) = Self::rich_text_measure_segments(text, &rich_text, &base) {
+                let default_line_h = (base.font_size * crate::canvas::TEXT_LINE_HEIGHT_FACTOR)
+                    .ceil()
+                    .max(1.0);
+                return Self::measure_rich_text_for_autosize(
+                    text_engine,
+                    &segments,
+                    max_width,
+                    default_line_h,
+                );
+            }
+        }
+
+        Self::measure_text_stretched_for_autosize(text_engine, text, &base, max_width)
+    }
+
     fn resolve_header_text_measure_style<'a>(&'a self, col: i32) -> (&'a str, f32, bool, bool) {
         if self.fixed_rows > 0 {
             self.resolve_text_measure_style(0, col)
@@ -3397,9 +3747,7 @@ impl VolvoxGrid {
                     row, col, barcode, &text, padding, &mut te,
                 );
             } else if !text.is_empty() {
-                let (font_name, font_size, bold, italic) =
-                    self.resolve_text_measure_style(row, col);
-                let (w, _) = te.measure_text(&text, font_name, font_size, bold, italic, None);
+                let (w, _) = self.measure_cell_text_for_autosize(row, col, &text, None, &mut te);
                 cell_w += w;
             }
             max_w = max_w.max(cell_w);
@@ -3440,9 +3788,8 @@ impl VolvoxGrid {
             let text = self.get_display_text(row, col);
             if !text.is_empty() {
                 let max_width = self.auto_resize_row_measure_width(row, col, word_wrap);
-                let (font_name, font_size, bold, italic) =
-                    self.resolve_text_measure_style(row, col);
-                let (_, h) = te.measure_text(&text, font_name, font_size, bold, italic, max_width);
+                let (_, h) =
+                    self.measure_cell_text_for_autosize(row, col, &text, max_width, &mut te);
                 max_h = max_h.max(h);
             }
         }
@@ -3670,10 +4017,8 @@ impl VolvoxGrid {
                             &mut te,
                         );
                     } else if !text.is_empty() {
-                        let (font_name, font_size, bold, italic) =
-                            self.resolve_text_measure_style(row, col);
                         let (w, _) =
-                            te.measure_text(&text, font_name, font_size, bold, italic, None);
+                            self.measure_cell_text_for_autosize(row, col, &text, None, &mut te);
                         cell_w += w;
                     }
                     max_widths[idx] = max_widths[idx].max(cell_w);
@@ -3710,11 +4055,9 @@ impl VolvoxGrid {
                     if text.is_empty() {
                         continue;
                     }
-                    let (font_name, font_size, bold, italic) =
-                        self.resolve_text_measure_style(row, col);
                     let max_width = self.auto_resize_row_measure_width(row, col, word_wrap);
                     let (_, h) =
-                        te.measure_text(&text, font_name, font_size, bold, italic, max_width);
+                        self.measure_cell_text_for_autosize(row, col, &text, max_width, &mut te);
                     let idx = row as usize;
                     max_heights[idx] = max_heights[idx].max(h);
                 }
@@ -5313,6 +5656,53 @@ mod tests {
         grid.auto_resize_row(0);
 
         assert!(grid.get_row_height(0) > before);
+    }
+
+    #[test]
+    fn auto_resize_uses_rich_text_run_fonts_and_newlines() {
+        let text = "meta\nLarge".to_string();
+        let build_grid = |rich: bool| {
+            let mut grid = VolvoxGrid::new(1, 320, 200, 1, 1, 0, 0);
+            grid.default_col_width = 10;
+            grid.default_row_height = 12;
+            grid.auto_resize = true;
+            grid.cells.set_text(0, 0, text.clone());
+            if rich {
+                grid.cells.get_mut(0, 0).extra_mut().rich_text = Some(pb::RichText {
+                    runs: vec![
+                        pb::TextFormatRun {
+                            start_index: 0,
+                            style: Some(pb::TextRunStyle {
+                                font: Some(pb::Font {
+                                    size: Some(8.0),
+                                    ..Default::default()
+                                }),
+                                ..Default::default()
+                            }),
+                        },
+                        pb::TextFormatRun {
+                            start_index: 5,
+                            style: Some(pb::TextRunStyle {
+                                font: Some(pb::Font {
+                                    size: Some(28.0),
+                                    bold: Some(true),
+                                    ..Default::default()
+                                }),
+                                ..Default::default()
+                            }),
+                        },
+                    ],
+                });
+            }
+            grid.auto_resize_all();
+            grid
+        };
+
+        let plain = build_grid(false);
+        let rich = build_grid(true);
+
+        assert!(rich.get_col_width(0) > plain.get_col_width(0));
+        assert!(rich.get_row_height(0) > plain.get_row_height(0));
     }
 
     #[test]

@@ -4,8 +4,8 @@
 # The script name determines the target: zig-cc-x86_64-macos.sh or zig-cc-aarch64-macos.sh.
 #
 # Filters out linker flags that zig cc / lld don't support on macOS targets,
-# and uses -undefined dynamic_lookup so missing macOS system libs (iconv, System,
-# CoreFoundation, etc.) are resolved at load time on the real macOS host.
+# and uses -undefined dynamic_lookup so missing macOS system libs (iconv, objc,
+# System, CoreFoundation, etc.) are resolved at load time on the real macOS host.
 
 SCRIPT_NAME="$(basename "$0")"
 
@@ -36,7 +36,7 @@ for arg in "$@"; do
       continue
       ;;
     # macOS system libs not available in Docker cross-compile environment
-    -liconv|-lSystem|-lc|-lm)
+    -liconv|-lobjc|-lSystem|-lc|-lm)
       continue
       ;;
     # macOS frameworks not available

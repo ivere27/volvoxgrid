@@ -57,6 +57,8 @@ message NodeCellUpdate {
   ImageData picture = 6;
   optional ImageAlignment picture_align = 7;
   optional Dropdown dropdown = 8;
+  // Full replacement, not a sparse patch. Empty `runs` clears rich text.
+  optional RichText rich_text = 9;
 }
 
 message LoadTreeRequest {

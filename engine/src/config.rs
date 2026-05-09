@@ -11,6 +11,7 @@ use crate::indicator::{
     CornerIndicatorSlotState, CornerIndicatorState, RowIndicatorSlotState,
 };
 use crate::proto::volvoxgrid::v1;
+use crate::rich_text::validate_rich_text;
 use crate::row::RowStatus;
 use crate::scrollbar::{
     default_scrollbar_colors, default_scrollbar_corner_radius, default_scrollbar_size,
@@ -909,9 +910,18 @@ enum PlannedCellValueWrite {
 }
 
 #[derive(Clone, Debug)]
+enum PlannedRichTextWrite {
+    None,
+    Replace(v1::RichText),
+    Clear,
+    Skip,
+}
+
+#[derive(Clone, Debug)]
 struct PlannedCellUpdate {
     update: v1::CellUpdate,
     value_plan: PlannedCellValueWrite,
+    rich_text_plan: PlannedRichTextWrite,
     in_bounds: bool,
 }
 
@@ -1048,6 +1058,19 @@ fn cell_value_to_text(value: &CellValueData) -> String {
         CellValueData::Timestamp(v) => v.to_string(),
         CellValueData::Empty => String::new(),
     }
+}
+
+fn cell_value_data_to_proto(value: &CellValueData, fallback_text: &str) -> v1::CellValue {
+    let value = match value {
+        CellValueData::Text(v) => Some(v1::cell_value::Value::Text(v.clone())),
+        CellValueData::Number(v) => Some(v1::cell_value::Value::Number(*v)),
+        CellValueData::Bool(v) => Some(v1::cell_value::Value::Flag(*v)),
+        CellValueData::Bytes(v) => Some(v1::cell_value::Value::Raw(v.clone())),
+        CellValueData::Timestamp(v) => Some(v1::cell_value::Value::Timestamp(*v)),
+        CellValueData::Empty if fallback_text.is_empty() => None,
+        CellValueData::Empty => Some(v1::cell_value::Value::Text(fallback_text.to_string())),
+    };
+    v1::CellValue { value }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -2762,6 +2785,116 @@ impl VolvoxGrid {
         }
     }
 
+    fn current_cell_value_proto(&self, row: i32, col: i32) -> v1::CellValue {
+        cell_value_data_to_proto(
+            self.cells.get_value(row, col),
+            self.cells.get_text(row, col),
+        )
+    }
+
+    fn rich_text_base_text_for_update(
+        &self,
+        row: i32,
+        col: i32,
+        update: &v1::CellUpdate,
+        value_plan: &PlannedCellValueWrite,
+    ) -> Result<String, String> {
+        if update.value.is_some() {
+            return match value_plan {
+                PlannedCellValueWrite::Write {
+                    value: CellValueData::Text(_),
+                    text,
+                } => Ok(text.clone()),
+                PlannedCellValueWrite::Write { .. }
+                | PlannedCellValueWrite::SetNull
+                | PlannedCellValueWrite::Skip => {
+                    Err("Rich text requires CellValue.text in the same update".to_string())
+                }
+                PlannedCellValueWrite::None => {
+                    Err("Rich text requires CellValue.text in the same update".to_string())
+                }
+            };
+        }
+
+        match self.cells.get_value(row, col) {
+            CellValueData::Text(v) => Ok(v.clone()),
+            CellValueData::Empty => Ok(self.cells.get_text(row, col).to_string()),
+            _ => Err("Rich text requires an existing text cell or CellValue.text".to_string()),
+        }
+    }
+
+    fn plan_rich_text_write(
+        &self,
+        update: &v1::CellUpdate,
+        value_plan: &PlannedCellValueWrite,
+        in_bounds: bool,
+    ) -> (PlannedRichTextWrite, Option<v1::TypeViolation>, bool) {
+        let Some(rich_text) = update.rich_text.as_ref() else {
+            return (PlannedRichTextWrite::None, None, false);
+        };
+
+        let actual = update
+            .value
+            .clone()
+            .unwrap_or_else(|| self.current_cell_value_proto(update.row, update.col));
+
+        if !in_bounds {
+            return (
+                PlannedRichTextWrite::Skip,
+                Some(self.build_violation(
+                    update.row,
+                    update.col,
+                    v1::ColumnDataType::ColumnDataString as i32,
+                    &actual,
+                    "Cell out of bounds".to_string(),
+                )),
+                true,
+            );
+        }
+
+        if rich_text.runs.is_empty() {
+            return (PlannedRichTextWrite::Clear, None, false);
+        }
+
+        let text =
+            match self.rich_text_base_text_for_update(update.row, update.col, update, value_plan) {
+                Ok(text) => text,
+                Err(reason) => {
+                    return (
+                        PlannedRichTextWrite::Skip,
+                        Some(self.build_violation(
+                            update.row,
+                            update.col,
+                            v1::ColumnDataType::ColumnDataString as i32,
+                            &actual,
+                            reason,
+                        )),
+                        true,
+                    );
+                }
+            };
+
+        if let Err(reason) = validate_rich_text(&text, rich_text) {
+            return (
+                PlannedRichTextWrite::Skip,
+                Some(self.build_violation(
+                    update.row,
+                    update.col,
+                    v1::ColumnDataType::ColumnDataString as i32,
+                    &actual,
+                    reason,
+                )),
+                true,
+            );
+        }
+
+        (
+            PlannedRichTextWrite::Replace(rich_text.clone()),
+            None,
+            false,
+        )
+    }
+
     fn plan_batch_write(
         &self,
         updates: &[v1::CellUpdate],
@@ -2811,9 +2944,19 @@ impl VolvoxGrid {
             } else {
                 PlannedCellValueWrite::None
             };
+            let (rich_text_plan, rich_text_violation, rich_text_hard_reject) =
+                self.plan_rich_text_write(update, &value_plan, in_bounds);
+            if let Some(v) = rich_text_violation {
+                violations.push(v);
+                rejected_count += 1;
+            }
+            if rich_text_hard_reject {
+                has_hard_reject = true;
+            }
             entries.push(PlannedCellUpdate {
                 update: update.clone(),
                 value_plan,
+                rich_text_plan,
                 in_bounds,
             });
         }
@@ -2854,6 +2997,24 @@ impl VolvoxGrid {
                             v1::CheckedState::CheckedUnchecked as i32
                         };
                 }
+            }
+        }
+    }
+
+    fn clear_rich_text(&mut self, row: i32, col: i32) {
+        if let Some(cell) = self.cells.get_mut_existing(row, col) {
+            if let Some(extra) = cell.extra.as_mut() {
+                extra.rich_text = None;
+            }
+        }
+    }
+
+    fn apply_rich_text_plan(&mut self, row: i32, col: i32, plan: &PlannedRichTextWrite) {
+        match plan {
+            PlannedRichTextWrite::None | PlannedRichTextWrite::Skip => {}
+            PlannedRichTextWrite::Clear => self.clear_rich_text(row, col),
+            PlannedRichTextWrite::Replace(rich_text) => {
+                self.cells.get_mut(row, col).extra_mut().rich_text = Some(rich_text.clone());
             }
         }
     }
@@ -2988,6 +3149,15 @@ impl VolvoxGrid {
             if value_changed {
                 applied_any = true;
             }
+            if value_changed
+                && matches!(
+                    entry.rich_text_plan,
+                    PlannedRichTextWrite::None | PlannedRichTextWrite::Skip
+                )
+            {
+                self.clear_rich_text(entry.update.row, entry.update.col);
+            }
+            self.apply_rich_text_plan(entry.update.row, entry.update.col, &entry.rich_text_plan);
             self.apply_non_value_update(&entry.update);
             if barcode_col_resize_enabled {
                 if entry.update.barcode.is_some() {
@@ -3012,6 +3182,7 @@ impl VolvoxGrid {
                 || entry.update.button_picture.is_some()
                 || entry.update.dropdown.is_some()
                 || entry.update.barcode.is_some()
+                || entry.update.rich_text.is_some()
                 || entry.update.interaction.is_some()
                 || entry.update.sticky_row.is_some()
                 || entry.update.sticky_col.is_some()
@@ -3069,6 +3240,7 @@ impl VolvoxGrid {
                     sticky_col: None,
                     interaction: None,
                     barcode: None,
+                    rich_text: None,
                 }
             })
             .collect();
@@ -3220,6 +3392,7 @@ impl VolvoxGrid {
         include_checked: bool,
         include_typed: bool,
         include_barcode_status: bool,
+        include_rich_text: bool,
     ) -> Vec<v1::CellData> {
         let r1 = row1.max(0).min(self.rows - 1);
         let r2 = row2.max(0).min(self.rows - 1);
@@ -3301,6 +3474,11 @@ impl VolvoxGrid {
                 let barcode = cell_ref
                     .and_then(|cd| cd.barcode())
                     .map(barcode_spec_to_proto);
+                let rich_text = if include_rich_text {
+                    cell_ref.and_then(|cd| cd.rich_text().cloned())
+                } else {
+                    None
+                };
                 result.push(v1::CellData {
                     row,
                     col,
@@ -3310,6 +3488,7 @@ impl VolvoxGrid {
                     interaction,
                     barcode,
                     barcode_status,
+                    rich_text,
                 });
             }
         }
@@ -4029,6 +4208,137 @@ mod tests {
         );
     }
 
+    fn rich_run(start_index: u32, foreground: u32, bold: Option<bool>) -> v1::TextFormatRun {
+        v1::TextFormatRun {
+            start_index,
+            style: Some(v1::TextRunStyle {
+                foreground: Some(foreground),
+                font: Some(v1::Font {
+                    bold,
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+        }
+    }
+
+    #[test]
+    fn write_cells_rich_text_readback_and_clearing() {
+        let mut grid = test_grid();
+        let rich_text = v1::RichText {
+            runs: vec![
+                rich_run(0, 0xFFFF0000, Some(true)),
+                rich_run(2, 0xFF0000FF, None),
+            ],
+        };
+
+        let result = grid.write_cells(
+            &[v1::CellUpdate {
+                row: 1,
+                col: 1,
+                value: Some(v1::CellValue {
+                    value: Some(v1::cell_value::Value::Text("Hello".to_string())),
+                }),
+                rich_text: Some(rich_text.clone()),
+                ..Default::default()
+            }],
+            false,
+        );
+
+        assert_eq!(result.written_count, 1);
+        assert_eq!(result.rejected_count, 0);
+        assert_eq!(
+            grid.cells.get(1, 1).and_then(|c| c.rich_text()),
+            Some(&rich_text)
+        );
+
+        let without_rich = grid.get_cells(1, 1, 1, 1, false, false, false, false, false);
+        assert!(without_rich[0].rich_text.is_none());
+        let with_rich = grid.get_cells(1, 1, 1, 1, false, false, false, false, true);
+        assert_eq!(with_rich[0].rich_text.as_ref(), Some(&rich_text));
+
+        grid.update_cells(&[v1::CellUpdate {
+            row: 1,
+            col: 1,
+            value: Some(v1::CellValue {
+                value: Some(v1::cell_value::Value::Text("Plain".to_string())),
+            }),
+            ..Default::default()
+        }]);
+        assert!(grid.cells.get(1, 1).and_then(|c| c.rich_text()).is_none());
+
+        grid.update_cells(&[v1::CellUpdate {
+            row: 1,
+            col: 1,
+            rich_text: Some(rich_text),
+            ..Default::default()
+        }]);
+        assert!(grid.cells.get(1, 1).and_then(|c| c.rich_text()).is_some());
+
+        grid.update_cells(&[v1::CellUpdate {
+            row: 1,
+            col: 1,
+            rich_text: Some(v1::RichText { runs: Vec::new() }),
+            ..Default::default()
+        }]);
+        assert!(grid.cells.get(1, 1).and_then(|c| c.rich_text()).is_none());
+    }
+
+    #[test]
+    fn write_cells_rich_text_validation_rejects_bad_runs_atomically() {
+        let mut grid = test_grid();
+
+        let result = grid.write_cells(
+            &[v1::CellUpdate {
+                row: 1,
+                col: 1,
+                value: Some(v1::CellValue {
+                    value: Some(v1::cell_value::Value::Text("abc".to_string())),
+                }),
+                rich_text: Some(v1::RichText {
+                    runs: vec![rich_run(4, 0xFFFF0000, None)],
+                }),
+                ..Default::default()
+            }],
+            true,
+        );
+
+        assert_eq!(result.written_count, 0);
+        assert_eq!(result.rejected_count, 1);
+        assert_eq!(result.violations.len(), 1);
+        assert_eq!(grid.cells.get_text(1, 1), "");
+    }
+
+    #[test]
+    fn write_cells_rich_text_rejects_non_text_cells() {
+        let mut grid = test_grid();
+        grid.define_columns(&[v1::ColumnDef {
+            index: 1,
+            data_type: Some(v1::ColumnDataType::ColumnDataNumber as i32),
+            coercion_mode: Some(v1::CoercionMode::CoercionStrict as i32),
+            ..Default::default()
+        }]);
+
+        let result = grid.write_cells(
+            &[v1::CellUpdate {
+                row: 1,
+                col: 1,
+                value: Some(v1::CellValue {
+                    value: Some(v1::cell_value::Value::Number(42.0)),
+                }),
+                rich_text: Some(v1::RichText {
+                    runs: vec![rich_run(0, 0xFFFF0000, None)],
+                }),
+                ..Default::default()
+            }],
+            false,
+        );
+
+        assert_eq!(result.written_count, 1);
+        assert_eq!(result.rejected_count, 1);
+        assert!(grid.cells.get(1, 1).and_then(|c| c.rich_text()).is_none());
+    }
+
     #[test]
     fn write_cells_strict_rejects_type_mismatch() {
         let mut grid = test_grid();
@@ -4119,7 +4429,7 @@ mod tests {
         assert_eq!(result.written_count, 1);
         assert_eq!(result.rejected_count, 0);
 
-        let cells = grid.get_cells(0, 0, 0, 0, false, false, true, false);
+        let cells = grid.get_cells(0, 0, 0, 0, false, false, true, false, false);
         assert!(matches!(
             cells.first().and_then(|c| c.value.clone()),
             Some(v1::CellValue {
@@ -4158,7 +4468,7 @@ mod tests {
         grid.cells.set_text(1, 2, "B".to_string());
         grid.cells.set_text(2, 1, "C".to_string());
 
-        let cells = grid.get_cells(1, 1, 2, 2, false, false, false, false);
+        let cells = grid.get_cells(1, 1, 2, 2, false, false, false, false, false);
         assert_eq!(cells.len(), 4); // 2x2 range
 
         let a = cells.iter().find(|c| c.row == 1 && c.col == 1).unwrap();
@@ -4191,11 +4501,12 @@ mod tests {
                 sticky_col: None,
                 interaction: Some(v1::CellInteraction::Button as i32),
                 barcode: None,
+                rich_text: None,
             }],
             false,
         );
 
-        let button_cell = grid.get_cells(1, 1, 1, 1, false, false, false, false);
+        let button_cell = grid.get_cells(1, 1, 1, 1, false, false, false, false, false);
         assert_eq!(
             button_cell.first().and_then(|c| c.interaction),
             Some(v1::CellInteraction::Button as i32)
@@ -4216,11 +4527,12 @@ mod tests {
                 sticky_col: None,
                 interaction: Some(v1::CellInteraction::Unspecified as i32),
                 barcode: None,
+                rich_text: None,
             }],
             false,
         );
 
-        let link_cell = grid.get_cells(1, 1, 1, 1, false, false, false, false);
+        let link_cell = grid.get_cells(1, 1, 1, 1, false, false, false, false, false);
         assert_eq!(
             link_cell.first().and_then(|c| c.interaction),
             Some(v1::CellInteraction::TextLink as i32)
@@ -4571,7 +4883,7 @@ mod tests {
         assert!(spec.show_size_warning);
         assert!(spec.use_full_rect);
 
-        let cells = grid.get_cells(1, 1, 1, 1, false, false, false, true);
+        let cells = grid.get_cells(1, 1, 1, 1, false, false, false, true, false);
         assert_eq!(
             cells.first().and_then(|c| c.barcode.as_ref()),
             Some(&barcode)
@@ -4582,7 +4894,7 @@ mod tests {
         );
 
         // Without opt-in the status field stays absent.
-        let cells_no_status = grid.get_cells(1, 1, 1, 1, false, false, false, false);
+        let cells_no_status = grid.get_cells(1, 1, 1, 1, false, false, false, false, false);
         assert_eq!(cells_no_status.first().and_then(|c| c.barcode_status), None);
 
         grid.update_cells(&[v1::CellUpdate {

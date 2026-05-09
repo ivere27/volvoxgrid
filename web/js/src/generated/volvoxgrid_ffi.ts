@@ -544,6 +544,11 @@ export enum TerminalCommand_Kind {
   TERMINAL_COMMAND_NONE = 0,
   TERMINAL_COMMAND_EXIT = 1,
 }
+export enum TextBaseline {
+  TEXT_BASELINE_NORMAL = 0,
+  TEXT_BASELINE_SUPERSCRIPT = 1,
+  TEXT_BASELINE_SUBSCRIPT = 2,
+}
 export enum TextEffect {
   TEXT_EFFECT_NONE = 0,
   TEXT_EFFECT_EMBOSS = 1,
@@ -783,6 +788,7 @@ export const CellDataFields = {
   "interaction": 6,
   "barcode": 7,
   "barcode_status": 8,
+  "rich_text": 9,
 } as const;
 export const CellEditChangeEventFields = {
   "text": 1,
@@ -844,6 +850,7 @@ export const CellUpdateFields = {
   "sticky_col": 11,
   "interaction": 12,
   "barcode": 13,
+  "rich_text": 14,
 } as const;
 export const CellValueFields = {
   "text": 1,
@@ -1253,6 +1260,7 @@ export const GetCellsRequestFields = {
   "include_checked": 7,
   "include_typed": 8,
   "include_barcode_status": 9,
+  "include_rich_text": 10,
 } as const;
 export const GetConfigRequestFields = {
   "grid_id": 1,
@@ -1871,6 +1879,9 @@ export const ResizeViewportResponseFields = {
   "viewport_width": 1,
   "viewport_height": 2,
 } as const;
+export const RichTextFields = {
+  "runs": 1,
+} as const;
 export const RowDefFields = {
   "index": 1,
   "height": 2,
@@ -2123,6 +2134,10 @@ export const TerminalViewportFields = {
   "height": 4,
   "fullscreen": 5,
 } as const;
+export const TextFormatRunFields = {
+  "start_index": 1,
+  "style": 2,
+} as const;
 export const TextQueryFields = {
   "text": 1,
   "case_sensitive": 2,
@@ -2132,6 +2147,12 @@ export const TextRenderingFields = {
   "mode": 1,
   "hinting": 2,
   "pixel_snap": 3,
+} as const;
+export const TextRunStyleFields = {
+  "foreground": 1,
+  "font": 2,
+  "baseline": 3,
+  "link_url": 4,
 } as const;
 export const TooltipRequestFields = {
   "x": 1,

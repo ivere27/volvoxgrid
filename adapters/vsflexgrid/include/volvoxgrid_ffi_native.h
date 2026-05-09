@@ -115,6 +115,7 @@ uint8_t* volvox_grid_get_cells(
     int32_t include_checked,
     int32_t include_typed,
     int32_t include_barcode_status,
+    int32_t include_rich_text,
     int32_t* out_len
 );
 

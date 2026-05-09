@@ -491,6 +491,7 @@ class VolvoxGridController extends ChangeNotifier {
     bool includeStyle = false,
     bool includeChecked = false,
     bool includeTyped = false,
+    bool includeRichText = false,
   }) {
     return VolvoxGridService.GetCells(GetCellsRequest()
       ..gridId = _gridId
@@ -500,7 +501,8 @@ class VolvoxGridController extends ChangeNotifier {
       ..col2 = col2
       ..includeStyle = includeStyle
       ..includeChecked = includeChecked
-      ..includeTyped = includeTyped);
+      ..includeTyped = includeTyped
+      ..includeRichText = includeRichText);
   }
 
   /// Get the text of a cell at the given [row] and [col].

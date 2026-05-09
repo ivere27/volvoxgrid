@@ -160,6 +160,7 @@ pub(crate) fn get_cells(grid: &mut Grid, request: &GetCellsRequest) -> CellsResp
             request.include_checked,
             request.include_typed,
             request.include_barcode_status,
+            request.include_rich_text,
         ),
     }
 }

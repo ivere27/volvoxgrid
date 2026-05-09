@@ -11,6 +11,7 @@ use crate::cell::BarcodeSpec;
 use crate::control::CellControl;
 use crate::grid::{PullToRefreshState, VolvoxGrid};
 use crate::proto::volvoxgrid::v1 as pb;
+use crate::rich_text::utf16_index_to_byte_index;
 use crate::scrollbar::{
     compute_scrollbar_geometry, normalize_scrollbar_appearance, normalize_scrollbar_mode,
     scale_color_alpha, scrollbar_mode_visible, scrollbar_overlays_content,
@@ -931,6 +932,410 @@ fn draw_text_decorations<C: Canvas>(
         if strike_y >= clip_y && strike_y < clip_y + clip_h {
             canvas.hline(line_start, strike_y, line_w, color);
         }
+    }
+}
+
+#[derive(Clone, Debug)]
+struct RichTextDrawStyle {
+    font_name: String,
+    font_size: f32,
+    bold: bool,
+    italic: bool,
+    underline: bool,
+    strikethrough: bool,
+    stretch: f32,
+    fore: u32,
+    text_effect: i32,
+    baseline: i32,
+}
+
+impl RichTextDrawStyle {
+    fn scaled(&self, scale: f32) -> Self {
+        let mut next = self.clone();
+        if scale.is_finite() && scale > 0.0 {
+            next.font_size = (next.font_size * scale).max(1.0);
+        }
+        next
+    }
+
+    fn baseline_offset_px(&self) -> i32 {
+        match self.baseline {
+            1 => -((self.font_size * 0.35).ceil() as i32),
+            2 => (self.font_size * 0.25).ceil() as i32,
+            _ => 0,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+struct RichTextSegment {
+    text: String,
+    style: RichTextDrawStyle,
+}
+
+#[derive(Clone, Debug)]
+struct RichTextPiece {
+    text: String,
+    style: RichTextDrawStyle,
+    x: f32,
+    y: f32,
+    w: f32,
+}
+
+#[derive(Clone, Debug)]
+struct RichTextLayout {
+    pieces: Vec<RichTextPiece>,
+    width: f32,
+    height: f32,
+}
+
+fn resolve_rich_text_run_style(
+    base: &RichTextDrawStyle,
+    run_style: Option<&pb::TextRunStyle>,
+) -> RichTextDrawStyle {
+    let mut resolved = base.clone();
+    let Some(run_style) = run_style else {
+        return resolved;
+    };
+
+    if let Some(color) = run_style.foreground {
+        resolved.fore = color;
+    }
+    if let Some(font) = &run_style.font {
+        if let Some(family) = font
+            .family
+            .as_deref()
+            .map(str::trim)
+            .filter(|v| !v.is_empty())
+        {
+            resolved.font_name = family.to_string();
+        } else if let Some(family) = font
+            .families
+            .iter()
+            .map(|v| v.trim())
+            .find(|v| !v.is_empty())
+        {
+            resolved.font_name = family.to_string();
+        }
+        if let Some(size) = font.size.filter(|v| v.is_finite() && *v > 0.0) {
+            resolved.font_size = size;
+        }
+        if let Some(v) = font.bold {
+            resolved.bold = v;
+        }
+        if let Some(v) = font.italic {
+            resolved.italic = v;
+        }
+        if let Some(v) = font.underline {
+            resolved.underline = v;
+        }
+        if let Some(v) = font.strikethrough {
+            resolved.strikethrough = v;
+        }
+        if let Some(v) = font.stretch.filter(|v| v.is_finite() && *v > 0.0) {
+            resolved.stretch = v;
+        }
+    }
+    if let Some(baseline) = run_style.baseline {
+        resolved.baseline = baseline;
+        if baseline == 1 || baseline == 2 {
+            resolved.font_size = (resolved.font_size * 0.75).max(1.0);
+        }
+    }
+
+    resolved
+}
+
+fn rich_text_segments(
+    text: &str,
+    rich_text: &pb::RichText,
+    base: &RichTextDrawStyle,
+) -> Option<Vec<RichTextSegment>> {
+    if rich_text.runs.is_empty() {
+        return None;
+    }
+
+    let mut segments = Vec::with_capacity(rich_text.runs.len().saturating_add(1));
+    let mut active_style = base.clone();
+    let mut last_byte = 0usize;
+
+    for run in &rich_text.runs {
+        let start_byte = utf16_index_to_byte_index(text, run.start_index)?;
+        if start_byte > last_byte {
+            segments.push(RichTextSegment {
+                text: text[last_byte..start_byte].to_string(),
+                style: active_style.clone(),
+            });
+        }
+        active_style = resolve_rich_text_run_style(base, run.style.as_ref());
+        last_byte = start_byte;
+    }
+
+    if last_byte < text.len() {
+        segments.push(RichTextSegment {
+            text: text[last_byte..].to_string(),
+            style: active_style,
+        });
+    }
+
+    (!segments.is_empty()).then_some(segments)
+}
+
+fn finish_rich_text_line(
+    layout: &mut RichTextLayout,
+    line_w: &mut f32,
+    line_h: &mut f32,
+    y: &mut f32,
+    default_line_h: f32,
+) {
+    layout.width = layout.width.max(line_w.ceil());
+    *y += line_h.max(default_line_h).ceil();
+    *line_w = 0.0;
+    *line_h = 0.0;
+}
+
+fn add_rich_text_piece<C: Canvas>(
+    canvas: &mut C,
+    layout: &mut RichTextLayout,
+    line_w: &mut f32,
+    line_h: &mut f32,
+    y: f32,
+    text: &str,
+    style: &RichTextDrawStyle,
+    font_scale: f32,
+) {
+    if text.is_empty() {
+        return;
+    }
+    let style = style.scaled(font_scale);
+    let (w, h) = canvas.measure_text_stretched(
+        text,
+        &style.font_name,
+        style.font_size,
+        style.bold,
+        style.italic,
+        style.stretch,
+        None,
+    );
+    layout.pieces.push(RichTextPiece {
+        text: text.to_string(),
+        style,
+        x: *line_w,
+        y,
+        w,
+    });
+    *line_w += w;
+    *line_h = line_h.max(h);
+}
+
+fn rich_text_tokens(text: &str) -> Vec<String> {
+    let mut tokens = Vec::new();
+    let mut current = String::new();
+    let mut current_is_ws = None;
+
+    for ch in text.chars() {
+        if ch == '\n' {
+            if !current.is_empty() {
+                tokens.push(std::mem::take(&mut current));
+                current_is_ws = None;
+            }
+            tokens.push("\n".to_string());
+            continue;
+        }
+        let is_ws = ch.is_whitespace();
+        if current_is_ws.is_some_and(|v| v != is_ws) {
+            tokens.push(std::mem::take(&mut current));
+        }
+        current_is_ws = Some(is_ws);
+        current.push(ch);
+    }
+
+    if !current.is_empty() {
+        tokens.push(current);
+    }
+    tokens
+}
+
+fn layout_rich_text<C: Canvas>(
+    canvas: &mut C,
+    segments: &[RichTextSegment],
+    wrap_width: Option<f32>,
+    font_scale: f32,
+    default_line_h: f32,
+) -> RichTextLayout {
+    let mut layout = RichTextLayout {
+        pieces: Vec::new(),
+        width: 0.0,
+        height: 0.0,
+    };
+    let mut line_w = 0.0;
+    let mut line_h = 0.0;
+    let mut y = 0.0;
+
+    for segment in segments {
+        if let Some(wrap_width) = wrap_width {
+            for token in rich_text_tokens(&segment.text) {
+                if token == "\n" {
+                    finish_rich_text_line(
+                        &mut layout,
+                        &mut line_w,
+                        &mut line_h,
+                        &mut y,
+                        default_line_h,
+                    );
+                    continue;
+                }
+
+                let style = segment.style.scaled(font_scale);
+                let (token_w, _) = canvas.measure_text_stretched(
+                    &token,
+                    &style.font_name,
+                    style.font_size,
+                    style.bold,
+                    style.italic,
+                    style.stretch,
+                    None,
+                );
+                if line_w > 0.0 && line_w + token_w > wrap_width {
+                    finish_rich_text_line(
+                        &mut layout,
+                        &mut line_w,
+                        &mut line_h,
+                        &mut y,
+                        default_line_h,
+                    );
+                }
+
+                if token_w > wrap_width && token.chars().count() > 1 {
+                    for ch in token.chars() {
+                        let part = ch.to_string();
+                        let (part_w, _) = canvas.measure_text_stretched(
+                            &part,
+                            &style.font_name,
+                            style.font_size,
+                            style.bold,
+                            style.italic,
+                            style.stretch,
+                            None,
+                        );
+                        if line_w > 0.0 && line_w + part_w > wrap_width {
+                            finish_rich_text_line(
+                                &mut layout,
+                                &mut line_w,
+                                &mut line_h,
+                                &mut y,
+                                default_line_h,
+                            );
+                        }
+                        add_rich_text_piece(
+                            canvas,
+                            &mut layout,
+                            &mut line_w,
+                            &mut line_h,
+                            y,
+                            &part,
+                            &segment.style,
+                            font_scale,
+                        );
+                    }
+                } else {
+                    add_rich_text_piece(
+                        canvas,
+                        &mut layout,
+                        &mut line_w,
+                        &mut line_h,
+                        y,
+                        &token,
+                        &segment.style,
+                        font_scale,
+                    );
+                }
+            }
+        } else {
+            let mut parts = segment.text.split('\n').peekable();
+            while let Some(part) = parts.next() {
+                add_rich_text_piece(
+                    canvas,
+                    &mut layout,
+                    &mut line_w,
+                    &mut line_h,
+                    y,
+                    part,
+                    &segment.style,
+                    font_scale,
+                );
+                if parts.peek().is_some() {
+                    finish_rich_text_line(
+                        &mut layout,
+                        &mut line_w,
+                        &mut line_h,
+                        &mut y,
+                        default_line_h,
+                    );
+                }
+            }
+        }
+    }
+
+    finish_rich_text_line(
+        &mut layout,
+        &mut line_w,
+        &mut line_h,
+        &mut y,
+        default_line_h,
+    );
+    layout.height = y.max(default_line_h).ceil();
+    layout
+}
+
+fn draw_rich_text_layout<C: Canvas>(
+    canvas: &mut C,
+    layout: &RichTextLayout,
+    x: i32,
+    y: i32,
+    clip_x: i32,
+    clip_y: i32,
+    clip_w: i32,
+    clip_h: i32,
+) {
+    for piece in &layout.pieces {
+        let draw_x = x + piece.x.round() as i32;
+        let draw_y = y + piece.y.round() as i32 + piece.style.baseline_offset_px();
+        let draw_clip_h = text_clip_h_for_draw(draw_y, clip_y, clip_h);
+        if draw_clip_h <= 0 {
+            continue;
+        }
+        canvas.draw_text_styled_stretched_fast(
+            draw_x,
+            draw_y,
+            &piece.text,
+            &piece.style.font_name,
+            piece.style.font_size,
+            piece.style.bold,
+            piece.style.italic,
+            piece.style.stretch,
+            piece.style.fore,
+            clip_x,
+            clip_y,
+            clip_w,
+            draw_clip_h,
+            piece.style.text_effect,
+            None,
+        );
+        draw_text_decorations(
+            canvas,
+            draw_x,
+            draw_y,
+            piece.w,
+            piece.style.font_size,
+            piece.style.fore,
+            clip_x,
+            clip_y,
+            clip_w,
+            clip_h,
+            piece.style.underline,
+            piece.style.strikethrough,
+        );
     }
 }
 
@@ -5861,6 +6266,31 @@ fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
         } else {
             style_override.text_effect.unwrap_or(grid.style.text_effect)
         };
+        let rich_segments = grid
+            .cells
+            .get(text_row, text_col)
+            .and_then(|cell| {
+                if cell.display_text() == display_text {
+                    cell.rich_text()
+                } else {
+                    None
+                }
+            })
+            .and_then(|rich_text| {
+                let base = RichTextDrawStyle {
+                    font_name: font_name.to_string(),
+                    font_size,
+                    bold: font_bold,
+                    italic: font_italic,
+                    underline: font_underline,
+                    strikethrough: font_strikethrough,
+                    stretch: font_stretch,
+                    fore,
+                    text_effect: text_style,
+                    baseline: 0,
+                };
+                rich_text_segments(display_text, rich_text, &base)
+            });
         let alignment = meta.alignment;
         let cell_padding = meta.padding;
 
@@ -5906,7 +6336,20 @@ fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
             || (ellipsis_mode != 0 && !grid.word_wrap)
             || (shrink_to_fit && !grid.word_wrap)
             || (grid.text_overflow && !grid.word_wrap && !shrink_to_fit && !is_merged_cell);
-        let (tw, th) = if needs_measure {
+        let mut rich_font_scale = 1.0f32;
+        let mut rich_layout = None;
+        let (tw, th) = if let Some(segments) = rich_segments.as_ref() {
+            let layout = layout_rich_text(
+                canvas,
+                segments,
+                wrap_width,
+                rich_font_scale,
+                default_line_h,
+            );
+            let measured = (layout.width, layout.height);
+            rich_layout = Some(layout);
+            measured
+        } else if needs_measure {
             canvas.measure_text_stretched(
                 display_text,
                 font_name,
@@ -5925,16 +6368,34 @@ fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
             if shrink_to_fit && !grid.word_wrap && tw > inner_w as f32 && inner_w > 0 {
                 let scale = inner_w as f32 / tw;
                 let shrunk = (font_size * scale).floor().max(6.0);
-                let (stw, sth) = canvas.measure_text_stretched(
-                    display_text,
-                    font_name,
-                    shrunk,
-                    font_bold,
-                    font_italic,
-                    font_stretch,
-                    None,
-                );
-                (shrunk, stw, sth)
+                if let Some(segments) = rich_segments.as_ref() {
+                    rich_font_scale = if font_size > 0.0 {
+                        shrunk / font_size
+                    } else {
+                        1.0
+                    };
+                    let layout = layout_rich_text(
+                        canvas,
+                        segments,
+                        None,
+                        rich_font_scale,
+                        (shrunk * TEXT_LINE_HEIGHT_FACTOR).ceil(),
+                    );
+                    let measured = (layout.width, layout.height);
+                    rich_layout = Some(layout);
+                    (shrunk, measured.0, measured.1)
+                } else {
+                    let (stw, sth) = canvas.measure_text_stretched(
+                        display_text,
+                        font_name,
+                        shrunk,
+                        font_bold,
+                        font_italic,
+                        font_stretch,
+                        None,
+                    );
+                    (shrunk, stw, sth)
+                }
             } else {
                 (font_size, tw, th)
             };
@@ -6113,6 +6574,30 @@ fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
                 clip_h,
                 font_underline,
                 font_strikethrough,
+            );
+        } else if let Some(segments) = rich_segments.as_ref() {
+            let fallback_layout;
+            let layout = if let Some(layout) = rich_layout.as_ref() {
+                layout
+            } else {
+                fallback_layout = layout_rich_text(
+                    canvas,
+                    segments,
+                    wrap_width,
+                    rich_font_scale,
+                    (effective_font_size * TEXT_LINE_HEIGHT_FACTOR).ceil(),
+                );
+                &fallback_layout
+            };
+            draw_rich_text_layout(
+                canvas,
+                layout,
+                text_x,
+                text_y,
+                clip_x,
+                clip_y_cell,
+                clip_w,
+                clip_h,
             );
         } else {
             canvas.draw_text_styled_stretched_fast(
@@ -10883,6 +11368,7 @@ mod tests {
         font_size: f32,
         bold: bool,
         italic: bool,
+        color: u32,
     }
 
     struct RecordingTextDrawRenderer {
@@ -10919,7 +11405,7 @@ mod tests {
             font_size: f32,
             bold: bool,
             italic: bool,
-            _color: u32,
+            color: u32,
             _max_width: Option<f32>,
         ) -> f32 {
             self.draws.lock().unwrap().push(TextDrawCall {
@@ -10931,6 +11417,7 @@ mod tests {
                 font_size,
                 bold,
                 italic,
+                color,
             });
             (text.chars().count().max(1) as f32) * 6.0
         }
@@ -11152,6 +11639,68 @@ mod tests {
         assert_eq!(first.y, -10);
         assert_eq!(first.clip_y, 0);
         assert_eq!(first.clip_h, 26);
+    }
+
+    #[test]
+    fn rich_text_cell_draws_separate_runs_with_run_styles() {
+        let width = 120;
+        let height = 40;
+        let stride = width * 4;
+        let draws = Arc::new(Mutex::new(Vec::new()));
+        let mut text = RecordingTextDrawRenderer {
+            draws: draws.clone(),
+        };
+        let mut buffer = vec![0; (height * stride) as usize];
+        let mut canvas = CpuCanvas::new(&mut buffer, width, height, stride, &mut text);
+        let mut grid = VolvoxGrid::new(1, width, height, 1, 1, 0, 0);
+        grid.render_layer_mask = 1u64 << super::layer::CELL_TEXT;
+        grid.columns[0].alignment = pb::Align::LeftCenter as i32;
+        grid.update_cells(&[pb::CellUpdate {
+            row: 0,
+            col: 0,
+            value: Some(pb::CellValue {
+                value: Some(pb::cell_value::Value::Text("Hello".to_string())),
+            }),
+            rich_text: Some(pb::RichText {
+                runs: vec![
+                    pb::TextFormatRun {
+                        start_index: 0,
+                        style: Some(pb::TextRunStyle {
+                            foreground: Some(0xFFFF0000),
+                            ..Default::default()
+                        }),
+                    },
+                    pb::TextFormatRun {
+                        start_index: 2,
+                        style: Some(pb::TextRunStyle {
+                            foreground: Some(0xFF0000FF),
+                            font: Some(pb::Font {
+                                bold: Some(true),
+                                ..Default::default()
+                            }),
+                            ..Default::default()
+                        }),
+                    },
+                ],
+            }),
+            ..Default::default()
+        }]);
+
+        render_grid(&grid, &mut canvas);
+
+        let draws = draws.lock().unwrap();
+        let first = draws
+            .iter()
+            .find(|draw| draw.text == "He")
+            .expect("first rich text run should render");
+        let second = draws
+            .iter()
+            .find(|draw| draw.text == "llo")
+            .expect("second rich text run should render");
+        assert_eq!(first.color, 0xFFFF0000);
+        assert!(!first.bold);
+        assert_eq!(second.color, 0xFF0000FF);
+        assert!(second.bold);
     }
 
     #[test]
