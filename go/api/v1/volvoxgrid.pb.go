@@ -2871,10 +2871,15 @@ func (ApplyScope) EnumDescriptor() ([]byte, []int) {
 //
 //	AUTO (0): Engine picks CPU or GPU based on host capabilities.
 //	CPU (1):  Renders into a host-owned RGBA buffer (most portable).
-//	GPU (2):  Renders via wgpu to a host-provided native surface.
-//	TUI (5):  Terminal mode — renders ANSI escape sequences.
+//	GPU (2):  Renders via wgpu; backend is selected by wgpu/OS.
+//	GPU_VULKAN (3): Force Vulkan when available.
+//	GPU_GLES (4):   Force the wgpu GL backend (legacy name; OpenGL/OpenGL ES).
+//	TUI (5):        Terminal mode — renders ANSI escape sequences.
+//	GPU_DX12 (6):   Force Direct3D 12 when available.
+//	GPU_METAL (7):  Force Metal when available.
+//	GPU_OPENGL (8): Force the wgpu GL backend (desktop OpenGL/OpenGL ES).
 //
-// If GPU initialization fails, the engine falls back to CPU silently.
+// GPU modes require GpuSurfaceReady; hosts switch to CPU explicitly.
 type RendererMode int32
 
 const (
@@ -2884,6 +2889,9 @@ const (
 	RendererMode_RENDERER_GPU_VULKAN RendererMode = 3
 	RendererMode_RENDERER_GPU_GLES   RendererMode = 4
 	RendererMode_RENDERER_TUI        RendererMode = 5
+	RendererMode_RENDERER_GPU_DX12   RendererMode = 6
+	RendererMode_RENDERER_GPU_METAL  RendererMode = 7
+	RendererMode_RENDERER_GPU_OPENGL RendererMode = 8
 )
 
 // Enum value maps for RendererMode.
@@ -2895,6 +2903,9 @@ var (
 		3: "RENDERER_GPU_VULKAN",
 		4: "RENDERER_GPU_GLES",
 		5: "RENDERER_TUI",
+		6: "RENDERER_GPU_DX12",
+		7: "RENDERER_GPU_METAL",
+		8: "RENDERER_GPU_OPENGL",
 	}
 	RendererMode_value = map[string]int32{
 		"RENDERER_AUTO":       0,
@@ -2903,6 +2914,9 @@ var (
 		"RENDERER_GPU_VULKAN": 3,
 		"RENDERER_GPU_GLES":   4,
 		"RENDERER_TUI":        5,
+		"RENDERER_GPU_DX12":   6,
+		"RENDERER_GPU_METAL":  7,
+		"RENDERER_GPU_OPENGL": 8,
 	}
 )
 
@@ -18292,7 +18306,8 @@ func (x *TerminalCommand) GetKind() TerminalCommand_Kind {
 
 // GPU rendering: host provides a native surface for wgpu.
 // handle=0 means surface destroyed. See runtime/src/lib.rs GpuSurfaceReady.
-// If GPU initialization fails, the runtime falls back to CPU mode silently.
+// If GPU initialization or surface setup fails, the runtime returns
+// GpuFrameDone(rendered=false); it does not render GPU mode into BufferReady.
 type GpuSurfaceReady struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	SurfaceHandle int64                  `protobuf:"varint,1,opt,name=surface_handle,json=surfaceHandle,proto3" json:"surface_handle,omitempty"` // platform-specific native surface (0 = destroyed)
@@ -26417,14 +26432,17 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\n" +
 	"ApplyScope\x12\x10\n" +
 	"\fAPPLY_SINGLE\x10\x00\x12\x13\n" +
-	"\x0fAPPLY_SELECTION\x10\x01*\x87\x01\n" +
+	"\x0fAPPLY_SELECTION\x10\x01*\xcf\x01\n" +
 	"\fRendererMode\x12\x11\n" +
 	"\rRENDERER_AUTO\x10\x00\x12\x10\n" +
 	"\fRENDERER_CPU\x10\x01\x12\x10\n" +
 	"\fRENDERER_GPU\x10\x02\x12\x17\n" +
 	"\x13RENDERER_GPU_VULKAN\x10\x03\x12\x15\n" +
 	"\x11RENDERER_GPU_GLES\x10\x04\x12\x10\n" +
-	"\fRENDERER_TUI\x10\x05*]\n" +
+	"\fRENDERER_TUI\x10\x05\x12\x15\n" +
+	"\x11RENDERER_GPU_DX12\x10\x06\x12\x16\n" +
+	"\x12RENDERER_GPU_METAL\x10\a\x12\x17\n" +
+	"\x13RENDERER_GPU_OPENGL\x10\b*]\n" +
 	"\vPresentMode\x12\x10\n" +
 	"\fPRESENT_AUTO\x10\x00\x12\x10\n" +
 	"\fPRESENT_FIFO\x10\x01\x12\x13\n" +

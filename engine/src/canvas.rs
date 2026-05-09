@@ -311,6 +311,16 @@ pub trait Canvas {
     /// Canvas height in pixels.
     fn height(&self) -> i32;
 
+    /// Current text cache entry count for the active drawing backend, if known.
+    fn text_cache_len(&self) -> Option<usize> {
+        None
+    }
+
+    /// Current text renderer backend name for the active drawing backend, if known.
+    fn text_renderer_name(&self) -> Option<&str> {
+        None
+    }
+
     /// Called before overlay layers (editor, dropdown) that should render above grid content.
     fn begin_overlay(&mut self) {}
 
@@ -10362,6 +10372,11 @@ fn render_debug_overlay<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
 
     let buf_w = canvas.width();
     let buf_h = canvas.height();
+    let text_cache_len = canvas
+        .text_cache_len()
+        .map(|len| len.min(i32::MAX as usize) as i32)
+        .unwrap_or(grid.debug_text_cache_len);
+    let text_renderer_name = canvas.text_renderer_name().unwrap_or("Engine");
 
     // Keep the debug overlay at a fixed 2x on Android; raw density makes the
     // bitmap font comically large on modern phones and tablets.
@@ -10451,8 +10466,9 @@ fn render_debug_overlay<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
     };
 
     lines.push(format!(
-        "{} {}x{} {}",
+        "{} Text:{} {}x{} {}",
         mode_str,
+        text_renderer_name,
         format_number(grid.rows),
         grid.cols,
         status_str
@@ -10475,7 +10491,7 @@ fn render_debug_overlay<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
         grid.scroll.scroll_x as i32,
         grid.scroll.scroll_y as i32,
         mem_str,
-        grid.debug_text_cache_len,
+        text_cache_len,
         grid.text_layout_cache_cap,
     ));
 

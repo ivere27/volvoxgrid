@@ -1,7 +1,6 @@
 #[cfg(feature = "cosmic-text")]
 use cosmic_text::{Attrs, Buffer, Family, FontSystem, Metrics, Shaping, SwashCache};
-#[cfg(feature = "cosmic-text")]
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 #[cfg(feature = "cosmic-text")]
 use std::hash::{BuildHasher, Hash, Hasher};
 
@@ -94,6 +93,276 @@ pub trait TextRenderer: Send {
             color,
             max_width,
         );
+    }
+
+    /// Number of cached text layout/raster entries owned by this renderer.
+    fn cache_len(&self) -> usize {
+        0
+    }
+
+    /// Update cache capacity when the grid's text cache setting changes.
+    fn set_cache_cap(&mut self, _cap: usize) {}
+
+    /// Clear cached text layout/raster entries owned by this renderer.
+    fn clear_cache(&mut self) {}
+
+    /// Human-readable backend name shown in the debug overlay.
+    fn renderer_name(&self) -> &str {
+        "External"
+    }
+}
+
+/// Quantized key for cached external text masks.
+///
+/// The cache intentionally excludes color: external renderers produce an alpha
+/// mask, and the engine blends that mask using the requested ARGB color.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct ExternalTextKey {
+    text: String,
+    font_name: String,
+    font_size_tenths: i32,
+    bold: bool,
+    italic: bool,
+    max_width_tenths: i32,
+}
+
+impl ExternalTextKey {
+    pub fn new(
+        text: &str,
+        font_name: &str,
+        font_size: f32,
+        bold: bool,
+        italic: bool,
+        max_width: Option<f32>,
+    ) -> Self {
+        Self {
+            text: text.to_string(),
+            font_name: font_name.to_string(),
+            font_size_tenths: (font_size * 10.0).round() as i32,
+            bold,
+            italic,
+            max_width_tenths: max_width
+                .filter(|v| *v > 0.0 && v.is_finite())
+                .map_or(-1, |v| (v * 10.0).round() as i32),
+        }
+    }
+}
+
+pub struct ExternalTextMask {
+    pub measured_width: f32,
+    pub measured_height: f32,
+    pub mask_width: i32,
+    pub mask_height: i32,
+    pub alpha: Vec<u8>,
+}
+
+pub struct ExternalTextMaskCache {
+    entries: HashMap<ExternalTextKey, (ExternalTextMask, u64)>,
+    current_gen: u64,
+    cap: usize,
+}
+
+impl ExternalTextMaskCache {
+    pub fn new(cap: usize) -> Self {
+        Self {
+            entries: HashMap::new(),
+            current_gen: 0,
+            cap,
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_disabled(&self) -> bool {
+        self.cap == 0
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+        self.current_gen = 0;
+    }
+
+    pub fn set_cap(&mut self, cap: usize) {
+        self.cap = cap;
+        self.enforce_cap();
+    }
+
+    fn touch(&mut self, key: &ExternalTextKey) {
+        if let Some((_, gen)) = self.entries.get_mut(key) {
+            *gen = self.current_gen;
+            self.current_gen += 1;
+        }
+    }
+
+    fn enforce_cap(&mut self) {
+        if self.cap == 0 {
+            self.clear();
+            return;
+        }
+        while self.entries.len() > self.cap {
+            let mut oldest_gen = u64::MAX;
+            let mut oldest_key = None;
+            for (k, (_, gen)) in &self.entries {
+                if *gen < oldest_gen {
+                    oldest_gen = *gen;
+                    oldest_key = Some(k.clone());
+                }
+            }
+            if let Some(k) = oldest_key {
+                self.entries.remove(&k);
+            } else {
+                break;
+            }
+        }
+    }
+
+    pub fn get_measure(&mut self, key: &ExternalTextKey) -> Option<(f32, f32)> {
+        let result = self
+            .entries
+            .get(key)
+            .map(|(entry, _)| (entry.measured_width, entry.measured_height));
+        if result.is_some() {
+            self.touch(key);
+        }
+        result
+    }
+
+    pub fn put_measure(&mut self, key: ExternalTextKey, width: f32, height: f32) {
+        if self.cap == 0 {
+            return;
+        }
+        if let Some((entry, gen)) = self.entries.get_mut(&key) {
+            entry.measured_width = width;
+            entry.measured_height = height;
+            *gen = self.current_gen;
+            self.current_gen += 1;
+            return;
+        }
+        self.entries.insert(
+            key,
+            (
+                ExternalTextMask {
+                    measured_width: width,
+                    measured_height: height,
+                    mask_width: 0,
+                    mask_height: 0,
+                    alpha: Vec::new(),
+                },
+                self.current_gen,
+            ),
+        );
+        self.current_gen += 1;
+        self.enforce_cap();
+    }
+
+    pub fn put_mask(&mut self, key: ExternalTextKey, mask: ExternalTextMask) {
+        if self.cap == 0 {
+            return;
+        }
+        self.entries.insert(key, (mask, self.current_gen));
+        self.current_gen += 1;
+        self.enforce_cap();
+    }
+
+    pub fn with_mask<R>(
+        &mut self,
+        key: &ExternalTextKey,
+        f: impl FnOnce(&ExternalTextMask) -> R,
+    ) -> Option<R> {
+        if !self
+            .entries
+            .get(key)
+            .map_or(false, |(entry, _)| !entry.alpha.is_empty())
+        {
+            return None;
+        }
+        self.touch(key);
+        self.entries.get(key).map(|(m, _)| f(m))
+    }
+}
+
+pub fn blend_external_text_mask_into_rgba(
+    buffer_pixels: &mut [u8],
+    buf_width: i32,
+    buf_height: i32,
+    stride: i32,
+    x: i32,
+    y: i32,
+    clip_x: i32,
+    clip_y: i32,
+    clip_w: i32,
+    clip_h: i32,
+    mask_width: i32,
+    mask_height: i32,
+    alpha: &[u8],
+    color: u32,
+) {
+    if buffer_pixels.is_empty()
+        || alpha.is_empty()
+        || buf_width <= 0
+        || buf_height <= 0
+        || stride <= 0
+        || clip_w <= 0
+        || clip_h <= 0
+        || mask_width <= 0
+        || mask_height <= 0
+    {
+        return;
+    }
+
+    let global_a = ((color >> 24) & 0xFF) as u32;
+    if global_a == 0 {
+        return;
+    }
+    let src_r = ((color >> 16) & 0xFF) as u32;
+    let src_g = ((color >> 8) & 0xFF) as u32;
+    let src_b = (color & 0xFF) as u32;
+
+    let min_x = x.max(clip_x).max(0);
+    let min_y = y.max(clip_y).max(0);
+    let max_x = (x + mask_width).min(clip_x + clip_w).min(buf_width);
+    // `clip_h` is measured from the text draw origin.
+    let max_y = (y + mask_height).min(y + clip_h).min(buf_height);
+    if max_x <= min_x || max_y <= min_y {
+        return;
+    }
+
+    let stride_usize = stride as usize;
+    let mask_width_usize = mask_width as usize;
+    for row in min_y..max_y {
+        let mask_row = (row - y) as usize;
+        let dst_row = row as usize * stride_usize;
+        for col in min_x..max_x {
+            let mask_col = (col - x) as usize;
+            let mask_idx = mask_row * mask_width_usize + mask_col;
+            let Some(&mask_a_u8) = alpha.get(mask_idx) else {
+                continue;
+            };
+            let mask_a = mask_a_u8 as u32;
+            if mask_a == 0 {
+                continue;
+            }
+            let src_a = (mask_a * global_a + 127) / 255;
+            if src_a == 0 {
+                continue;
+            }
+            let dst_idx = dst_row + col as usize * 4;
+            if dst_idx + 4 > buffer_pixels.len() {
+                continue;
+            }
+            let inv_a = 255 - src_a;
+            let dst_r = buffer_pixels[dst_idx] as u32;
+            let dst_g = buffer_pixels[dst_idx + 1] as u32;
+            let dst_b = buffer_pixels[dst_idx + 2] as u32;
+            let dst_a = buffer_pixels[dst_idx + 3] as u32;
+            buffer_pixels[dst_idx] = ((src_r * src_a + dst_r * inv_a + 127) / 255) as u8;
+            buffer_pixels[dst_idx + 1] = ((src_g * src_a + dst_g * inv_a + 127) / 255) as u8;
+            buffer_pixels[dst_idx + 2] = ((src_b * src_a + dst_b * inv_a + 127) / 255) as u8;
+            let out_a = src_a + (dst_a * inv_a + 127) / 255;
+            buffer_pixels[dst_idx + 3] = out_a.min(255) as u8;
+        }
     }
 }
 
@@ -241,6 +510,9 @@ impl TextEngine {
     }
 
     pub fn layout_cache_len(&self) -> usize {
+        if let Some(ext) = &self.external_renderer {
+            return ext.cache_len();
+        }
         #[cfg(feature = "cosmic-text")]
         {
             self.layout_cache.len()
@@ -253,9 +525,31 @@ impl TextEngine {
 
     pub fn set_layout_cache_cap(&mut self, cap: usize) {
         self.layout_cache_cap = cap;
+        if let Some(ext) = &mut self.external_renderer {
+            ext.set_cache_cap(cap);
+        }
         #[cfg(feature = "cosmic-text")]
         {
             Self::enforce_cache_cap(&mut self.layout_cache, &mut self.layout_fifo, cap);
+        }
+    }
+
+    pub fn clear_cache(&mut self) {
+        if let Some(ext) = &mut self.external_renderer {
+            ext.clear_cache();
+        }
+        #[cfg(feature = "cosmic-text")]
+        {
+            self.layout_cache.clear();
+            self.layout_fifo.clear();
+        }
+    }
+
+    pub fn renderer_name(&self) -> &str {
+        if let Some(ext) = &self.external_renderer {
+            ext.renderer_name()
+        } else {
+            "Engine"
         }
     }
 
@@ -1547,6 +1841,10 @@ impl Default for TextEngine {
 }
 
 impl TextRenderer for TextEngine {
+    fn renderer_name(&self) -> &str {
+        TextEngine::renderer_name(self)
+    }
+
     fn measure_text(
         &mut self,
         text: &str,
@@ -1641,5 +1939,17 @@ impl TextRenderer for TextEngine {
             color,
             max_width,
         );
+    }
+
+    fn cache_len(&self) -> usize {
+        TextEngine::layout_cache_len(self)
+    }
+
+    fn set_cache_cap(&mut self, cap: usize) {
+        TextEngine::set_layout_cache_cap(self, cap);
+    }
+
+    fn clear_cache(&mut self) {
+        TextEngine::clear_cache(self);
     }
 }

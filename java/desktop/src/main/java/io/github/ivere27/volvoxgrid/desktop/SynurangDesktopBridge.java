@@ -21,9 +21,11 @@ public final class SynurangDesktopBridge implements AutoCloseable {
     private final Method openStreamMethod;
     private final Method closeMethod;
     private final Method directBufferAddressMethod;
+    private final String libraryPath;
 
-    private SynurangDesktopBridge(Object host, Class<?> hostClass) throws SynurangBridgeException {
+    private SynurangDesktopBridge(Object host, Class<?> hostClass, String libraryPath) throws SynurangBridgeException {
         this.host = host;
+        this.libraryPath = libraryPath;
         try {
             this.invokeMethod = hostClass.getMethod("invoke", String.class, String.class, byte[].class);
             this.openStreamMethod = hostClass.getMethod("openStream", String.class, String.class);
@@ -56,7 +58,7 @@ public final class SynurangDesktopBridge implements AutoCloseable {
             Method loadMethod = hostClass.getMethod("load", String.class);
             Object host = loadMethod.invoke(null, libraryPath);
             VolvoxGridBuildInfo.logDesktopLibraryLoadOnce(libraryPath);
-            return new SynurangDesktopBridge(host, hostClass);
+            return new SynurangDesktopBridge(host, hostClass, libraryPath);
         } catch (ClassNotFoundException e) {
             throw new SynurangBridgeException(
                 "Synurang desktop host is not available. "
@@ -70,6 +72,10 @@ public final class SynurangDesktopBridge implements AutoCloseable {
         } catch (IllegalAccessException e) {
             throw new SynurangBridgeException("Cannot access Synurang host", e);
         }
+    }
+
+    public String libraryPath() {
+        return libraryPath;
     }
 
     public byte[] invoke(String service, String methodPath, byte[] payload) throws SynurangBridgeException {

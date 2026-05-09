@@ -1117,6 +1117,9 @@ export enum RendererMode {
   RENDERER_GPU_VULKAN = 3,
   RENDERER_GPU_GLES = 4,
   RENDERER_TUI = 5,
+  RENDERER_GPU_DX12 = 6,
+  RENDERER_GPU_METAL = 7,
+  RENDERER_GPU_OPENGL = 8,
 }
 export enum RowIndicatorSlotKind {
   ROW_INDICATOR_SLOT_NONE = 0,

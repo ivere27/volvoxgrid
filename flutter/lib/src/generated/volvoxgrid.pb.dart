@@ -17933,7 +17933,8 @@ class TerminalCommand extends $pb.GeneratedMessage {
 
 /// GPU rendering: host provides a native surface for wgpu.
 /// handle=0 means surface destroyed. See runtime/src/lib.rs GpuSurfaceReady.
-/// If GPU initialization fails, the runtime falls back to CPU mode silently.
+/// If GPU initialization or surface setup fails, the runtime returns
+/// GpuFrameDone(rendered=false); it does not render GPU mode into BufferReady.
 class GpuSurfaceReady extends $pb.GeneratedMessage {
   factory GpuSurfaceReady({
     $fixnum.Int64? surfaceHandle,

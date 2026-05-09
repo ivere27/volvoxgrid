@@ -30,13 +30,15 @@ dependencies {
 Compared to `volvoxgrid-android`, it excludes:
 
 - Built-in text engine (`cosmic-text`)
+- Native GPU renderer (`wgpu`)
 - Regex-based search (`regex`)
 - Parallel sort processing (`rayon`)
 
 Practical impact:
 - Smaller binary size
+- CPU rendering only
 - Text shaping/rasterization is host-driven (in `VolvoxGridView`, Android callback rendering via JNI is auto-registered)
-- C-side JNI bridge text cache can be tuned at runtime via `VolvoxGridView.setAndroidTextCacheSize(...)` to minimize JNI overhead
+- The Rust runtime owns the external text mask cache used by lite mode
 - Regex search APIs are unavailable
 - Sorting/work generation is single-threaded
 - Demo APIs remain available (`loadDemo`)
@@ -62,8 +64,10 @@ The Android example has a `Cache` dropdown (`8192`, `4096`, `1024`, `256`, `0`).
 
 - Changes apply immediately at runtime.
 - It updates engine cache via `ctrl.setTextLayoutCacheCap(cap)`.
-- It also updates the C-side JNI bridge text cache via `gridView.setAndroidTextCacheSize(cap)` (used by lite mode).
-- `0` disables and clears both text caches.
+- `gridView.setAndroidTextCacheSize(cap)` is kept as a compatibility hook for lite hosts, but current lite caching is owned by the Rust runtime.
+- `0` disables and clears the engine text cache.
+
+See [../TEXT_RENDERING.md](../TEXT_RENDERING.md) for full/lite text rendering and cache ownership.
 
 ## Quick Start
 
@@ -244,8 +248,8 @@ gridView.initialize(pluginHost, existingGridId);
 | `release()` | Clean up all resources |
 | `requestFrame()` | Request a render on next VSync |
 | `requestFrameImmediate()` | Request a render immediately |
-| `setRendererMode(mode)` | `0` = CPU, `1` = GPU (Auto), `3` = GPU (Vulkan), `4` = GPU (GLES) |
-| `setAndroidTextCacheSize(size)` | Set Android host text-render cache size (`0` disables cache) |
+| `setRendererMode(mode)` | `0` = Auto, `1` = CPU, `2` = GPU (Auto), `3` = GPU (Vulkan), `4` = GPU (GLES) |
+| `setAndroidTextCacheSize(size)` | Compatibility hook for lite host text cache sizing; engine cache is controlled by `setTextLayoutCacheCap` |
 | `setFlingFriction(friction)` | Tune scroll deceleration (0.001 -- 0.15) |
 | `resolveBundledLibraryPath(context)` | Resolve the bundled library `.so` path for `PluginHost.load(...)` |
 
@@ -575,11 +579,11 @@ LoadDataResult loaded = ctrl.loadData("name,qty\napple,3\nbanana,5".getBytes(jav
 #### Rendering
 
 ```java
-ctrl.setRendererMode(1);          // 0=CPU, 1=GPU (Auto), 3=GPU (Vulkan), 4=GPU (GLES)
+ctrl.setRendererMode(2);          // 0=Auto, 1=CPU, 2=GPU, 3=GPU (Vulkan), 4=GPU (GLES)
 ctrl.setDebugOverlay(true);       // show debug grid overlay
 ```
 
-**GPU Backend Note:** On some Android devices (especially those with Adreno GPUs), Vulkan may fail during internal capability probing (4x4 allocation error). If you experience crashes or hangs in GPU mode, try pinning to **GLES** (mode `4`). Mode `1` (Auto) defaults to GLES on Android for better stability.
+**GPU Backend Note:** On some Android devices (especially those with Adreno GPUs), Vulkan may fail during internal capability probing (4x4 allocation error). If you experience crashes or hangs in GPU mode, try pinning to **GLES** (mode `4`). Mode `2` (GPU auto) defaults to GLES on Android for better stability.
 
 **Rendering Performance & VSync:** All rendering modes are vsync-locked on Android — there is no need to manually cap the frame rate.
 
@@ -593,8 +597,8 @@ ctrl.setDebugOverlay(true);       // show debug grid overlay
 
 ```java
 ctrl.setAnimationEnabled(true, 250);  // enable with 250ms duration
-ctrl.setTextLayoutCacheCap(4096); // engine text layout cache size
-gridView.setAndroidTextCacheSize(4096); // lite host text cache size (0 disables)
+ctrl.setTextLayoutCacheCap(4096); // engine text layout/cache size, also used by lite text masks
+gridView.setAndroidTextCacheSize(4096); // compatibility hook for lite hosts
 
 ctrl.setRedraw(false);            // batch: disable rendering
 // ... make many changes ...

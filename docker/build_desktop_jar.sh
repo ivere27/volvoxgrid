@@ -9,6 +9,7 @@ set -euo pipefail
 # with classes from volvoxgrid-java-common + embedded native/ libraries.
 #
 # Usage (inside Docker): VERSION=0.8.7 /opt/volvoxgrid/build_desktop_jar.sh
+# Optional: LIBRARY_BUILD_MODE=lite (default: full)
 
 REPO_ROOT="${REPO_ROOT:-$(pwd)}"
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-${REPO_ROOT}/target}"
@@ -16,6 +17,7 @@ VERSION="${VERSION:-0.8.7}"
 SYNURANG_VERSION="${SYNURANG_VERSION:-0.5.4}"
 GROUP_ID="${GROUP_ID:-io.github.ivere27}"
 ARTIFACT_ID="${ARTIFACT_ID:-volvoxgrid-desktop}"
+LIBRARY_BUILD_MODE="${LIBRARY_BUILD_MODE:-full}"
 GIT_COMMIT="${GIT_COMMIT:-$(git -C "${REPO_ROOT}" rev-parse --short=12 HEAD 2>/dev/null || echo unknown)}"
 BUILD_DATE="${BUILD_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
 DIST_DIR="${DIST_DIR:-${REPO_ROOT}/dist/maven}"
@@ -46,7 +48,21 @@ fi
 export BUILD_JOBS
 export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-${BUILD_JOBS}}"
 GRADLE_MAX_WORKERS="${GRADLE_MAX_WORKERS:-${BUILD_JOBS}}"
-echo "Using BUILD_JOBS=${BUILD_JOBS} (cpu=${CPU_COUNT}, cargo=${CARGO_BUILD_JOBS}, gradle=${GRADLE_MAX_WORKERS})"
+case "${LIBRARY_BUILD_MODE}" in
+  full)
+    LIBRARY_FEATURE_ARGS=(--features gpu)
+    POM_DESCRIPTION="VolvoxGrid pixel-rendering grid engine for desktop (Linux, macOS, Windows)"
+    ;;
+  lite)
+    LIBRARY_FEATURE_ARGS=(--no-default-features --features demo)
+    POM_DESCRIPTION="VolvoxGrid lite pixel-rendering grid engine for desktop (Linux, macOS, Windows)"
+    ;;
+  *)
+    echo "Error: LIBRARY_BUILD_MODE must be 'full' or 'lite', got '${LIBRARY_BUILD_MODE}'." >&2
+    exit 1
+    ;;
+esac
+echo "Using BUILD_JOBS=${BUILD_JOBS} (cpu=${CPU_COUNT}, cargo=${CARGO_BUILD_JOBS}, gradle=${GRADLE_MAX_WORKERS}, mode=${LIBRARY_BUILD_MODE})"
 
 # Metadata consumed by engine/build.rs for embedding into binaries.
 export VOLVOXGRID_VERSION="${VOLVOXGRID_VERSION:-${VERSION}}"
@@ -88,14 +104,14 @@ export CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER="/opt/volvoxgrid/zig-cc-aarch64-
 
 # linux-x86_64 (native)
 echo "Building library: linux-x86_64..."
-(cd "${LIBRARY_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target x86_64-unknown-linux-gnu)
+(cd "${LIBRARY_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target x86_64-unknown-linux-gnu "${LIBRARY_FEATURE_ARGS[@]}")
 mkdir -p "${NATIVES_DIR}/linux-x86_64"
 cp "${CARGO_TARGET_DIR}/x86_64-unknown-linux-gnu/release/libvolvoxgrid.so" "${NATIVES_DIR}/linux-x86_64/"
 
 # linux-x86 (cross-compile)
 if command -v i686-linux-gnu-gcc >/dev/null 2>&1; then
   echo "Building library: linux-x86..."
-  (cd "${LIBRARY_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target i686-unknown-linux-gnu)
+  (cd "${LIBRARY_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target i686-unknown-linux-gnu "${LIBRARY_FEATURE_ARGS[@]}")
   mkdir -p "${NATIVES_DIR}/linux-x86"
   cp "${CARGO_TARGET_DIR}/i686-unknown-linux-gnu/release/libvolvoxgrid.so" "${NATIVES_DIR}/linux-x86/"
 else
@@ -105,7 +121,7 @@ fi
 # linux-aarch64 (cross-compile)
 if command -v aarch64-linux-gnu-gcc >/dev/null 2>&1; then
   echo "Building library: linux-aarch64..."
-  (cd "${LIBRARY_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target aarch64-unknown-linux-gnu)
+  (cd "${LIBRARY_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target aarch64-unknown-linux-gnu "${LIBRARY_FEATURE_ARGS[@]}")
   mkdir -p "${NATIVES_DIR}/linux-aarch64"
   cp "${CARGO_TARGET_DIR}/aarch64-unknown-linux-gnu/release/libvolvoxgrid.so" "${NATIVES_DIR}/linux-aarch64/"
 else
@@ -115,7 +131,7 @@ fi
 # linux-armv7 (cross-compile)
 if command -v arm-linux-gnueabihf-gcc >/dev/null 2>&1; then
   echo "Building library: linux-armv7..."
-  (cd "${LIBRARY_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target armv7-unknown-linux-gnueabihf)
+  (cd "${LIBRARY_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target armv7-unknown-linux-gnueabihf "${LIBRARY_FEATURE_ARGS[@]}")
   mkdir -p "${NATIVES_DIR}/linux-armv7"
   cp "${CARGO_TARGET_DIR}/armv7-unknown-linux-gnueabihf/release/libvolvoxgrid.so" "${NATIVES_DIR}/linux-armv7/"
 else
@@ -125,7 +141,7 @@ fi
 # windows-x86 (MinGW cross-compile)
 if command -v i686-w64-mingw32-gcc >/dev/null 2>&1; then
   echo "Building library: windows-x86..."
-  (cd "${LIBRARY_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target i686-pc-windows-gnu)
+  (cd "${LIBRARY_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target i686-pc-windows-gnu "${LIBRARY_FEATURE_ARGS[@]}")
   mkdir -p "${NATIVES_DIR}/windows-x86"
   cp "${CARGO_TARGET_DIR}/i686-pc-windows-gnu/release/volvoxgrid.dll" "${NATIVES_DIR}/windows-x86/"
 else
@@ -135,7 +151,7 @@ fi
 # windows-x86_64 (MinGW cross-compile)
 if command -v x86_64-w64-mingw32-gcc >/dev/null 2>&1; then
   echo "Building library: windows-x86_64..."
-  (cd "${LIBRARY_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target x86_64-pc-windows-gnu)
+  (cd "${LIBRARY_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target x86_64-pc-windows-gnu "${LIBRARY_FEATURE_ARGS[@]}")
   mkdir -p "${NATIVES_DIR}/windows-x86_64"
   cp "${CARGO_TARGET_DIR}/x86_64-pc-windows-gnu/release/volvoxgrid.dll" "${NATIVES_DIR}/windows-x86_64/"
 else
@@ -185,12 +201,12 @@ fi
 # macos-x86_64 (zig cross-compile)
 if command -v zig >/dev/null 2>&1; then
   echo "Building library: macos-x86_64..."
-  (cd "${LIBRARY_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target x86_64-apple-darwin)
+  (cd "${LIBRARY_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target x86_64-apple-darwin "${LIBRARY_FEATURE_ARGS[@]}")
   mkdir -p "${NATIVES_DIR}/macos-x86_64"
   cp "${CARGO_TARGET_DIR}/x86_64-apple-darwin/release/libvolvoxgrid.dylib" "${NATIVES_DIR}/macos-x86_64/"
 
   echo "Building library: macos-aarch64..."
-  (cd "${LIBRARY_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target aarch64-apple-darwin)
+  (cd "${LIBRARY_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target aarch64-apple-darwin "${LIBRARY_FEATURE_ARGS[@]}")
   mkdir -p "${NATIVES_DIR}/macos-aarch64"
   cp "${CARGO_TARGET_DIR}/aarch64-apple-darwin/release/libvolvoxgrid.dylib" "${NATIVES_DIR}/macos-aarch64/"
 else
@@ -280,7 +296,7 @@ cat > "${POM_OUT}" <<POM
   <version>${VERSION}</version>
   <packaging>jar</packaging>
   <name>${ARTIFACT_ID}</name>
-  <description>VolvoxGrid pixel-rendering grid engine for desktop (Linux, macOS, Windows)</description>
+  <description>${POM_DESCRIPTION}</description>
   <url>https://github.com/ivere27/volvoxgrid</url>
   <licenses>
     <license>
@@ -328,9 +344,11 @@ mkdir -p "${JAVADOC_DIR}"
 
 DOTNET_STAGE_OUT_X64=""
 DOTNET_STAGE_OUT_X86=""
+DOTNET_LITE_STAGE_OUT_X64=""
+DOTNET_LITE_STAGE_OUT_X86=""
 if should_build_dotnet; then
   echo ""
-  echo "Building .NET WinForms artifacts (release, net40, x64+x86)..."
+  echo "Building .NET WinForms artifacts (release, net40, x64+x86, full+lite)..."
   if ! command -v dotnet >/dev/null 2>&1; then
     echo "Error: dotnet CLI not found in Docker image." >&2
     exit 1
@@ -363,6 +381,25 @@ if should_build_dotnet; then
   mkdir -p "${DOTNET_STAGE_OUT_X64}" "${DOTNET_STAGE_OUT_X86}"
   cp -a "${DOTNET_STAGE_DIR_X64}/." "${DOTNET_STAGE_OUT_X64}/"
   cp -a "${DOTNET_STAGE_DIR_X86}/." "${DOTNET_STAGE_OUT_X86}/"
+
+  echo ""
+  echo "Building .NET WinForms lite artifacts (release, net40, x64+x86)..."
+  (
+    cd "${REPO_ROOT}"
+    CARGO_TARGET_DIR="${REPO_ROOT}/target/dotnet/lite-cargo" VOLVOXGRID_VARIANT=lite DOTNET_TFM=net40 DOTNET_ARCH=x64 bash "${REPO_ROOT}/dotnet/build_dotnet.sh" release
+    CARGO_TARGET_DIR="${REPO_ROOT}/target/dotnet/lite-cargo" VOLVOXGRID_VARIANT=lite DOTNET_TFM=net40 DOTNET_ARCH=x86 bash "${REPO_ROOT}/dotnet/build_dotnet.sh" release
+  )
+
+  DOTNET_LITE_STAGE_OUT_X64="${DOTNET_DIST_DIR}/winforms_release_lite"
+  DOTNET_LITE_STAGE_OUT_X86="${DOTNET_DIST_DIR}/winforms_release_lite_x86"
+  mkdir -p "${DOTNET_LITE_STAGE_OUT_X64}" "${DOTNET_LITE_STAGE_OUT_X86}"
+  cp -a "${DOTNET_STAGE_DIR_X64}/." "${DOTNET_LITE_STAGE_OUT_X64}/"
+  cp -a "${DOTNET_STAGE_DIR_X86}/." "${DOTNET_LITE_STAGE_OUT_X86}/"
+
+  rm -rf "${DOTNET_STAGE_DIR_X64}" "${DOTNET_STAGE_DIR_X86}"
+  mkdir -p "${DOTNET_STAGE_DIR_X64}" "${DOTNET_STAGE_DIR_X86}"
+  cp -a "${DOTNET_STAGE_OUT_X64}/." "${DOTNET_STAGE_DIR_X64}/"
+  cp -a "${DOTNET_STAGE_OUT_X86}/." "${DOTNET_STAGE_DIR_X86}/"
 fi
 
 echo ""
@@ -378,5 +415,11 @@ if [[ -n "${DOTNET_STAGE_OUT_X64}" || -n "${DOTNET_STAGE_OUT_X86}" ]]; then
   fi
   if [[ -n "${DOTNET_STAGE_OUT_X86}" ]]; then
     echo "  ${DOTNET_STAGE_OUT_X86}"
+  fi
+  if [[ -n "${DOTNET_LITE_STAGE_OUT_X64}" ]]; then
+    echo "  ${DOTNET_LITE_STAGE_OUT_X64}"
+  fi
+  if [[ -n "${DOTNET_LITE_STAGE_OUT_X86}" ]]; then
+    echo "  ${DOTNET_LITE_STAGE_OUT_X86}"
   fi
 fi

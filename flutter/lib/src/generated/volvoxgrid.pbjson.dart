@@ -888,6 +888,9 @@ const RendererMode$json = {
     {'1': 'RENDERER_GPU_VULKAN', '2': 3},
     {'1': 'RENDERER_GPU_GLES', '2': 4},
     {'1': 'RENDERER_TUI', '2': 5},
+    {'1': 'RENDERER_GPU_DX12', '2': 6},
+    {'1': 'RENDERER_GPU_METAL', '2': 7},
+    {'1': 'RENDERER_GPU_OPENGL', '2': 8},
   ],
 };
 
@@ -895,7 +898,8 @@ const RendererMode$json = {
 final $typed_data.Uint8List rendererModeDescriptor = $convert.base64Decode(
     'CgxSZW5kZXJlck1vZGUSEQoNUkVOREVSRVJfQVVUTxAAEhAKDFJFTkRFUkVSX0NQVRABEhAKDF'
     'JFTkRFUkVSX0dQVRACEhcKE1JFTkRFUkVSX0dQVV9WVUxLQU4QAxIVChFSRU5ERVJFUl9HUFVf'
-    'R0xFUxAEEhAKDFJFTkRFUkVSX1RVSRAF');
+    'R0xFUxAEEhAKDFJFTkRFUkVSX1RVSRAFEhUKEVJFTkRFUkVSX0dQVV9EWDEyEAYSFgoSUkVORE'
+    'VSRVJfR1BVX01FVEFMEAcSFwoTUkVOREVSRVJfR1BVX09QRU5HTBAI');
 
 @$core.Deprecated('Use presentModeDescriptor instead')
 const PresentMode$json = {

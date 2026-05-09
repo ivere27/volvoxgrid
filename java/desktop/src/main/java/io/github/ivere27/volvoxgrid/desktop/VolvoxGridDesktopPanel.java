@@ -27,6 +27,7 @@ import io.github.ivere27.volvoxgrid.GetConfigRequest;
 import io.github.ivere27.volvoxgrid.GetSelectionRequest;
 import io.github.ivere27.volvoxgrid.GridConfig;
 import io.github.ivere27.volvoxgrid.GridEvent;
+import io.github.ivere27.volvoxgrid.GpuSurfaceReady;
 import io.github.ivere27.volvoxgrid.LayoutConfig;
 import io.github.ivere27.volvoxgrid.PointerEvent;
 import io.github.ivere27.volvoxgrid.RenderConfig;
@@ -40,7 +41,9 @@ import io.github.ivere27.volvoxgrid.SelectionMode;
 import io.github.ivere27.volvoxgrid.SelectionState;
 import io.github.ivere27.volvoxgrid.common.VolvoxGridHost;
 import io.github.ivere27.volvoxgrid.common.RendererBackend;
+import java.awt.Canvas;
 import java.awt.Color;
+import java.awt.Component;
 import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Graphics;
@@ -51,6 +54,7 @@ import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
+import java.awt.event.HierarchyEvent;
 import java.awt.event.InputEvent;
 import java.awt.event.InputMethodEvent;
 import java.awt.event.InputMethodListener;
@@ -78,7 +82,6 @@ import javax.swing.BorderFactory;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 import javax.swing.JTextField;
-import javax.swing.Timer;
 import javax.swing.event.CaretEvent;
 import javax.swing.event.CaretListener;
 import javax.swing.event.DocumentEvent;
@@ -89,15 +92,15 @@ import javax.swing.text.BadLocationException;
 import javax.swing.text.DocumentFilter;
 
 /**
- * Swing-based VolvoxGrid host with CPU shared-buffer rendering.
+ * Swing-based VolvoxGrid host with CPU shared-buffer rendering and native-surface GPU rendering.
  */
 public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHost<VolvoxGridDesktopController> {
     private static final Logger LOG = Logger.getLogger(VolvoxGridDesktopPanel.class.getName());
     private static final float WHEEL_SCROLL_GAIN = 3.0f;
-    private static final float HOST_FLING_IMPULSE_GAIN = 2.2f;
-    private static final float HOST_FLING_DAMPING = 0.90f;
-    private static final float HOST_FLING_MIN_VELOCITY = 0.12f;
-    private static final float HOST_FLING_MAX_VELOCITY = 120f;
+    private static final float HOST_FLING_IMPULSE_GAIN = 0.75f;
+    private static final float HOST_FLING_DAMPING = 0.86f;
+    private static final float HOST_FLING_MIN_VELOCITY = 0.08f;
+    private static final float HOST_FLING_MAX_VELOCITY = 36f;
     private static final long HOST_FLING_FRAME_MILLIS = 16L;
     private static final int AUTO_FALLBACK_FRAME_RATE_HZ = 30;
     private static final long FRAME_PACING_CONFIG_REFRESH_NANOS = 250_000_000L;
@@ -330,6 +333,24 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         }
     }
 
+    private static final class GpuSurfaceCanvas extends Canvas {
+        GpuSurfaceCanvas() {
+            setFocusable(true);
+            setIgnoreRepaint(true);
+            setBackground(Color.BLACK);
+        }
+
+        @Override
+        public void update(Graphics g) {
+            // wgpu presents directly to this native surface.
+        }
+
+        @Override
+        public void paint(Graphics g) {
+            // wgpu presents directly to this native surface.
+        }
+    }
+
     private final Object sendLock = new Object();
     private final Object imageLock = new Object();
     private final Object resizeLock = new Object();
@@ -339,10 +360,11 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     private final AtomicBoolean pendingFrame = new AtomicBoolean(false);
     private final AtomicBoolean needsFollowupRender = new AtomicBoolean(false);
     private final AtomicBoolean renderRequestPending = new AtomicBoolean(false);
-    private final AtomicBoolean followupRenderScheduled = new AtomicBoolean(false);
 
     private SynurangDesktopBridge bridge;
     private VolvoxGridDesktopClient client;
+    private Java2DTextRendererBridge textRendererBridge;
+    private DesktopNativeSurfaceBridge nativeSurfaceBridge;
     private long gridId;
     private boolean ownsHost;
 
@@ -371,6 +393,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     private volatile int editSelectionCol = -1;
     private final JPanel editOverlayHost;
     private final JTextField editOverlay;
+    private final Canvas gpuSurfaceCanvas;
     private volatile boolean suppressEditOverlayTextChanged = false;
     private volatile boolean suppressEditOverlayCommit = false;
     private volatile int editOverlayRow = -1;
@@ -389,6 +412,9 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     private volatile boolean pendingHostEditOverlayPreserveFieldState = false;
 
     private volatile RendererBackend rendererBackend = RendererBackend.CPU;
+    private volatile boolean gpuSupported = false;
+    private volatile boolean gpuSurfaceActive = false;
+    private volatile String lastGpuSurfaceWarning = "";
     private volatile boolean hostFlingEnabled = false;
     private volatile Thread flingThread;
     private volatile boolean flingActive = false;
@@ -400,10 +426,8 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     private volatile int multiRangeAnchorCol = -1;
     private volatile int multiRangeDragRow = -1;
     private volatile int multiRangeDragCol = -1;
-    private volatile int framePacingModeValue = FramePacingMode.FRAME_PACING_MODE_AUTO_VALUE;
-    private volatile int targetFrameRateHz = AUTO_FALLBACK_FRAME_RATE_HZ;
+    private volatile int framePacingModeValue = FramePacingMode.FRAME_PACING_MODE_PLATFORM_VALUE;
     private volatile long framePacingConfigLastRefreshNanos = 0L;
-    private volatile Timer followupRenderTimer;
     private final Set<Integer> suppressedKeyUps = new HashSet<Integer>();
 
     public VolvoxGridDesktopPanel() {
@@ -413,6 +437,37 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         setFocusable(true);
         setFocusTraversalKeysEnabled(false);
         enableInputMethods(false);
+
+        gpuSurfaceCanvas = new GpuSurfaceCanvas();
+        gpuSurfaceCanvas.setVisible(false);
+        gpuSurfaceCanvas.addComponentListener(new ComponentAdapter() {
+            @Override
+            public void componentShown(ComponentEvent e) {
+                handleGpuSurfaceAvailableEvent();
+            }
+
+            @Override
+            public void componentResized(ComponentEvent e) {
+                handleGpuSurfaceAvailableEvent();
+            }
+
+            @Override
+            public void componentHidden(ComponentEvent e) {
+                sendGpuSurfaceDestroyed();
+            }
+        });
+        gpuSurfaceCanvas.addHierarchyListener(event -> {
+            long flags = event.getChangeFlags();
+            if ((flags & (HierarchyEvent.DISPLAYABILITY_CHANGED | HierarchyEvent.SHOWING_CHANGED)) == 0L) {
+                return;
+            }
+            if (gpuSurfaceCanvas.isDisplayable() && gpuSurfaceCanvas.isShowing()) {
+                handleGpuSurfaceAvailableEvent();
+            } else {
+                sendGpuSurfaceDestroyed();
+            }
+        });
+        add(gpuSurfaceCanvas);
 
         editOverlayHost = new JPanel(null);
         editOverlayHost.setVisible(true);
@@ -536,6 +591,12 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         this.bridge = SynurangDesktopBridge.load(libraryPath);
         this.ownsHost = true;
         this.client = new VolvoxGridDesktopClient(this.bridge);
+        this.textRendererBridge = Java2DTextRendererBridge.tryCreate(libraryPath);
+        this.gpuSupported = NativeLibraryCapabilities.hasGpuRenderer(libraryPath);
+        this.nativeSurfaceBridge = this.gpuSupported
+            ? DesktopNativeSurfaceBridge.tryCreate(libraryPath)
+            : null;
+        this.gpuSupported = this.gpuSupported && this.nativeSurfaceBridge != null;
 
         int w = resolveViewportWidth();
         int h = resolveViewportHeight();
@@ -552,7 +613,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
             .setRendering(
                 RenderConfig.newBuilder()
                     .setRendererMode(RendererMode.RENDERER_CPU)
-                    .setFramePacingMode(FramePacingMode.FRAME_PACING_MODE_AUTO)
+                    .setFramePacingMode(FramePacingMode.FRAME_PACING_MODE_PLATFORM)
                     .setTargetFrameRateHz(AUTO_FALLBACK_FRAME_RATE_HZ)
                     .build()
             )
@@ -567,8 +628,10 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
                 .build()
         );
         this.gridId = response.getGridId();
+        registerHostTextRenderer();
 
         displayTarget = createFrameTarget(w, h);
+        syncGpuSurfaceCanvasBounds(w, h);
         safeResizeViewport(w, h);
         startStreams();
     }
@@ -584,11 +647,19 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         this.bridge = host;
         this.ownsHost = false;
         this.client = new VolvoxGridDesktopClient(host);
+        this.textRendererBridge = Java2DTextRendererBridge.tryCreate(host.libraryPath());
+        this.gpuSupported = NativeLibraryCapabilities.hasGpuRenderer(host.libraryPath());
+        this.nativeSurfaceBridge = this.gpuSupported
+            ? DesktopNativeSurfaceBridge.tryCreate(host.libraryPath())
+            : null;
+        this.gpuSupported = this.gpuSupported && this.nativeSurfaceBridge != null;
         this.gridId = existingGridId;
+        registerHostTextRenderer();
 
         int w = resolveViewportWidth();
         int h = resolveViewportHeight();
         displayTarget = createFrameTarget(w, h);
+        syncGpuSurfaceCanvasBounds(w, h);
         safeResizeViewport(w, h);
         startStreams();
     }
@@ -623,8 +694,20 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
 
         bridge = null;
         client = null;
+        if (textRendererBridge != null) {
+            textRendererBridge.close();
+            textRendererBridge = null;
+        }
+        if (nativeSurfaceBridge != null) {
+            nativeSurfaceBridge.close();
+            nativeSurfaceBridge = null;
+        }
         ownsHost = false;
         gridId = 0L;
+        rendererBackend = RendererBackend.CPU;
+        gpuSupported = false;
+        gpuSurfaceCanvas.setVisible(false);
+        gpuSurfaceActive = false;
         clearMultiRangeDrag();
         hideEditOverlay(false);
         resetEditSelectionAnchor();
@@ -697,15 +780,39 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         }
     }
 
-    /**
-     * CPU-only for now.
-     */
     public void setRendererBackend(RendererBackend backend) throws SynurangDesktopBridge.SynurangBridgeException {
         Objects.requireNonNull(backend, "backend");
-        if (backend == RendererBackend.GPU) {
-            throw new UnsupportedOperationException("Desktop GPU path is not implemented yet. CPU mode only.");
+        switch (backend) {
+            case GPU:
+                setRendererMode(RendererMode.RENDERER_GPU);
+                return;
+            case AUTO:
+                setRendererMode(RendererMode.RENDERER_AUTO);
+                return;
+            case CPU:
+                setRendererMode(RendererMode.RENDERER_CPU);
+                return;
+            default:
+                throw new IllegalArgumentException("Unknown renderer backend: " + backend);
         }
-        this.rendererBackend = RendererBackend.CPU;
+    }
+
+    public void setRendererMode(RendererMode mode) throws SynurangDesktopBridge.SynurangBridgeException {
+        if (mode == null || mode == RendererMode.UNRECOGNIZED || mode == RendererMode.RENDERER_TUI) {
+            mode = RendererMode.RENDERER_CPU;
+        }
+
+        RendererBackend backend = isGpuRendererMode(mode) ? RendererBackend.GPU
+            : (mode == RendererMode.RENDERER_AUTO ? RendererBackend.AUTO : RendererBackend.CPU);
+
+        if (backend == RendererBackend.GPU && !gpuSupported) {
+            throw new UnsupportedOperationException(
+                "GPU native-surface renderer is not available in this native library or platform."
+            );
+        }
+
+        updateGpuSurfaceComponent(backend);
+        this.rendererBackend = backend;
 
         VolvoxGridDesktopClient c = client;
         long id = gridId;
@@ -717,8 +824,8 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
                         GridConfig.newBuilder()
                             .setRendering(
                                 RenderConfig.newBuilder()
-                                    .setRendererMode(RendererMode.RENDERER_CPU)
-                                    .setFramePacingMode(FramePacingMode.FRAME_PACING_MODE_AUTO)
+                                    .setRendererMode(mode)
+                                    .setFramePacingMode(FramePacingMode.FRAME_PACING_MODE_PLATFORM)
                                     .setTargetFrameRateHz(AUTO_FALLBACK_FRAME_RATE_HZ)
                                     .build()
                             )
@@ -730,19 +837,75 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         }
     }
 
+    private void updateGpuSurfaceComponent(RendererBackend backend) {
+        Runnable update = () -> {
+            if (backend == RendererBackend.GPU) {
+                syncGpuSurfaceCanvasBounds(resolveViewportWidth(), resolveViewportHeight());
+                gpuSurfaceCanvas.setVisible(true);
+                gpuSurfaceCanvas.requestFocusInWindow();
+            } else {
+                gpuSurfaceCanvas.setVisible(false);
+                if (displayTarget == null) {
+                    displayTarget = createFrameTarget(resolveViewportWidth(), resolveViewportHeight());
+                }
+                lastGpuSurfaceWarning = "";
+            }
+        };
+
+        if (SwingUtilities.isEventDispatchThread()) {
+            update.run();
+            if (backend != RendererBackend.GPU) {
+                sendGpuSurfaceDestroyed();
+            }
+            return;
+        }
+
+        try {
+            SwingUtilities.invokeAndWait(update);
+        } catch (Exception e) {
+            throw new SynurangDesktopBridge.SynurangBridgeException(
+                "Failed to update GPU surface component",
+                e
+            );
+        }
+        if (backend != RendererBackend.GPU) {
+            sendGpuSurfaceDestroyed();
+        }
+    }
+
+    private static boolean isGpuRendererMode(RendererMode mode) {
+        switch (mode) {
+            case RENDERER_GPU:
+            case RENDERER_GPU_VULKAN:
+            case RENDERER_GPU_GLES:
+            case RENDERER_GPU_DX12:
+            case RENDERER_GPU_METAL:
+            case RENDERER_GPU_OPENGL:
+                return true;
+            case RENDERER_AUTO:
+            case RENDERER_CPU:
+            case RENDERER_TUI:
+            case UNRECOGNIZED:
+            default:
+                return false;
+        }
+    }
+
     public RendererBackend rendererBackend() {
         return rendererBackend;
     }
 
     public boolean isGpuSupported() {
-        return false;
+        return gpuSupported;
     }
 
-    /**
-     * GPU stub hook for later native surface integration.
-     */
-    public void initializeGpuSurfaceStub() {
-        throw new UnsupportedOperationException("GPU surface path is not implemented yet.");
+    private void registerHostTextRenderer() {
+        Java2DTextRendererBridge renderer = textRendererBridge;
+        long id = gridId;
+        if (renderer == null || id == 0L || !renderer.shouldRegister()) {
+            return;
+        }
+        renderer.register(id);
     }
 
     public void setHostFlingEnabled(boolean enabled) {
@@ -780,7 +943,6 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         if (!renderRequestPending.compareAndSet(false, true)) {
             return;
         }
-        cancelScheduledFollowupRender();
 
         SwingUtilities.invokeLater(() -> {
             renderRequestPending.set(false);
@@ -796,13 +958,16 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         if (renderRequestPending.get()) {
             return;
         }
-        cancelScheduledFollowupRender();
         dispatchRenderFrame();
     }
 
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
+
+        if (rendererBackend == RendererBackend.GPU) {
+            return;
+        }
 
         FrameTarget target = displayTarget;
         if (target == null) {
@@ -817,12 +982,17 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     }
 
     private void installInputHandlers() {
-        addMouseListener(new MouseAdapter() {
+        installInputHandlersOn(this);
+        installInputHandlersOn(gpuSurfaceCanvas);
+    }
+
+    private void installInputHandlersOn(Component target) {
+        target.addMouseListener(new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
                 stopHostFling();
                 resetEditSelectionAnchor();
-                requestFocusInWindow();
+                target.requestFocusInWindow();
                 if (SwingUtilities.isRightMouseButton(e)) {
                     sendPointer(
                         PointerEvent.Type.MOVE,
@@ -856,7 +1026,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
             }
         });
 
-        addMouseMotionListener(new MouseMotionAdapter() {
+        target.addMouseMotionListener(new MouseMotionAdapter() {
             @Override
             public void mouseDragged(MouseEvent e) {
                 stopHostFling();
@@ -877,14 +1047,14 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
             }
         });
 
-        addMouseWheelListener(new MouseWheelListener() {
+        target.addMouseWheelListener(new MouseWheelListener() {
             @Override
             public void mouseWheelMoved(MouseWheelEvent e) {
                 sendScroll(e);
             }
         });
 
-        addKeyListener(new KeyAdapter() {
+        target.addKeyListener(new KeyAdapter() {
             @Override
             public void keyPressed(java.awt.event.KeyEvent e) {
                 if (editOverlayDisplayed) {
@@ -964,7 +1134,6 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
                 requestFrame();
             }
         });
-
     }
 
     private void showEditOverlay(EditRequest request) {
@@ -2124,7 +2293,12 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     }
 
     private void dispatchRenderFrame() {
-        if (rendererBackend != RendererBackend.CPU) {
+        if (rendererBackend == RendererBackend.GPU) {
+            if (!SwingUtilities.isEventDispatchThread()) {
+                requestFrame();
+                return;
+            }
+            sendGpuSurfaceReady();
             return;
         }
         sendBufferReady();
@@ -2262,7 +2436,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
 
     private void sendBufferReady() {
         SynurangDesktopBridge p = bridge;
-        if (p == null || gridId == 0L) {
+        if (p == null || gridId == 0L || rendererBackend == RendererBackend.GPU) {
             return;
         }
 
@@ -2342,6 +2516,125 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
             }
             LOG.log(Level.FINER, "sendBufferReady failed", e);
         }
+    }
+
+    private void sendGpuSurfaceReady() {
+        if (gridId == 0L || rendererBackend != RendererBackend.GPU) {
+            return;
+        }
+        DesktopNativeSurfaceBridge surfaceBridge = nativeSurfaceBridge;
+        if (surfaceBridge == null) {
+            return;
+        }
+
+        if (!pendingFrame.compareAndSet(false, true)) {
+            needsFollowupRender.set(true);
+            return;
+        }
+
+        int width = resolveViewportWidth();
+        int height = resolveViewportHeight();
+        synchronized (resizeLock) {
+            if (pendingResizeWidth > 0 && pendingResizeHeight > 0) {
+                width = pendingResizeWidth;
+                height = pendingResizeHeight;
+                pendingResizeWidth = 0;
+                pendingResizeHeight = 0;
+            }
+        }
+        syncGpuSurfaceCanvasBounds(width, height);
+        safeResizeViewport(width, height);
+
+        long surfaceHandle = surfaceBridge.surfaceHandle(gpuSurfaceCanvas);
+        if (surfaceHandle == 0L) {
+            warnGpuSurfaceNotReady(surfaceBridge.lastFailure());
+            pendingFrame.set(false);
+            needsFollowupRender.set(false);
+            return;
+        }
+        lastGpuSurfaceWarning = "";
+
+        try {
+            RenderInput input = RenderInput.newBuilder()
+                .setGridId(gridId)
+                .setGpuSurface(
+                    GpuSurfaceReady.newBuilder()
+                        .setSurfaceHandle(surfaceHandle)
+                        .setWidth(width)
+                        .setHeight(height)
+                        .build()
+                )
+                .build();
+
+            boolean sent;
+            synchronized (sendLock) {
+                VolvoxGridDesktopClient.RenderSession session = renderSession;
+                if (session == null) {
+                    sent = false;
+                } else {
+                    session.send(input);
+                    sent = true;
+                    gpuSurfaceActive = true;
+                }
+            }
+
+            if (!sent) {
+                queuePendingResize(width, height);
+                pendingFrame.set(false);
+                if (needsFollowupRender.getAndSet(false)) {
+                    requestFrame();
+                }
+            }
+        } catch (Exception e) {
+            queuePendingResize(width, height);
+            pendingFrame.set(false);
+            if (needsFollowupRender.getAndSet(false)) {
+                requestFrame();
+            }
+            LOG.log(Level.FINER, "sendGpuSurfaceReady failed", e);
+        }
+    }
+
+    private void warnGpuSurfaceNotReady(String reason) {
+        String message = reason == null || reason.trim().isEmpty() ? "unknown reason" : reason.trim();
+        if (!message.equals(lastGpuSurfaceWarning)) {
+            lastGpuSurfaceWarning = message;
+            LOG.warning("GPU native surface is not ready: " + message);
+        }
+    }
+
+    private void sendGpuSurfaceDestroyed() {
+        if (!gpuSurfaceActive || gridId == 0L) {
+            return;
+        }
+        try {
+            RenderInput input = RenderInput.newBuilder()
+                .setGridId(gridId)
+                .setGpuSurface(
+                    GpuSurfaceReady.newBuilder()
+                        .setSurfaceHandle(0L)
+                        .setWidth(0)
+                        .setHeight(0)
+                        .build()
+                )
+                .build();
+            sendRenderInput(input);
+        } catch (Exception e) {
+            LOG.log(Level.FINER, "sendGpuSurfaceDestroyed failed", e);
+        } finally {
+            gpuSurfaceActive = false;
+        }
+    }
+
+    private void handleGpuSurfaceAvailableEvent() {
+        if (gridId == 0L || !running.get() || rendererBackend != RendererBackend.GPU) {
+            return;
+        }
+        if (!gpuSurfaceCanvas.isDisplayable() || !gpuSurfaceCanvas.isShowing()) {
+            return;
+        }
+        needsFollowupRender.set(true);
+        requestFrame();
     }
 
     private void startStreams() {
@@ -2798,29 +3091,12 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
             RenderConfig rendering = config.getRendering();
             framePacingModeValue = rendering.hasFramePacingMode()
                 ? rendering.getFramePacingModeValue()
-                : FramePacingMode.FRAME_PACING_MODE_AUTO_VALUE;
-            targetFrameRateHz = normalizeTargetFrameRateHz(
-                rendering.hasTargetFrameRateHz() ? rendering.getTargetFrameRateHz() : AUTO_FALLBACK_FRAME_RATE_HZ
-            );
+                : FramePacingMode.FRAME_PACING_MODE_PLATFORM_VALUE;
         } catch (Exception e) {
             LOG.log(Level.FINER, "refreshFramePacingConfigIfStale failed", e);
-            framePacingModeValue = FramePacingMode.FRAME_PACING_MODE_AUTO_VALUE;
-            targetFrameRateHz = AUTO_FALLBACK_FRAME_RATE_HZ;
+            framePacingModeValue = FramePacingMode.FRAME_PACING_MODE_PLATFORM_VALUE;
         } finally {
             framePacingConfigLastRefreshNanos = now;
-        }
-    }
-
-    private static int normalizeTargetFrameRateHz(int hz) {
-        return hz > 0 ? hz : AUTO_FALLBACK_FRAME_RATE_HZ;
-    }
-
-    private void cancelScheduledFollowupRender() {
-        followupRenderScheduled.set(false);
-        Timer timer = followupRenderTimer;
-        if (timer != null) {
-            timer.stop();
-            followupRenderTimer = null;
         }
     }
 
@@ -2832,26 +3108,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         int mode = framePacingModeValue;
         if (mode == FramePacingMode.FRAME_PACING_MODE_UNLIMITED_VALUE) {
             requestFrame();
-            return;
         }
-        if (!followupRenderScheduled.compareAndSet(false, true)) {
-            return;
-        }
-
-        int hz = AUTO_FALLBACK_FRAME_RATE_HZ;
-        if (mode == FramePacingMode.FRAME_PACING_MODE_FIXED_VALUE) {
-            hz = normalizeTargetFrameRateHz(targetFrameRateHz);
-        }
-
-        int delayMs = Math.max(1, Math.round(1000f / hz));
-        Timer timer = new Timer(delayMs, event -> {
-            followupRenderScheduled.set(false);
-            followupRenderTimer = null;
-            requestFrame();
-        });
-        timer.setRepeats(false);
-        followupRenderTimer = timer;
-        timer.start();
     }
 
     private void blitFrame(FrameDone frame, FrameTarget target) {
@@ -2929,8 +3186,17 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
 
         int w = resolveViewportWidth();
         int h = resolveViewportHeight();
+        syncGpuSurfaceCanvasBounds(w, h);
         queuePendingResize(w, h);
         requestFrameImmediate();
+    }
+
+    private void syncGpuSurfaceCanvasBounds(int width, int height) {
+        int w = Math.max(1, width);
+        int h = Math.max(1, height);
+        gpuSurfaceCanvas.setBounds(0, 0, w, h);
+        setComponentZOrder(gpuSurfaceCanvas, Math.max(0, getComponentCount() - 1));
+        setComponentZOrder(editOverlayHost, 0);
     }
 
     private void queuePendingResize(int width, int height) {
@@ -2963,13 +3229,18 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
 
     private synchronized void shutdownStreams(boolean destroyGrid) {
         stopHostFling();
-        cancelScheduledFollowupRender();
+        sendGpuSurfaceDestroyed();
         running.set(false);
         renderRequestPending.set(false);
         pendingFrame.set(false);
         needsFollowupRender.set(false);
         decisionChannelEnabled = false;
         framePacingConfigLastRefreshNanos = 0L;
+
+        Java2DTextRendererBridge renderer = textRendererBridge;
+        if (renderer != null && gridId != 0L) {
+            renderer.clear(gridId);
+        }
 
         VolvoxGridDesktopClient.RenderSession render = renderSession;
         renderSession = null;

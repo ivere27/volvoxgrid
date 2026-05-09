@@ -91,6 +91,23 @@ namespace VolvoxGrid.DotNet.Internal
             IntPtr renderFn,
             IntPtr userData);
 
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate int SynHasBuiltinTextEngineDelegate();
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate int SynHasGpuRendererDelegate();
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate IntPtr SynNativeSurfaceDescriptorNewDelegate(
+            uint kind,
+            int screen,
+            IntPtr display,
+            IntPtr surface,
+            ulong window);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate void SynNativeSurfaceDescriptorFreeDelegate(IntPtr descriptor);
+
         private readonly IntPtr _module;
         private readonly SynInvokeDelegate _invoke;
         private readonly SynStreamOpenDelegate _openStream;
@@ -99,6 +116,10 @@ namespace VolvoxGrid.DotNet.Internal
         private readonly SynStreamCloseSendDelegate _streamCloseSend;
         private readonly SynStreamCloseDelegate _streamClose;
         private readonly SynSetTextRendererDelegate _setTextRenderer;
+        private readonly SynHasBuiltinTextEngineDelegate _hasBuiltinTextEngine;
+        private readonly SynHasGpuRendererDelegate _hasGpuRenderer;
+        private readonly SynNativeSurfaceDescriptorNewDelegate _nativeSurfaceDescriptorNew;
+        private readonly SynNativeSurfaceDescriptorFreeDelegate _nativeSurfaceDescriptorFree;
         private readonly SynFreeDelegate _free;
 
         private bool _disposed;
@@ -112,6 +133,10 @@ namespace VolvoxGrid.DotNet.Internal
             SynStreamCloseSendDelegate streamCloseSend,
             SynStreamCloseDelegate streamClose,
             SynSetTextRendererDelegate setTextRenderer,
+            SynHasBuiltinTextEngineDelegate hasBuiltinTextEngine,
+            SynHasGpuRendererDelegate hasGpuRenderer,
+            SynNativeSurfaceDescriptorNewDelegate nativeSurfaceDescriptorNew,
+            SynNativeSurfaceDescriptorFreeDelegate nativeSurfaceDescriptorFree,
             SynFreeDelegate free)
         {
             _module = module;
@@ -122,6 +147,10 @@ namespace VolvoxGrid.DotNet.Internal
             _streamCloseSend = streamCloseSend;
             _streamClose = streamClose;
             _setTextRenderer = setTextRenderer;
+            _hasBuiltinTextEngine = hasBuiltinTextEngine;
+            _hasGpuRenderer = hasGpuRenderer;
+            _nativeSurfaceDescriptorNew = nativeSurfaceDescriptorNew;
+            _nativeSurfaceDescriptorFree = nativeSurfaceDescriptorFree;
             _free = free;
         }
 
@@ -148,6 +177,10 @@ namespace VolvoxGrid.DotNet.Internal
                 IntPtr closeSendPtr = GetRequiredExport(module, "Synurang_Stream_CloseSend");
                 IntPtr closePtr = GetRequiredExport(module, "Synurang_Stream_Close");
                 IntPtr setTextRendererPtr = GetExport(module, "volvox_grid_set_text_renderer");
+                IntPtr hasBuiltinTextEnginePtr = GetExport(module, "volvox_grid_has_builtin_text_engine");
+                IntPtr hasGpuRendererPtr = GetExport(module, "volvox_grid_has_gpu_renderer");
+                IntPtr nativeSurfaceDescriptorNewPtr = GetExport(module, "volvox_grid_native_surface_descriptor_new");
+                IntPtr nativeSurfaceDescriptorFreePtr = GetExport(module, "volvox_grid_native_surface_descriptor_free");
                 IntPtr freePtr = GetRequiredExport(module, "Synurang_Free");
 
                 var invoke = (SynInvokeDelegate)Marshal.GetDelegateForFunctionPointer(invokePtr, typeof(SynInvokeDelegate));
@@ -159,9 +192,34 @@ namespace VolvoxGrid.DotNet.Internal
                 var setTextRenderer = setTextRendererPtr != IntPtr.Zero
                     ? (SynSetTextRendererDelegate)Marshal.GetDelegateForFunctionPointer(setTextRendererPtr, typeof(SynSetTextRendererDelegate))
                     : null;
+                var hasBuiltinTextEngine = hasBuiltinTextEnginePtr != IntPtr.Zero
+                    ? (SynHasBuiltinTextEngineDelegate)Marshal.GetDelegateForFunctionPointer(hasBuiltinTextEnginePtr, typeof(SynHasBuiltinTextEngineDelegate))
+                    : null;
+                var hasGpuRenderer = hasGpuRendererPtr != IntPtr.Zero
+                    ? (SynHasGpuRendererDelegate)Marshal.GetDelegateForFunctionPointer(hasGpuRendererPtr, typeof(SynHasGpuRendererDelegate))
+                    : null;
+                var nativeSurfaceDescriptorNew = nativeSurfaceDescriptorNewPtr != IntPtr.Zero
+                    ? (SynNativeSurfaceDescriptorNewDelegate)Marshal.GetDelegateForFunctionPointer(nativeSurfaceDescriptorNewPtr, typeof(SynNativeSurfaceDescriptorNewDelegate))
+                    : null;
+                var nativeSurfaceDescriptorFree = nativeSurfaceDescriptorFreePtr != IntPtr.Zero
+                    ? (SynNativeSurfaceDescriptorFreeDelegate)Marshal.GetDelegateForFunctionPointer(nativeSurfaceDescriptorFreePtr, typeof(SynNativeSurfaceDescriptorFreeDelegate))
+                    : null;
                 var free = (SynFreeDelegate)Marshal.GetDelegateForFunctionPointer(freePtr, typeof(SynFreeDelegate));
 
-                return new SynurangReflectionHost(module, invoke, open, send, recv, closeSend, close, setTextRenderer, free);
+                return new SynurangReflectionHost(
+                    module,
+                    invoke,
+                    open,
+                    send,
+                    recv,
+                    closeSend,
+                    close,
+                    setTextRenderer,
+                    hasBuiltinTextEngine,
+                    hasGpuRenderer,
+                    nativeSurfaceDescriptorNew,
+                    nativeSurfaceDescriptorFree,
+                    free);
             }
             catch
             {
@@ -250,6 +308,21 @@ namespace VolvoxGrid.DotNet.Internal
             get { return _setTextRenderer != null; }
         }
 
+        public bool HasBuiltinTextEngine
+        {
+            get { return _hasBuiltinTextEngine == null || _hasBuiltinTextEngine() != 0; }
+        }
+
+        public bool SupportsGpuRenderer
+        {
+            get { return _hasGpuRenderer != null && _hasGpuRenderer() != 0; }
+        }
+
+        public bool SupportsNativeSurfaceDescriptor
+        {
+            get { return _nativeSurfaceDescriptorNew != null && _nativeSurfaceDescriptorFree != null; }
+        }
+
         public void SetTextRenderer(
             long gridId,
             SynMeasureTextCallback measure,
@@ -274,6 +347,28 @@ namespace VolvoxGrid.DotNet.Internal
             {
                 throw new InvalidOperationException("volvox_grid_set_text_renderer failed with status " + rc);
             }
+        }
+
+        public IntPtr CreateNativeSurfaceDescriptor(uint kind, int screen, IntPtr display, IntPtr surface, ulong window)
+        {
+            EnsureNotDisposed();
+            if (_nativeSurfaceDescriptorNew == null)
+            {
+                return IntPtr.Zero;
+            }
+
+            return _nativeSurfaceDescriptorNew(kind, screen, display, surface, window);
+        }
+
+        public void FreeNativeSurfaceDescriptor(IntPtr descriptor)
+        {
+            EnsureNotDisposed();
+            if (descriptor == IntPtr.Zero || _nativeSurfaceDescriptorFree == null)
+            {
+                return;
+            }
+
+            _nativeSurfaceDescriptorFree(descriptor);
         }
 
         public void Dispose()

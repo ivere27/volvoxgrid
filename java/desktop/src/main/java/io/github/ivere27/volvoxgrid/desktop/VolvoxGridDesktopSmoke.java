@@ -3,13 +3,18 @@ package io.github.ivere27.volvoxgrid.desktop;
 import io.github.ivere27.volvoxgrid.CellUpdate;
 import io.github.ivere27.volvoxgrid.CellValue;
 import io.github.ivere27.volvoxgrid.CellsResponse;
+import io.github.ivere27.volvoxgrid.BufferReady;
 import io.github.ivere27.volvoxgrid.CreateRequest;
 import io.github.ivere27.volvoxgrid.CreateResponse;
 import io.github.ivere27.volvoxgrid.DestroyRequest;
 import io.github.ivere27.volvoxgrid.GetCellsRequest;
+import io.github.ivere27.volvoxgrid.FrameKind;
 import io.github.ivere27.volvoxgrid.GridConfig;
 import io.github.ivere27.volvoxgrid.LayoutConfig;
+import io.github.ivere27.volvoxgrid.RenderInput;
+import io.github.ivere27.volvoxgrid.RenderOutput;
 import io.github.ivere27.volvoxgrid.UpdateCellsRequest;
+import java.nio.ByteBuffer;
 
 /**
  * Headless smoke test for desktop Synurang + VolvoxGrid host.
@@ -35,6 +40,7 @@ public final class VolvoxGridDesktopSmoke {
         }
 
         SynurangDesktopBridge bridge = null;
+        Java2DTextRendererBridge textBridge = null;
         long gridId = 0L;
         try {
             bridge = SynurangDesktopBridge.load(libraryPath);
@@ -55,6 +61,12 @@ public final class VolvoxGridDesktopSmoke {
             );
             gridId = response.getGridId();
 
+            textBridge = Java2DTextRendererBridge.tryCreate(libraryPath);
+            boolean registeredHostTextRenderer = textBridge != null && textBridge.shouldRegister();
+            if (registeredHostTextRenderer) {
+                textBridge.register(gridId);
+            }
+
             client.updateCells(
                 UpdateCellsRequest.newBuilder()
                     .setGridId(gridId)
@@ -67,6 +79,8 @@ public final class VolvoxGridDesktopSmoke {
                     )
                     .build()
             );
+
+            renderOneFrame(client, gridId, 320, 200);
 
             CellsResponse cells = client.getCells(
                 GetCellsRequest.newBuilder()
@@ -88,6 +102,8 @@ public final class VolvoxGridDesktopSmoke {
 
             client.destroy(DestroyRequest.newBuilder().setGridId(gridId).build());
             gridId = 0L;
+            textBridge.close();
+            textBridge = null;
             bridge.close();
             bridge = null;
 
@@ -105,12 +121,65 @@ public final class VolvoxGridDesktopSmoke {
                 // best effort
             }
             try {
+                if (textBridge != null) {
+                    textBridge.close();
+                }
+            } catch (Exception ignored) {
+                // best effort
+            }
+            try {
                 if (bridge != null) {
                     bridge.close();
                 }
             } catch (Exception ignored) {
                 // best effort
             }
+        }
+    }
+
+    private static void renderOneFrame(
+        VolvoxGridDesktopClient client,
+        long gridId,
+        int width,
+        int height
+    ) throws SynurangDesktopBridge.SynurangBridgeException {
+        ByteBuffer buffer = ByteBuffer.allocateDirect(width * height * 4);
+        long address = client.getDirectBufferAddress(buffer);
+
+        VolvoxGridDesktopClient.RenderSession session = client.openRenderSession();
+        try {
+            session.send(
+                RenderInput.newBuilder()
+                    .setGridId(gridId)
+                    .setBuffer(
+                        BufferReady.newBuilder()
+                            .setHandle(address)
+                            .setStride(width * 4)
+                            .setWidth(width)
+                            .setHeight(height)
+                            .build()
+                    )
+                    .build()
+            );
+
+            for (int i = 0; i < 8; i++) {
+                RenderOutput output = session.recv();
+                if (output == null) {
+                    throw new IllegalStateException("Render smoke stream closed before a CPU frame.");
+                }
+                if (!output.hasFrameDone()) {
+                    continue;
+                }
+                if (output.getFrameDone().getHandle() != 0L && output.getFrameDone().getHandle() != address) {
+                    continue;
+                }
+                if (output.getFrameDone().getFrameKind() == FrameKind.FRAME_KIND_FRAME) {
+                    return;
+                }
+            }
+            throw new IllegalStateException("Render smoke did not receive a CPU frame.");
+        } finally {
+            session.close();
         }
     }
 

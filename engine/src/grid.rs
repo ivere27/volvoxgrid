@@ -2316,6 +2316,12 @@ impl VolvoxGrid {
         }
     }
 
+    pub fn clear_text_cache(&mut self) {
+        if let Some(te) = &mut self.text_engine {
+            te.clear_cache();
+        }
+    }
+
     pub(crate) fn build_text_cell_static_meta(
         &self,
         row: i32,

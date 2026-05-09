@@ -31,11 +31,11 @@ internal class AndroidCanvasTextRenderer : NativeTextRendererBridge.Callback {
     private var rasterizeResult = ByteArray(1024)
 
     /**
-     * Cache size is now managed entirely on the C-side.
+     * Cache size is managed by the Rust engine-side external text cache.
      */
     @Synchronized
     fun setCacheSize(size: Int) {
-        // No-op: handled by C-side cache via VolvoxGridView
+        // No-op: handled by Rust via VolvoxGridView.
     }
 
     @Synchronized

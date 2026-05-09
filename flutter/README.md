@@ -7,6 +7,7 @@ A high-performance, pixel-rendered data grid widget for Flutter. The native Rust
 | Platform | Native Library | Source |
 |---|---|---|
 | Android | `libvolvoxgrid.so` (AAR) | Maven (`volvoxgrid-android`) |
+| iOS | `VolvoxGrid.xcframework` | GitHub release |
 | Linux | `libvolvoxgrid.so` (JAR) | Maven (`volvoxgrid-desktop`) |
 | macOS | `libvolvoxgrid.dylib` (JAR) | Maven (`volvoxgrid-desktop`) |
 | Windows | `volvoxgrid.dll` (JAR) | Maven (`volvoxgrid-desktop`) |
@@ -30,6 +31,9 @@ By default, `VOLVOXGRID_SOURCE=maven` pulls pre-built binaries from Maven Centra
 |---|---|---|
 | `VOLVOXGRID_SOURCE` | `maven` | `maven` or `local` |
 | `VOLVOXGRID_VERSION` | `0.8.7` | Maven artifact version |
+| `VOLVOXGRID_VARIANT` | empty | Set to `lite` for lite artifacts where the platform supports them |
+
+Text rendering follows the native artifact selected for the platform. Full native artifacts use the built-in Rust text engine. Android lite artifacts use Android OS text fallback through the Android host layer. iOS lite uses `VolvoxGridLite.xcframework` with CoreText/CoreGraphics fallback. Flutter macOS can use `volvoxgrid-desktop-lite` because the lite native runtime has a built-in CoreText fallback. Linux and Windows Flutter desktop should use the full desktop runtime for text. See [../TEXT_RENDERING.md](../TEXT_RENDERING.md).
 
 ## Quick Start
 

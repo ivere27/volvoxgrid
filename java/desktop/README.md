@@ -1,7 +1,7 @@
 # VolvoxGrid for Java desktop (Swing)
 
-Java/Swing bindings for the VolvoxGrid native engine. Renders directly into
-a `JComponent` via JNA-loaded shared libraries
+Java/Swing bindings for the VolvoxGrid native engine. Renders into a
+`JComponent` through CPU buffers or native-surface GPU rendering via JNA-loaded shared libraries
 (`libvolvoxgrid.{so,dylib}` / `volvoxgrid.dll`).
 
 ## Install
@@ -21,12 +21,26 @@ Gradle (Kotlin):
 
 ```kotlin
 implementation("io.github.ivere27:volvoxgrid-desktop:0.8.7")
+// or: implementation("io.github.ivere27:volvoxgrid-desktop-lite:0.8.7")
 ```
 
 The JAR resolves the right native library at runtime — no manual
 `LD_LIBRARY_PATH` / `PATH` setup required.
 
 **Requirements:** Java 8+, Swing.
+
+### Lite Variant
+
+`volvoxgrid-desktop-lite` uses a native runtime built without the built-in Rust text engine, GPU renderer, regex search, or rayon parallelism. The Swing wrapper registers a Java2D text renderer automatically when the loaded native library has no built-in text engine.
+
+The engine/runtime still owns the external text mask cache. Java2D only measures and rasterizes on cache misses, with a small Java-side `Font` object cache. See [../../TEXT_RENDERING.md](../../TEXT_RENDERING.md).
+
+Local sample selection:
+
+```bash
+make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.8.7
+make java-desktop-run-release VOLVOXGRID_VARIANT=lite
+```
 
 ## Quick start
 
@@ -113,6 +127,20 @@ ctrl.setColumnCaption(1, "Price");
 ctrl.setCellText(0, 0, "Widget A");
 ctrl.setCellText(0, 1, "29.99");
 ```
+
+Renderer mode helpers include CPU, auto GPU, and explicit GPU backends:
+
+```java
+ctrl.setRendererModeCpu();
+ctrl.setRendererModeGpu();
+ctrl.setRendererModeGpuVulkan();
+ctrl.setRendererModeGpuGles();
+ctrl.setRendererModeGpuOpenGl();
+ctrl.setRendererModeGpuDx12();
+ctrl.setRendererModeGpuMetal();
+```
+
+GPU rendering uses a real native surface. The full native library enables it when the platform and driver support the selected `wgpu` backend. The lite native library is CPU-only, so GPU modes are rejected by capability checks.
 
 See the runnable demos in this directory for fuller examples:
 

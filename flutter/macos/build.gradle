@@ -28,7 +28,9 @@ if (defaultVolvoxgridVersion.isEmpty()) {
 }
 
 def vGroup = System.getenv("VOLVOXGRID_GROUP") ?: "io.github.ivere27"
-def vArtifact = System.getenv("VOLVOXGRID_ARTIFACT") ?: "volvoxgrid-desktop"
+def vVariant = System.getenv("VOLVOXGRID_VARIANT") ?: ""
+def defaultArtifact = vVariant == "lite" ? "volvoxgrid-desktop-lite" : "volvoxgrid-desktop"
+def vArtifact = System.getenv("VOLVOXGRID_ARTIFACT") ?: defaultArtifact
 def vVersion = System.getenv("VOLVOXGRID_VERSION") ?: project.findProperty("volvoxgridVersion") ?: defaultVolvoxgridVersion
 def isSnapshot = vVersion.endsWith("-SNAPSHOT")
 def hostArch = (System.getProperty("os.arch") ?: "").toLowerCase(Locale.ROOT)
@@ -58,7 +60,7 @@ task copyNative(type: Copy) {
     duplicatesStrategy = DuplicatesStrategy.FAIL
     doFirst {
         def files = configurations.volvoxgrid.resolve().collect { it.absolutePath }
-        logger.lifecycle("VolvoxGrid copyNative: ${vGroup}:${vArtifact}:${vVersion} arch=${macosArchDir}")
+        logger.lifecycle("VolvoxGrid copyNative: ${vGroup}:${vArtifact}:${vVersion} variant=${vVariant ?: 'full'} arch=${macosArchDir}")
         files.each { logger.lifecycle("VolvoxGrid copyNative source: ${it}") }
     }
     from configurations.volvoxgrid.collect { zipTree(it) }

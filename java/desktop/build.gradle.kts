@@ -143,6 +143,7 @@ dependencies {
         )
     }
     implementation("com.google.protobuf:protobuf-java:3.25.1")
+    implementation("net.java.dev.jna:jna:5.6.0")
     if (synurangDesktopSource == "maven") {
         implementation("io.github.ivere27:synurang-desktop:$synurangDesktopVersion") {
             isChanging = isSynurangDesktopSnapshot
@@ -192,6 +193,8 @@ val stageProto = tasks.register<Copy>("stageProto") {
 
 val generateVolvoxGridBuildInfo = tasks.register("generateVolvoxGridBuildInfo") {
     val outputDir = layout.buildDirectory.dir("generated/source/volvoxgridBuildInfo/main/java")
+    inputs.property("volvoxgridVersion", volvoxgridVersion)
+    inputs.property("volvoxgridGitCommit", volvoxgridGitCommit)
     outputs.dir(outputDir)
     doLast {
         val targetDir = outputDir.get().asFile.resolve("io/github/ivere27/volvoxgrid/desktop")

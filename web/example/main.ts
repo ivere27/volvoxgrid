@@ -1894,10 +1894,32 @@ async function main() {
   const hasBuiltinText = typeof (wasmModule as any).has_builtin_text_engine === "function"
     && (wasmModule as any).has_builtin_text_engine();
   let canvas2DRenderer: any = null;
+
+  const registerCanvas2DTextRenderer = (renderer: any, gridId?: number): void => {
+    const wasmAny = wasmModule as any;
+    const measure = renderer.measureText;
+    const render = renderer.renderText;
+    const cacheSize = typeof renderer.cacheSize === "function" ? renderer.cacheSize : (() => 0);
+    const setCacheSize = typeof renderer.setCacheSize === "function" ? renderer.setCacheSize : (() => {});
+    if (typeof gridId === "number") {
+      if (typeof wasmAny.set_grid_text_renderer_with_cache === "function") {
+        wasmAny.set_grid_text_renderer_with_cache(gridId, measure, render, cacheSize, setCacheSize);
+      } else if (typeof wasmAny.set_grid_text_renderer === "function") {
+        wasmAny.set_grid_text_renderer(gridId, measure, render);
+      }
+      return;
+    }
+    if (typeof wasmAny.set_text_renderer_with_cache === "function") {
+      wasmAny.set_text_renderer_with_cache(measure, render, cacheSize, setCacheSize);
+    } else if (typeof wasmAny.set_text_renderer === "function") {
+      wasmAny.set_text_renderer(measure, render);
+    }
+  };
+
   if (!hasBuiltinText && typeof (wasmModule as any).set_text_renderer === "function") {
     canvas2DRenderer = createCanvas2DTextRenderer(wasmModule);
     canvas2DRenderer.setCacheSize(selectedTextLayoutCacheCap());
-    (wasmModule as any).set_text_renderer(canvas2DRenderer.measureText, canvas2DRenderer.renderText);
+    registerCanvas2DTextRenderer(canvas2DRenderer);
     console.info("Registered Canvas2D external text renderer (Lite mode)");
   }
 
@@ -1954,7 +1976,7 @@ async function main() {
     // Also register the external renderer for this specific grid (for measurement/auto-size)
     if (!hasBuiltinText && typeof (wasmModule as any).set_grid_text_renderer === "function") {
       const renderer = canvas2DRenderer ?? createCanvas2DTextRenderer(wasmModule);
-      (wasmModule as any).set_grid_text_renderer(id, renderer.measureText, renderer.renderText);
+      registerCanvas2DTextRenderer(renderer, id);
     }
 
     applyRenderLayerMaskToGrid(id);
@@ -1975,7 +1997,7 @@ async function main() {
   const grid = new VolvoxGrid(canvas, wasmModule, 2, SALES_COLS);
   if (!hasBuiltinText && typeof (wasmModule as any).set_grid_text_renderer === "function") {
     const renderer = canvas2DRenderer ?? createCanvas2DTextRenderer(wasmModule);
-    (wasmModule as any).set_grid_text_renderer(grid.id, renderer.measureText, renderer.renderText);
+    registerCanvas2DTextRenderer(renderer, grid.id);
   }
   setupDefaultInput(grid, wasmModule, canvas);
   grid.onZoomChange = () => { updateStatus(); };

@@ -1453,9 +1453,14 @@ class ApplyScope extends $pb.ProtobufEnum {
 /// Rendering backend selection. See GUI.md and TUI.md.
 ///   AUTO (0): Engine picks CPU or GPU based on host capabilities.
 ///   CPU (1):  Renders into a host-owned RGBA buffer (most portable).
-///   GPU (2):  Renders via wgpu to a host-provided native surface.
-///   TUI (5):  Terminal mode — renders ANSI escape sequences.
-/// If GPU initialization fails, the engine falls back to CPU silently.
+///   GPU (2):  Renders via wgpu; backend is selected by wgpu/OS.
+///   GPU_VULKAN (3): Force Vulkan when available.
+///   GPU_GLES (4):   Force the wgpu GL backend (legacy name; OpenGL/OpenGL ES).
+///   TUI (5):        Terminal mode — renders ANSI escape sequences.
+///   GPU_DX12 (6):   Force Direct3D 12 when available.
+///   GPU_METAL (7):  Force Metal when available.
+///   GPU_OPENGL (8): Force the wgpu GL backend (desktop OpenGL/OpenGL ES).
+/// GPU modes require GpuSurfaceReady; hosts switch to CPU explicitly.
 class RendererMode extends $pb.ProtobufEnum {
   static const RendererMode RENDERER_AUTO =
       RendererMode._(0, _omitEnumNames ? '' : 'RENDERER_AUTO');
@@ -1469,6 +1474,12 @@ class RendererMode extends $pb.ProtobufEnum {
       RendererMode._(4, _omitEnumNames ? '' : 'RENDERER_GPU_GLES');
   static const RendererMode RENDERER_TUI =
       RendererMode._(5, _omitEnumNames ? '' : 'RENDERER_TUI');
+  static const RendererMode RENDERER_GPU_DX12 =
+      RendererMode._(6, _omitEnumNames ? '' : 'RENDERER_GPU_DX12');
+  static const RendererMode RENDERER_GPU_METAL =
+      RendererMode._(7, _omitEnumNames ? '' : 'RENDERER_GPU_METAL');
+  static const RendererMode RENDERER_GPU_OPENGL =
+      RendererMode._(8, _omitEnumNames ? '' : 'RENDERER_GPU_OPENGL');
 
   static const $core.List<RendererMode> values = <RendererMode>[
     RENDERER_AUTO,
@@ -1477,10 +1488,13 @@ class RendererMode extends $pb.ProtobufEnum {
     RENDERER_GPU_VULKAN,
     RENDERER_GPU_GLES,
     RENDERER_TUI,
+    RENDERER_GPU_DX12,
+    RENDERER_GPU_METAL,
+    RENDERER_GPU_OPENGL,
   ];
 
   static final $core.List<RendererMode?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 5);
+      $pb.ProtobufEnum.$_initByValueList(values, 8);
   static RendererMode? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

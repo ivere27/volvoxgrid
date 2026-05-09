@@ -126,6 +126,23 @@ namespace VolvoxGrid.DotNet.Sample
             }
         }
 
+        private sealed class RendererModeOption
+        {
+            public RendererModeOption(string label, VolvoxGridRendererMode mode)
+            {
+                Label = label ?? string.Empty;
+                Mode = mode;
+            }
+
+            public string Label { get; private set; }
+            public VolvoxGridRendererMode Mode { get; private set; }
+
+            public override string ToString()
+            {
+                return Label;
+            }
+        }
+
         private readonly VolvoxGridControl _grid;
         private readonly Label _status;
         private readonly Button _btnSales;
@@ -134,11 +151,14 @@ namespace VolvoxGrid.DotNet.Sample
         private readonly Button _selectionModeButton;
         private readonly ContextMenuStrip _selectionModeMenu;
         private readonly SelectionModeOption[] _selectionModeOptions;
+        private readonly ComboBox _rendererModeBox;
+        private readonly RendererModeOption[] _rendererModeOptions;
         private readonly Dictionary<DemoMode, long> _demoGridIds;
         private readonly bool _smokeMode;
         private DemoMode _currentDemo;
         private bool _demoLoaded;
         private bool _smokeStarted;
+        private bool _suppressRendererModeChange;
 
         public DemoForm()
         {
@@ -170,6 +190,17 @@ namespace VolvoxGrid.DotNet.Sample
                 new SelectionModeOption("By Column", VolvoxGridSelectionMode.ByColumn),
                 new SelectionModeOption("Listbox", VolvoxGridSelectionMode.Listbox),
                 new SelectionModeOption("MultiRange", VolvoxGridSelectionMode.MultiRange),
+            };
+            _rendererModeOptions = new[]
+            {
+                new RendererModeOption("CPU", VolvoxGridRendererMode.Cpu),
+                new RendererModeOption("Auto", VolvoxGridRendererMode.Auto),
+                new RendererModeOption("GPU", VolvoxGridRendererMode.Gpu),
+                new RendererModeOption("Vulkan", VolvoxGridRendererMode.GpuVulkan),
+                new RendererModeOption("OpenGL", VolvoxGridRendererMode.GpuOpenGl),
+                new RendererModeOption("GLES", VolvoxGridRendererMode.GpuGles),
+                new RendererModeOption("DX12", VolvoxGridRendererMode.GpuDx12),
+                new RendererModeOption("Metal", VolvoxGridRendererMode.GpuMetal),
             };
 
             var btnSortUp = new Button
@@ -276,6 +307,29 @@ namespace VolvoxGrid.DotNet.Sample
             _grid.SelectionChanged += OnSelectionChanged;
             _grid.CellClick += OnCellClick;
 
+            var rendererLabel = new Label
+            {
+                Text = "Renderer",
+                AutoSize = true,
+                Margin = new Padding(16, 8, 0, 0),
+            };
+            _rendererModeBox = new ComboBox
+            {
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Width = 118,
+                Height = 28,
+                Margin = new Padding(8, 0, 0, 0),
+            };
+            RefreshRendererModeOptions();
+            _rendererModeBox.SelectedIndexChanged += delegate
+            {
+                if (_suppressRendererModeChange)
+                {
+                    return;
+                }
+                ApplyRendererModeOption(_rendererModeBox.SelectedItem as RendererModeOption);
+            };
+
             _selectionModeButton = new Button
             {
                 Width = 120,
@@ -319,6 +373,8 @@ namespace VolvoxGrid.DotNet.Sample
 
             topBar.Controls.Add(selectionLabel);
             topBar.Controls.Add(_selectionModeButton);
+            topBar.Controls.Add(rendererLabel);
+            topBar.Controls.Add(_rendererModeBox);
 
             _status = new Label
             {
@@ -347,11 +403,18 @@ namespace VolvoxGrid.DotNet.Sample
                 AppLog.Info("Library path was not resolved.");
             }
 
-            _grid.FlingImpulseGain = 40.0f;
-            _grid.FlingFriction = 3.2f;
-            AppLog.Info("Applied sample fling tuning: impulse_gain=40.0, friction=3.2");
-            AppLog.Info("Renderer mode forced to CPU for stable rendering in Wine/headless hosts.");
+            _grid.FlingEnabled = true;
+            AppLog.Info("Host-side smooth fling enabled.");
             SwitchDemo(DemoMode.Sales);
+            RefreshRendererModeOptions();
+            if (_grid.IsGpuAvailable)
+            {
+                AppLog.Info("Renderer starts in CPU mode; use the Renderer dropdown to select native-surface GPU modes.");
+            }
+            else
+            {
+                AppLog.Info("Renderer starts in CPU mode; loaded native library has no available GPU renderer.");
+            }
 
             if (_smokeMode)
             {
@@ -463,8 +526,23 @@ namespace VolvoxGrid.DotNet.Sample
             SmokeAssert(true, "Column/row definition APIs");
 
             int foundText = _grid.FindRowByText("Gamma*", 1, 0, false, true);
-            int foundRegex = _grid.FindRowByRegex("Delta\\*\\*", 1, 0);
-            SmokeAssert(foundText >= 0 && foundRegex >= 0, "FindRowByText/FindRowByRegex");
+            SmokeAssert(foundText >= 0, "FindRowByText");
+            if (IsLiteNativeVariant())
+            {
+                RunOptionalSmokeStep("FindRowByRegex", delegate
+                {
+                    int foundRegexLite = _grid.FindRowByRegex("Delta\\*\\*", 1, 0);
+                    if (foundRegexLite < 0)
+                    {
+                        throw new InvalidOperationException("Regex search is not available in lite native builds.");
+                    }
+                });
+            }
+            else
+            {
+                int foundRegex = _grid.FindRowByRegex("Delta\\*\\*", 1, 0);
+                SmokeAssert(foundRegex >= 0, "FindRowByRegex");
+            }
 
             RunOptionalSmokeStep("Aggregate", delegate
             {
@@ -669,6 +747,12 @@ namespace VolvoxGrid.DotNet.Sample
                 default:
                     return defaultValue;
             }
+        }
+
+        private static bool IsLiteNativeVariant()
+        {
+            string raw = Environment.GetEnvironmentVariable("VOLVOXGRID_VARIANT");
+            return string.Equals((raw ?? string.Empty).Trim(), "lite", StringComparison.OrdinalIgnoreCase);
         }
 
         private void SwitchDemo(DemoMode mode)
@@ -904,6 +988,155 @@ namespace VolvoxGrid.DotNet.Sample
             _grid.SelectionMode = option.Mode;
             UpdateSelectionModeUi(option);
             SetStatus("Selection mode: " + option.Label + ".");
+        }
+
+        private void SelectRendererModeOption(VolvoxGridRendererMode mode)
+        {
+            if (_rendererModeBox == null)
+            {
+                return;
+            }
+
+            _suppressRendererModeChange = true;
+            try
+            {
+                for (int i = 0; i < _rendererModeBox.Items.Count; i++)
+                {
+                    RendererModeOption option = _rendererModeBox.Items[i] as RendererModeOption;
+                    if (option != null && option.Mode == mode)
+                    {
+                        _rendererModeBox.SelectedItem = option;
+                        return;
+                    }
+                }
+
+                if (_rendererModeBox.Items.Count > 0)
+                {
+                    _rendererModeBox.SelectedIndex = 0;
+                }
+            }
+            finally
+            {
+                _suppressRendererModeChange = false;
+            }
+        }
+
+        private void RefreshRendererModeOptions()
+        {
+            if (_rendererModeBox == null || _grid == null)
+            {
+                return;
+            }
+
+            VolvoxGridRendererMode current = _grid.RendererMode;
+            bool includeGpuModes = _grid.IsGpuAvailable;
+            _suppressRendererModeChange = true;
+            try
+            {
+                _rendererModeBox.Items.Clear();
+                for (int i = 0; i < _rendererModeOptions.Length; i++)
+                {
+                    RendererModeOption option = _rendererModeOptions[i];
+                    if (includeGpuModes || option.Mode == VolvoxGridRendererMode.Cpu)
+                    {
+                        _rendererModeBox.Items.Add(option);
+                    }
+                }
+                _rendererModeBox.Enabled = includeGpuModes;
+            }
+            finally
+            {
+                _suppressRendererModeChange = false;
+            }
+
+            if (!includeGpuModes && IsGpuRendererMode(current))
+            {
+                current = VolvoxGridRendererMode.Cpu;
+            }
+            SelectRendererModeOption(current);
+        }
+
+        private void ApplyRendererModeOption(RendererModeOption option)
+        {
+            if (option == null)
+            {
+                return;
+            }
+
+            VolvoxGridRendererMode requestedMode = option.Mode;
+            VolvoxGridRendererMode actualMode = NormalizeRendererModeForHost(requestedMode);
+
+            if (IsGpuRendererMode(actualMode) && !_grid.IsGpuAvailable)
+            {
+                SelectRendererModeOption(_grid.RendererMode);
+                string message = "GPU renderer is not available in this native library or host.";
+                SetStatus(message);
+                AppLog.Info(message);
+                return;
+            }
+
+            try
+            {
+                _grid.RendererMode = actualMode;
+                SelectRendererModeOption(actualMode);
+                string label = RendererModeLabel(actualMode);
+                if (actualMode != requestedMode)
+                {
+                    label = option.Label + " -> " + label + " (Wine/Linux)";
+                }
+                SetStatus("Renderer mode: " + label + ".");
+                AppLog.Info("Renderer mode selected: " + label);
+            }
+            catch (Exception ex)
+            {
+                SelectRendererModeOption(_grid.RendererMode);
+                SetStatus("Renderer switch failed: " + ex.Message);
+                AppLog.Error("Renderer switch failed", ex);
+            }
+        }
+
+        private static VolvoxGridRendererMode NormalizeRendererModeForHost(VolvoxGridRendererMode mode)
+        {
+            if (mode == VolvoxGridRendererMode.Gpu && IsWineHosted())
+            {
+                return VolvoxGridRendererMode.GpuOpenGl;
+            }
+
+            return mode;
+        }
+
+        private static bool IsWineHosted()
+        {
+            return !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WINEPREFIX"));
+        }
+
+        private string RendererModeLabel(VolvoxGridRendererMode mode)
+        {
+            for (int i = 0; i < _rendererModeOptions.Length; i++)
+            {
+                if (_rendererModeOptions[i].Mode == mode)
+                {
+                    return _rendererModeOptions[i].Label;
+                }
+            }
+
+            return mode.ToString();
+        }
+
+        private static bool IsGpuRendererMode(VolvoxGridRendererMode mode)
+        {
+            switch (mode)
+            {
+                case VolvoxGridRendererMode.Gpu:
+                case VolvoxGridRendererMode.GpuVulkan:
+                case VolvoxGridRendererMode.GpuGles:
+                case VolvoxGridRendererMode.GpuDx12:
+                case VolvoxGridRendererMode.GpuMetal:
+                case VolvoxGridRendererMode.GpuOpenGl:
+                    return true;
+                default:
+                    return false;
+            }
         }
 
         private void UpdateSelectionModeUi(SelectionModeOption selected)

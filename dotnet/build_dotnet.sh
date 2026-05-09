@@ -8,6 +8,7 @@
 #   DOTNET_TFM=net40|net8.0|net8.0-windows   (default: net40)
 #   DOTNET_ARCH=x64|x86                      (default: x64, WinForms builds only)
 #   DOTNET_SAMPLE=auto|winforms|console|tui  (default: auto)
+#   VOLVOXGRID_VARIANT=lite                  (build native runtime without standard/gpu features)
 #
 # Produces:
 #   ${CARGO_TARGET_DIR:-target}/<windows-target-triple>/{debug|release}/volvoxgrid.dll
@@ -29,10 +30,18 @@ TARGET_ARCH="${DOTNET_ARCH:-x64}"
 TARGET_SAMPLE="${DOTNET_SAMPLE:-}"
 unset DOTNET_TFM DOTNET_ARCH
 LIBRARY_FEATURES="${VOLVOXGRID_DOTNET_LIBRARY_FEATURES:-gpu}"
+LIBRARY_NO_DEFAULT_FEATURES=0
 LIBRARY_FEATURE_ARGS=()
 RUST_WINDOWS_TARGET=""
 DOTNET_PLATFORM_TARGET=""
 MSBUILD_ARCH_ROOT="default"
+
+if [ "${VOLVOXGRID_VARIANT:-}" = "lite" ]; then
+    LIBRARY_NO_DEFAULT_FEATURES=1
+    LIBRARY_FEATURES="${VOLVOXGRID_DOTNET_LIBRARY_FEATURES:-demo}"
+elif [ -n "${VOLVOXGRID_VARIANT:-}" ]; then
+    echo "Note: unknown VOLVOXGRID_VARIANT='${VOLVOXGRID_VARIANT}', falling back to normal." >&2
+fi
 
 normalize_tfm_for_path() {
     local tfm="$1"
@@ -327,8 +336,11 @@ copy_required_artifact() {
     cp -f "$src" "$STAGE_DIR/"
 }
 
+if [ "$LIBRARY_NO_DEFAULT_FEATURES" = "1" ]; then
+    LIBRARY_FEATURE_ARGS+=(--no-default-features)
+fi
 if [ -n "$LIBRARY_FEATURES" ]; then
-    LIBRARY_FEATURE_ARGS=(--features "$LIBRARY_FEATURES")
+    LIBRARY_FEATURE_ARGS+=(--features "$LIBRARY_FEATURES")
 fi
 
 while [ "$#" -gt 0 ]; do
@@ -393,6 +405,9 @@ if [ "$SAMPLE_KIND" = "winforms" ]; then
 fi
 
 echo "=== VolvoxGrid .NET Build (${PROFILE}, ${TARGET_TFM}, ${TARGET_ARCH}, ${SAMPLE_KIND}) ==="
+if [ "$LIBRARY_NO_DEFAULT_FEATURES" = "1" ]; then
+    echo "[library] using .NET lite native variant (${LIBRARY_FEATURE_ARGS[*]})"
+fi
 
 if [ "$SAMPLE_KIND" = "winforms" ]; then
     echo "[library] cargo build --target ${RUST_WINDOWS_TARGET} ${CARGO_FLAGS} ${LIBRARY_FEATURE_ARGS[*]}"

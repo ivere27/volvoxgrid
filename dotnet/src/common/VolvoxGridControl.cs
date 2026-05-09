@@ -133,10 +133,10 @@ namespace VolvoxGrid.DotNet
             EnsureSelectionConfig().Allow = true;
             SetHoverMask(EnsureSelectionConfig(), 7u);
             EnsureScrollConfig().Scrollbars = (ScrollBarsMode)VolvoxGridScrollBarsMode.Both;
-            EnsureScrollConfig().FlingEnabled = true;
+            EnsureScrollConfig().FlingEnabled = false;
             EnsureScrollConfig().FastScroll = true;
             EnsureRenderConfig().RendererMode = (RendererMode)VolvoxGridRendererMode.Auto;
-            EnsureRenderConfig().FramePacingMode = (Volvoxgrid.V1.FramePacingMode)VolvoxFramePacingMode.Auto;
+            EnsureRenderConfig().FramePacingMode = (Volvoxgrid.V1.FramePacingMode)VolvoxFramePacingMode.Platform;
             EnsureRenderConfig().TargetFrameRateHz = 30;
             EnsureColIndicatorTopConfig().Visible = true;
             EnsureColIndicatorTopConfig().BandRows = 1;
@@ -144,10 +144,7 @@ namespace VolvoxGrid.DotNet
             EnsureRowIndicatorStartConfig().Visible = false;
             EnsureRowIndicatorStartConfig().Width = 35;
             EnsureRowIndicatorStartConfig().Slots.AddRange(DefaultRowIndicatorSlots());
-            if (GdiTextRendererBridge.ShouldUseForCurrentProcess())
-            {
-                _hostTextRenderer = new GdiTextRendererBridge();
-            }
+            _hostTextRenderer = new GdiTextRendererBridge();
 
             _renderHost = new RenderHostCpu
             {
@@ -155,6 +152,8 @@ namespace VolvoxGrid.DotNet
             };
             _renderHost.ResolveEditAlignment = ResolveHostEditAlignment;
             _renderHost.ResolveEditPadding = ResolveHostEditPadding;
+            _renderHost.HostFlingEnabled = true;
+            _renderHost.SetRendererMode(RendererMode);
             SyncRenderHostSelectionMode();
             Controls.Add(_renderHost);
         }
@@ -525,13 +524,17 @@ namespace VolvoxGrid.DotNet
 
         public bool FlingEnabled
         {
-            get { return _config.Scrolling == null || !_config.Scrolling.HasFlingEnabled || _config.Scrolling.FlingEnabled; }
+            get { return _renderHost == null || _renderHost.HostFlingEnabled; }
             set
             {
                 var cfg = EnsureScrollConfig();
-                if (!cfg.HasFlingEnabled || cfg.FlingEnabled != value)
+                if (_renderHost != null)
                 {
-                    cfg.FlingEnabled = value;
+                    _renderHost.HostFlingEnabled = value;
+                }
+                if (!cfg.HasFlingEnabled || cfg.FlingEnabled)
+                {
+                    cfg.FlingEnabled = false;
                     ApplyEngineConfig();
                 }
             }
@@ -559,9 +562,22 @@ namespace VolvoxGrid.DotNet
                 if (!cfg.HasRendererMode || cfg.RendererMode != mapped)
                 {
                     cfg.RendererMode = mapped;
+                    if (_renderHost != null)
+                    {
+                        _renderHost.SetRendererMode(value);
+                    }
                     ApplyEngineConfig();
                 }
+                else if (_renderHost != null)
+                {
+                    _renderHost.SetRendererMode(value);
+                }
             }
+        }
+
+        public bool IsGpuAvailable
+        {
+            get { return _renderHost != null && _renderHost.IsGpuSupported; }
         }
 
         public VolvoxGridRendererMode RendererBackend
@@ -2635,6 +2651,7 @@ namespace VolvoxGrid.DotNet
 
         public void CancelFling(long gridId)
         {
+            if (gridId == _gridId && _renderHost != null) _renderHost.CancelHostFling();
             if (_client == null || gridId == 0) return;
             try
             {

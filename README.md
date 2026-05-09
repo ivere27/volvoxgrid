@@ -36,14 +36,15 @@ VolvoxGrid is not a single-framework widget. It is a shared grid engine with pla
 
 The same retained grid model can drive GUI surfaces, terminal hosts, and compatibility adapters, while the platform layer stays focused on windowing, input wiring, packaging, and native lifecycle.
 
-If you are evaluating the rendering paths themselves, read [GUI.md](GUI.md) and [TUI.md](TUI.md). If you are changing VolvoxGrid internals, read [ARCHITECTURE.md](ARCHITECTURE.md).
+If you are evaluating the rendering paths themselves, read [GUI.md](GUI.md), [TUI.md](TUI.md), and [TEXT_RENDERING.md](TEXT_RENDERING.md). If you are changing VolvoxGrid internals, read [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Features
 
 ### Rendering
 
-- Pixel-rendered GUI engine with CPU and GPU backends (Vulkan, OpenGL ES, WebGPU) and automatic CPU fallback
+- Pixel-rendered GUI engine with CPU and native-surface GPU backends through `wgpu`
 - Shared Rust engine across Flutter, Android, Java desktop, web/WASM, Go, `.NET`, and terminal hosts
+- Full packages use the built-in Rust text engine; lite packages use OS/browser text fallback with an engine-owned cache, including CoreText on Apple platforms
 - Thin-host TUI path for ANSI streams or structured cell buffers
 - Fling physics scrolling with scrollbar fade animations
 - Background images and custom icon themes
@@ -174,6 +175,8 @@ Android:
 dependencies {
     implementation("io.github.ivere27:volvoxgrid-android:0.8.7")
     // or: implementation("io.github.ivere27:volvoxgrid-android-lite:0.8.7")
+    // Compose: implementation("io.github.ivere27:volvoxgrid-android-compose:0.8.7")
+    // Compose lite: implementation("io.github.ivere27:volvoxgrid-android-compose-lite:0.8.7")
 }
 ```
 
@@ -186,6 +189,7 @@ repositories {
 
 dependencies {
     implementation("io.github.ivere27:volvoxgrid-desktop:0.8.7")
+    // or: implementation("io.github.ivere27:volvoxgrid-desktop-lite:0.8.7")
 }
 ```
 
@@ -201,19 +205,22 @@ dependencies:
   volvoxgrid: ^0.8.7
 ```
 
-The Flutter package resolves Android and desktop native binaries from Maven Central at build time. See [flutter/README.md](flutter/README.md).
+The Flutter package resolves Android and desktop native binaries from Maven Central at build time, and iOS XCFrameworks from GitHub releases. Set `VOLVOXGRID_VARIANT=lite` on supported platforms to use lite artifacts. See [flutter/README.md](flutter/README.md).
+
+iOS native consumers can use the `VolvoxGrid` SwiftPM product for the full XCFramework, or `VolvoxGridLite` after a release has published `VolvoxGridLite.xcframework.zip`.
 
 ### Web / npm
 
 ```bash
 npm install volvoxgrid
+npm install volvoxgrid-lite
 npm install @volvoxgrid/ag-grid
 npm install @volvoxgrid/sheet
 ```
 
 The web and adapter npm packages publish minified `dist/*.min.js` browser bundles for unpkg/jsDelivr usage in addition to their module exports.
 
-See [web/js/README.md](web/js/README.md) for the web package API and [GUI.md](GUI.md) for engine behavior.
+The `volvoxgrid-lite` package ships the lite WASM runtime and uses browser Canvas2D for OS/browser font fallback. See [web/js/README.md](web/js/README.md) for the web package API and [TEXT_RENDERING.md](TEXT_RENDERING.md) for the text-rendering model.
 
 ### Go
 
@@ -230,18 +237,19 @@ See [go/README.md](go/README.md) for setup and usage.
 
 ### .NET
 
-The managed wrapper package ID is `VolvoxGrid.DotNet`. The repo currently documents local project and local NuGet flows in [dotnet/README.md](dotnet/README.md):
+The managed wrapper package IDs are `VolvoxGrid.DotNet` and `VolvoxGrid.DotNet.Lite`. The repo currently documents local project and local NuGet flows in [dotnet/README.md](dotnet/README.md):
 
 ```bash
 dotnet pack dotnet/src/VolvoxGrid.DotNet.csproj -c Release
 ```
 
-The native `volvoxgrid` library is still a library dependency.
+The NuGet packages embed staged native libraries for supported RIDs. Project-reference or manual deployment flows still need the native `volvoxgrid` library beside the app or configured through `VOLVOXGRID_LIBRARY_PATH`.
 
 ## Documents
 
 - [GUI.md](GUI.md): GUI rendering design and host responsibilities
 - [TUI.md](TUI.md): terminal rendering design and host responsibilities
+- [TEXT_RENDERING.md](TEXT_RENDERING.md): full/lite text rendering and cache ownership
 - [ARCHITECTURE.md](ARCHITECTURE.md): repo architecture, build workflow, and VolvoxGrid development
 - [CONTRIBUTING.md](CONTRIBUTING.md): contribution guidelines
 - [CHANGELOG.md](CHANGELOG.md): project-level changelog

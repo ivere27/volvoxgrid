@@ -67,6 +67,30 @@ fn engine_scrollbar_colors_to_v1(colors: crate::scrollbar::ScrollBarColors) -> v
     }
 }
 
+fn legacy_scrollbars_to_modes(scrollbars: i32) -> (i32, i32) {
+    let auto = v1::ScrollBarMode::ScrollbarModeAuto as i32;
+    let never = v1::ScrollBarMode::ScrollbarModeNever as i32;
+    match v1::ScrollBarsMode::try_from(scrollbars).ok() {
+        Some(v1::ScrollBarsMode::ScrollbarHorizontal) => (auto, never),
+        Some(v1::ScrollBarsMode::ScrollbarVertical) => (never, auto),
+        Some(v1::ScrollBarsMode::ScrollbarBoth) => (auto, auto),
+        Some(v1::ScrollBarsMode::ScrollbarNone) | None => (never, never),
+    }
+}
+
+fn modes_to_legacy_scrollbars(show_h: i32, show_v: i32) -> i32 {
+    let never = v1::ScrollBarMode::ScrollbarModeNever as i32;
+    match (
+        normalize_scrollbar_mode(show_h) != never,
+        normalize_scrollbar_mode(show_v) != never,
+    ) {
+        (true, true) => v1::ScrollBarsMode::ScrollbarBoth as i32,
+        (true, false) => v1::ScrollBarsMode::ScrollbarHorizontal as i32,
+        (false, true) => v1::ScrollBarsMode::ScrollbarVertical as i32,
+        (false, false) => v1::ScrollBarsMode::ScrollbarNone as i32,
+    }
+}
+
 fn apply_indicator_colors_patch(
     target: &mut crate::indicator::IndicatorColors,
     patch: &v1::IndicatorColors,
@@ -1724,6 +1748,12 @@ impl VolvoxGrid {
         if let Some(v) = sc.fast_scroll {
             self.fast_scroll_enabled = v;
         }
+        if let Some(v) = sc.scrollbars {
+            let (show_h, show_v) = legacy_scrollbars_to_modes(v);
+            self.scrollbar_show_h = show_h;
+            self.scrollbar_show_v = show_v;
+            reset_scrollbar_fade_state(self);
+        }
         if let Some(ptr) = sc.pull_to_refresh.as_ref() {
             if let Some(v) = ptr.enabled {
                 self.pull_to_refresh_enabled = v;
@@ -2151,7 +2181,10 @@ impl VolvoxGrid {
 
     fn get_scroll_config(&self) -> v1::ScrollConfig {
         v1::ScrollConfig {
-            scrollbars: None,
+            scrollbars: Some(modes_to_legacy_scrollbars(
+                self.scrollbar_show_h,
+                self.scrollbar_show_v,
+            )),
             scroll_track: Some(self.scroll_track),
             scroll_tips: Some(self.scroll_tips),
             fling_enabled: Some(self.fling_enabled),
@@ -3702,6 +3735,45 @@ mod tests {
         assert_eq!(grid.scrollbar_colors.thumb, 0xFF123456);
         assert_eq!(grid.scrollbar_fade_delay_ms, 1000);
         assert_eq!(grid.scrollbar_margin, 2);
+    }
+
+    #[test]
+    fn apply_scroll_config_uses_legacy_scrollbars_field() {
+        let mut grid = test_grid();
+
+        grid.apply_config(&v1::GridConfig {
+            scrolling: Some(v1::ScrollConfig {
+                scrollbars: Some(v1::ScrollBarsMode::ScrollbarBoth as i32),
+                ..Default::default()
+            }),
+            ..Default::default()
+        });
+
+        assert_eq!(
+            grid.scrollbar_show_h,
+            v1::ScrollBarMode::ScrollbarModeAuto as i32
+        );
+        assert_eq!(
+            grid.scrollbar_show_v,
+            v1::ScrollBarMode::ScrollbarModeAuto as i32
+        );
+
+        grid.apply_config(&v1::GridConfig {
+            scrolling: Some(v1::ScrollConfig {
+                scrollbars: Some(v1::ScrollBarsMode::ScrollbarNone as i32),
+                ..Default::default()
+            }),
+            ..Default::default()
+        });
+
+        assert_eq!(
+            grid.scrollbar_show_h,
+            v1::ScrollBarMode::ScrollbarModeNever as i32
+        );
+        assert_eq!(
+            grid.scrollbar_show_v,
+            v1::ScrollBarMode::ScrollbarModeNever as i32
+        );
     }
 
     #[test]

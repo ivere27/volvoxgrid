@@ -2,7 +2,7 @@
 
 This document is for developers changing VolvoxGrid itself.
 
-For product overview and package installation, see [README.md](README.md). For renderer-specific design, see [GUI.md](GUI.md) and [TUI.md](TUI.md).
+For product overview and package installation, see [README.md](README.md). For renderer-specific design, see [GUI.md](GUI.md), [TUI.md](TUI.md), and [TEXT_RENDERING.md](TEXT_RENDERING.md).
 
 ## System Overview
 
@@ -10,6 +10,7 @@ VolvoxGrid is organized around one Rust grid engine with multiple host paths:
 
 - GUI hosts use the shared pixel-rendering engine through the native runtime or WASM bindings
 - TUI hosts use the same engine through terminal-oriented render sessions
+- full builds use the built-in Rust text engine, while lite builds register host OS/browser text renderers
 - platform wrappers stay thin and translate native events, buffers, and lifecycle into the shared contract
 - adapters sit above wrappers and map third-party grid APIs into VolvoxGrid behavior
 
@@ -64,6 +65,18 @@ The native runtime is the shared host-facing boundary for non-web integrations. 
 
 The web path builds the WASM-facing entry points from `runtime/` with `wasm-pack` and layers the `web/js/` TypeScript wrapper on top. The engine logic is still shared, but loading, JS interop, packaging, and browser integration are web-specific.
 
+### Text Rendering
+
+Text is still an engine concern even when a lite package delegates measurement and rasterization to the host.
+
+- Full builds use the built-in Rust text engine.
+- Lite builds register a named external text renderer, such as `Android`, `Browser`, `Java2D`, or `GDI`.
+- The Rust engine/runtime owns cache capacity, cache eviction, color-independent alpha masks, clipping, and final blending.
+- Platform bridges keep only small object or scratch-buffer caches.
+- When a render stream switches to another active grid, the previous grid's text cache is cleared.
+
+See [TEXT_RENDERING.md](TEXT_RENDERING.md) for the package matrix and debug-overlay behavior.
+
 ### Wrappers And Hosts
 
 Platform wrappers should stay thin. Their job is to:
@@ -81,7 +94,7 @@ The protobuf contract in `proto/` and the [Synurang](https://github.com/ivere27/
 
 The engine exposes two output modes through the same proto API:
 
-- **GUI (pixel)**: the engine renders to a CPU RGBA buffer or GPU surface. The host provides a window or canvas and blits the result. This path drives Flutter, Android, Java desktop, `.NET` desktop, and ActiveX hosts. The web/WASM host uses the same engine through wasm-bindgen instead of Synurang FFI.
+- **GUI (pixel)**: the engine renders to a CPU RGBA buffer or GPU surface. The host provides a window, canvas, buffer, or native surface and presents the result. This path drives Flutter, Android, Java desktop, `.NET` desktop, and ActiveX hosts. The web/WASM host uses the same engine through wasm-bindgen instead of Synurang FFI.
 - **TUI (terminal)**: the engine renders to ANSI escape sequences or structured cell buffers. The host writes the output to a terminal. This path drives Java TUI, `.NET` TUI, and Go TUI hosts.
 
 Adding a new native language binding does not require changing the engine. The steps are:
@@ -147,7 +160,9 @@ make sheet-lite
 make flutter-run
 make android
 make java-desktop-run
+make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.8.7-SNAPSHOT
 make dotnet-build
+make dotnet-run-release VOLVOXGRID_VARIANT=lite
 make gtk-test
 make java-tui-run
 make dotnet-tui-run
@@ -181,15 +196,19 @@ Packaging builds:
 - `make docker_ios`
 - `make docker_all`
 
+`make docker_all` builds the publishable full and lite Maven artifacts for Android, Android Compose, and Java desktop, plus iOS full and lite XCFrameworks. When `.NET` packaging is enabled, it also builds WinForms full and lite x64/x86 output for NuGet staging.
+
 Web packaging is targetable with `WEB_DOCKER_TARGET={all|bundle|web|sheet|sheet-lite|report|wasm|wasm-lite|wasm-threaded}`. The web and sheet release-demo targets externalize package JavaScript through CDN import maps and use the minified browser bundles.
 
 Publishing:
 
 - `make publish_maven`
+- `make publish_nuget`
+- `make publish_npm`
 
 Snapshot note:
 
-- `-SNAPSHOT` Docker packaging flows automatically install generated Maven artifacts into `~/.m2/repository`
+- `-SNAPSHOT` Docker packaging flows automatically install generated Maven artifacts, including lite artifacts, into `~/.m2/repository`
 
 ## Testing And Verification
 
@@ -209,4 +228,5 @@ Adapter-specific comparison tests and visual checks live with the adapter projec
 - [README.md](README.md) for project positioning and package entry points
 - [GUI.md](GUI.md) if you are changing pixel-rendered GUI behavior
 - [TUI.md](TUI.md) if you are changing terminal rendering or host integration
+- [TEXT_RENDERING.md](TEXT_RENDERING.md) if you are changing full/lite font fallback or text cache behavior
 - this document for repo structure, build workflow, and development entry points
