@@ -98,9 +98,8 @@ Or in your `csproj`:
 
 When the package targets a supported RID, NuGet drops the matching native
 library into `runtimes/<rid>/native/` automatically — no `LibraryPath` setup
-required. Currently shipped RIDs: `win-x64`, `win-x86`, `linux-x64`. Other
-platforms (linux-arm64, osx-x64, osx-arm64) need the local-pack flow below
-or a manually-deployed native library until the next release.
+required. Currently shipped RIDs: `win-x64`, `win-x86`, `linux-x64`,
+`linux-arm64`, `osx-x64`, and `osx-arm64`.
 
 ### Option B: Reference the project directly
 
