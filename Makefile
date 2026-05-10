@@ -1830,8 +1830,16 @@ publish_github:
 	SYMBOLS_DIR="$(CURRENT_DIR)/dist/symbols"; \
 	if [ -d "$$SYMBOLS_DIR" ]; then \
 	  found_symbols=0; \
-	  for f in "$$SYMBOLS_DIR"/*"$(VOLVOXGRID_VERSION)"*debug-symbols.zip; \
+	  for symbol_name in \
+	    "VolvoxGrid-$(VOLVOXGRID_VERSION)-debug-symbols.zip" \
+	    "VolvoxGridLite-$(VOLVOXGRID_VERSION)-debug-symbols.zip" \
+	    "volvoxgrid-activex-$(VOLVOXGRID_VERSION)-debug-symbols.zip" \
+	    "volvoxgrid-android-$(VOLVOXGRID_VERSION)-debug-symbols.zip" \
+	    "volvoxgrid-android-lite-$(VOLVOXGRID_VERSION)-debug-symbols.zip" \
+	    "volvoxgrid-desktop-$(VOLVOXGRID_VERSION)-debug-symbols.zip" \
+	    "volvoxgrid-desktop-lite-$(VOLVOXGRID_VERSION)-debug-symbols.zip"; \
 	  do \
+	    f="$$SYMBOLS_DIR/$$symbol_name"; \
 	    if [ -f "$$f" ]; then \
 	      found_symbols=1; \
 	      echo "Uploading debug symbols $$(basename "$$f") to $$TAG..."; \
@@ -2014,6 +2022,11 @@ NUGET_SOURCE          ?= https://api.nuget.org/v3/index.json
 
 publish_nuget:
 	@command -v dotnet >/dev/null 2>&1 || { echo "Error: dotnet SDK not found in PATH."; exit 1; }
+	@if echo "$(VOLVOXGRID_VERSION)" | grep -q -- '-SNAPSHOT$$'; then \
+		echo "Error: publish_nuget refuses SNAPSHOT versions ($(VOLVOXGRID_VERSION))."; \
+		echo "Build a release version first, for example: make docker_all VOLVOXGRID_VERSION=$$(printf '%s' "$(VOLVOXGRID_VERSION)" | sed 's/-SNAPSHOT$$//')"; \
+		exit 1; \
+	fi
 	@if [ -z "$$NUGET_API_KEY" ] && [ -f "$$HOME/.nuget-env" ]; then \
 		echo "Loading NUGET_API_KEY from $$HOME/.nuget-env"; \
 	fi
@@ -2037,31 +2050,34 @@ publish_nuget:
 	WIN86="$(CURRENT_DIR)/dist/dotnet/winforms_release_x86/volvoxgrid.dll"; \
 	if [ -f "$$WIN64" ]; then cp -f "$$WIN64" "$(DOTNET_NATIVE_STAGE)/win-x64/volvoxgrid.dll";     echo "  win-x64    <- $$WIN64"; fi; \
 	if [ -f "$$WIN86" ]; then cp -f "$$WIN86" "$(DOTNET_NATIVE_STAGE)/win-x86/volvoxgrid.dll";     echo "  win-x86    <- $$WIN86"; fi; \
-	JAR=$$(ls -t "$(CURRENT_DIR)/dist/maven/volvoxgrid-desktop-"*.jar 2>/dev/null | grep -vE -- '-sources\.jar$$|-javadoc\.jar$$' | head -n1); \
-	if [ -n "$$JAR" ] && [ -f "$$JAR" ]; then \
-	  echo "Staging RIDs from $$(basename "$$JAR")..."; \
-	  for entry in \
-	    "linux-x86_64|linux-x64|libvolvoxgrid.so" \
-	    "linux-aarch64|linux-arm64|libvolvoxgrid.so" \
-	    "macos-x86_64|osx-x64|libvolvoxgrid.dylib" \
-	    "macos-aarch64|osx-arm64|libvolvoxgrid.dylib" \
-	    "windows-x86_64|win-x64|volvoxgrid.dll" \
-	    "windows-x86|win-x86|volvoxgrid.dll"; \
-	  do \
-	    plat=$$(echo "$$entry" | cut -d'|' -f1); \
-	    rid=$$(echo "$$entry" | cut -d'|' -f2); \
-	    libname=$$(echo "$$entry" | cut -d'|' -f3); \
-	    dest="$(DOTNET_NATIVE_STAGE)/$$rid/$$libname"; \
-	    tmpdir=$$(mktemp -d); \
-	    unzip -q -j "$$JAR" "native/$$plat/*" -d "$$tmpdir" 2>/dev/null || true; \
-	    src=$$(ls "$$tmpdir"/* 2>/dev/null | head -n1); \
-	    if [ -n "$$src" ] && [ -f "$$src" ]; then \
-	      cp -f "$$src" "$$dest"; \
-	      echo "  $$rid    <- $$(basename "$$JAR")!native/$$plat/"; \
-	    fi; \
-	    rm -rf "$$tmpdir"; \
-	  done; \
+	JAR="$(CURRENT_DIR)/dist/maven/volvoxgrid-desktop-$(VOLVOXGRID_VERSION).jar"; \
+	if [ ! -f "$$JAR" ]; then \
+	  echo "Error: release desktop JAR not found: $$JAR"; \
+	  echo "Run 'make docker_all VOLVOXGRID_VERSION=$(VOLVOXGRID_VERSION)' before publish_nuget."; \
+	  exit 1; \
 	fi; \
+	echo "Staging RIDs from $$(basename "$$JAR")..."; \
+	for entry in \
+	  "linux-x86_64|linux-x64|libvolvoxgrid.so" \
+	  "linux-aarch64|linux-arm64|libvolvoxgrid.so" \
+	  "macos-x86_64|osx-x64|libvolvoxgrid.dylib" \
+	  "macos-aarch64|osx-arm64|libvolvoxgrid.dylib" \
+	  "windows-x86_64|win-x64|volvoxgrid.dll" \
+	  "windows-x86|win-x86|volvoxgrid.dll"; \
+	do \
+	  plat=$$(echo "$$entry" | cut -d'|' -f1); \
+	  rid=$$(echo "$$entry" | cut -d'|' -f2); \
+	  libname=$$(echo "$$entry" | cut -d'|' -f3); \
+	  dest="$(DOTNET_NATIVE_STAGE)/$$rid/$$libname"; \
+	  tmpdir=$$(mktemp -d); \
+	  unzip -q -j "$$JAR" "native/$$plat/*" -d "$$tmpdir" 2>/dev/null || true; \
+	  src=$$(ls "$$tmpdir"/* 2>/dev/null | head -n1); \
+	  if [ -n "$$src" ] && [ -f "$$src" ]; then \
+	    cp -f "$$src" "$$dest"; \
+	    echo "  $$rid    <- $$(basename "$$JAR")!native/$$plat/"; \
+	  fi; \
+	  rm -rf "$$tmpdir"; \
+	done; \
 	for dylib in \
 	  "$(DOTNET_NATIVE_STAGE)/osx-x64/libvolvoxgrid.dylib" \
 	  "$(DOTNET_NATIVE_STAGE)/osx-arm64/libvolvoxgrid.dylib"; \
@@ -2106,11 +2122,6 @@ publish_nuget:
 	    --source "$(NUGET_SOURCE)" \
 	    --skip-duplicate
 	@echo "NuGet publish complete: $(DOTNET_NUGET_PACKAGE) $(VOLVOXGRID_VERSION)"
-	@echo "Building local lite native runtime for NuGet staging..."
-	@VOLVOXGRID_VERSION="$(VOLVOXGRID_VERSION)" \
-	  CARGO_TARGET_DIR="$(CURRENT_DIR)/target/dotnet/lite-cargo" \
-	  cargo build --manifest-path "$(CURRENT_DIR)/runtime/Cargo.toml" \
-	    -p volvoxgrid-runtime -j "$(CARGO_BUILD_JOBS)" --release --no-default-features --features demo
 	@echo "Staging lite native binaries into $(DOTNET_NATIVE_LITE_STAGE)/..."
 	@rm -rf "$(DOTNET_NATIVE_LITE_STAGE)"
 	@mkdir -p "$(DOTNET_NATIVE_LITE_STAGE)/win-x64" \
@@ -2119,56 +2130,38 @@ publish_nuget:
 	          "$(DOTNET_NATIVE_LITE_STAGE)/linux-arm64" \
 	          "$(DOTNET_NATIVE_LITE_STAGE)/osx-x64" \
 	          "$(DOTNET_NATIVE_LITE_STAGE)/osx-arm64"
-	@HOST_OS=$$(uname -s 2>/dev/null || echo unknown); \
-	LITE_WIN64="$(CURRENT_DIR)/dist/dotnet/winforms_release_lite/volvoxgrid.dll"; \
+	@LITE_WIN64="$(CURRENT_DIR)/dist/dotnet/winforms_release_lite/volvoxgrid.dll"; \
 	LITE_WIN86="$(CURRENT_DIR)/dist/dotnet/winforms_release_lite_x86/volvoxgrid.dll"; \
-	LITE_ROOT="$(CURRENT_DIR)/target/dotnet/lite-cargo/release"; \
 	if [ -f "$$LITE_WIN64" ]; then cp -f "$$LITE_WIN64" "$(DOTNET_NATIVE_LITE_STAGE)/win-x64/volvoxgrid.dll"; echo "  win-x64    <- $$LITE_WIN64"; fi; \
 	if [ -f "$$LITE_WIN86" ]; then cp -f "$$LITE_WIN86" "$(DOTNET_NATIVE_LITE_STAGE)/win-x86/volvoxgrid.dll"; echo "  win-x86    <- $$LITE_WIN86"; fi; \
-	case "$$HOST_OS" in \
-	  Linux*) \
-	    if [ -f "$$LITE_ROOT/libvolvoxgrid.so" ]; then \
-	      cp -f "$$LITE_ROOT/libvolvoxgrid.so" "$(DOTNET_NATIVE_LITE_STAGE)/linux-x64/libvolvoxgrid.so"; \
-	      echo "  linux-x64  <- $$LITE_ROOT/libvolvoxgrid.so"; \
-	    fi ;; \
-	  Darwin*) \
-	    if [ -f "$$LITE_ROOT/libvolvoxgrid.dylib" ]; then \
-	      cp -f "$$LITE_ROOT/libvolvoxgrid.dylib" "$(DOTNET_NATIVE_LITE_STAGE)/osx-x64/libvolvoxgrid.dylib"; \
-	      echo "  osx-x64    <- $$LITE_ROOT/libvolvoxgrid.dylib"; \
-	    fi ;; \
-	  MINGW*|MSYS*|CYGWIN*) \
-	    if [ -f "$$LITE_ROOT/volvoxgrid.dll" ]; then \
-	      cp -f "$$LITE_ROOT/volvoxgrid.dll" "$(DOTNET_NATIVE_LITE_STAGE)/win-x64/volvoxgrid.dll"; \
-	      echo "  win-x64    <- $$LITE_ROOT/volvoxgrid.dll"; \
-	    fi ;; \
-	esac; \
-	JAR=$$(ls -t "$(CURRENT_DIR)/dist/maven/volvoxgrid-desktop-lite-"*.jar 2>/dev/null | grep -vE -- '-sources\.jar$$|-javadoc\.jar$$' | head -n1); \
-	if [ -n "$$JAR" ] && [ -f "$$JAR" ]; then \
-	  echo "Staging lite RIDs from $$(basename "$$JAR")..."; \
-	  for entry in \
-	    "linux-x86_64|linux-x64|libvolvoxgrid.so" \
-	    "linux-aarch64|linux-arm64|libvolvoxgrid.so" \
-	    "macos-x86_64|osx-x64|libvolvoxgrid.dylib" \
-	    "macos-aarch64|osx-arm64|libvolvoxgrid.dylib" \
-	    "windows-x86_64|win-x64|volvoxgrid.dll" \
-	    "windows-x86|win-x86|volvoxgrid.dll"; \
-	  do \
-	    plat=$$(echo "$$entry" | cut -d'|' -f1); \
-	    rid=$$(echo "$$entry" | cut -d'|' -f2); \
-	    libname=$$(echo "$$entry" | cut -d'|' -f3); \
-	    dest="$(DOTNET_NATIVE_LITE_STAGE)/$$rid/$$libname"; \
-	    tmpdir=$$(mktemp -d); \
-	    unzip -q -j "$$JAR" "native/$$plat/*" -d "$$tmpdir" 2>/dev/null || true; \
-	    src=$$(ls "$$tmpdir"/* 2>/dev/null | head -n1); \
-	    if [ -n "$$src" ] && [ -f "$$src" ]; then \
-	      cp -f "$$src" "$$dest"; \
-	      echo "  $$rid    <- $$(basename "$$JAR")!native/$$plat/"; \
-	    fi; \
-	    rm -rf "$$tmpdir"; \
-	  done; \
-	else \
-	  echo "Note: desktop lite JAR not found; package will include only locally built lite RIDs."; \
+	JAR="$(CURRENT_DIR)/dist/maven/volvoxgrid-desktop-lite-$(VOLVOXGRID_VERSION).jar"; \
+	if [ ! -f "$$JAR" ]; then \
+	  echo "Error: release desktop lite JAR not found: $$JAR"; \
+	  echo "Run 'make docker_all VOLVOXGRID_VERSION=$(VOLVOXGRID_VERSION)' before publish_nuget."; \
+	  exit 1; \
 	fi; \
+	echo "Staging lite RIDs from $$(basename "$$JAR")..."; \
+	for entry in \
+	  "linux-x86_64|linux-x64|libvolvoxgrid.so" \
+	  "linux-aarch64|linux-arm64|libvolvoxgrid.so" \
+	  "macos-x86_64|osx-x64|libvolvoxgrid.dylib" \
+	  "macos-aarch64|osx-arm64|libvolvoxgrid.dylib" \
+	  "windows-x86_64|win-x64|volvoxgrid.dll" \
+	  "windows-x86|win-x86|volvoxgrid.dll"; \
+	do \
+	  plat=$$(echo "$$entry" | cut -d'|' -f1); \
+	  rid=$$(echo "$$entry" | cut -d'|' -f2); \
+	  libname=$$(echo "$$entry" | cut -d'|' -f3); \
+	  dest="$(DOTNET_NATIVE_LITE_STAGE)/$$rid/$$libname"; \
+	  tmpdir=$$(mktemp -d); \
+	  unzip -q -j "$$JAR" "native/$$plat/*" -d "$$tmpdir" 2>/dev/null || true; \
+	  src=$$(ls "$$tmpdir"/* 2>/dev/null | head -n1); \
+	  if [ -n "$$src" ] && [ -f "$$src" ]; then \
+	    cp -f "$$src" "$$dest"; \
+	    echo "  $$rid    <- $$(basename "$$JAR")!native/$$plat/"; \
+	  fi; \
+	  rm -rf "$$tmpdir"; \
+	done; \
 	for dylib in \
 	  "$(DOTNET_NATIVE_LITE_STAGE)/osx-x64/libvolvoxgrid.dylib" \
 	  "$(DOTNET_NATIVE_LITE_STAGE)/osx-arm64/libvolvoxgrid.dylib"; \
