@@ -19,8 +19,8 @@ repositories {
 }
 
 dependencies {
-    implementation("io.github.ivere27:volvoxgrid-desktop:0.8.7")
-    // or: implementation("io.github.ivere27:volvoxgrid-desktop-lite:0.8.7")
+    implementation("io.github.ivere27:volvoxgrid-desktop:0.8.8")
+    // or: implementation("io.github.ivere27:volvoxgrid-desktop-lite:0.8.8")
 }
 ```
 
@@ -35,8 +35,8 @@ The JAR bundles native libraries for Linux (x86, x86_64, armv7, aarch64), macOS 
 Use `VOLVOXGRID_VARIANT=lite` for local and Maven sample runs:
 
 ```bash
-make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.8.7
-make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.8.7-SNAPSHOT
+make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.8.8
+make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.8.8-SNAPSHOT
 make java-desktop-run-release VOLVOXGRID_VARIANT=lite
 ```
 

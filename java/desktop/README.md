@@ -13,15 +13,15 @@ native libraries embedded under `native/<platform>/`:
 <dependency>
     <groupId>io.github.ivere27</groupId>
     <artifactId>volvoxgrid-desktop</artifactId>
-    <version>0.8.7</version>
+    <version>0.8.8</version>
 </dependency>
 ```
 
 Gradle (Kotlin):
 
 ```kotlin
-implementation("io.github.ivere27:volvoxgrid-desktop:0.8.7")
-// or: implementation("io.github.ivere27:volvoxgrid-desktop-lite:0.8.7")
+implementation("io.github.ivere27:volvoxgrid-desktop:0.8.8")
+// or: implementation("io.github.ivere27:volvoxgrid-desktop-lite:0.8.8")
 ```
 
 The JAR resolves the right native library at runtime — no manual
@@ -38,7 +38,7 @@ The engine/runtime still owns the external text mask cache. Java2D only measures
 Local sample selection:
 
 ```bash
-make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.8.7
+make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.8.8
 make java-desktop-run-release VOLVOXGRID_VARIANT=lite
 ```
 

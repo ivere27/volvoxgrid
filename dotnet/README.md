@@ -83,16 +83,16 @@ with native binaries embedded for the supported runtimes (RIDs):
 - <https://www.nuget.org/packages/VolvoxGrid.DotNet.Lite/>
 
 ```bash
-dotnet add package VolvoxGrid.DotNet --version 0.8.7
-dotnet add package VolvoxGrid.DotNet.Lite --version 0.8.7
+dotnet add package VolvoxGrid.DotNet --version 0.8.8
+dotnet add package VolvoxGrid.DotNet.Lite --version 0.8.8
 ```
 
 Or in your `csproj`:
 
 ```xml
 <ItemGroup>
-  <PackageReference Include="VolvoxGrid.DotNet" Version="0.8.7" />
-  <!-- or: <PackageReference Include="VolvoxGrid.DotNet.Lite" Version="0.8.7" /> -->
+  <PackageReference Include="VolvoxGrid.DotNet" Version="0.8.8" />
+  <!-- or: <PackageReference Include="VolvoxGrid.DotNet.Lite" Version="0.8.8" /> -->
 </ItemGroup>
 ```
 

@@ -127,7 +127,7 @@ Or use the `<volvox-grid>` custom element:
 
 ```yaml
 dependencies:
-  volvoxgrid: ^0.8.7
+  volvoxgrid: ^0.8.8
 ```
 
 ```dart
@@ -149,7 +149,7 @@ VolvoxGridWidget(controller: controller)
 
 ```kotlin
 dependencies {
-    implementation("io.github.ivere27:volvoxgrid-desktop:0.8.7")
+    implementation("io.github.ivere27:volvoxgrid-desktop:0.8.8")
 }
 ```
 
@@ -165,7 +165,7 @@ ctrl.setCellText(0, 0, "Widget A");
 
 ## Packages
 
-Examples below use `0.8.7`. Replace it with the release you want to consume.
+Examples below use `0.8.8`. Replace it with the release you want to consume.
 
 ### Maven / Gradle
 
@@ -173,10 +173,10 @@ Android:
 
 ```kotlin
 dependencies {
-    implementation("io.github.ivere27:volvoxgrid-android:0.8.7")
-    // or: implementation("io.github.ivere27:volvoxgrid-android-lite:0.8.7")
-    // Compose: implementation("io.github.ivere27:volvoxgrid-android-compose:0.8.7")
-    // Compose lite: implementation("io.github.ivere27:volvoxgrid-android-compose-lite:0.8.7")
+    implementation("io.github.ivere27:volvoxgrid-android:0.8.8")
+    // or: implementation("io.github.ivere27:volvoxgrid-android-lite:0.8.8")
+    // Compose: implementation("io.github.ivere27:volvoxgrid-android-compose:0.8.8")
+    // Compose lite: implementation("io.github.ivere27:volvoxgrid-android-compose-lite:0.8.8")
 }
 ```
 
@@ -188,8 +188,8 @@ repositories {
 }
 
 dependencies {
-    implementation("io.github.ivere27:volvoxgrid-desktop:0.8.7")
-    // or: implementation("io.github.ivere27:volvoxgrid-desktop-lite:0.8.7")
+    implementation("io.github.ivere27:volvoxgrid-desktop:0.8.8")
+    // or: implementation("io.github.ivere27:volvoxgrid-desktop-lite:0.8.8")
 }
 ```
 
@@ -202,7 +202,7 @@ Platform docs:
 
 ```yaml
 dependencies:
-  volvoxgrid: ^0.8.7
+  volvoxgrid: ^0.8.8
 ```
 
 The Flutter package resolves Android and desktop native binaries from Maven Central at build time, and iOS XCFrameworks from GitHub releases. Set `VOLVOXGRID_VARIANT=lite` on supported platforms to use lite artifacts. See [flutter/README.md](flutter/README.md).
@@ -249,6 +249,7 @@ The NuGet packages embed staged native libraries for supported RIDs. Project-ref
 
 - [GUI.md](GUI.md): GUI rendering design and host responsibilities
 - [TUI.md](TUI.md): terminal rendering design and host responsibilities
+- [BUILD_VARIANTS.md](BUILD_VARIANTS.md): full/lite features, artifact types, and binary size notes
 - [TEXT_RENDERING.md](TEXT_RENDERING.md): full/lite text rendering and cache ownership
 - [ARCHITECTURE.md](ARCHITECTURE.md): repo architecture, build workflow, and VolvoxGrid development
 - [CONTRIBUTING.md](CONTRIBUTING.md): contribution guidelines

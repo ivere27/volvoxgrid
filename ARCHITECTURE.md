@@ -160,7 +160,7 @@ make sheet-lite
 make flutter-run
 make android
 make java-desktop-run
-make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.8.7-SNAPSHOT
+make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.8.8-SNAPSHOT
 make dotnet-build
 make dotnet-run-release VOLVOXGRID_VARIANT=lite
 make gtk-test

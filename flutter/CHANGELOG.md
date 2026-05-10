@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.8
+
+- Added `VOLVOXGRID_VARIANT=lite` documentation and iOS podspec support for `VolvoxGridLite.xcframework`.
+- Regenerated protocol bindings for rich-text cells, text baselines, and explicit GPU renderer modes.
+- Added `includeRichText` to `VolvoxGridController.getCells`.
+
 ## 0.8.7
 
 - Added the `VolvoxDataGrid` helper API and refreshed package docs for Maven-backed native binary resolution.
