@@ -16,6 +16,8 @@ GIT_COMMIT="${GIT_COMMIT:-$(git -C "${REPO_ROOT}" rev-parse --short=12 HEAD 2>/d
 BUILD_DATE="${BUILD_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
 DIST_DIR="${DIST_DIR:-${REPO_ROOT}/dist/ios}"
 LIBRARY_BUILD_MODE="${LIBRARY_BUILD_MODE:-full}"
+BUILD_DEBUG_SYMBOLS="${BUILD_DEBUG_SYMBOLS:-1}"
+DEBUG_SYMBOLS_DIR="${DEBUG_SYMBOLS_DIR:-${REPO_ROOT}/dist/symbols}"
 
 case "${LIBRARY_BUILD_MODE}" in
   full)
@@ -54,6 +56,7 @@ fi
 export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-${BUILD_JOBS}}"
 echo "Using BUILD_JOBS=${BUILD_JOBS} (cpu=${CPU_COUNT}, cargo=${CARGO_BUILD_JOBS})"
 echo "Using LIBRARY_BUILD_MODE=${LIBRARY_BUILD_MODE} (${XCFW_NAME}.xcframework)"
+echo "Using BUILD_DEBUG_SYMBOLS=${BUILD_DEBUG_SYMBOLS}"
 
 # Metadata consumed by engine/build.rs for embedding into binaries.
 export VOLVOXGRID_VERSION="${VOLVOXGRID_VERSION:-${VERSION}}"
@@ -70,10 +73,81 @@ WORK_DIR="$(mktemp -d /tmp/volvoxgrid-ios-XXXXXX)"
 cleanup() { rm -rf "${WORK_DIR}"; }
 trap cleanup EXIT
 
+should_build_debug_symbols() {
+  case "${BUILD_DEBUG_SYMBOLS}" in
+    1|true|TRUE|yes|YES|on|ON)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+CARGO_RELEASE_ARGS=(-j "${CARGO_BUILD_JOBS}" --release)
+if should_build_debug_symbols; then
+  CARGO_RELEASE_ARGS+=(--config 'profile.release.debug="line-tables-only"')
+  CARGO_RELEASE_ARGS+=(--config 'profile.release.strip="none"')
+fi
+
+strip_static_archive() {
+  local archive="$1"
+
+  if ! command -v llvm-strip >/dev/null 2>&1; then
+    echo "Warning: llvm-strip not found; keeping iOS archive unstripped: ${archive}" >&2
+    return 0
+  fi
+
+  # Strip DWARF and local symbols from the distributable archive while preserving
+  # global symbols needed by the final app link.
+  if ! llvm-strip --strip-debug --discard-all "${archive}"; then
+    echo "Warning: failed to strip iOS archive: ${archive}" >&2
+    return 0
+  fi
+}
+
+capture_static_archive_symbols() {
+  local slice="$1"
+  local archive="$2"
+  local root="${WORK_DIR}/debug-symbols/${XCFW_NAME}-${VERSION}-debug-symbols"
+  local out_dir="${root}/ios/${slice}"
+
+  if ! should_build_debug_symbols || [[ ! -f "${archive}" ]]; then
+    return 0
+  fi
+
+  mkdir -p "${out_dir}"
+  cp -f "${archive}" "${out_dir}/libvolvoxgrid.a.unstripped"
+}
+
+finalize_debug_symbols() {
+  if ! should_build_debug_symbols; then
+    return 0
+  fi
+
+  local root="${WORK_DIR}/debug-symbols/${XCFW_NAME}-${VERSION}-debug-symbols"
+  if [[ ! -d "${root}" ]] || ! find "${root}" -mindepth 1 -print -quit | grep -q .; then
+    echo "No iOS debug symbols captured for ${XCFW_NAME}-${VERSION}."
+    return 0
+  fi
+
+  mkdir -p "${root}/META-INF/volvoxgrid" "${DEBUG_SYMBOLS_DIR}"
+  cat > "${root}/META-INF/volvoxgrid/build-info.properties" <<META
+volvoxgrid.version=${VERSION}
+volvoxgrid.artifact_id=${XCFW_NAME}
+volvoxgrid.git_commit=${GIT_COMMIT}
+volvoxgrid.build_date=${BUILD_DATE}
+META
+
+  local zip_path
+  zip_path="$(cd "${DEBUG_SYMBOLS_DIR}" && pwd)/${XCFW_NAME}-${VERSION}-debug-symbols.zip"
+  rm -f "${zip_path}"
+  (cd "$(dirname "${root}")" && zip -qr "${zip_path}" "$(basename "${root}")")
+  echo "Built iOS debug symbols: ${zip_path}"
+}
+
 # ── Build static libraries for each iOS target ─────────────────────────────
 
 echo "Building library: aarch64-apple-ios (device, staticlib)..."
-(cd "${LIBRARY_CRATE}" && cargo rustc -j "${CARGO_BUILD_JOBS}" --release --lib "${LIBRARY_FEATURE_ARGS[@]}" --target aarch64-apple-ios --crate-type staticlib)
+(cd "${LIBRARY_CRATE}" && cargo rustc "${CARGO_RELEASE_ARGS[@]}" --lib "${LIBRARY_FEATURE_ARGS[@]}" --target aarch64-apple-ios --crate-type staticlib)
 DEVICE_LIB="${CARGO_TARGET_DIR}/aarch64-apple-ios/release/libvolvoxgrid.a"
 if [[ ! -f "${DEVICE_LIB}" ]]; then
   echo "Error: device static lib not found: ${DEVICE_LIB}" >&2
@@ -81,7 +155,7 @@ if [[ ! -f "${DEVICE_LIB}" ]]; then
 fi
 
 echo "Building library: aarch64-apple-ios-sim (simulator arm64, staticlib)..."
-(cd "${LIBRARY_CRATE}" && cargo rustc -j "${CARGO_BUILD_JOBS}" --release --lib "${LIBRARY_FEATURE_ARGS[@]}" --target aarch64-apple-ios-sim --crate-type staticlib)
+(cd "${LIBRARY_CRATE}" && cargo rustc "${CARGO_RELEASE_ARGS[@]}" --lib "${LIBRARY_FEATURE_ARGS[@]}" --target aarch64-apple-ios-sim --crate-type staticlib)
 SIM_ARM64_LIB="${CARGO_TARGET_DIR}/aarch64-apple-ios-sim/release/libvolvoxgrid.a"
 if [[ ! -f "${SIM_ARM64_LIB}" ]]; then
   echo "Error: simulator arm64 static lib not found: ${SIM_ARM64_LIB}" >&2
@@ -89,7 +163,7 @@ if [[ ! -f "${SIM_ARM64_LIB}" ]]; then
 fi
 
 echo "Building library: x86_64-apple-ios (simulator x86_64, staticlib)..."
-(cd "${LIBRARY_CRATE}" && cargo rustc -j "${CARGO_BUILD_JOBS}" --release --lib "${LIBRARY_FEATURE_ARGS[@]}" --target x86_64-apple-ios --crate-type staticlib)
+(cd "${LIBRARY_CRATE}" && cargo rustc "${CARGO_RELEASE_ARGS[@]}" --lib "${LIBRARY_FEATURE_ARGS[@]}" --target x86_64-apple-ios --crate-type staticlib)
 SIM_X64_LIB="${CARGO_TARGET_DIR}/x86_64-apple-ios/release/libvolvoxgrid.a"
 if [[ ! -f "${SIM_X64_LIB}" ]]; then
   echo "Error: simulator x86_64 static lib not found: ${SIM_X64_LIB}" >&2
@@ -123,11 +197,15 @@ rm -rf "${XCFW_DIR}"
 DEVICE_DIR="${XCFW_DIR}/ios-arm64"
 mkdir -p "${DEVICE_DIR}"
 cp "${DEVICE_LIB}" "${DEVICE_DIR}/libvolvoxgrid.a"
+capture_static_archive_symbols "ios-arm64" "${DEVICE_DIR}/libvolvoxgrid.a"
+strip_static_archive "${DEVICE_DIR}/libvolvoxgrid.a"
 
 # Simulator slice (universal arm64 + x86_64)
 SIM_DIR="${XCFW_DIR}/ios-arm64_x86_64-simulator"
 mkdir -p "${SIM_DIR}"
 cp "${SIM_UNIVERSAL}" "${SIM_DIR}/libvolvoxgrid.a"
+capture_static_archive_symbols "ios-arm64_x86_64-simulator" "${SIM_DIR}/libvolvoxgrid.a"
+strip_static_archive "${SIM_DIR}/libvolvoxgrid.a"
 
 # ── Generate C header ──────────────────────────────────────────────────────
 HEADER_FILE="${DIST_DIR}/volvoxgrid.h"
@@ -225,6 +303,8 @@ cp "${HEADER_FILE}" "${SIM_DIR}/Headers/"
 cp "${MODULEMAP_FILE}" "${DEVICE_DIR}/Headers/module.modulemap"
 cp "${MODULEMAP_FILE}" "${SIM_DIR}/Headers/module.modulemap"
 
+finalize_debug_symbols
+
 echo ""
 echo "Built iOS artifacts:"
 echo "  ${XCFW_DIR}/"
@@ -232,3 +312,6 @@ echo "    ios-arm64/libvolvoxgrid.a"
 echo "    ios-arm64_x86_64-simulator/libvolvoxgrid.a"
 echo "  ${HEADER_FILE}"
 echo "  module ${XCFW_NAME}"
+if should_build_debug_symbols && [[ -f "${DEBUG_SYMBOLS_DIR}/${XCFW_NAME}-${VERSION}-debug-symbols.zip" ]]; then
+  echo "  ${DEBUG_SYMBOLS_DIR}/${XCFW_NAME}-${VERSION}-debug-symbols.zip"
+fi

@@ -62,7 +62,7 @@ dist/web/
 Publishing helpers consume these outputs:
 
 - `make publish_maven` uploads Android, Android lite, Compose, Compose lite, Java desktop, and Java desktop lite artifacts.
-- `make publish_github` uploads `VolvoxGrid.xcframework.zip` and `VolvoxGridLite.xcframework.zip` when present.
+- `make publish_github` uploads release artifacts, including debug-symbol zips from `dist/symbols/` when present.
 - `make publish_nuget` publishes both `VolvoxGrid.DotNet` and `VolvoxGrid.DotNet.Lite`.
 - `make publish_npm` publishes `volvoxgrid`, `volvoxgrid-lite`, and adapter packages when their artifacts are present.
 

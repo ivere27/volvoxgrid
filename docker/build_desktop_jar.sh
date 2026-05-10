@@ -25,6 +25,8 @@ BUILD_OCX="${BUILD_OCX:-1}"
 OCX_DIST_DIR="${OCX_DIST_DIR:-${REPO_ROOT}/dist/desktop/ocx}"
 BUILD_DOTNET="${BUILD_DOTNET:-0}"
 DOTNET_DIST_DIR="${DOTNET_DIST_DIR:-${REPO_ROOT}/dist/dotnet}"
+BUILD_DEBUG_SYMBOLS="${BUILD_DEBUG_SYMBOLS:-1}"
+DEBUG_SYMBOLS_DIR="${DEBUG_SYMBOLS_DIR:-${REPO_ROOT}/dist/symbols}"
 
 detect_cpu_count() {
   if command -v nproc >/dev/null 2>&1; then
@@ -62,7 +64,7 @@ case "${LIBRARY_BUILD_MODE}" in
     exit 1
     ;;
 esac
-echo "Using BUILD_JOBS=${BUILD_JOBS} (cpu=${CPU_COUNT}, cargo=${CARGO_BUILD_JOBS}, gradle=${GRADLE_MAX_WORKERS}, mode=${LIBRARY_BUILD_MODE})"
+echo "Using BUILD_JOBS=${BUILD_JOBS} (cpu=${CPU_COUNT}, cargo=${CARGO_BUILD_JOBS}, gradle=${GRADLE_MAX_WORKERS}, mode=${LIBRARY_BUILD_MODE}, debug_symbols=${BUILD_DEBUG_SYMBOLS})"
 
 # Metadata consumed by engine/build.rs for embedding into binaries.
 export VOLVOXGRID_VERSION="${VOLVOXGRID_VERSION:-${VERSION}}"
@@ -83,33 +85,100 @@ should_build_dotnet() {
   return 1
 }
 
-file_size_bytes() {
-  stat -c%s "$1"
+should_build_debug_symbols() {
+  case "${BUILD_DEBUG_SYMBOLS}" in
+    1|true|TRUE|yes|YES|on|ON)
+      return 0
+      ;;
+  esac
+  return 1
 }
 
 strip_macos_dylib() {
-  local dylib="$1"
-  local tmp="${dylib}.stripped"
+  bash "${REPO_ROOT}/scripts/strip_macos_dylibs.sh" "$1"
+}
 
-  if ! command -v llvm-strip >/dev/null 2>&1; then
-    echo "Warning: llvm-strip not found; keeping macOS dylib unstripped: ${dylib}" >&2
+SYMBOLS_STAGE_ROOT="${WORK_DIR}/debug-symbols/${ARTIFACT_ID}-${VERSION}-debug-symbols"
+CARGO_RELEASE_ARGS=(-j "${CARGO_BUILD_JOBS}" --release)
+if should_build_debug_symbols; then
+  CARGO_RELEASE_ARGS+=(--config 'profile.release.debug="line-tables-only"')
+  CARGO_RELEASE_ARGS+=(--config 'profile.release.strip="none"')
+fi
+
+process_native_library() {
+  local platform="$1"
+  local library="$2"
+
+  if should_build_debug_symbols; then
+    bash "${REPO_ROOT}/scripts/split_native_debug_symbols.sh" \
+      "${platform}" \
+      "${library}" \
+      "${SYMBOLS_STAGE_ROOT}/native/${platform}"
+  elif [[ "${platform}" == macos-* ]]; then
+    strip_macos_dylib "${library}"
+  fi
+}
+
+collect_dotnet_symbols() {
+  local label="$1"
+  shift
+
+  if ! should_build_debug_symbols; then
     return 0
   fi
 
-  local before
-  before="$(file_size_bytes "${dylib}")"
+  local out_dir="${SYMBOLS_STAGE_ROOT}/dotnet/${label}"
+  local dir
+  local pdb
+  for dir in "$@"; do
+    [[ -d "${dir}" ]] || continue
+    for pdb in "${dir}"/*.pdb; do
+      [[ -f "${pdb}" ]] || continue
+      mkdir -p "${out_dir}"
+      cp -f "${pdb}" "${out_dir}/"
+    done
+  done
+}
 
-  rm -f "${tmp}"
-  if ! llvm-strip --strip-all -o "${tmp}" "${dylib}"; then
-    echo "Warning: llvm-strip failed; keeping macOS dylib unstripped: ${dylib}" >&2
-    rm -f "${tmp}"
+finalize_debug_symbols() {
+  if ! should_build_debug_symbols; then
     return 0
   fi
-  mv -f "${tmp}" "${dylib}"
 
-  local after
-  after="$(file_size_bytes "${dylib}")"
-  echo "Stripped macOS dylib: ${dylib} (${before} -> ${after} bytes)"
+  local symbols_parent="${WORK_DIR}/debug-symbols"
+  if [[ ! -d "${symbols_parent}" ]] || ! find "${symbols_parent}" -mindepth 2 -print -quit | grep -q .; then
+    echo "No debug symbols captured."
+    return 0
+  fi
+
+  mkdir -p "${DEBUG_SYMBOLS_DIR}"
+
+  local root
+  for root in "${symbols_parent}"/*-debug-symbols; do
+    [[ -d "${root}" ]] || continue
+    if ! find "${root}" -mindepth 1 -print -quit | grep -q .; then
+      continue
+    fi
+
+    local base
+    local artifact_id
+    local zip_path
+    base="$(basename "${root}")"
+    artifact_id="${base%-${VERSION}-debug-symbols}"
+
+    mkdir -p "${root}/META-INF/volvoxgrid"
+    cat > "${root}/META-INF/volvoxgrid/build-info.properties" <<META
+volvoxgrid.version=${VERSION}
+volvoxgrid.artifact_id=${artifact_id}
+volvoxgrid.git_commit=${GIT_COMMIT}
+volvoxgrid.build_date=${BUILD_DATE}
+META
+
+    zip_path="$(cd "${DEBUG_SYMBOLS_DIR}" && pwd)/${base}.zip"
+    rm -f "${zip_path}"
+    (cd "${symbols_parent}" && zip -qr "${zip_path}" "${base}")
+    echo "Built debug symbols: ${zip_path}"
+  done
 }
 
 LIBRARY_CRATE="${REPO_ROOT}/runtime"
@@ -133,16 +202,18 @@ export CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER="/opt/volvoxgrid/zig-cc-aarch64-
 
 # linux-x86_64 (native)
 echo "Building library: linux-x86_64..."
-(cd "${LIBRARY_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target x86_64-unknown-linux-gnu "${LIBRARY_FEATURE_ARGS[@]}")
+(cd "${LIBRARY_CRATE}" && cargo build "${CARGO_RELEASE_ARGS[@]}" --target x86_64-unknown-linux-gnu "${LIBRARY_FEATURE_ARGS[@]}")
 mkdir -p "${NATIVES_DIR}/linux-x86_64"
 cp "${CARGO_TARGET_DIR}/x86_64-unknown-linux-gnu/release/libvolvoxgrid.so" "${NATIVES_DIR}/linux-x86_64/"
+process_native_library "linux-x86_64" "${NATIVES_DIR}/linux-x86_64/libvolvoxgrid.so"
 
 # linux-x86 (cross-compile)
 if command -v i686-linux-gnu-gcc >/dev/null 2>&1; then
   echo "Building library: linux-x86..."
-  (cd "${LIBRARY_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target i686-unknown-linux-gnu "${LIBRARY_FEATURE_ARGS[@]}")
+  (cd "${LIBRARY_CRATE}" && cargo build "${CARGO_RELEASE_ARGS[@]}" --target i686-unknown-linux-gnu "${LIBRARY_FEATURE_ARGS[@]}")
   mkdir -p "${NATIVES_DIR}/linux-x86"
   cp "${CARGO_TARGET_DIR}/i686-unknown-linux-gnu/release/libvolvoxgrid.so" "${NATIVES_DIR}/linux-x86/"
+  process_native_library "linux-x86" "${NATIVES_DIR}/linux-x86/libvolvoxgrid.so"
 else
   echo "SKIP: linux-x86 (i686-linux-gnu-gcc not found)"
 fi
@@ -150,9 +221,10 @@ fi
 # linux-aarch64 (cross-compile)
 if command -v aarch64-linux-gnu-gcc >/dev/null 2>&1; then
   echo "Building library: linux-aarch64..."
-  (cd "${LIBRARY_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target aarch64-unknown-linux-gnu "${LIBRARY_FEATURE_ARGS[@]}")
+  (cd "${LIBRARY_CRATE}" && cargo build "${CARGO_RELEASE_ARGS[@]}" --target aarch64-unknown-linux-gnu "${LIBRARY_FEATURE_ARGS[@]}")
   mkdir -p "${NATIVES_DIR}/linux-aarch64"
   cp "${CARGO_TARGET_DIR}/aarch64-unknown-linux-gnu/release/libvolvoxgrid.so" "${NATIVES_DIR}/linux-aarch64/"
+  process_native_library "linux-aarch64" "${NATIVES_DIR}/linux-aarch64/libvolvoxgrid.so"
 else
   echo "SKIP: linux-aarch64 (aarch64-linux-gnu-gcc not found)"
 fi
@@ -160,9 +232,10 @@ fi
 # linux-armv7 (cross-compile)
 if command -v arm-linux-gnueabihf-gcc >/dev/null 2>&1; then
   echo "Building library: linux-armv7..."
-  (cd "${LIBRARY_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target armv7-unknown-linux-gnueabihf "${LIBRARY_FEATURE_ARGS[@]}")
+  (cd "${LIBRARY_CRATE}" && cargo build "${CARGO_RELEASE_ARGS[@]}" --target armv7-unknown-linux-gnueabihf "${LIBRARY_FEATURE_ARGS[@]}")
   mkdir -p "${NATIVES_DIR}/linux-armv7"
   cp "${CARGO_TARGET_DIR}/armv7-unknown-linux-gnueabihf/release/libvolvoxgrid.so" "${NATIVES_DIR}/linux-armv7/"
+  process_native_library "linux-armv7" "${NATIVES_DIR}/linux-armv7/libvolvoxgrid.so"
 else
   echo "SKIP: linux-armv7 (arm-linux-gnueabihf-gcc not found)"
 fi
@@ -170,9 +243,10 @@ fi
 # windows-x86 (MinGW cross-compile)
 if command -v i686-w64-mingw32-gcc >/dev/null 2>&1; then
   echo "Building library: windows-x86..."
-  (cd "${LIBRARY_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target i686-pc-windows-gnu "${LIBRARY_FEATURE_ARGS[@]}")
+  (cd "${LIBRARY_CRATE}" && cargo build "${CARGO_RELEASE_ARGS[@]}" --target i686-pc-windows-gnu "${LIBRARY_FEATURE_ARGS[@]}")
   mkdir -p "${NATIVES_DIR}/windows-x86"
   cp "${CARGO_TARGET_DIR}/i686-pc-windows-gnu/release/volvoxgrid.dll" "${NATIVES_DIR}/windows-x86/"
+  process_native_library "windows-x86" "${NATIVES_DIR}/windows-x86/volvoxgrid.dll"
 else
   echo "SKIP: windows-x86 (i686-w64-mingw32-gcc not found)"
 fi
@@ -180,9 +254,10 @@ fi
 # windows-x86_64 (MinGW cross-compile)
 if command -v x86_64-w64-mingw32-gcc >/dev/null 2>&1; then
   echo "Building library: windows-x86_64..."
-  (cd "${LIBRARY_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target x86_64-pc-windows-gnu "${LIBRARY_FEATURE_ARGS[@]}")
+  (cd "${LIBRARY_CRATE}" && cargo build "${CARGO_RELEASE_ARGS[@]}" --target x86_64-pc-windows-gnu "${LIBRARY_FEATURE_ARGS[@]}")
   mkdir -p "${NATIVES_DIR}/windows-x86_64"
   cp "${CARGO_TARGET_DIR}/x86_64-pc-windows-gnu/release/volvoxgrid.dll" "${NATIVES_DIR}/windows-x86_64/"
+  process_native_library "windows-x86_64" "${NATIVES_DIR}/windows-x86_64/volvoxgrid.dll"
 else
   echo "SKIP: windows-x86_64 (x86_64-w64-mingw32-gcc not found)"
 fi
@@ -204,7 +279,9 @@ else
     echo "Building ActiveX OCX: ${flavor}..."
     (
       cd "${VSFLEXGRID_MINGW_DIR}"
-      ./build_ocx.sh release "${extra_args[@]}"
+      BUILD_DEBUG_SYMBOLS="${BUILD_DEBUG_SYMBOLS}" \
+      DEBUG_SYMBOLS_DIR="${WORK_DIR}/debug-symbols/volvoxgrid-activex-${VERSION}-debug-symbols/ocx/${flavor}" \
+        ./build_ocx.sh release "${extra_args[@]}"
     )
 
     mkdir -p "${OCX_DIST_DIR}"
@@ -230,16 +307,16 @@ fi
 # macos-x86_64 (zig cross-compile)
 if command -v zig >/dev/null 2>&1; then
   echo "Building library: macos-x86_64..."
-  (cd "${LIBRARY_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target x86_64-apple-darwin "${LIBRARY_FEATURE_ARGS[@]}")
+  (cd "${LIBRARY_CRATE}" && cargo build "${CARGO_RELEASE_ARGS[@]}" --target x86_64-apple-darwin "${LIBRARY_FEATURE_ARGS[@]}")
   mkdir -p "${NATIVES_DIR}/macos-x86_64"
   cp "${CARGO_TARGET_DIR}/x86_64-apple-darwin/release/libvolvoxgrid.dylib" "${NATIVES_DIR}/macos-x86_64/"
-  strip_macos_dylib "${NATIVES_DIR}/macos-x86_64/libvolvoxgrid.dylib"
+  process_native_library "macos-x86_64" "${NATIVES_DIR}/macos-x86_64/libvolvoxgrid.dylib"
 
   echo "Building library: macos-aarch64..."
-  (cd "${LIBRARY_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target aarch64-apple-darwin "${LIBRARY_FEATURE_ARGS[@]}")
+  (cd "${LIBRARY_CRATE}" && cargo build "${CARGO_RELEASE_ARGS[@]}" --target aarch64-apple-darwin "${LIBRARY_FEATURE_ARGS[@]}")
   mkdir -p "${NATIVES_DIR}/macos-aarch64"
   cp "${CARGO_TARGET_DIR}/aarch64-apple-darwin/release/libvolvoxgrid.dylib" "${NATIVES_DIR}/macos-aarch64/"
-  strip_macos_dylib "${NATIVES_DIR}/macos-aarch64/libvolvoxgrid.dylib"
+  process_native_library "macos-aarch64" "${NATIVES_DIR}/macos-aarch64/libvolvoxgrid.dylib"
 else
   echo "SKIP: macos-x86_64, macos-aarch64 (zig not found)"
 fi
@@ -409,9 +486,22 @@ if should_build_dotnet; then
 
   DOTNET_STAGE_OUT_X64="${DOTNET_DIST_DIR}/winforms_release"
   DOTNET_STAGE_OUT_X86="${DOTNET_DIST_DIR}/winforms_release_x86"
+  DOTNET_MSBUILD_ROOT="${REPO_ROOT}/target/dotnet/msbuild"
   mkdir -p "${DOTNET_STAGE_OUT_X64}" "${DOTNET_STAGE_OUT_X86}"
   cp -a "${DOTNET_STAGE_DIR_X64}/." "${DOTNET_STAGE_OUT_X64}/"
   cp -a "${DOTNET_STAGE_DIR_X86}/." "${DOTNET_STAGE_OUT_X86}/"
+  collect_dotnet_symbols "winforms_release_x64" \
+    "${DOTNET_STAGE_OUT_X64}" \
+    "${DOTNET_MSBUILD_ROOT}/bin/x64/VolvoxGrid.DotNet/Release/net40" \
+    "${DOTNET_MSBUILD_ROOT}/bin/x64/VolvoxGrid.WinFormsSample/Release/net40" \
+    "${DOTNET_MSBUILD_ROOT}/obj/x64/VolvoxGrid.DotNet/Release/net40" \
+    "${DOTNET_MSBUILD_ROOT}/obj/x64/VolvoxGrid.WinFormsSample/Release/net40"
+  collect_dotnet_symbols "winforms_release_x86" \
+    "${DOTNET_STAGE_OUT_X86}" \
+    "${DOTNET_MSBUILD_ROOT}/bin/x86/VolvoxGrid.DotNet/Release/net40" \
+    "${DOTNET_MSBUILD_ROOT}/bin/x86/VolvoxGrid.WinFormsSample/Release/net40" \
+    "${DOTNET_MSBUILD_ROOT}/obj/x86/VolvoxGrid.DotNet/Release/net40" \
+    "${DOTNET_MSBUILD_ROOT}/obj/x86/VolvoxGrid.WinFormsSample/Release/net40"
 
   echo ""
   echo "Building .NET WinForms lite artifacts (release, net40, x64+x86)..."
@@ -426,12 +516,26 @@ if should_build_dotnet; then
   mkdir -p "${DOTNET_LITE_STAGE_OUT_X64}" "${DOTNET_LITE_STAGE_OUT_X86}"
   cp -a "${DOTNET_STAGE_DIR_X64}/." "${DOTNET_LITE_STAGE_OUT_X64}/"
   cp -a "${DOTNET_STAGE_DIR_X86}/." "${DOTNET_LITE_STAGE_OUT_X86}/"
+  collect_dotnet_symbols "winforms_release_lite_x64" \
+    "${DOTNET_LITE_STAGE_OUT_X64}" \
+    "${DOTNET_MSBUILD_ROOT}/bin/x64/VolvoxGrid.DotNet/Release/net40" \
+    "${DOTNET_MSBUILD_ROOT}/bin/x64/VolvoxGrid.WinFormsSample/Release/net40" \
+    "${DOTNET_MSBUILD_ROOT}/obj/x64/VolvoxGrid.DotNet/Release/net40" \
+    "${DOTNET_MSBUILD_ROOT}/obj/x64/VolvoxGrid.WinFormsSample/Release/net40"
+  collect_dotnet_symbols "winforms_release_lite_x86" \
+    "${DOTNET_LITE_STAGE_OUT_X86}" \
+    "${DOTNET_MSBUILD_ROOT}/bin/x86/VolvoxGrid.DotNet/Release/net40" \
+    "${DOTNET_MSBUILD_ROOT}/bin/x86/VolvoxGrid.WinFormsSample/Release/net40" \
+    "${DOTNET_MSBUILD_ROOT}/obj/x86/VolvoxGrid.DotNet/Release/net40" \
+    "${DOTNET_MSBUILD_ROOT}/obj/x86/VolvoxGrid.WinFormsSample/Release/net40"
 
   rm -rf "${DOTNET_STAGE_DIR_X64}" "${DOTNET_STAGE_DIR_X86}"
   mkdir -p "${DOTNET_STAGE_DIR_X64}" "${DOTNET_STAGE_DIR_X86}"
   cp -a "${DOTNET_STAGE_OUT_X64}/." "${DOTNET_STAGE_DIR_X64}/"
   cp -a "${DOTNET_STAGE_OUT_X86}/." "${DOTNET_STAGE_DIR_X86}/"
 fi
+
+finalize_debug_symbols
 
 echo ""
 echo "Built desktop JAR artifacts:"
@@ -453,4 +557,8 @@ if [[ -n "${DOTNET_STAGE_OUT_X64}" || -n "${DOTNET_STAGE_OUT_X86}" ]]; then
   if [[ -n "${DOTNET_LITE_STAGE_OUT_X86}" ]]; then
     echo "  ${DOTNET_LITE_STAGE_OUT_X86}"
   fi
+fi
+if should_build_debug_symbols && [[ -f "${DEBUG_SYMBOLS_DIR}/${ARTIFACT_ID}-${VERSION}-debug-symbols.zip" ]]; then
+  echo "Built debug symbols:"
+  echo "  ${DEBUG_SYMBOLS_DIR}/${ARTIFACT_ID}-${VERSION}-debug-symbols.zip"
 fi

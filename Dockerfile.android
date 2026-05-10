@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     file \
     git \
+    llvm \
     openjdk-17-jdk \
     pkg-config \
     protobuf-compiler \

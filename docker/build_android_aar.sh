@@ -23,6 +23,8 @@ LIBRARY_BUILD_MODE="${LIBRARY_BUILD_MODE:-full}"
 AAR_BUILD_TYPE="${AAR_BUILD_TYPE:-release}"
 ANDROID_ABIS="${ANDROID_ABIS:-arm64-v8a,armeabi-v7a}"
 DIST_DIR="${DIST_DIR:-${REPO_ROOT}/dist/maven}"
+BUILD_DEBUG_SYMBOLS="${BUILD_DEBUG_SYMBOLS:-1}"
+DEBUG_SYMBOLS_DIR="${DEBUG_SYMBOLS_DIR:-${REPO_ROOT}/dist/symbols}"
 
 detect_cpu_count() {
   if command -v nproc >/dev/null 2>&1; then
@@ -45,7 +47,7 @@ if ! [[ "${BUILD_JOBS}" =~ ^[0-9]+$ ]] || [[ "${BUILD_JOBS}" -lt 1 ]]; then
 fi
 export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-${BUILD_JOBS}}"
 GRADLE_MAX_WORKERS="${GRADLE_MAX_WORKERS:-${BUILD_JOBS}}"
-echo "Using BUILD_JOBS=${BUILD_JOBS} (cpu=${CPU_COUNT}, cargo=${CARGO_BUILD_JOBS}, gradle=${GRADLE_MAX_WORKERS})"
+echo "Using BUILD_JOBS=${BUILD_JOBS} (cpu=${CPU_COUNT}, cargo=${CARGO_BUILD_JOBS}, gradle=${GRADLE_MAX_WORKERS}, debug_symbols=${BUILD_DEBUG_SYMBOLS})"
 
 # Metadata consumed by engine/build.rs for embedding into binaries.
 export VOLVOXGRID_VERSION="${VOLVOXGRID_VERSION:-${VERSION}}"
@@ -76,6 +78,64 @@ case "${AAR_BUILD_TYPE}" in
     exit 1
     ;;
 esac
+
+should_build_debug_symbols() {
+  if [[ "${AAR_BUILD_TYPE}" != "release" ]]; then
+    return 1
+  fi
+  case "${BUILD_DEBUG_SYMBOLS}" in
+    1|true|TRUE|yes|YES|on|ON)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+SYMBOLS_WORK_DIR="$(mktemp -d /tmp/volvoxgrid-android-symbols-XXXXXX)"
+SYMBOLS_STAGE_ROOT="${SYMBOLS_WORK_DIR}/${ARTIFACT_ID}-${VERSION}-debug-symbols"
+if should_build_debug_symbols; then
+  CARGO_PROFILE_ARGS+=(--config 'profile.release.debug="line-tables-only"')
+  CARGO_PROFILE_ARGS+=(--config 'profile.release.strip="none"')
+fi
+
+process_native_library() {
+  local abi="$1"
+  local library="$2"
+
+  if ! should_build_debug_symbols || [[ ! -f "${library}" ]]; then
+    return 0
+  fi
+
+  bash "${REPO_ROOT}/scripts/split_native_debug_symbols.sh" \
+    "android-${abi}" \
+    "${library}" \
+    "${SYMBOLS_STAGE_ROOT}/native/${abi}"
+}
+
+finalize_debug_symbols() {
+  if ! should_build_debug_symbols; then
+    return 0
+  fi
+
+  if [[ ! -d "${SYMBOLS_STAGE_ROOT}" ]] || ! find "${SYMBOLS_STAGE_ROOT}" -mindepth 1 -print -quit | grep -q .; then
+    echo "No Android debug symbols captured for ${ARTIFACT_ID}-${VERSION}."
+    return 0
+  fi
+
+  mkdir -p "${SYMBOLS_STAGE_ROOT}/META-INF/volvoxgrid" "${DEBUG_SYMBOLS_DIR}"
+  cat > "${SYMBOLS_STAGE_ROOT}/META-INF/volvoxgrid/build-info.properties" <<META
+volvoxgrid.version=${VERSION}
+volvoxgrid.artifact_id=${ARTIFACT_ID}
+volvoxgrid.git_commit=${GIT_COMMIT}
+volvoxgrid.build_date=${BUILD_DATE}
+META
+
+  local zip_path
+  zip_path="$(cd "${DEBUG_SYMBOLS_DIR}" && pwd)/${ARTIFACT_ID}-${VERSION}-debug-symbols.zip"
+  rm -f "${zip_path}"
+  (cd "$(dirname "${SYMBOLS_STAGE_ROOT}")" && zip -qr "${zip_path}" "$(basename "${SYMBOLS_STAGE_ROOT}")")
+  echo "Built debug symbols: ${zip_path}"
+}
 
 export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-/opt/android-sdk}"
 export ANDROID_HOME="${ANDROID_HOME:-${ANDROID_SDK_ROOT}}"
@@ -279,7 +339,7 @@ if [[ -d "${AAR_UNPACKED_DIR}/jni" ]]; then
   done
 fi
 
-if [[ "${AAR_BUILD_TYPE}" == "debug" ]]; then
+if [[ "${AAR_BUILD_TYPE}" == "debug" ]] || should_build_debug_symbols; then
   for ABI in "${ABI_LIST[@]}"; do
     JNI_SO="$(find_unstripped_jni_so "${ABI}" || true)"
     if [[ -z "${JNI_SO}" ]]; then
@@ -310,6 +370,8 @@ for ABI in "${ABI_LIST[@]}"; do
     "${AAR_UNPACKED_DIR}/jni/${ABI}/libvolvoxgrid.so" \
     "${AAR_UNPACKED_DIR}/jni/${ABI}/libvolvoxgrid_lite.so"
   cp -f "${SRC_SO}" "${AAR_UNPACKED_DIR}/jni/${ABI}/${AAR_LIBRARY_SO_NAME}"
+  process_native_library "${ABI}" "${AAR_UNPACKED_DIR}/jni/${ABI}/${AAR_LIBRARY_SO_NAME}"
+  process_native_library "${ABI}" "${AAR_UNPACKED_DIR}/jni/${ABI}/libvolvoxgrid_jni.so"
 done
 
 (cd "${CLASSES_WORK_DIR}" && jar xf "${AAR_UNPACKED_DIR}/classes.jar")
@@ -324,6 +386,8 @@ AAR_OUT="${DIST_DIR}/${ARTIFACT_ID}-${VERSION}.aar"
 # Remove any prior output first to avoid stale JNI libs from previous builds.
 rm -f "${AAR_OUT}"
 (cd "${AAR_UNPACKED_DIR}" && zip -qr "${AAR_OUT}" .)
+finalize_debug_symbols
+rm -rf "${SYMBOLS_WORK_DIR}"
 rm -rf "${MERGE_WORK_DIR}"
 rm -rf "${JNI_STAGE_DIR}"
 

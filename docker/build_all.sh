@@ -31,6 +31,7 @@ run_android() {
   GROUP_ID="${full_group_id}" \
   ARTIFACT_ID="${full_artifact_id}" \
   LIBRARY_BUILD_MODE=full \
+  BUILD_DEBUG_SYMBOLS="${AAR_BUILD_DEBUG_SYMBOLS:-${BUILD_DEBUG_SYMBOLS:-1}}" \
     "${SCRIPT_DIR}/build_android_aar.sh"
 
   case "${include_lite}" in
@@ -41,6 +42,7 @@ run_android() {
       GROUP_ID="${lite_group_id}" \
       ARTIFACT_ID="${lite_artifact_id}" \
       LIBRARY_BUILD_MODE=lite \
+      BUILD_DEBUG_SYMBOLS="${AAR_BUILD_DEBUG_SYMBOLS:-${BUILD_DEBUG_SYMBOLS:-1}}" \
         "${SCRIPT_DIR}/build_android_aar.sh"
       ;;
   esac
@@ -85,6 +87,7 @@ run_desktop() {
   GROUP_ID="${desktop_group_id}" \
   ARTIFACT_ID="${desktop_artifact_id}" \
   LIBRARY_BUILD_MODE=full \
+  BUILD_DEBUG_SYMBOLS="${DESKTOP_BUILD_DEBUG_SYMBOLS:-${BUILD_DEBUG_SYMBOLS:-1}}" \
   VERSION="${desktop_version}" \
   GIT_COMMIT="${desktop_git_commit}" \
   BUILD_DATE="${desktop_build_date}" \
@@ -96,6 +99,7 @@ run_desktop() {
   GROUP_ID="${desktop_lite_group_id}" \
   ARTIFACT_ID="${desktop_lite_artifact_id}" \
   LIBRARY_BUILD_MODE=lite \
+  BUILD_DEBUG_SYMBOLS="${DESKTOP_BUILD_DEBUG_SYMBOLS:-${BUILD_DEBUG_SYMBOLS:-1}}" \
   BUILD_OCX=0 \
   BUILD_DOTNET=0 \
   VERSION="${desktop_version}" \
@@ -108,14 +112,18 @@ run_ios() {
   echo "========================================"
   echo "  Building: iOS XCFramework"
   echo "========================================"
-  LIBRARY_BUILD_MODE=full "${SCRIPT_DIR}/build_ios.sh"
+  LIBRARY_BUILD_MODE=full \
+  BUILD_DEBUG_SYMBOLS="${IOS_BUILD_DEBUG_SYMBOLS:-${BUILD_DEBUG_SYMBOLS:-1}}" \
+    "${SCRIPT_DIR}/build_ios.sh"
 
   case "${BUILD_IOS_INCLUDE_LITE:-0}" in
     1|true|TRUE|yes|YES|on|ON)
       echo "----------------------------------------"
       echo "  Building: iOS XCFramework (lite)"
       echo "----------------------------------------"
-      LIBRARY_BUILD_MODE=lite "${SCRIPT_DIR}/build_ios.sh"
+      LIBRARY_BUILD_MODE=lite \
+      BUILD_DEBUG_SYMBOLS="${IOS_BUILD_DEBUG_SYMBOLS:-${BUILD_DEBUG_SYMBOLS:-1}}" \
+        "${SCRIPT_DIR}/build_ios.sh"
       ;;
   esac
 }

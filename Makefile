@@ -141,6 +141,7 @@ AAR_COMPOSE_LITE_ARTIFACT_ID ?= volvoxgrid-android-compose-lite
 AAR_GIT_COMMIT ?= $(shell git -C "$(CURRENT_DIR)" rev-parse --short=12 HEAD 2>/dev/null || echo unknown)
 AAR_BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 AAR_ANDROID_ABIS ?= arm64-v8a,armeabi-v7a
+AAR_BUILD_DEBUG_SYMBOLS ?= 1
 DOCKER_GO_BUILD_CACHE_VOLUME ?= go-build-cache
 DOCKER_GRADLE_BUILD_CACHE_VOLUME ?= gradle-build-cache
 DOCKER_GO_BUILD_CACHE_DIR ?= /cache/go-build
@@ -153,6 +154,7 @@ DESKTOP_LITE_GROUP_ID ?= $(DESKTOP_GROUP_ID)
 DESKTOP_LITE_ARTIFACT_ID ?= volvoxgrid-desktop-lite
 DESKTOP_BUILD_OCX ?= 1
 DESKTOP_BUILD_DOTNET ?= 1
+DESKTOP_BUILD_DEBUG_SYMBOLS ?= 1
 DESKTOP_GIT_COMMIT ?= $(shell git -C "$(CURRENT_DIR)" rev-parse --short=12 HEAD 2>/dev/null || echo unknown)
 DESKTOP_BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 WEB_DOCKER_IMAGE ?= volvoxgrid-web:latest
@@ -165,6 +167,7 @@ IOS_VERSION ?= $(VOLVOXGRID_VERSION)
 IOS_GIT_COMMIT ?= $(shell git -C "$(CURRENT_DIR)" rev-parse --short=12 HEAD 2>/dev/null || echo unknown)
 IOS_BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 IOS_LIBRARY_BUILD_MODE ?= full
+IOS_BUILD_DEBUG_SYMBOLS ?= 1
 ALL_DOCKER_IMAGE ?= volvoxgrid-all:latest
 ALL_GIT_COMMIT ?= $(AAR_GIT_COMMIT)
 ALL_BUILD_DATE ?= $(AAR_BUILD_DATE)
@@ -342,7 +345,7 @@ help:
 	@echo "  docker_all_image          Build unified Docker image (all toolchains)"
 	@echo "  docker_all                Build all platform artifacts via unified Docker image (Android full+lite, desktop full+lite, iOS full+lite, .NET WinForms full+lite x64+x86), auto-install SNAPSHOT to mavenLocal"
 	@echo "  publish_maven             Upload Android, Android lite, Compose, Compose lite AARs + desktop JARs to Maven Central"
-	@echo "  publish_github            Upload all artifacts (xcframework, AAR, JAR, .NET, ActiveX, web zips) to GitHub release"
+	@echo "  publish_github            Upload all artifacts (xcframework, AAR, JAR, .NET, ActiveX, web zips, debug symbols) to GitHub release"
 	@echo "  publish_local             Install built SNAPSHOT artifacts from dist/maven into ~/.m2/repository"
 	@echo "  publish_web               Copy dist/web -> public (clean), then run firebase deploy"
 	@echo "  publish_npm               Publish volvoxgrid + adapter npm packages from dist/web zip"
@@ -1275,7 +1278,7 @@ docker_android_aar_image:
 
 docker_android: docker_android_aar_image
 	@echo "Packaging Android AAR + Android lite AAR + Compose AAR + Compose lite AAR (version $(AAR_VERSION), ABIs $(AAR_ANDROID_ABIS))..."
-	@echo "Using BUILD_JOBS=$(BUILD_JOBS) (cargo=$(CARGO_BUILD_JOBS), gradle=$(GRADLE_MAX_WORKERS))"
+	@echo "Using BUILD_JOBS=$(BUILD_JOBS) (cargo=$(CARGO_BUILD_JOBS), gradle=$(GRADLE_MAX_WORKERS), debug_symbols=$(AAR_BUILD_DEBUG_SYMBOLS))"
 	@mkdir -p dist/maven
 	docker run --rm \
 		--entrypoint /bin/bash \
@@ -1300,6 +1303,7 @@ docker_android: docker_android_aar_image
 		-e GIT_COMMIT="$(AAR_GIT_COMMIT)" \
 		-e BUILD_DATE="$(AAR_BUILD_DATE)" \
 		-e ANDROID_ABIS="$(AAR_ANDROID_ABIS)" \
+		-e BUILD_DEBUG_SYMBOLS="$(AAR_BUILD_DEBUG_SYMBOLS)" \
 		"$(AAR_DOCKER_IMAGE)"
 	docker run --rm \
 		-u "$$(id -u):$$(id -g)" \
@@ -1319,6 +1323,7 @@ docker_android: docker_android_aar_image
 		-e BUILD_DATE="$(AAR_BUILD_DATE)" \
 		-e ANDROID_ABIS="$(AAR_ANDROID_ABIS)" \
 		-e LIBRARY_BUILD_MODE=lite \
+		-e BUILD_DEBUG_SYMBOLS="$(AAR_BUILD_DEBUG_SYMBOLS)" \
 		"$(AAR_DOCKER_IMAGE)"
 	docker run --rm \
 		--entrypoint /opt/volvoxgrid/build_android_compose_aar.sh \
@@ -1369,7 +1374,7 @@ docker_desktop_image:
 
 docker_desktop: docker_desktop_image
 	@echo "Packaging desktop JARs (version $(DESKTOP_VERSION))..."
-	@echo "Using BUILD_JOBS=$(BUILD_JOBS) (cargo=$(CARGO_BUILD_JOBS), gradle=$(GRADLE_MAX_WORKERS), dotnet=$(DESKTOP_BUILD_DOTNET))"
+	@echo "Using BUILD_JOBS=$(BUILD_JOBS) (cargo=$(CARGO_BUILD_JOBS), gradle=$(GRADLE_MAX_WORKERS), dotnet=$(DESKTOP_BUILD_DOTNET), debug_symbols=$(DESKTOP_BUILD_DEBUG_SYMBOLS))"
 	@mkdir -p dist/maven
 	docker run --rm \
 		--entrypoint /bin/bash \
@@ -1395,6 +1400,7 @@ docker_desktop: docker_desktop_image
 		-e BUILD_DATE="$(DESKTOP_BUILD_DATE)" \
 		-e BUILD_OCX="$(DESKTOP_BUILD_OCX)" \
 		-e BUILD_DOTNET="$(DESKTOP_BUILD_DOTNET)" \
+		-e BUILD_DEBUG_SYMBOLS="$(DESKTOP_BUILD_DEBUG_SYMBOLS)" \
 		"$(DESKTOP_DOCKER_IMAGE)"
 	docker run --rm \
 		-u "$$(id -u):$$(id -g)" \
@@ -1415,6 +1421,7 @@ docker_desktop: docker_desktop_image
 		-e LIBRARY_BUILD_MODE=lite \
 		-e BUILD_OCX=0 \
 		-e BUILD_DOTNET=0 \
+		-e BUILD_DEBUG_SYMBOLS="$(DESKTOP_BUILD_DEBUG_SYMBOLS)" \
 		"$(DESKTOP_DOCKER_IMAGE)"
 	@echo "Desktop JAR artifacts (default + lite): dist/maven/"
 	@echo "ActiveX OCX artifacts: dist/desktop/ocx/ (set DESKTOP_BUILD_OCX=0 to skip)"
@@ -1431,7 +1438,7 @@ docker_desktop: docker_desktop_image
 
 docker_desktop_lite: docker_desktop_image
 	@echo "Packaging desktop lite JAR (version $(DESKTOP_VERSION))..."
-	@echo "Using BUILD_JOBS=$(BUILD_JOBS) (cargo=$(CARGO_BUILD_JOBS), gradle=$(GRADLE_MAX_WORKERS))"
+	@echo "Using BUILD_JOBS=$(BUILD_JOBS) (cargo=$(CARGO_BUILD_JOBS), gradle=$(GRADLE_MAX_WORKERS), debug_symbols=$(DESKTOP_BUILD_DEBUG_SYMBOLS))"
 	@mkdir -p dist/maven
 	docker run --rm \
 		--entrypoint /bin/bash \
@@ -1458,6 +1465,7 @@ docker_desktop_lite: docker_desktop_image
 		-e LIBRARY_BUILD_MODE=lite \
 		-e BUILD_OCX=0 \
 		-e BUILD_DOTNET=0 \
+		-e BUILD_DEBUG_SYMBOLS="$(DESKTOP_BUILD_DEBUG_SYMBOLS)" \
 		"$(DESKTOP_DOCKER_IMAGE)"
 	@echo "Desktop lite JAR artifacts: dist/maven/"
 	@if echo "$(DESKTOP_VERSION)" | grep -q -- '-SNAPSHOT$$'; then \
@@ -1498,7 +1506,7 @@ docker_ios_image:
 	docker build -t "$(IOS_DOCKER_IMAGE)" -f Dockerfile.ios .
 
 docker_ios: docker_ios_image
-	@echo "Building iOS XCFramework ($(IOS_LIBRARY_BUILD_MODE))..."
+	@echo "Building iOS XCFramework ($(IOS_LIBRARY_BUILD_MODE), debug_symbols=$(IOS_BUILD_DEBUG_SYMBOLS))..."
 	@echo "Using BUILD_JOBS=$(BUILD_JOBS) (cargo=$(CARGO_BUILD_JOBS))"
 	@mkdir -p dist/ios
 	docker run --rm \
@@ -1521,6 +1529,7 @@ docker_ios: docker_ios_image
 		-e GIT_COMMIT="$(IOS_GIT_COMMIT)" \
 		-e BUILD_DATE="$(IOS_BUILD_DATE)" \
 		-e LIBRARY_BUILD_MODE="$(IOS_LIBRARY_BUILD_MODE)" \
+		-e BUILD_DEBUG_SYMBOLS="$(IOS_BUILD_DEBUG_SYMBOLS)" \
 		"$(IOS_DOCKER_IMAGE)"
 	@echo "iOS artifacts: dist/ios/"
 
@@ -1534,7 +1543,7 @@ docker_all_image:
 
 docker_all: docker_all_image
 	@echo "Building all platform artifacts via unified image..."
-	@echo "Using BUILD_JOBS=$(BUILD_JOBS) (cargo=$(CARGO_BUILD_JOBS), gradle=$(GRADLE_MAX_WORKERS), dotnet=$(DESKTOP_BUILD_DOTNET), build_date=$(ALL_BUILD_DATE), desktop_ocx=$(ALL_BUILD_OCX))"
+	@echo "Using BUILD_JOBS=$(BUILD_JOBS) (cargo=$(CARGO_BUILD_JOBS), gradle=$(GRADLE_MAX_WORKERS), dotnet=$(DESKTOP_BUILD_DOTNET), debug_symbols=$(DESKTOP_BUILD_DEBUG_SYMBOLS), build_date=$(ALL_BUILD_DATE), desktop_ocx=$(ALL_BUILD_OCX))"
 	@mkdir -p dist/maven dist/dotnet dist/ios dist/wasm dist/wasm-lite dist/web
 	docker run --rm \
 		--entrypoint /bin/bash \
@@ -1560,6 +1569,9 @@ docker_all: docker_all_image
 		-e WEB_BUNDLE_VERSION="$(VOLVOXGRID_VERSION)" \
 		-e BUILD_OCX="$(ALL_BUILD_OCX)" \
 		-e BUILD_DOTNET="$(DESKTOP_BUILD_DOTNET)" \
+		-e AAR_BUILD_DEBUG_SYMBOLS="$(AAR_BUILD_DEBUG_SYMBOLS)" \
+		-e DESKTOP_BUILD_DEBUG_SYMBOLS="$(DESKTOP_BUILD_DEBUG_SYMBOLS)" \
+		-e IOS_BUILD_DEBUG_SYMBOLS="$(IOS_BUILD_DEBUG_SYMBOLS)" \
 		-e BUILD_ANDROID_INCLUDE_LITE=1 \
 		-e BUILD_IOS_INCLUDE_LITE=1 \
 		-e GROUP_ID="$(AAR_GROUP_ID)" \
@@ -1815,20 +1827,42 @@ publish_github:
 	    echo "Skip web bundle: $$f not found."; \
 	  fi; \
 	done; \
+	SYMBOLS_DIR="$(CURRENT_DIR)/dist/symbols"; \
+	if [ -d "$$SYMBOLS_DIR" ]; then \
+	  found_symbols=0; \
+	  for f in "$$SYMBOLS_DIR"/*"$(VOLVOXGRID_VERSION)"*debug-symbols.zip; \
+	  do \
+	    if [ -f "$$f" ]; then \
+	      found_symbols=1; \
+	      echo "Uploading debug symbols $$(basename "$$f") to $$TAG..."; \
+	      gh release upload "$$TAG" "$$f" --repo "$(IOS_GITHUB_REPO)" --clobber; \
+	    fi; \
+	  done; \
+	  if [ "$$found_symbols" = "0" ]; then \
+	    echo "Skip debug symbols: no .zip files found in $$SYMBOLS_DIR."; \
+	  fi; \
+	else \
+	  echo "Skip debug symbols: $$SYMBOLS_DIR not found."; \
+	fi; \
 	DOTNET_X64_DIR="$(CURRENT_DIR)/dist/dotnet/winforms_release"; \
 	DOTNET_X86_DIR="$(CURRENT_DIR)/dist/dotnet/winforms_release_x86"; \
+	DOTNET_LITE_X64_DIR="$(CURRENT_DIR)/dist/dotnet/winforms_release_lite"; \
+	DOTNET_LITE_X86_DIR="$(CURRENT_DIR)/dist/dotnet/winforms_release_lite_x86"; \
 	if [ ! -d "$$DOTNET_X64_DIR" ]; then DOTNET_X64_DIR="$(CURRENT_DIR)/target/dotnet/winforms_release"; fi; \
 	if [ ! -d "$$DOTNET_X86_DIR" ]; then DOTNET_X86_DIR="$(CURRENT_DIR)/target/dotnet/winforms_release_x86"; fi; \
+	if [ ! -d "$$DOTNET_LITE_X64_DIR" ]; then DOTNET_LITE_X64_DIR="$(CURRENT_DIR)/target/dotnet/winforms_release_lite"; fi; \
+	if [ ! -d "$$DOTNET_LITE_X86_DIR" ]; then DOTNET_LITE_X86_DIR="$(CURRENT_DIR)/target/dotnet/winforms_release_lite_x86"; fi; \
 	for entry in \
-	  "x64:$$DOTNET_X64_DIR" \
-	  "x86:$$DOTNET_X86_DIR"; \
+	  "volvoxgrid-dotnet-winforms-$(VOLVOXGRID_VERSION)-x64:$$DOTNET_X64_DIR" \
+	  "volvoxgrid-dotnet-winforms-$(VOLVOXGRID_VERSION)-x86:$$DOTNET_X86_DIR" \
+	  "volvoxgrid-dotnet-winforms-lite-$(VOLVOXGRID_VERSION)-x64:$$DOTNET_LITE_X64_DIR" \
+	  "volvoxgrid-dotnet-winforms-lite-$(VOLVOXGRID_VERSION)-x86:$$DOTNET_LITE_X86_DIR"; \
 	do \
-	  arch="$${entry%%:*}"; \
+	  top_dir="$${entry%%:*}"; \
 	  dir="$${entry#*:}"; \
 	  if [ -d "$$dir" ]; then \
 	    stage_dir=$$(mktemp -d); \
-	    top_dir="volvoxgrid-dotnet-winforms-$(VOLVOXGRID_VERSION)-$$arch"; \
-	    zip_path="/tmp/$${top_dir}.zip"; \
+	    zip_path="/tmp/$$top_dir.zip"; \
 	    mkdir -p "$$stage_dir/$$top_dir"; \
 	    cp -a "$$dir/." "$$stage_dir/$$top_dir/"; \
 	    find "$$stage_dir/$$top_dir" -maxdepth 1 -type f -name '*.log' -delete; \
@@ -1837,7 +1871,7 @@ publish_github:
 	    gh release upload "$$TAG" "$$zip_path" --repo "$(IOS_GITHUB_REPO)" --clobber; \
 	    rm -rf "$$stage_dir" "$$zip_path"; \
 	  else \
-	    echo "Skip .NET $$arch bundle: $$dir not found."; \
+	    echo "Skip .NET bundle $$top_dir: $$dir not found."; \
 	  fi; \
 	done; \
 	OCX_DIR="$(CURRENT_DIR)/dist/desktop/ocx"; \
@@ -1992,6 +2026,7 @@ publish_nuget:
 		exit 1; \
 	fi
 	@echo "Staging native binaries into $(DOTNET_NATIVE_STAGE)/..."
+	@rm -rf "$(DOTNET_NATIVE_STAGE)"
 	@mkdir -p "$(DOTNET_NATIVE_STAGE)/win-x64" \
 	          "$(DOTNET_NATIVE_STAGE)/win-x86" \
 	          "$(DOTNET_NATIVE_STAGE)/linux-x64" \
@@ -2000,13 +2035,11 @@ publish_nuget:
 	          "$(DOTNET_NATIVE_STAGE)/osx-arm64"
 	@WIN64="$(CURRENT_DIR)/dist/dotnet/winforms_release/volvoxgrid.dll"; \
 	WIN86="$(CURRENT_DIR)/dist/dotnet/winforms_release_x86/volvoxgrid.dll"; \
-	LIN64="$(CURRENT_DIR)/target/release/libvolvoxgrid.so"; \
 	if [ -f "$$WIN64" ]; then cp -f "$$WIN64" "$(DOTNET_NATIVE_STAGE)/win-x64/volvoxgrid.dll";     echo "  win-x64    <- $$WIN64"; fi; \
 	if [ -f "$$WIN86" ]; then cp -f "$$WIN86" "$(DOTNET_NATIVE_STAGE)/win-x86/volvoxgrid.dll";     echo "  win-x86    <- $$WIN86"; fi; \
-	if [ -f "$$LIN64" ]; then cp -f "$$LIN64" "$(DOTNET_NATIVE_STAGE)/linux-x64/libvolvoxgrid.so"; echo "  linux-x64  <- $$LIN64"; fi; \
 	JAR=$$(ls -t "$(CURRENT_DIR)/dist/maven/volvoxgrid-desktop-"*.jar 2>/dev/null | grep -vE -- '-sources\.jar$$|-javadoc\.jar$$' | head -n1); \
 	if [ -n "$$JAR" ] && [ -f "$$JAR" ]; then \
-	  echo "Backfilling missing RIDs from $$(basename "$$JAR")..."; \
+	  echo "Staging RIDs from $$(basename "$$JAR")..."; \
 	  for entry in \
 	    "linux-x86_64|linux-x64|libvolvoxgrid.so" \
 	    "linux-aarch64|linux-arm64|libvolvoxgrid.so" \
@@ -2019,7 +2052,6 @@ publish_nuget:
 	    rid=$$(echo "$$entry" | cut -d'|' -f2); \
 	    libname=$$(echo "$$entry" | cut -d'|' -f3); \
 	    dest="$(DOTNET_NATIVE_STAGE)/$$rid/$$libname"; \
-	    if [ -f "$$dest" ]; then continue; fi; \
 	    tmpdir=$$(mktemp -d); \
 	    unzip -q -j "$$JAR" "native/$$plat/*" -d "$$tmpdir" 2>/dev/null || true; \
 	    src=$$(ls "$$tmpdir"/* 2>/dev/null | head -n1); \
@@ -2030,18 +2062,29 @@ publish_nuget:
 	    rm -rf "$$tmpdir"; \
 	  done; \
 	fi; \
+	for dylib in \
+	  "$(DOTNET_NATIVE_STAGE)/osx-x64/libvolvoxgrid.dylib" \
+	  "$(DOTNET_NATIVE_STAGE)/osx-arm64/libvolvoxgrid.dylib"; \
+	do \
+	  if [ -f "$$dylib" ]; then \
+	    bash "$(CURRENT_DIR)/scripts/strip_macos_dylibs.sh" "$$dylib"; \
+	  fi; \
+	done; \
 	echo "Final RID coverage:"; \
 	staged=0; \
+	missing=0; \
 	for entry in "win-x64|volvoxgrid.dll" "win-x86|volvoxgrid.dll" "linux-x64|libvolvoxgrid.so" "linux-arm64|libvolvoxgrid.so" "osx-x64|libvolvoxgrid.dylib" "osx-arm64|libvolvoxgrid.dylib"; do \
 	  rid=$${entry%%|*}; libname=$${entry##*|}; \
 	  if [ -f "$(DOTNET_NATIVE_STAGE)/$$rid/$$libname" ]; then \
 	    echo "  $$rid    OK"; staged=$$((staged+1)); \
+	    bash "$(CURRENT_DIR)/scripts/verify_embedded_version.sh" "$(VOLVOXGRID_VERSION)" "$(DOTNET_NATIVE_STAGE)/$$rid/$$libname" >/dev/null || exit 1; \
 	  else \
 	    echo "  $$rid    MISSING (run 'make docker_all' to cross-build)"; \
+	    missing=1; \
 	  fi; \
 	done; \
-	if [ "$$staged" -eq 0 ]; then \
-	  echo "Error: no native binaries available — refusing to publish a managed-only package."; \
+	if [ "$$missing" -ne 0 ] || [ "$$staged" -ne 6 ]; then \
+	  echo "Error: incomplete native RID coverage — refusing to publish."; \
 	  exit 1; \
 	fi
 	@echo "Building NuGet package $(DOTNET_NUGET_PACKAGE).$(VOLVOXGRID_VERSION).nupkg..."
@@ -2064,10 +2107,12 @@ publish_nuget:
 	    --skip-duplicate
 	@echo "NuGet publish complete: $(DOTNET_NUGET_PACKAGE) $(VOLVOXGRID_VERSION)"
 	@echo "Building local lite native runtime for NuGet staging..."
-	@CARGO_TARGET_DIR="$(CURRENT_DIR)/target/dotnet/lite-cargo" \
+	@VOLVOXGRID_VERSION="$(VOLVOXGRID_VERSION)" \
+	  CARGO_TARGET_DIR="$(CURRENT_DIR)/target/dotnet/lite-cargo" \
 	  cargo build --manifest-path "$(CURRENT_DIR)/runtime/Cargo.toml" \
 	    -p volvoxgrid-runtime -j "$(CARGO_BUILD_JOBS)" --release --no-default-features --features demo
 	@echo "Staging lite native binaries into $(DOTNET_NATIVE_LITE_STAGE)/..."
+	@rm -rf "$(DOTNET_NATIVE_LITE_STAGE)"
 	@mkdir -p "$(DOTNET_NATIVE_LITE_STAGE)/win-x64" \
 	          "$(DOTNET_NATIVE_LITE_STAGE)/win-x86" \
 	          "$(DOTNET_NATIVE_LITE_STAGE)/linux-x64" \
@@ -2099,7 +2144,7 @@ publish_nuget:
 	esac; \
 	JAR=$$(ls -t "$(CURRENT_DIR)/dist/maven/volvoxgrid-desktop-lite-"*.jar 2>/dev/null | grep -vE -- '-sources\.jar$$|-javadoc\.jar$$' | head -n1); \
 	if [ -n "$$JAR" ] && [ -f "$$JAR" ]; then \
-	  echo "Backfilling missing lite RIDs from $$(basename "$$JAR")..."; \
+	  echo "Staging lite RIDs from $$(basename "$$JAR")..."; \
 	  for entry in \
 	    "linux-x86_64|linux-x64|libvolvoxgrid.so" \
 	    "linux-aarch64|linux-arm64|libvolvoxgrid.so" \
@@ -2112,7 +2157,6 @@ publish_nuget:
 	    rid=$$(echo "$$entry" | cut -d'|' -f2); \
 	    libname=$$(echo "$$entry" | cut -d'|' -f3); \
 	    dest="$(DOTNET_NATIVE_LITE_STAGE)/$$rid/$$libname"; \
-	    if [ -f "$$dest" ]; then continue; fi; \
 	    tmpdir=$$(mktemp -d); \
 	    unzip -q -j "$$JAR" "native/$$plat/*" -d "$$tmpdir" 2>/dev/null || true; \
 	    src=$$(ls "$$tmpdir"/* 2>/dev/null | head -n1); \
@@ -2125,18 +2169,29 @@ publish_nuget:
 	else \
 	  echo "Note: desktop lite JAR not found; package will include only locally built lite RIDs."; \
 	fi; \
+	for dylib in \
+	  "$(DOTNET_NATIVE_LITE_STAGE)/osx-x64/libvolvoxgrid.dylib" \
+	  "$(DOTNET_NATIVE_LITE_STAGE)/osx-arm64/libvolvoxgrid.dylib"; \
+	do \
+	  if [ -f "$$dylib" ]; then \
+	    bash "$(CURRENT_DIR)/scripts/strip_macos_dylibs.sh" "$$dylib"; \
+	  fi; \
+	done; \
 	echo "Final lite RID coverage:"; \
 	staged=0; \
+	missing=0; \
 	for entry in "win-x64|volvoxgrid.dll" "win-x86|volvoxgrid.dll" "linux-x64|libvolvoxgrid.so" "linux-arm64|libvolvoxgrid.so" "osx-x64|libvolvoxgrid.dylib" "osx-arm64|libvolvoxgrid.dylib"; do \
 	  rid=$${entry%%|*}; libname=$${entry##*|}; \
 	  if [ -f "$(DOTNET_NATIVE_LITE_STAGE)/$$rid/$$libname" ]; then \
 	    echo "  $$rid    OK"; staged=$$((staged+1)); \
+	    bash "$(CURRENT_DIR)/scripts/verify_embedded_version.sh" "$(VOLVOXGRID_VERSION)" "$(DOTNET_NATIVE_LITE_STAGE)/$$rid/$$libname" >/dev/null || exit 1; \
 	  else \
 	    echo "  $$rid    MISSING (run 'make docker_all' to build desktop lite artifacts)"; \
+	    missing=1; \
 	  fi; \
 	done; \
-	if [ "$$staged" -eq 0 ]; then \
-	  echo "Error: no lite native binaries available — refusing to publish a managed-only package."; \
+	if [ "$$missing" -ne 0 ] || [ "$$staged" -ne 6 ]; then \
+	  echo "Error: incomplete lite native RID coverage — refusing to publish."; \
 	  exit 1; \
 	fi
 	@echo "Building NuGet package $(DOTNET_NUGET_LITE_PACKAGE).$(VOLVOXGRID_VERSION).nupkg..."
