@@ -1199,7 +1199,8 @@ fn row_indicator_expander_toggle_hit(
 
             let tg = crate::outline::TreeGeometry::from_grid(grid);
             let indent_x = (slot_x + depth * tg.indent_step).min(slot_x + slot_w - 1);
-            let toggle_size = tg.btn_size.max(1);
+            let row_height = grid.get_row_height(row).max(1);
+            let toggle_size = crate::outline::outline_toggle_box_size(grid, row_height, tg).max(1);
             let bx = (indent_x + tg.line_offset - toggle_size / 2)
                 .clamp(slot_x, (slot_x + slot_w - toggle_size).max(slot_x));
             return px >= bx && px < bx + toggle_size;
@@ -8010,6 +8011,32 @@ mod tests {
             grid.last_hover_target.as_ref().unwrap().target.slot_kind,
             pb::RowIndicatorSlotKind::RowIndicatorSlotExpander as i32
         );
+    }
+
+    #[test]
+    fn themed_row_indicator_expander_hit_matches_rendered_toggle_width() {
+        let mut grid = outline_indicator_test_grid();
+        grid.set_row_height(1, 36);
+        grid.style.icon_theme_slots.tree_expanded = Some("expand_more".to_string());
+        grid.style.icon_theme_slots.tree_collapsed = Some("chevron_right".to_string());
+        prime_layout(&mut grid);
+
+        let (_cx, row_y, _cw, row_h) = grid.cell_screen_rect(1, 0).unwrap();
+        let tg = crate::outline::TreeGeometry::from_grid(&grid);
+        let depth = outline_visual_depth(&grid, 1).unwrap_or(0);
+        let indent_x = depth * tg.indent_step;
+        let rendered_toggle_size = crate::outline::outline_toggle_box_size(&grid, row_h, tg).max(1);
+        assert!(rendered_toggle_size > tg.btn_size);
+
+        let bx = (indent_x + tg.line_offset - rendered_toggle_size / 2).clamp(
+            0,
+            (grid.indicator_bands.start_width() - rendered_toggle_size).max(0),
+        );
+        let x = bx + rendered_toggle_size - 2;
+        let hit = hit_test(&mut grid, x as f32, (row_y + row_h / 2) as f32);
+
+        assert_eq!(hit.area, HitArea::OutlineButton);
+        assert_eq!(hit.row, 1);
     }
 
     #[test]

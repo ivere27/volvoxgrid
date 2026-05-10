@@ -48,6 +48,36 @@ impl TreeGeometry {
     }
 }
 
+pub fn outline_toggle_uses_themed_icon(grid: &VolvoxGrid) -> bool {
+    grid.outline.node_open_picture.is_some()
+        || grid.outline.node_closed_picture.is_some()
+        || grid
+            .style
+            .icon_theme_slots
+            .tree_expanded
+            .as_deref()
+            .map_or(false, |s| !s.trim().is_empty())
+        || grid
+            .style
+            .icon_theme_slots
+            .tree_collapsed
+            .as_deref()
+            .map_or(false, |s| !s.trim().is_empty())
+}
+
+pub fn outline_toggle_box_size(grid: &VolvoxGrid, row_height: i32, tg: TreeGeometry) -> i32 {
+    let max_size = row_height.saturating_sub(2).max(0);
+    if max_size <= 0 {
+        return 0;
+    }
+    let base_size = tg.btn_size.max(0);
+    if outline_toggle_uses_themed_icon(grid) {
+        base_size.max(row_height.saturating_sub(4)).min(max_size)
+    } else {
+        base_size.min(max_size)
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct OutlineState {
     pub tree_indicator: i32,       // TreeIndicatorStyle enum

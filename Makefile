@@ -609,23 +609,24 @@ dotnet-tui-smoke-release: dotnet-tui-build-release
 # =============================================================================
 WASM_OUTPUT_DIR := web/example/wasm
 WASM_OUTPUT_MAIN := $(WASM_OUTPUT_DIR)/volvoxgrid_wasm_bg.wasm
+WASM_PACK_OPT_FLAGS ?= --no-opt
 
 wasm:
 	@command -v wasm-pack >/dev/null 2>&1 || { echo "Error: wasm-pack not found. Install with: cargo install wasm-pack"; exit 1; }
 	@echo "Building WASM crate..."
-	cd runtime && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" rustup run nightly wasm-pack build . --target web --out-dir ../web/example/wasm --out-name volvoxgrid_wasm --no-default-features --features wasm-default,gpu
+	cd runtime && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" rustup run nightly wasm-pack build . $(WASM_PACK_OPT_FLAGS) --target web --out-dir ../web/example/wasm --out-name volvoxgrid_wasm --no-default-features --features wasm-default,gpu
 	@echo "WASM build complete: web/example/wasm/"
 
 wasm-lite:
 	@command -v wasm-pack >/dev/null 2>&1 || { echo "Error: wasm-pack not found. Install with: cargo install wasm-pack"; exit 1; }
 	@echo "Building WASM crate (lite, with demo fixtures)..."
-	cd runtime && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" rustup run nightly wasm-pack build . --target web --out-dir ../web/example/wasm --out-name volvoxgrid_wasm --no-default-features --features demo
+	cd runtime && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" rustup run nightly wasm-pack build . $(WASM_PACK_OPT_FLAGS) --target web --out-dir ../web/example/wasm --out-name volvoxgrid_wasm --no-default-features --features demo
 	@echo "WASM lite build complete: web/example/wasm/"
 
 wasm-threaded:
 	@command -v wasm-pack >/dev/null 2>&1 || { echo "Error: wasm-pack not found. Install with: cargo install wasm-pack"; exit 1; }
 	@echo "Building WASM crate (threaded)..."
-	cd runtime && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" RUSTFLAGS='-C target-feature=+atomics,+bulk-memory,+mutable-globals' rustup run nightly wasm-pack build . --target web --out-dir ../web/example/wasm --out-name volvoxgrid_wasm --no-default-features --features wasm-default,wasm-threads,gpu -Z build-std=std,panic_abort
+	cd runtime && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" RUSTFLAGS='-C target-feature=+atomics,+bulk-memory,+mutable-globals' rustup run nightly wasm-pack build . $(WASM_PACK_OPT_FLAGS) --target web --out-dir ../web/example/wasm --out-name volvoxgrid_wasm --no-default-features --features wasm-default,wasm-threads,gpu -Z build-std=std,panic_abort
 	@echo "WASM threaded build complete: web/example/wasm/"
 
 wasm-ready:

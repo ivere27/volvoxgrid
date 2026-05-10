@@ -2268,6 +2268,40 @@ mod tests {
     }
 
     #[test]
+    fn native_tree_root_can_toggle_repeatedly_from_projected_row() {
+        let mut grid = VolvoxGrid::new(0, 320, 240, 1, 3, 1, 0);
+        load_tree(
+            &mut grid,
+            pb::LoadTreeRequest {
+                grid_id: 0,
+                nodes: vec![
+                    node("root", "", vec![text_cell("root", 0, "Root")]),
+                    node("child", "root", vec![text_cell("child", 0, "Child")]),
+                ],
+                replace: true,
+                collapse_initial: false,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(grid.tree.node_id_at_row(grid.fixed_rows, 1), Some("root"));
+        assert!(!grid.row_props.get(&1).unwrap().is_collapsed);
+
+        crate::input::apply_node_toggle_after_before(&mut grid, 1, true);
+        assert_eq!(grid.tree.visible_count(), 1);
+        assert!(grid.row_props.get(&1).unwrap().is_collapsed);
+
+        crate::input::apply_node_toggle_after_before(&mut grid, 1, false);
+        assert_eq!(grid.tree.visible_count(), 2);
+        assert_eq!(grid.tree.node_id_at_row(grid.fixed_rows, 1), Some("root"));
+        assert!(!grid.row_props.get(&1).unwrap().is_collapsed);
+
+        crate::input::apply_node_toggle_after_before(&mut grid, 1, true);
+        assert_eq!(grid.tree.visible_count(), 1);
+        assert!(grid.row_props.get(&1).unwrap().is_collapsed);
+    }
+
+    #[test]
     fn duplicate_ids_are_rejected() {
         let mut tree = TreeState::default();
         let err = tree

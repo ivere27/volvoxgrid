@@ -4874,40 +4874,6 @@ fn draw_outline_toggle<C: Canvas>(
     );
 }
 
-fn outline_toggle_uses_themed_icon(grid: &VolvoxGrid) -> bool {
-    grid.outline.node_open_picture.is_some()
-        || grid.outline.node_closed_picture.is_some()
-        || grid
-            .style
-            .icon_theme_slots
-            .tree_expanded
-            .as_deref()
-            .map_or(false, |s| !s.trim().is_empty())
-        || grid
-            .style
-            .icon_theme_slots
-            .tree_collapsed
-            .as_deref()
-            .map_or(false, |s| !s.trim().is_empty())
-}
-
-fn outline_toggle_box_size(
-    grid: &VolvoxGrid,
-    row_height: i32,
-    tg: crate::outline::TreeGeometry,
-) -> i32 {
-    let max_size = row_height.saturating_sub(2).max(0);
-    if max_size <= 0 {
-        return 0;
-    }
-    let base_size = tg.btn_size.max(0);
-    if outline_toggle_uses_themed_icon(grid) {
-        base_size.max(row_height.saturating_sub(4)).min(max_size)
-    } else {
-        base_size.min(max_size)
-    }
-}
-
 fn render_outline_expander_slot_clipped<C: Canvas>(
     canvas: &mut C,
     grid: &VolvoxGrid,
@@ -4938,7 +4904,7 @@ fn render_outline_expander_slot_clipped<C: Canvas>(
         || grid.outline.tree_indicator
             == pb::TreeIndicatorStyle::TreeIndicatorConnectorsLeaf as i32;
     let show_toggle = has_children || leaf_style;
-    let toggle_size = outline_toggle_box_size(grid, h, tg);
+    let toggle_size = crate::outline::outline_toggle_box_size(grid, h, tg);
     let mut text_x = indent_x;
     let toggle_rect = if show_toggle && toggle_size > 0 {
         let bx =
@@ -11168,9 +11134,9 @@ mod tests {
         compose_preedit_display_text, draw_linear_barcode, draw_outline_toggle, draw_qr_barcode,
         draw_tree_guide_hline_except_rect, draw_tree_guide_vline_except_rect, dropdown_button_rect,
         dropdown_glyph_metrics, dropdown_layer_needed, encode_linear_barcode,
-        linear_barcode_preview_rect, normalized_code128_payload, outline_toggle_box_size,
-        parse_progress_percent, picture_layer_needed, progress_layer_needed, render_fast_scroll,
-        render_grid, show_dropdown_button_for_cell, sort_arrow_box_size, BarcodeDrawRect, CellKey,
+        linear_barcode_preview_rect, normalized_code128_payload, parse_progress_percent,
+        picture_layer_needed, progress_layer_needed, render_fast_scroll, render_grid,
+        show_dropdown_button_for_cell, sort_arrow_box_size, BarcodeDrawRect, CellKey,
         RenderContext, RenderCtxCacheKey, RenderCtxCached, VisibleRange,
         DEFAULT_BARCODE_SIZE_WARNING_COLOR,
     };
@@ -11552,10 +11518,13 @@ mod tests {
     fn outline_toggle_box_uses_row_height_for_themed_icons() {
         let mut grid = VolvoxGrid::new(1, 120, 48, 2, 1, 0, 0);
         let tg = crate::outline::TreeGeometry::from_grid(&grid);
-        assert_eq!(outline_toggle_box_size(&grid, 36, tg), tg.btn_size);
+        assert_eq!(
+            crate::outline::outline_toggle_box_size(&grid, 36, tg),
+            tg.btn_size
+        );
 
         grid.style.icon_theme_slots.tree_collapsed = Some(">".to_string());
-        assert_eq!(outline_toggle_box_size(&grid, 36, tg), 32);
+        assert_eq!(crate::outline::outline_toggle_box_size(&grid, 36, tg), 32);
     }
 
     #[test]
