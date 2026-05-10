@@ -78,14 +78,26 @@ impl Renderer {
 
     /// Returns the number of entries currently in the text layout cache.
     pub fn text_cache_len(&self) -> usize {
-        #[cfg(feature = "cosmic-text")]
-        {
-            self.text_engine.layout_cache.len()
+        if let Some(custom) = self.custom_text_renderer.as_ref() {
+            custom.cache_len()
+        } else {
+            self.text_engine.layout_cache_len()
         }
-        #[cfg(not(feature = "cosmic-text"))]
-        {
-            0
+    }
+
+    pub fn text_renderer_name(&self) -> &str {
+        if let Some(custom) = self.custom_text_renderer.as_ref() {
+            custom.renderer_name()
+        } else {
+            self.text_engine.renderer_name()
         }
+    }
+
+    pub fn clear_text_cache(&mut self) {
+        if let Some(custom) = self.custom_text_renderer.as_mut() {
+            custom.clear_cache();
+        }
+        self.text_engine.clear_cache();
     }
 
     /// Main entry point: render the entire grid into the supplied RGBA buffer.
@@ -110,6 +122,9 @@ impl Renderer {
         if self.text_engine.layout_cache_cap != grid.text_layout_cache_cap {
             self.text_engine
                 .set_layout_cache_cap(grid.text_layout_cache_cap);
+        }
+        if let Some(custom) = self.custom_text_renderer.as_mut() {
+            custom.set_cache_cap(grid.text_layout_cache_cap);
         }
 
         // Sync text rasterization options from current grid style.

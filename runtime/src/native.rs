@@ -9,8 +9,17 @@ use std::time::{Duration, Instant};
 use crate::shared;
 use volvoxgrid_engine::proto::volvoxgrid::v1 as pb;
 use volvoxgrid_engine::proto::volvoxgrid::v1::*;
+use volvoxgrid_engine::text::{
+    blend_external_text_mask_into_rgba, ExternalTextKey, ExternalTextMask, ExternalTextMaskCache,
+};
 use volvoxgrid_engine::GridManager;
 
+#[cfg(all(
+    any(target_os = "macos", target_os = "ios"),
+    not(feature = "cosmic-text")
+))]
+#[path = "apple_text.rs"]
+mod apple_text;
 #[path = "volvoxgrid_ffi_runtime.rs"]
 mod ffi_impl;
 use ffi_impl::*;
@@ -139,6 +148,57 @@ fn current_frame_metrics(grid: &volvoxgrid_engine::grid::VolvoxGrid) -> Option<F
         zone_cell_counts: grid.zone_cell_counts.to_vec(),
         instance_count: grid.debug_instance_count,
     })
+}
+
+#[cfg(all(
+    any(target_os = "macos", target_os = "ios"),
+    not(feature = "cosmic-text")
+))]
+fn default_platform_text_renderer() -> Option<Box<dyn volvoxgrid_engine::text::TextRenderer + Send>>
+{
+    Some(Box::new(apple_text::AppleTextRenderer::new()))
+}
+
+#[cfg(not(all(
+    any(target_os = "macos", target_os = "ios"),
+    not(feature = "cosmic-text")
+)))]
+fn default_platform_text_renderer() -> Option<Box<dyn volvoxgrid_engine::text::TextRenderer + Send>>
+{
+    None
+}
+
+fn install_default_platform_text_renderer(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) {
+    if let Some(renderer) = default_platform_text_renderer() {
+        let cap = grid.text_layout_cache_cap;
+        let text_engine = grid.ensure_text_engine();
+        text_engine.set_external_renderer(Some(renderer));
+        text_engine.set_layout_cache_cap(cap);
+    }
+}
+
+fn new_cpu_renderer() -> volvoxgrid_engine::render::Renderer {
+    let mut renderer = volvoxgrid_engine::render::Renderer::new();
+    if let Some(text_renderer) = default_platform_text_renderer() {
+        renderer.set_custom_text_renderer(Some(text_renderer));
+    }
+    renderer
+}
+
+fn apply_cpu_text_renderer_registration(
+    renderer: &mut volvoxgrid_engine::render::Renderer,
+    registration: Option<TextRendererRegistration>,
+) {
+    match registration {
+        Some(registration) => {
+            renderer.set_custom_text_renderer(Some(Box::new(ffi_text_renderer_from_registration(
+                registration,
+            ))));
+        }
+        None => {
+            renderer.set_custom_text_renderer(default_platform_text_renderer());
+        }
+    }
 }
 
 fn with_tui_pointer_geometry<R>(
@@ -1435,6 +1495,36 @@ fn ensure_layout(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) {
 #[cfg(feature = "gpu")]
 fn pollster_block<F: std::future::Future>(f: F) -> F::Output {
     pollster::block_on(f)
+}
+
+#[cfg(feature = "gpu")]
+fn preferred_gpu_backends(renderer_mode: i32) -> Option<wgpu::Backends> {
+    match renderer_mode {
+        m if m == RendererMode::RendererGpuVulkan as i32 => Some(wgpu::Backends::VULKAN),
+        m if m == RendererMode::RendererGpuGles as i32
+            || m == RendererMode::RendererGpuOpengl as i32 =>
+        {
+            Some(wgpu::Backends::GL)
+        }
+        m if m == RendererMode::RendererGpuDx12 as i32 => Some(wgpu::Backends::DX12),
+        m if m == RendererMode::RendererGpuMetal as i32 => Some(wgpu::Backends::METAL),
+        _ => None,
+    }
+}
+
+#[cfg(feature = "gpu")]
+fn gpu_backend_matches_renderer_mode(renderer_mode: i32, backend: wgpu::Backend) -> bool {
+    match renderer_mode {
+        m if m == RendererMode::RendererGpuVulkan as i32 => backend == wgpu::Backend::Vulkan,
+        m if m == RendererMode::RendererGpuGles as i32
+            || m == RendererMode::RendererGpuOpengl as i32 =>
+        {
+            backend == wgpu::Backend::Gl
+        }
+        m if m == RendererMode::RendererGpuDx12 as i32 => backend == wgpu::Backend::Dx12,
+        m if m == RendererMode::RendererGpuMetal as i32 => backend == wgpu::Backend::Metal,
+        _ => true,
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -5592,6 +5682,9 @@ impl VolvoxGridServiceRuntime for VolvoxGridRuntime {
                 grid.apply_config(config);
             });
         }
+        let _ = self.with_grid(id, |grid| {
+            install_default_platform_text_renderer(grid);
+        });
 
         Ok(CreateResponse {
             grid_id: id,
@@ -6058,6 +6151,7 @@ impl VolvoxGridServiceRuntime for VolvoxGridRuntime {
         let mut terminal_session = terminal_tui::TerminalTuiSession::new();
         let mut renderer_text_registration: Option<TextRendererRegistration> = None;
         let mut cpu_font_count_applied: usize = 0;
+        let mut active_text_cache_grid_id: Option<i64> = None;
         #[cfg(feature = "gpu")]
         let mut gpu_renderer: Option<volvoxgrid_engine::gpu_render::GpuRenderer> = None;
         #[cfg(feature = "gpu")]
@@ -6118,6 +6212,19 @@ impl VolvoxGridServiceRuntime for VolvoxGridRuntime {
                         1.0 / 60.0
                     };
                     last_fling_tick = Some(now);
+
+                    if active_text_cache_grid_id != Some(grid_id) {
+                        if let Some(prev_grid_id) = active_text_cache_grid_id.replace(grid_id) {
+                            clear_grid_text_cache(prev_grid_id);
+                        }
+                        if let Some(r) = renderer.as_mut() {
+                            r.clear_text_cache();
+                        }
+                        #[cfg(feature = "gpu")]
+                        if let Some(gr) = gpu_renderer.as_mut() {
+                            gr.clear_text_cache();
+                        }
+                    }
 
                     let result = self.with_grid(grid_id, |grid| {
                         let terminal_active = terminal_session.is_active() && grid.is_tui_mode();
@@ -6231,93 +6338,33 @@ impl VolvoxGridServiceRuntime for VolvoxGridRuntime {
                             return (true, dx, dy, dw, dh, None);
                         }
 
+                        #[cfg(feature = "gpu")]
+                        if grid.renderer_mode >= 2 {
+                            grid.debug_renderer_actual = 0;
+                            grid.debug_gpu_backend.clear();
+                            grid.debug_gpu_present_mode.clear();
+                            return (false, 0, 0, 0, 0, None);
+                        }
+
                         let buf_size = (stride * height) as usize;
                         let buffer =
                             unsafe { std::slice::from_raw_parts_mut(handle as *mut u8, buf_size) };
 
-                        #[cfg(feature = "gpu")]
-                        if grid.renderer_mode >= 2 {
-                            let preferred_backends = match grid.renderer_mode {
-                                3 => Some(wgpu::Backends::VULKAN),
-                                4 => Some(wgpu::Backends::GL),
-                                _ => None,
-                            };
-
-                            // Detect backend mismatch and force recreation
-                            if let Some(gr) = gpu_renderer.as_ref() {
-                                let current_type = gr.backend_type();
-                                let mismatch = match grid.renderer_mode {
-                                    3 => current_type != wgpu::Backend::Vulkan,
-                                    4 => current_type != wgpu::Backend::Gl,
-                                    _ => false,
-                                };
-                                if mismatch {
-                                    gpu_renderer = None;
-                                    gpu_font_count_applied = 0;
-                                }
-                            }
-
-                            if gpu_renderer.is_none() {
-                                match pollster_block(
-                                    volvoxgrid_engine::gpu_render::GpuRenderer::new(
-                                        preferred_backends,
-                                    ),
-                                ) {
-                                    Ok(gr) => {
-                                        gpu_renderer = Some(gr);
-                                    }
-                                    Err(_e) => {
-                                        grid.set_renderer_mode(RendererMode::RendererCpu as i32);
-                                    }
-                                }
-                            }
-                            if let Some(gr) = gpu_renderer.as_mut() {
-                                self.sync_fonts_into_gpu_renderer(gr, &mut gpu_font_count_applied);
-                                grid.debug_renderer_actual = RendererMode::RendererGpu as i32;
-                                grid.debug_gpu_backend = gr.backend_name();
-                                grid.debug_gpu_present_mode = gr.present_mode_name();
-                                grid.debug_text_cache_len = gr.text_cache_len() as i32;
-                                let ((dx, dy, dw, dh), layer_times, zone_counts) =
-                                    gr.render_to_buffer(grid, buffer, width, height, stride);
-                                if grid.layer_profiling {
-                                    grid.layer_times_us = layer_times;
-                                    grid.zone_cell_counts = zone_counts;
-                                }
-                                grid.debug_instance_count = gr.instance_count() as i32;
-                                let elapsed = frame_start.elapsed().as_secs_f32() * 1000.0;
-                                grid.debug_frame_time_ms = elapsed;
-                                grid.debug_fps =
-                                    grid.debug_fps * 0.9 + (1000.0 / elapsed.max(0.1)) * 0.1;
-                                grid.clear_dirty();
-                                return (true, dx, dy, dw, dh, None);
-                            }
-                        }
-
                         grid.debug_renderer_actual = RendererMode::RendererCpu as i32;
-                        grid.debug_text_cache_len = grid
-                            .text_engine
-                            .as_ref()
-                            .map_or(0, |te| te.layout_cache_len() as i32);
-                        let r =
-                            renderer.get_or_insert_with(volvoxgrid_engine::render::Renderer::new);
+                        let r = renderer.get_or_insert_with(new_cpu_renderer);
                         let desired_text_registration = get_registered_text_renderer(grid_id);
                         if !same_text_renderer_registration(
-                            renderer_text_registration,
-                            desired_text_registration,
+                            renderer_text_registration.as_ref(),
+                            desired_text_registration.as_ref(),
                         ) {
-                            match desired_text_registration {
-                                Some(registration) => {
-                                    r.set_custom_text_renderer(Some(Box::new(
-                                        ffi_text_renderer_from_registration(registration),
-                                    )));
-                                }
-                                None => {
-                                    r.set_custom_text_renderer(None);
-                                }
-                            }
+                            apply_cpu_text_renderer_registration(
+                                r,
+                                desired_text_registration.clone(),
+                            );
                             renderer_text_registration = desired_text_registration;
                         }
                         self.sync_fonts_into_renderer(r, &mut cpu_font_count_applied);
+                        grid.debug_text_cache_len = r.text_cache_len() as i32;
                         let ((dx, dy, dw, dh), layer_times, zone_counts) =
                             r.render(grid, buffer, width, height, stride);
                         if grid.layer_profiling {
@@ -6437,6 +6484,19 @@ impl VolvoxGridServiceRuntime for VolvoxGridRuntime {
                     let handle = surface_ready.surface_handle;
                     let width = surface_ready.width;
                     let height = surface_ready.height;
+                    let mut configured_gpu_surface_this_frame = false;
+
+                    if active_text_cache_grid_id != Some(grid_id) {
+                        if let Some(prev_grid_id) = active_text_cache_grid_id.replace(grid_id) {
+                            clear_grid_text_cache(prev_grid_id);
+                        }
+                        if let Some(r) = renderer.as_mut() {
+                            r.clear_text_cache();
+                        }
+                        if let Some(gr) = gpu_renderer.as_mut() {
+                            gr.clear_text_cache();
+                        }
+                    }
 
                     // Surface handle == 0 means the native window was destroyed.
                     if handle == 0 {
@@ -6488,11 +6548,8 @@ impl VolvoxGridServiceRuntime for VolvoxGridRuntime {
                             .with_grid(grid_id, |grid| grid.renderer_mode)
                             .unwrap_or(0);
                         let current_type = gpu_renderer.as_ref().unwrap().backend_type();
-                        let mismatch = match requested_mode {
-                            3 => current_type != wgpu::Backend::Vulkan,
-                            4 => current_type != wgpu::Backend::Gl,
-                            _ => false,
-                        };
+                        let mismatch =
+                            !gpu_backend_matches_renderer_mode(requested_mode, current_type);
                         if mismatch {
                             gpu_renderer = None;
                             gpu_font_count_applied = 0;
@@ -6503,11 +6560,7 @@ impl VolvoxGridServiceRuntime for VolvoxGridRuntime {
                     if gpu_renderer.is_none() {
                         let preferred_backends = self
                             .manager()
-                            .with_grid(grid_id, |grid| match grid.renderer_mode {
-                                3 => Some(wgpu::Backends::VULKAN),
-                                4 => Some(wgpu::Backends::GL),
-                                _ => None,
-                            })
+                            .with_grid(grid_id, |grid| preferred_gpu_backends(grid.renderer_mode))
                             .ok()
                             .flatten();
 
@@ -6515,12 +6568,20 @@ impl VolvoxGridServiceRuntime for VolvoxGridRuntime {
                             preferred_backends,
                         )) {
                             Ok(gr) => {
+                                eprintln!(
+                                    "[volvoxgrid] GPU renderer initialized: renderer_mode={} backend={}",
+                                    requested_mode,
+                                    gr.backend_name()
+                                );
                                 gpu_renderer = Some(gr);
                             }
-                            Err(_e) => {
-                                let _ = self.with_grid(grid_id, |grid| {
-                                    grid.set_renderer_mode(RendererMode::RendererCpu as i32);
-                                });
+                            Err(e) => {
+                                eprintln!(
+                                    "[volvoxgrid] GPU renderer initialization failed: renderer_mode={} preferred_backends={:?}: {}",
+                                    requested_mode,
+                                    preferred_backends,
+                                    e
+                                );
                                 stream.send(RenderOutput {
                                     rendered: false,
                                     event: Some(render_output::Event::GpuFrameDone(GpuFrameDone {
@@ -6555,10 +6616,16 @@ impl VolvoxGridServiceRuntime for VolvoxGridRuntime {
                                 requested_pm,
                             )
                         });
-                        if let Err(_e) = configure_result {
-                            let _ = self.with_grid(grid_id, |grid| {
-                                grid.set_renderer_mode(RendererMode::RendererCpu as i32);
-                            });
+                        if let Err(e) = configure_result {
+                            eprintln!(
+                                "[volvoxgrid] GPU surface configuration failed: renderer_mode={} handle=0x{:x} size={}x{} present_mode={}: {}",
+                                requested_mode,
+                                handle,
+                                width,
+                                height,
+                                requested_pm,
+                                e
+                            );
                             last_surface_handle = 0;
                             last_present_mode = -1;
                             stream.send(RenderOutput {
@@ -6575,6 +6642,7 @@ impl VolvoxGridServiceRuntime for VolvoxGridRuntime {
                         }
                         last_surface_handle = handle;
                         last_present_mode = requested_pm;
+                        configured_gpu_surface_this_frame = true;
                         // Surface reconfiguration can happen after Android HOME/resume
                         // with no data mutation. Force one redraw so the newly bound
                         // surface is populated instead of staying black.
@@ -6662,8 +6730,8 @@ impl VolvoxGridServiceRuntime for VolvoxGridRuntime {
                         let frame_start = std::time::Instant::now();
 
                         grid.debug_renderer_actual = RendererMode::RendererGpu as i32;
-                        grid.debug_gpu_backend = gr_backend_name;
-                        grid.debug_gpu_present_mode = gr_present_mode_name;
+                        grid.debug_gpu_backend = gr_backend_name.clone();
+                        grid.debug_gpu_present_mode = gr_present_mode_name.clone();
 
                         match gr.render_to_surface(grid, width, height) {
                             Ok(((dx, dy, dw, dh), layer_times, zone_counts)) => {
@@ -6685,6 +6753,17 @@ impl VolvoxGridServiceRuntime for VolvoxGridRuntime {
 
                     match result {
                         Ok(Ok((rendered, dx, dy, dw, dh))) => {
+                            if configured_gpu_surface_this_frame {
+                                eprintln!(
+                                    "[volvoxgrid] GPU surface configured: backend={} present_mode={} size={}x{} handle=0x{:x} rendered={}",
+                                    gr_backend_name,
+                                    gr_present_mode_name,
+                                    width,
+                                    height,
+                                    handle,
+                                    rendered
+                                );
+                            }
                             let metrics = if rendered {
                                 self.with_grid(grid_id, |grid| current_frame_metrics(grid))
                                     .ok()
@@ -6711,7 +6790,16 @@ impl VolvoxGridServiceRuntime for VolvoxGridRuntime {
                                 );
                             }
                         }
-                        Ok(Err(_)) => {
+                        Ok(Err(e)) => {
+                            eprintln!(
+                                "[volvoxgrid] GPU surface render failed: backend={} present_mode={} size={}x{} handle=0x{:x}: {:?}",
+                                gr_backend_name,
+                                gr_present_mode_name,
+                                width,
+                                height,
+                                handle,
+                                e
+                            );
                             // Surface error (e.g. Lost, Outdated). Drop the surface immediately
                             // and force reconfiguration on next frame.
                             if let Some(gr) = gpu_renderer.as_mut() {
@@ -6730,7 +6818,16 @@ impl VolvoxGridServiceRuntime for VolvoxGridRuntime {
                                 })),
                             });
                         }
-                        Err(_) => {
+                        Err(e) => {
+                            eprintln!(
+                                "[volvoxgrid] GPU render failed before presenting: backend={} present_mode={} size={}x{} handle=0x{:x}: {:?}",
+                                gr_backend_name,
+                                gr_present_mode_name,
+                                width,
+                                height,
+                                handle,
+                                e
+                            );
                             stream.send(RenderOutput {
                                 rendered: false,
                                 event: Some(render_output::Event::GpuFrameDone(GpuFrameDone {
@@ -7215,19 +7312,21 @@ type VvRenderTextFn = unsafe extern "C" fn(
     user_data: *mut std::ffi::c_void,
 ) -> f32;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 struct TextRendererRegistration {
     measure_fn: VvMeasureTextFn,
     render_fn: VvRenderTextFn,
     user_data: usize,
+    name: String,
 }
 
 impl TextRendererRegistration {
-    fn identity_key(self) -> (usize, usize, usize) {
+    fn identity_key(&self) -> (usize, usize, usize, &str) {
         (
             self.measure_fn as usize,
             self.render_fn as usize,
             self.user_data,
+            self.name.as_str(),
         )
     }
 }
@@ -7237,13 +7336,18 @@ struct FfiTextRenderer {
     measure_fn: VvMeasureTextFn,
     render_fn: VvRenderTextFn,
     user_data: *mut std::ffi::c_void,
+    name: String,
+    cache: ExternalTextMaskCache,
 }
 
 // The host side owns `user_data` synchronization guarantees.
 unsafe impl Send for FfiTextRenderer {}
 
-impl volvoxgrid_engine::text::TextRenderer for FfiTextRenderer {
-    fn measure_text(
+const FFI_TEXT_MASK_CACHE_CAP: usize = volvoxgrid_engine::text::DEFAULT_LAYOUT_CACHE_CAP;
+const FFI_TEXT_MASK_MAX_PIXELS: usize = 4 * 1024 * 1024;
+
+impl FfiTextRenderer {
+    fn measure_uncached(
         &mut self,
         text: &str,
         font_name: &str,
@@ -7273,7 +7377,7 @@ impl volvoxgrid_engine::text::TextRenderer for FfiTextRenderer {
         (out_w, out_h)
     }
 
-    fn render_text(
+    fn render_uncached(
         &mut self,
         buffer_pixels: &mut [u8],
         buf_width: i32,
@@ -7319,6 +7423,224 @@ impl volvoxgrid_engine::text::TextRenderer for FfiTextRenderer {
             )
         }
     }
+
+    fn cached_measure(
+        &mut self,
+        text: &str,
+        font_name: &str,
+        font_size: f32,
+        bold: bool,
+        italic: bool,
+        max_width: Option<f32>,
+    ) -> (f32, f32) {
+        if self.cache.is_disabled() {
+            return self.measure_uncached(text, font_name, font_size, bold, italic, max_width);
+        }
+
+        let key = ExternalTextKey::new(text, font_name, font_size, bold, italic, max_width);
+        if let Some(result) = self.cache.get_measure(&key) {
+            return result;
+        }
+
+        let (width, height) =
+            self.measure_uncached(text, font_name, font_size, bold, italic, max_width);
+        self.cache.put_measure(key, width, height);
+        (width, height)
+    }
+
+    fn ensure_cached_mask(
+        &mut self,
+        key: ExternalTextKey,
+        text: &str,
+        font_name: &str,
+        font_size: f32,
+        bold: bool,
+        italic: bool,
+        max_width: Option<f32>,
+    ) -> bool {
+        if self.cache.with_mask(&key, |_| ()).is_some() {
+            return true;
+        }
+
+        let (measured_width, measured_height) =
+            self.cached_measure(text, font_name, font_size, bold, italic, max_width);
+        let mask_width = measured_width.ceil().max(1.0) as i32;
+        let mask_height = measured_height
+            .ceil()
+            .max((font_size.max(1.0) * 1.2).ceil())
+            .max(1.0) as i32;
+        let pixels = (mask_width as usize).saturating_mul(mask_height as usize);
+        if pixels == 0 || pixels > FFI_TEXT_MASK_MAX_PIXELS {
+            return false;
+        }
+
+        let stride = mask_width.saturating_mul(4);
+        let Some(byte_len) = (stride as usize).checked_mul(mask_height as usize) else {
+            return false;
+        };
+        let mut rgba = vec![0u8; byte_len];
+        let rendered_width = self.render_uncached(
+            &mut rgba,
+            mask_width,
+            mask_height,
+            stride,
+            0,
+            0,
+            0,
+            0,
+            mask_width,
+            mask_height,
+            text,
+            font_name,
+            font_size,
+            bold,
+            italic,
+            0xFFFF_FFFF,
+            max_width,
+        );
+        let mut alpha = vec![0u8; pixels];
+        for i in 0..pixels {
+            alpha[i] = rgba[i * 4 + 3];
+        }
+
+        let width = rendered_width.max(measured_width);
+        self.cache.put_mask(
+            key,
+            ExternalTextMask {
+                measured_width: width,
+                measured_height,
+                mask_width,
+                mask_height,
+                alpha,
+            },
+        );
+        true
+    }
+}
+
+impl volvoxgrid_engine::text::TextRenderer for FfiTextRenderer {
+    fn renderer_name(&self) -> &str {
+        self.name.as_str()
+    }
+
+    fn measure_text(
+        &mut self,
+        text: &str,
+        font_name: &str,
+        font_size: f32,
+        bold: bool,
+        italic: bool,
+        max_width: Option<f32>,
+    ) -> (f32, f32) {
+        self.cached_measure(text, font_name, font_size, bold, italic, max_width)
+    }
+
+    fn render_text(
+        &mut self,
+        buffer_pixels: &mut [u8],
+        buf_width: i32,
+        buf_height: i32,
+        stride: i32,
+        x: i32,
+        y: i32,
+        clip_x: i32,
+        clip_y: i32,
+        clip_w: i32,
+        clip_h: i32,
+        text: &str,
+        font_name: &str,
+        font_size: f32,
+        bold: bool,
+        italic: bool,
+        color: u32,
+        max_width: Option<f32>,
+    ) -> f32 {
+        if self.cache.is_disabled() {
+            return self.render_uncached(
+                buffer_pixels,
+                buf_width,
+                buf_height,
+                stride,
+                x,
+                y,
+                clip_x,
+                clip_y,
+                clip_w,
+                clip_h,
+                text,
+                font_name,
+                font_size,
+                bold,
+                italic,
+                color,
+                max_width,
+            );
+        }
+
+        let key = ExternalTextKey::new(text, font_name, font_size, bold, italic, max_width);
+        if self.ensure_cached_mask(
+            key.clone(),
+            text,
+            font_name,
+            font_size,
+            bold,
+            italic,
+            max_width,
+        ) {
+            if let Some(width) = self.cache.with_mask(&key, |entry| {
+                blend_external_text_mask_into_rgba(
+                    buffer_pixels,
+                    buf_width,
+                    buf_height,
+                    stride,
+                    x,
+                    y,
+                    clip_x,
+                    clip_y,
+                    clip_w,
+                    clip_h,
+                    entry.mask_width,
+                    entry.mask_height,
+                    &entry.alpha,
+                    color,
+                );
+                entry.measured_width
+            }) {
+                return width;
+            }
+        }
+        self.render_uncached(
+            buffer_pixels,
+            buf_width,
+            buf_height,
+            stride,
+            x,
+            y,
+            clip_x,
+            clip_y,
+            clip_w,
+            clip_h,
+            text,
+            font_name,
+            font_size,
+            bold,
+            italic,
+            color,
+            max_width,
+        )
+    }
+
+    fn cache_len(&self) -> usize {
+        self.cache.len()
+    }
+
+    fn set_cache_cap(&mut self, cap: usize) {
+        self.cache.set_cap(cap);
+    }
+
+    fn clear_cache(&mut self) {
+        self.cache.clear();
+    }
 }
 
 lazy_static::lazy_static! {
@@ -7331,6 +7653,8 @@ fn ffi_text_renderer_from_registration(registration: TextRendererRegistration) -
         measure_fn: registration.measure_fn,
         render_fn: registration.render_fn,
         user_data: registration.user_data as *mut std::ffi::c_void,
+        name: registration.name,
+        cache: ExternalTextMaskCache::new(FFI_TEXT_MASK_CACHE_CAP),
     }
 }
 
@@ -7339,18 +7663,25 @@ fn get_registered_text_renderer(grid_id: i64) -> Option<TextRendererRegistration
         .lock()
         .unwrap_or_else(|e| e.into_inner())
         .get(&grid_id)
-        .copied()
+        .cloned()
 }
 
 fn same_text_renderer_registration(
-    left: Option<TextRendererRegistration>,
-    right: Option<TextRendererRegistration>,
+    left: Option<&TextRendererRegistration>,
+    right: Option<&TextRendererRegistration>,
 ) -> bool {
     match (left, right) {
         (Some(a), Some(b)) => a.identity_key() == b.identity_key(),
         (None, None) => true,
         _ => false,
     }
+}
+
+fn clear_grid_text_cache(grid_id: i64) {
+    let _ = SHARED_GRID_MANAGER.with_grid(grid_id, |grid| {
+        grid.clear_text_cache();
+        grid.debug_text_cache_len = 0;
+    });
 }
 
 fn set_grid_external_text_renderer(grid_id: i64, registration: Option<TextRendererRegistration>) {
@@ -7360,7 +7691,12 @@ fn set_grid_external_text_renderer(grid_id: i64, registration: Option<TextRender
                 .set_external_renderer(Some(Box::new(ffi_text_renderer_from_registration(reg))));
         }
         None => {
-            if let Some(text_engine) = &mut grid.text_engine {
+            if let Some(renderer) = default_platform_text_renderer() {
+                let cap = grid.text_layout_cache_cap;
+                let text_engine = grid.ensure_text_engine();
+                text_engine.set_external_renderer(Some(renderer));
+                text_engine.set_layout_cache_cap(cap);
+            } else if let Some(text_engine) = &mut grid.text_engine {
                 text_engine.set_external_renderer(None);
             }
         }
@@ -7375,6 +7711,57 @@ fn clear_registered_text_renderer(grid_id: i64) {
     set_grid_external_text_renderer(grid_id, None);
 }
 
+fn default_external_text_renderer_name() -> &'static str {
+    if cfg!(target_os = "android") {
+        "Android"
+    } else if cfg!(target_os = "windows") {
+        "GDI"
+    } else {
+        "External"
+    }
+}
+
+fn sanitize_external_text_renderer_name(name: Option<&str>) -> String {
+    let trimmed = name.unwrap_or(default_external_text_renderer_name()).trim();
+    let effective = if trimmed.is_empty() {
+        default_external_text_renderer_name()
+    } else {
+        trimmed
+    };
+    effective.chars().take(24).collect()
+}
+
+fn set_text_renderer_registration(
+    grid_id: i64,
+    measure_fn: Option<VvMeasureTextFn>,
+    render_fn: Option<VvRenderTextFn>,
+    user_data: *mut std::ffi::c_void,
+    name: Option<&str>,
+) -> i32 {
+    match (measure_fn, render_fn) {
+        (Some(measure), Some(render)) => {
+            let registration = TextRendererRegistration {
+                measure_fn: measure,
+                render_fn: render,
+                user_data: user_data as usize,
+                name: sanitize_external_text_renderer_name(name),
+            };
+            CUSTOM_TEXT_RENDERERS
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .insert(grid_id, registration);
+            let registration = get_registered_text_renderer(grid_id);
+            set_grid_external_text_renderer(grid_id, registration);
+            0
+        }
+        (None, None) => {
+            clear_registered_text_renderer(grid_id);
+            0
+        }
+        _ => -1,
+    }
+}
+
 /// Register or clear a custom text renderer for a grid.
 ///
 /// Pass non-null `measure_fn` + `render_fn` to enable; pass null for both to clear.
@@ -7386,26 +7773,28 @@ pub extern "C" fn volvox_grid_set_text_renderer(
     render_fn: Option<VvRenderTextFn>,
     user_data: *mut std::ffi::c_void,
 ) -> i32 {
-    match (measure_fn, render_fn) {
-        (Some(measure), Some(render)) => {
-            let registration = TextRendererRegistration {
-                measure_fn: measure,
-                render_fn: render,
-                user_data: user_data as usize,
-            };
-            CUSTOM_TEXT_RENDERERS
-                .lock()
-                .unwrap_or_else(|e| e.into_inner())
-                .insert(grid_id, registration);
-            set_grid_external_text_renderer(grid_id, Some(registration));
-            0
-        }
-        (None, None) => {
-            clear_registered_text_renderer(grid_id);
-            0
-        }
-        _ => -1,
-    }
+    set_text_renderer_registration(grid_id, measure_fn, render_fn, user_data, None)
+}
+
+/// Register or clear a custom text renderer with a debug-display backend name.
+#[no_mangle]
+pub extern "C" fn volvox_grid_set_text_renderer_named(
+    grid_id: i64,
+    measure_fn: Option<VvMeasureTextFn>,
+    render_fn: Option<VvRenderTextFn>,
+    user_data: *mut std::ffi::c_void,
+    name_ptr: *const u8,
+    name_len: i32,
+) -> i32 {
+    let name = if name_ptr.is_null() || name_len <= 0 {
+        None
+    } else {
+        std::str::from_utf8(unsafe {
+            std::slice::from_raw_parts(name_ptr, (name_len as usize).min(256))
+        })
+        .ok()
+    };
+    set_text_renderer_registration(grid_id, measure_fn, render_fn, user_data, name)
 }
 
 /// Returns 1 when built with the built-in `cosmic-text` engine, 0 otherwise.
@@ -7415,6 +7804,67 @@ pub extern "C" fn volvox_grid_has_builtin_text_engine() -> i32 {
         1
     } else {
         0
+    }
+}
+
+/// Returns 1 when built with the wgpu renderer, 0 otherwise.
+#[no_mangle]
+pub extern "C" fn volvox_grid_has_gpu_renderer() -> i32 {
+    if cfg!(feature = "gpu") {
+        1
+    } else {
+        0
+    }
+}
+
+/// Allocates a native surface descriptor for desktop `GpuSurfaceReady`.
+///
+/// `kind` uses volvoxgrid_engine::gpu_render::NATIVE_SURFACE_KIND_* values.
+/// The returned pointer must be released with
+/// `volvox_grid_native_surface_descriptor_free`.
+#[no_mangle]
+pub extern "C" fn volvox_grid_native_surface_descriptor_new(
+    kind: u32,
+    screen: i32,
+    display: *mut std::ffi::c_void,
+    surface: *mut std::ffi::c_void,
+    window: u64,
+) -> *mut std::ffi::c_void {
+    #[cfg(feature = "gpu")]
+    {
+        let Ok(kind) = u16::try_from(kind) else {
+            return std::ptr::null_mut();
+        };
+        let descriptor = volvoxgrid_engine::gpu_render::NativeSurfaceDescriptor {
+            magic: volvoxgrid_engine::gpu_render::NATIVE_SURFACE_DESC_MAGIC,
+            version: volvoxgrid_engine::gpu_render::NATIVE_SURFACE_DESC_VERSION,
+            kind,
+            screen,
+            reserved: 0,
+            display,
+            surface,
+            window,
+        };
+        Box::into_raw(Box::new(descriptor)) as *mut std::ffi::c_void
+    }
+    #[cfg(not(feature = "gpu"))]
+    {
+        let _ = (kind, screen, display, surface, window);
+        std::ptr::null_mut()
+    }
+}
+
+/// Releases a descriptor allocated by `volvox_grid_native_surface_descriptor_new`.
+#[no_mangle]
+pub extern "C" fn volvox_grid_native_surface_descriptor_free(ptr: *mut std::ffi::c_void) {
+    if ptr.is_null() {
+        return;
+    }
+    #[cfg(feature = "gpu")]
+    unsafe {
+        drop(Box::from_raw(
+            ptr as *mut volvoxgrid_engine::gpu_render::NativeSurfaceDescriptor,
+        ));
     }
 }
 

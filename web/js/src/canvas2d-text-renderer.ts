@@ -14,42 +14,15 @@ export function createCanvas2DTextRenderer(wasm: any) {
     baseline: number;
   }
 
-  // Cache for rendered text bitmaps to avoid getImageData and manual blit overhead.
-  interface CachedBitmap {
-    data: Uint8Array;
-    width: number;
-    height: number;
-    realWidth: number;  // The width the engine should use
-    realHeight: number; // The height the engine should use
-    lastUsed: number;
-  }
-  const bitmapCache = new Map<string, CachedBitmap>();
-  let maxCacheSize = 1000;
-
   const getMemory = () => (wasm.wasm_memory ? wasm.wasm_memory().buffer : wasm.memory.buffer);
 
-  function getCacheKey(text: string, fontName: string, fontSize: number, bold: boolean, italic: boolean, wrapWidth: number | null): string {
-    const ww = wrapWidth !== null ? `|ww${Math.round(wrapWidth * 10) / 10}` : '';
-    return `${text}|${fontName}|${fontSize}|${bold ? 'b' : ''}|${italic ? 'i' : ''}${ww}`;
+  function setCacheSize(_size: number) {
+    // Cache ownership lives in the Rust text renderer. Keep this method for
+    // compatibility with older callers.
   }
 
-  function pruneCache() {
-    if (bitmapCache.size <= maxCacheSize) return;
-    const entries = Array.from(bitmapCache.entries());
-    entries.sort((a, b) => a[1].lastUsed - b[1].lastUsed);
-    const toRemove = entries.slice(0, Math.floor(maxCacheSize / 4) || 1);
-    for (const [key] of toRemove) {
-      bitmapCache.delete(key);
-    }
-  }
-
-  function setCacheSize(size: number) {
-    maxCacheSize = Math.max(0, Math.trunc(size));
-    if (maxCacheSize === 0) {
-      bitmapCache.clear();
-    } else {
-      pruneCache();
-    }
+  function cacheSize() {
+    return 0;
   }
 
   function getFontStyle(fontName: string, fontSize: number, bold: boolean, italic: boolean): string {
@@ -77,13 +50,6 @@ export function createCanvas2DTextRenderer(wasm: any) {
     italic: boolean,
     maxWidth: number | null,
   ) {
-    const cacheKey = getCacheKey(text, fontName, fontSize, bold, italic, maxWidth);
-    const cached = bitmapCache.get(cacheKey);
-    if (cached) {
-      cached.lastUsed = Date.now();
-      return { width: cached.realWidth, height: cached.realHeight };
-    }
-
     ctx.font = getFontStyle(fontName, fontSize, bold, italic);
     const { lineHeight } = getLineMetrics(fontSize);
     
@@ -131,86 +97,64 @@ export function createCanvas2DTextRenderer(wasm: any) {
     color: number,
     maxWidth: number | null,
   ): number {
-    const cacheKey = getCacheKey(text, fontName, fontSize, bold, italic, maxWidth);
-    let cached = bitmapCache.get(cacheKey);
-    
     const { lineHeight: lh, baseline } = getLineMetrics(fontSize);
+    const style = getFontStyle(fontName, fontSize, bold, italic);
+    ctx.font = style;
 
-    if (cached) {
-      cached.lastUsed = Date.now();
-    } else {
-      const style = getFontStyle(fontName, fontSize, bold, italic);
-      ctx.font = style;
-      
-      let tw = 0;
-      let th = 0;
-      let lines: string[] = [];
-      let realH = 0;
-      
-      if (maxWidth !== null && maxWidth > 0) {
-        const words = text.split(' ');
-        let currentLine = '';
-        for (const word of words) {
-          const testLine = currentLine ? currentLine + ' ' + word : word;
-          if (ctx.measureText(testLine).width > maxWidth && currentLine) {
-            lines.push(currentLine);
-            currentLine = word;
-          } else {
-            currentLine = testLine;
-          }
+    let tw = 0;
+    let th = 0;
+    let lines: string[] = [];
+
+    if (maxWidth !== null && maxWidth > 0) {
+      const words = text.split(' ');
+      let currentLine = '';
+      for (const word of words) {
+        const testLine = currentLine ? currentLine + ' ' + word : word;
+        if (ctx.measureText(testLine).width > maxWidth && currentLine) {
+          lines.push(currentLine);
+          currentLine = word;
+        } else {
+          currentLine = testLine;
         }
-        lines.push(currentLine);
-        tw = Math.ceil(maxWidth);
-        th = Math.ceil(lines.length * lh);
-        realH = th;
-      } else {
-        const m = ctx.measureText(text);
-        tw = Math.ceil(m.width);
-        th = Math.ceil(lh);
-        realH = lh;
-        lines = [text];
       }
-      
-      if (tw <= 0 || th <= 0) return 0;
-      
-      if (canvas.width < tw) canvas.width = tw;
-      if (canvas.height < th) canvas.height = th;
-      
-      // Render black text on white background and derive alpha from inverse
-      // luminance.  This captures subpixel antialiasing from all three colour
-      // channels, producing a much sharper mask than white-on-transparent alpha.
-      ctx.fillStyle = 'white';
-      ctx.fillRect(0, 0, tw, th);
-      ctx.font = style;
-      ctx.textBaseline = 'alphabetic';
-      ctx.fillStyle = 'black';
-
-      lines.forEach((line, i) => {
-        ctx.fillText(line, 0, i * lh + baseline);
-      });
-
-      const imageData = ctx.getImageData(0, 0, tw, th);
-      const alpha = new Uint8Array(tw * th);
-      for (let i = 0; i < tw * th; i++) {
-        const ri = imageData.data[i * 4];
-        const gi = imageData.data[i * 4 + 1];
-        const bi = imageData.data[i * 4 + 2];
-        alpha[i] = 255 - ((ri + gi + bi + 1) / 3 | 0);
-      }
-      
-      cached = {
-        data: alpha,
-        width: tw,
-        height: th,
-        realWidth: (maxWidth !== null && maxWidth > 0) ? tw : ctx.measureText(text).width,
-        realHeight: realH,
-        lastUsed: Date.now(),
-      };
-      bitmapCache.set(cacheKey, cached);
-      pruneCache();
+      lines.push(currentLine);
+      tw = Math.ceil(maxWidth);
+      th = Math.ceil(lines.length * lh);
+    } else {
+      const m = ctx.measureText(text);
+      tw = Math.ceil(m.width);
+      th = Math.ceil(lh);
+      lines = [text];
     }
 
-    const { data: alphaData, width: tw, height: th, realWidth } = cached;
+    if (tw <= 0 || th <= 0) return 0;
+
+    if (canvas.width < tw) canvas.width = tw;
+    if (canvas.height < th) canvas.height = th;
+
+    // Render black text on white background and derive alpha from inverse
+    // luminance. This captures subpixel antialiasing from all three colour
+    // channels, producing a much sharper mask than white-on-transparent alpha.
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, tw, th);
+    ctx.font = style;
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = 'black';
+
+    lines.forEach((line, i) => {
+      ctx.fillText(line, 0, i * lh + baseline);
+    });
+
+    const imageData = ctx.getImageData(0, 0, tw, th);
+    const alphaData = new Uint8Array(tw * th);
+    for (let i = 0; i < tw * th; i++) {
+      const ri = imageData.data[i * 4];
+      const gi = imageData.data[i * 4 + 1];
+      const bi = imageData.data[i * 4 + 2];
+      alphaData[i] = 255 - ((ri + gi + bi + 1) / 3 | 0);
+    }
+
+    const realWidth = (maxWidth !== null && maxWidth > 0) ? tw : ctx.measureText(text).width;
     const rx = Math.round(x);
     const ry = Math.round(y);
     const rcx = Math.round(clipX);
@@ -252,7 +196,7 @@ export function createCanvas2DTextRenderer(wasm: any) {
           buf[dstIdx] = (r * alpha + buf[dstIdx] * inv);
           buf[dstIdx + 1] = (g * alpha + buf[dstIdx + 1] * inv);
           buf[dstIdx + 2] = (b * alpha + buf[dstIdx + 2] * inv);
-          buf[dstIdx + 3] = 255;
+          buf[dstIdx + 3] = (255 * alpha + buf[dstIdx + 3] * inv);
         }
       }
     }
@@ -260,5 +204,5 @@ export function createCanvas2DTextRenderer(wasm: any) {
     return realWidth;
   }
 
-  return { measureText, renderText, setCacheSize };
+  return { measureText, renderText, setCacheSize, cacheSize };
 }

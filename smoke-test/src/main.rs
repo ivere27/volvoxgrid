@@ -231,6 +231,7 @@ fn main() {
         include_checked: false,
         include_typed: false,
         include_barcode_status: false,
+        include_rich_text: false,
     };
     let resp_bytes = invoke(
         &runtime,
@@ -306,6 +307,7 @@ fn main() {
         include_checked: false,
         include_typed: false,
         include_barcode_status: false,
+        include_rich_text: false,
     };
     let resp_bytes = invoke(
         &runtime,
@@ -351,6 +353,7 @@ fn main() {
         include_checked: false,
         include_typed: false,
         include_barcode_status: false,
+        include_rich_text: false,
     };
     let resp_bytes = invoke(
         &runtime,

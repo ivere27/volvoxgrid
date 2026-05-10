@@ -220,6 +220,24 @@ message CellValue {
   }
 }
 
+message RichText {
+  repeated TextFormatRun runs = 1;
+}
+
+message TextFormatRun {
+  // Zero-based UTF-16 code unit index into CellValue.text.
+  // Style continues until the next run, or end of CellValue.text.
+  uint32 start_index = 1;
+  TextRunStyle style = 2;
+}
+
+message TextRunStyle {
+  optional uint32 foreground = 1; // ARGB
+  Font font = 2;
+  optional TextBaseline baseline = 3;
+  optional string link_url = 4;
+}
+
 // ═══════════════════════════════════════════════════════════
 // Enums
 // ═══════════════════════════════════════════════════════════
@@ -274,6 +292,12 @@ enum TextHintingMode {
   TEXT_HINT_NONE   = 1;
   TEXT_HINT_SLIGHT = 2;
   TEXT_HINT_FULL   = 3;
+}
+
+enum TextBaseline {
+  TEXT_BASELINE_NORMAL      = 0;
+  TEXT_BASELINE_SUPERSCRIPT = 1;
+  TEXT_BASELINE_SUBSCRIPT   = 2;
 }
 
 // Cell text alignment: "horizontal_vertical".
@@ -759,9 +783,14 @@ enum ApplyScope {
 // Rendering backend selection. See GUI.md and TUI.md.
 //   AUTO (0): Engine picks CPU or GPU based on host capabilities.
 //   CPU (1):  Renders into a host-owned RGBA buffer (most portable).
-//   GPU (2):  Renders via wgpu to a host-provided native surface.
-//   TUI (5):  Terminal mode — renders ANSI escape sequences.
-// If GPU initialization fails, the engine falls back to CPU silently.
+//   GPU (2):  Renders via wgpu; backend is selected by wgpu/OS.
+//   GPU_VULKAN (3): Force Vulkan when available.
+//   GPU_GLES (4):   Force the wgpu GL backend (legacy name; OpenGL/OpenGL ES).
+//   TUI (5):        Terminal mode — renders ANSI escape sequences.
+//   GPU_DX12 (6):   Force Direct3D 12 when available.
+//   GPU_METAL (7):  Force Metal when available.
+//   GPU_OPENGL (8): Force the wgpu GL backend (desktop OpenGL/OpenGL ES).
+// GPU modes require GpuSurfaceReady; hosts switch to CPU explicitly.
 enum RendererMode {
   RENDERER_AUTO       = 0;
   RENDERER_CPU        = 1;
@@ -769,6 +798,9 @@ enum RendererMode {
   RENDERER_GPU_VULKAN = 3;
   RENDERER_GPU_GLES   = 4;
   RENDERER_TUI        = 5;
+  RENDERER_GPU_DX12   = 6;
+  RENDERER_GPU_METAL  = 7;
+  RENDERER_GPU_OPENGL = 8;
 }
 
 enum PresentMode {
@@ -1685,6 +1717,8 @@ message CellUpdate {
   // Full replacement, not a sparse barcode patch. Send `symbology` every time;
   // `BARCODE_NONE` clears an existing barcode.
   optional BarcodeData   barcode        = 13;
+  // Full replacement, not a sparse patch. Empty `runs` clears rich text.
+  optional RichText      rich_text      = 14;
 }
 
 message UpdateCellsRequest {
@@ -1707,6 +1741,7 @@ message GetCellsRequest {
   // Opt-in: run the per-cell barcode encode probe and populate
   // `CellData.barcode_status`. Off by default because encoding is not free.
   bool  include_barcode_status = 9;
+  bool  include_rich_text = 10;
 }
 
 message CellData {
@@ -1722,6 +1757,7 @@ message CellData {
   // `include_barcode_status`. Field 8 is intentionally independent from
   // `CellUpdate.barcode = 13`; the messages have different purposes.
   optional BarcodeRenderStatus barcode_status = 8;
+  optional RichText      rich_text   = 9;
 }
 
 message CellsResponse {
@@ -2388,8 +2424,8 @@ message LoadDemoResponse {}
 //   6. Host forwards pointer/key/scroll events as they occur
 //   7. Engine returns EditRequest/DropdownRequest/CursorChange as needed
 //
-// GPU flow replaces step 3-4: host sends GpuSurfaceReady, engine
-// renders via wgpu directly to the native surface.
+// GPU surface flow replaces step 3-4: host sends GpuSurfaceReady,
+// engine renders via wgpu directly to the native surface.
 //
 // The session also carries EventDecision responses from the host
 // (see file header, "Cancelable events via EventDecision") and
@@ -2518,7 +2554,8 @@ message TerminalCommand {
 
 // GPU rendering: host provides a native surface for wgpu.
 // handle=0 means surface destroyed. See runtime/src/lib.rs GpuSurfaceReady.
-// If GPU initialization fails, the runtime falls back to CPU mode silently.
+// If GPU initialization or surface setup fails, the runtime returns
+// GpuFrameDone(rendered=false); it does not render GPU mode into BufferReady.
 message GpuSurfaceReady {
   int64 surface_handle = 1;  // platform-specific native surface (0 = destroyed)
   int32 width          = 2;  // surface width in pixels

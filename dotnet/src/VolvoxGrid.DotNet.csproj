@@ -12,8 +12,11 @@
     <RootNamespace>VolvoxGrid.DotNet</RootNamespace>
     <NoWarn>1591</NoWarn>
     <PackageId>VolvoxGrid.DotNet</PackageId>
+    <PackageId Condition="'$(VolvoxGridPackageId)' != ''">$(VolvoxGridPackageId)</PackageId>
     <Description>VolvoxGrid .NET bindings with WinForms and cross-platform controller support.</Description>
+    <Description Condition="'$(VolvoxGridPackageId)' == 'VolvoxGrid.DotNet.Lite'">VolvoxGrid .NET bindings packaged with lite native binaries and OS text rendering fallback.</Description>
     <PackageTags>volvoxgrid;datagrid;winforms;dotnet;cross-platform</PackageTags>
+    <PackageTags Condition="'$(VolvoxGridPackageId)' == 'VolvoxGrid.DotNet.Lite'">volvoxgrid;datagrid;winforms;dotnet;lite</PackageTags>
     <RepositoryUrl>https://github.com/ivere27/volvoxgrid</RepositoryUrl>
     <PackageProjectUrl>https://github.com/ivere27/volvoxgrid</PackageProjectUrl>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>

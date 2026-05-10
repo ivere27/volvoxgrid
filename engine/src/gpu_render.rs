@@ -105,6 +105,8 @@ pub const NATIVE_SURFACE_DESC_MAGIC: u32 = 0x5658_4753;
 pub const NATIVE_SURFACE_DESC_VERSION: u16 = 1;
 pub const NATIVE_SURFACE_KIND_WAYLAND: u16 = 1;
 pub const NATIVE_SURFACE_KIND_X11: u16 = 2;
+pub const NATIVE_SURFACE_KIND_WIN32: u16 = 3;
+pub const NATIVE_SURFACE_KIND_APPKIT: u16 = 4;
 
 /// Opaque native surface descriptor used by desktop hosts for `GpuSurfaceReady`.
 ///
@@ -122,6 +124,26 @@ pub struct NativeSurfaceDescriptor {
     pub display: *mut std::ffi::c_void,
     pub surface: *mut std::ffi::c_void,
     pub window: u64,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+unsafe fn validate_native_surface_descriptor(
+    native_window_ptr: *mut std::ffi::c_void,
+) -> Result<&'static NativeSurfaceDescriptor, String> {
+    let desc = &*(native_window_ptr as *const NativeSurfaceDescriptor);
+    if desc.magic != NATIVE_SURFACE_DESC_MAGIC {
+        return Err(format!(
+            "configure_surface_from_raw_handle: bad descriptor magic {:#x}",
+            desc.magic
+        ));
+    }
+    if desc.version != NATIVE_SURFACE_DESC_VERSION {
+        return Err(format!(
+            "configure_surface_from_raw_handle: unsupported descriptor version {}",
+            desc.version
+        ));
+    }
+    Ok(desc)
 }
 
 /// GPU renderer for VolvoxGrid.
@@ -583,21 +605,48 @@ impl GpuRenderer {
             )
         };
 
-        #[cfg(all(unix, not(target_os = "android")))]
+        #[cfg(target_os = "windows")]
         let (raw_window, raw_display) = {
-            let desc = &*(native_window_ptr as *const NativeSurfaceDescriptor);
-            if desc.magic != NATIVE_SURFACE_DESC_MAGIC {
+            let desc = validate_native_surface_descriptor(native_window_ptr)?;
+            if desc.kind != NATIVE_SURFACE_KIND_WIN32 {
                 return Err(format!(
-                    "configure_surface_from_raw_handle: bad descriptor magic {:#x}",
-                    desc.magic
+                    "configure_surface_from_raw_handle: unsupported Windows descriptor kind {}",
+                    desc.kind
                 ));
             }
-            if desc.version != NATIVE_SURFACE_DESC_VERSION {
+            let hwnd = std::num::NonZeroIsize::new(desc.window as isize)
+                .ok_or_else(|| "configure_surface_from_raw_handle: null HWND".to_string())?;
+            let wh = raw_window_handle::Win32WindowHandle::new(hwnd);
+            let dh = raw_window_handle::WindowsDisplayHandle::new();
+            (
+                raw_window_handle::RawWindowHandle::Win32(wh),
+                raw_window_handle::RawDisplayHandle::Windows(dh),
+            )
+        };
+
+        #[cfg(target_os = "macos")]
+        let (raw_window, raw_display) = {
+            let desc = validate_native_surface_descriptor(native_window_ptr)?;
+            if desc.kind != NATIVE_SURFACE_KIND_APPKIT {
                 return Err(format!(
-                    "configure_surface_from_raw_handle: unsupported descriptor version {}",
-                    desc.version
+                    "configure_surface_from_raw_handle: unsupported macOS descriptor kind {}",
+                    desc.kind
                 ));
             }
+            let ns_view = std::ptr::NonNull::new(desc.surface).ok_or_else(|| {
+                "configure_surface_from_raw_handle: null AppKit NSView".to_string()
+            })?;
+            let wh = raw_window_handle::AppKitWindowHandle::new(ns_view);
+            let dh = raw_window_handle::AppKitDisplayHandle::new();
+            (
+                raw_window_handle::RawWindowHandle::AppKit(wh),
+                raw_window_handle::RawDisplayHandle::AppKit(dh),
+            )
+        };
+
+        #[cfg(all(unix, not(target_os = "android"), not(target_os = "macos")))]
+        let (raw_window, raw_display) = {
+            let desc = validate_native_surface_descriptor(native_window_ptr)?;
 
             match desc.kind {
                 NATIVE_SURFACE_KIND_WAYLAND => {
@@ -635,10 +684,20 @@ impl GpuRenderer {
             }
         };
 
-        #[cfg(not(any(target_os = "android", all(unix, not(target_os = "android")))))]
+        #[cfg(not(any(
+            target_os = "android",
+            target_os = "windows",
+            target_os = "macos",
+            all(unix, not(target_os = "android"), not(target_os = "macos"))
+        )))]
         return Err("configure_surface_from_raw_handle: unsupported platform".to_string());
 
-        #[cfg(any(target_os = "android", all(unix, not(target_os = "android"))))]
+        #[cfg(any(
+            target_os = "android",
+            target_os = "windows",
+            target_os = "macos",
+            all(unix, not(target_os = "android"), not(target_os = "macos"))
+        ))]
         {
             let target = wgpu::SurfaceTargetUnsafe::RawHandle {
                 raw_window_handle: raw_window,
@@ -840,6 +899,14 @@ impl GpuRenderer {
     pub fn text_cache_len(&self) -> usize {
         self.text_engine.layout_cache.len()
     }
+
+    pub fn clear_text_cache(&mut self) {
+        self.text_engine.clear_cache();
+        self.glyph_pos_cache.clear();
+        self.glyph_atlas.clear();
+        self.atlas_textures.clear();
+        self.atlas_bind_groups.clear();
+    }
 }
 
 impl Drop for GpuRenderer {
@@ -883,6 +950,10 @@ impl GpuRenderer {
         let caps = surface.get_capabilities(&self.adapter);
         if caps.formats.is_empty() {
             // Surface is invalid or incompatible. Drop it to avoid crash in configure.
+            eprintln!(
+                "[volvoxgrid] GPU surface has no compatible formats for adapter {:?}",
+                self.adapter.get_info()
+            );
             self.drop_surface();
             return false;
         }
@@ -960,7 +1031,11 @@ impl GpuRenderer {
             self.device.push_error_scope(wgpu::ErrorFilter::Validation);
             surface.configure(&self.device, &config);
             let error = block_on_immediate(self.device.pop_error_scope());
-            if error.is_some() {
+            if let Some(error) = error {
+                eprintln!(
+                    "[volvoxgrid] GPU surface configure validation error: {}",
+                    error
+                );
                 self.drop_surface();
                 return false;
             }
@@ -983,6 +1058,10 @@ impl GpuRenderer {
         if let Some(ref surface) = self.surface {
             let caps = surface.get_capabilities(&self.adapter);
             if caps.formats.is_empty() {
+                eprintln!(
+                    "[volvoxgrid] GPU surface resize found no compatible formats for adapter {:?}",
+                    self.adapter.get_info()
+                );
                 self.drop_surface();
                 return;
             }
@@ -997,7 +1076,11 @@ impl GpuRenderer {
                     self.device.push_error_scope(wgpu::ErrorFilter::Validation);
                     surface.configure(&self.device, config);
                     let error = block_on_immediate(self.device.pop_error_scope());
-                    if error.is_some() {
+                    if let Some(error) = error {
+                        eprintln!(
+                            "[volvoxgrid] GPU surface resize validation error: {}",
+                            error
+                        );
                         self.surface = None;
                         #[cfg(target_os = "android")]
                         if let Some(window) = self.active_native_window.take() {

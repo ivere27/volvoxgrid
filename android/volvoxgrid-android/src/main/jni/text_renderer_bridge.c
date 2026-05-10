@@ -35,9 +35,17 @@ typedef int32_t (*vv_set_text_renderer_fn)(
     void* user_data
 );
 
+typedef int32_t (*vv_set_text_renderer_named_fn)(
+    int64_t grid_id,
+    vv_measure_text_fn measure_fn,
+    vv_render_text_fn render_fn,
+    void* user_data,
+    const uint8_t* name_ptr,
+    int32_t name_len
+);
+
 typedef int32_t (*vv_has_builtin_text_engine_fn)(void);
 
-#define MASK_CACHE_CAPACITY 8192
 #define MASK_CACHE_BUCKETS 2048
 
 typedef struct MaskCacheEntry {
@@ -233,6 +241,9 @@ static void mask_cache_put(MaskCache* cache, uint32_t hash,
     float font_size, int32_t bold, int32_t italic, float max_width,
     int32_t mask_w, int32_t mask_h, int32_t mask_stride, float real_width, float real_height,
     const uint8_t* mask_data, size_t mask_data_len) {
+    if (cache->capacity <= 0) {
+        return;
+    }
     
     MaskCacheEntry* existing = mask_cache_get(cache, hash, text, text_len, font, font_len, font_size, bold, italic, max_width);
     if (existing) {
@@ -453,7 +464,9 @@ static RendererBinding* create_binding(JNIEnv* env, jobject callback) {
     binding->callback_global = callback_global;
     binding->measure_method = measure_method;
     binding->rasterize_method = rasterize_method;
-    init_mask_cache(&binding->mask_cache, MASK_CACHE_CAPACITY);
+    // Runtime owns the external text mask cache. This JNI bridge keeps only
+    // reusable JNI buffers and the Java callback reference.
+    init_mask_cache(&binding->mask_cache, 0);
     return binding;
 }
 
@@ -462,6 +475,13 @@ static vv_set_text_renderer_fn resolve_set_text_renderer_fn(int64_t runtime_hand
         return NULL;
     }
     return (vv_set_text_renderer_fn)dlsym((void*)(intptr_t)runtime_handle, "volvox_grid_set_text_renderer");
+}
+
+static vv_set_text_renderer_named_fn resolve_set_text_renderer_named_fn(int64_t runtime_handle) {
+    if (runtime_handle == 0) {
+        return NULL;
+    }
+    return (vv_set_text_renderer_named_fn)dlsym((void*)(intptr_t)runtime_handle, "volvox_grid_set_text_renderer_named");
 }
 
 static vv_has_builtin_text_engine_fn resolve_has_builtin_text_engine_fn(int64_t runtime_handle) {
@@ -852,8 +872,9 @@ Java_io_github_ivere27_volvoxgrid_NativeTextRendererBridge_nativeRegisterTextRen
     if (callback == NULL) {
         return -1;
     }
+    vv_set_text_renderer_named_fn named_fn = resolve_set_text_renderer_named_fn((int64_t)runtime_handle);
     vv_set_text_renderer_fn fn = resolve_set_text_renderer_fn((int64_t)runtime_handle);
-    if (fn == NULL) {
+    if (named_fn == NULL && fn == NULL) {
         return -2;
     }
 
@@ -862,12 +883,22 @@ Java_io_github_ivere27_volvoxgrid_NativeTextRendererBridge_nativeRegisterTextRen
         return -3;
     }
 
-    int32_t rc = fn(
-        (int64_t)grid_id,
-        bridge_measure_text,
-        bridge_render_text,
-        (void*)binding
-    );
+    static const uint8_t renderer_name[] = "Android";
+    int32_t rc = named_fn != NULL
+        ? named_fn(
+            (int64_t)grid_id,
+            bridge_measure_text,
+            bridge_render_text,
+            (void*)binding,
+            renderer_name,
+            (int32_t)(sizeof(renderer_name) - 1)
+        )
+        : fn(
+            (int64_t)grid_id,
+            bridge_measure_text,
+            bridge_render_text,
+            (void*)binding
+        );
     if (rc != 0) {
         free_binding(binding);
         return (jint)rc;
@@ -923,7 +954,7 @@ Java_io_github_ivere27_volvoxgrid_NativeTextRendererBridge_nativeSetTextRenderer
     while (node != NULL) {
         if (node->grid_id == (int64_t)grid_id) {
             pthread_mutex_lock(&node->binding->mask_cache.lock);
-            mask_cache_set_capacity(&node->binding->mask_cache, (int)cap);
+            mask_cache_set_capacity(&node->binding->mask_cache, 0);
             pthread_mutex_unlock(&node->binding->mask_cache.lock);
             break;
         }

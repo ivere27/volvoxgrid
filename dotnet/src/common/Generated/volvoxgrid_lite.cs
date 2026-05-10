@@ -624,6 +624,9 @@ namespace Volvoxgrid.V1
         RENDERER_GPU_VULKAN = 3,
         RENDERER_GPU_GLES = 4,
         RENDERER_TUI = 5,
+        RENDERER_GPU_DX12 = 6,
+        RENDERER_GPU_METAL = 7,
+        RENDERER_GPU_OPENGL = 8,
     }
 
     public enum RowIndicatorSlotKind
@@ -736,6 +739,13 @@ namespace Volvoxgrid.V1
     {
         TERMINAL_COMMAND_NONE = 0,
         TERMINAL_COMMAND_EXIT = 1,
+    }
+
+    public enum TextBaseline
+    {
+        TEXT_BASELINE_NORMAL = 0,
+        TEXT_BASELINE_SUPERSCRIPT = 1,
+        TEXT_BASELINE_SUBSCRIPT = 2,
     }
 
     public enum TextEffect
@@ -2318,6 +2328,9 @@ namespace Volvoxgrid.V1
         private BarcodeRenderStatus? _barcodeStatus;
         public BarcodeRenderStatus BarcodeStatus { get { return _barcodeStatus.GetValueOrDefault(); } set { _barcodeStatus = value; } }
         public bool HasBarcodeStatus { get { return _barcodeStatus.HasValue; } }
+        private RichText _richText;
+        public RichText RichText { get { return _richText; } set { _richText = value; } }
+        public bool HasRichText { get { return _richText != null; } }
 
         // ── Serialization ──
 
@@ -2335,6 +2348,8 @@ namespace Volvoxgrid.V1
                 w.WriteMessageBytes(7, _barcode.ToByteArray());
             if (_barcodeStatus.HasValue)
                 w.WriteInt32(8, (int)_barcodeStatus.Value);
+            if (_richText != null)
+                w.WriteMessageBytes(9, _richText.ToByteArray());
             return w.ToArray();
         }
 
@@ -2360,6 +2375,7 @@ namespace Volvoxgrid.V1
                     case 6: msg.Interaction = (CellInteraction)r.ReadInt32(); break;
                     case 7: msg.Barcode = BarcodeData.ParseFrom(r.ReadLengthDelimited()); break;
                     case 8: msg.BarcodeStatus = (BarcodeRenderStatus)r.ReadInt32(); break;
+                    case 9: msg.RichText = RichText.ParseFrom(r.ReadLengthDelimited()); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -2763,6 +2779,9 @@ namespace Volvoxgrid.V1
         private BarcodeData _barcode;
         public BarcodeData Barcode { get { return _barcode; } set { _barcode = value; } }
         public bool HasBarcode { get { return _barcode != null; } }
+        private RichText _richText;
+        public RichText RichText { get { return _richText; } set { _richText = value; } }
+        public bool HasRichText { get { return _richText != null; } }
 
         // ── Serialization ──
 
@@ -2789,6 +2808,8 @@ namespace Volvoxgrid.V1
                 w.WriteInt32(12, (int)_interaction.Value);
             if (_barcode != null)
                 w.WriteMessageBytes(13, _barcode.ToByteArray());
+            if (_richText != null)
+                w.WriteMessageBytes(14, _richText.ToByteArray());
             return w.ToArray();
         }
 
@@ -2819,6 +2840,7 @@ namespace Volvoxgrid.V1
                     case 11: msg.StickyCol = (StickyEdge)r.ReadInt32(); break;
                     case 12: msg.Interaction = (CellInteraction)r.ReadInt32(); break;
                     case 13: msg.Barcode = BarcodeData.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 14: msg.RichText = RichText.ParseFrom(r.ReadLengthDelimited()); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -6278,6 +6300,7 @@ namespace Volvoxgrid.V1
         public bool IncludeChecked { get; set; }
         public bool IncludeTyped { get; set; }
         public bool IncludeBarcodeStatus { get; set; }
+        public bool IncludeRichText { get; set; }
 
         // ── Serialization ──
 
@@ -6293,6 +6316,7 @@ namespace Volvoxgrid.V1
             if (IncludeChecked) w.WriteBool(7, IncludeChecked);
             if (IncludeTyped) w.WriteBool(8, IncludeTyped);
             if (IncludeBarcodeStatus) w.WriteBool(9, IncludeBarcodeStatus);
+            if (IncludeRichText) w.WriteBool(10, IncludeRichText);
             return w.ToArray();
         }
 
@@ -6319,6 +6343,7 @@ namespace Volvoxgrid.V1
                     case 7: msg.IncludeChecked = r.ReadBool(); break;
                     case 8: msg.IncludeTyped = r.ReadBool(); break;
                     case 9: msg.IncludeBarcodeStatus = r.ReadBool(); break;
+                    case 10: msg.IncludeRichText = r.ReadBool(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -11304,6 +11329,42 @@ namespace Volvoxgrid.V1
         }
     }
 
+    public sealed class RichText
+    {
+        public List<TextFormatRun> Runs { get; private set; } = new List<TextFormatRun>();
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            foreach (var item in Runs)
+                w.WriteMessageBytes(1, item.ToByteArray());
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<RichText> Parser = new MessageParser<RichText>(data => ParseFrom(data));
+
+        public static RichText ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new RichText();
+            var r = new ProtoReader(data);
+            var msg = new RichText();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.Runs.Add(TextFormatRun.ParseFrom(r.ReadLengthDelimited())); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
     public sealed class RowDef
     {
         public int Index { get; set; }
@@ -13362,6 +13423,44 @@ namespace Volvoxgrid.V1
         }
     }
 
+    public sealed class TextFormatRun
+    {
+        public uint StartIndex { get; set; }
+        public TextRunStyle Style { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (StartIndex != 0u) w.WriteInt32(1, unchecked((int)StartIndex));
+            if (Style != null) w.WriteMessageBytes(2, Style.ToByteArray());
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<TextFormatRun> Parser = new MessageParser<TextFormatRun>(data => ParseFrom(data));
+
+        public static TextFormatRun ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new TextFormatRun();
+            var r = new ProtoReader(data);
+            var msg = new TextFormatRun();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.StartIndex = unchecked((uint)r.ReadInt32()); break;
+                    case 2: msg.Style = TextRunStyle.ParseFrom(r.ReadLengthDelimited()); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
     public sealed class TextQuery
     {
         public string Text { get; set; } = "";
@@ -13446,6 +13545,59 @@ namespace Volvoxgrid.V1
                     case 1: msg.Mode = (TextRenderMode)r.ReadInt32(); break;
                     case 2: msg.Hinting = (TextHintingMode)r.ReadInt32(); break;
                     case 3: msg.PixelSnap = r.ReadBool(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class TextRunStyle
+    {
+        private uint? _foreground;
+        public uint Foreground { get { return _foreground.GetValueOrDefault(); } set { _foreground = value; } }
+        public bool HasForeground { get { return _foreground.HasValue; } }
+        public Font Font { get; set; }
+        private TextBaseline? _baseline;
+        public TextBaseline Baseline { get { return _baseline.GetValueOrDefault(); } set { _baseline = value; } }
+        public bool HasBaseline { get { return _baseline.HasValue; } }
+        private string _linkUrl;
+        public string LinkUrl { get { return _linkUrl; } set { _linkUrl = value; } }
+        public bool HasLinkUrl { get { return _linkUrl != null; } }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (_foreground.HasValue)
+                w.WriteInt32(1, unchecked((int)_foreground.Value));
+            if (Font != null) w.WriteMessageBytes(2, Font.ToByteArray());
+            if (_baseline.HasValue)
+                w.WriteInt32(3, (int)_baseline.Value);
+            if (_linkUrl != null)
+                w.WriteString(4, _linkUrl);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<TextRunStyle> Parser = new MessageParser<TextRunStyle>(data => ParseFrom(data));
+
+        public static TextRunStyle ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new TextRunStyle();
+            var r = new ProtoReader(data);
+            var msg = new TextRunStyle();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.Foreground = unchecked((uint)r.ReadInt32()); break;
+                    case 2: msg.Font = Font.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 3: msg.Baseline = (TextBaseline)r.ReadInt32(); break;
+                    case 4: msg.LinkUrl = r.ReadString(); break;
                     default: r.SkipField(wire); break;
                 }
             }

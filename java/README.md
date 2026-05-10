@@ -1,6 +1,6 @@
 # VolvoxGrid for Java Desktop
 
-A high-performance datagrid panel for Java Swing applications. Renders directly to pixel buffers with CPU rendering. Supports cell editing, sorting, merged cells, scrolling, and more.
+A high-performance datagrid panel for Java Swing applications. Renders through CPU pixel buffers, with native-surface GPU rendering available in full desktop builds. Supports cell editing, sorting, merged cells, scrolling, and more.
 
 The repo also includes a Unix-oriented terminal sample that uses the thin TUI byte-stream path:
 
@@ -19,13 +19,28 @@ repositories {
 }
 
 dependencies {
-    implementation("io.github.ivere27:volvoxgrid-desktop:0.8.7")
+    implementation("io.github.ivere27:volvoxgrid-desktop:0.8.8")
+    // or: implementation("io.github.ivere27:volvoxgrid-desktop-lite:0.8.8")
 }
 ```
 
 The JAR bundles native libraries for Linux (x86, x86_64, armv7, aarch64), macOS (x86_64, aarch64), and Windows (x86, x86_64).
 
 **Requirements:** Java 8+
+
+### Lite Variant
+
+`volvoxgrid-desktop-lite` is the Java desktop package built without the built-in Rust text engine, GPU renderer, regex search, or rayon parallelism. It uses Java2D for OS font fallback and keeps the primary text mask cache in the Rust runtime.
+
+Use `VOLVOXGRID_VARIANT=lite` for local and Maven sample runs:
+
+```bash
+make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.8.8
+make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.8.8-SNAPSHOT
+make java-desktop-run-release VOLVOXGRID_VARIANT=lite
+```
+
+See [../TEXT_RENDERING.md](../TEXT_RENDERING.md) for full/lite text rendering and cache ownership.
 
 ## Quick Start
 
@@ -114,8 +129,11 @@ gridPanel.initialize(bridge, existingGridId);
 | `requestFrame()` | Request a render on next repaint |
 | `requestFrameImmediate()` | Request a render immediately |
 | `setRendererBackend(backend)` | `CPU`, `GPU`, or `AUTO` |
-| `isGpuSupported()` | Check if GPU rendering is available |
+| `setRendererMode(mode)` | Select `RENDERER_CPU`, `RENDERER_GPU`, `RENDERER_GPU_VULKAN`, `RENDERER_GPU_GLES`, `RENDERER_GPU_OPENGL`, `RENDERER_GPU_DX12`, or `RENDERER_GPU_METAL` |
+| `isGpuSupported()` | Check if the loaded native library and host expose native-surface GPU rendering |
 | `setHostFlingEnabled(enabled)` | Enable/disable momentum scrolling |
+
+Full desktop builds can use native-surface GPU rendering when the platform and selected backend are compatible. Lite desktop builds are CPU-only.
 
 #### Event Listeners
 

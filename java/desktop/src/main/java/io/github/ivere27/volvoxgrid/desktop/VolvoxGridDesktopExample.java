@@ -7,13 +7,13 @@ import io.github.ivere27.volvoxgrid.CreateResponse;
 import io.github.ivere27.volvoxgrid.DestroyRequest;
 import io.github.ivere27.volvoxgrid.GridEvent;
 import io.github.ivere27.volvoxgrid.GridConfig;
+import io.github.ivere27.volvoxgrid.FramePacingMode;
 import io.github.ivere27.volvoxgrid.LayoutConfig;
 import io.github.ivere27.volvoxgrid.RenderConfig;
 import io.github.ivere27.volvoxgrid.RendererMode;
 import io.github.ivere27.volvoxgrid.ScrollBarsMode;
 import io.github.ivere27.volvoxgrid.SelectionMode;
 import io.github.ivere27.volvoxgrid.SortOrder;
-import io.github.ivere27.volvoxgrid.common.RendererBackend;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.FlowLayout;
@@ -48,7 +48,7 @@ public final class VolvoxGridDesktopExample {
     private volatile VolvoxGridDesktopController controller;
     private volatile String currentDemo = "";
 
-    private volatile boolean gpuEnabled = false;
+    private volatile RendererMode rendererMode = RendererMode.RENDERER_CPU;
     private volatile boolean debugOverlayEnabled = false;
     private volatile boolean scrollBlitEnabled = false;
     private volatile boolean scrollbarsEnabled = true;
@@ -64,7 +64,7 @@ public final class VolvoxGridDesktopExample {
     private JButton btnStress;
     private JButton btnSortAsc;
     private JButton btnSortDesc;
-    private JCheckBox cbGpu;
+    private JComboBox<RendererModeOption> rendererModeBox;
     private JCheckBox cbDebug;
     private JCheckBox cbEdit;
     private JCheckBox cbScrollBlit;
@@ -73,6 +73,21 @@ public final class VolvoxGridDesktopExample {
     private JComboBox<SelectionMode> selectionModeBox;
 
     private VolvoxGridDesktopExample() {}
+
+    private static final class RendererModeOption {
+        final String label;
+        final RendererMode mode;
+
+        RendererModeOption(String label, RendererMode mode) {
+            this.label = label;
+            this.mode = mode;
+        }
+
+        @Override
+        public String toString() {
+            return label;
+        }
+    }
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> new VolvoxGridDesktopExample().start(args));
@@ -123,12 +138,24 @@ public final class VolvoxGridDesktopExample {
         btnStress = new JButton("Stress");
         btnSortAsc = new JButton("Sort Asc");
         btnSortDesc = new JButton("Sort Desc");
-        cbGpu = new JCheckBox("GPU (stub)");
         cbDebug = new JCheckBox("Debug");
         cbEdit = new JCheckBox("Edit", editableEnabled);
         cbScrollBlit = new JCheckBox("Scroll Blit", scrollBlitEnabled);
         cbScrollbars = new JCheckBox("Scrollbars", scrollbarsEnabled);
         cbFling = new JCheckBox("Fling", flingEnabled);
+        rendererModeBox = new JComboBox<>(
+            new RendererModeOption[] {
+                new RendererModeOption("AUTO", RendererMode.RENDERER_AUTO),
+                new RendererModeOption("CPU", RendererMode.RENDERER_CPU),
+                new RendererModeOption("GPU", RendererMode.RENDERER_GPU),
+                new RendererModeOption("GPU (Vulkan)", RendererMode.RENDERER_GPU_VULKAN),
+                new RendererModeOption("GPU (GLES)", RendererMode.RENDERER_GPU_GLES),
+                new RendererModeOption("GPU (OpenGL)", RendererMode.RENDERER_GPU_OPENGL),
+                new RendererModeOption("GPU (DX12)", RendererMode.RENDERER_GPU_DX12),
+                new RendererModeOption("GPU (Metal)", RendererMode.RENDERER_GPU_METAL),
+            }
+        );
+        selectRendererModeBox(rendererMode);
         selectionModeBox = new JComboBox<>(
             new SelectionMode[] {
                 SelectionMode.SELECTION_FREE,
@@ -146,7 +173,8 @@ public final class VolvoxGridDesktopExample {
         row1.add(btnStress);
         row1.add(new JLabel("Selection"));
         row1.add(selectionModeBox);
-        row1.add(cbGpu);
+        row1.add(new JLabel("Renderer"));
+        row1.add(rendererModeBox);
         row1.add(cbDebug);
         row1.add(cbEdit);
         row1.add(cbScrollBlit);
@@ -172,10 +200,10 @@ public final class VolvoxGridDesktopExample {
         btnStress.addActionListener(e -> submit(() -> switchDemo("stress")));
         btnSortAsc.addActionListener(e -> submit(() -> sortCurrent(true)));
         btnSortDesc.addActionListener(e -> submit(() -> sortCurrent(false)));
-        cbGpu.addActionListener(e -> {
-            boolean selected = cbGpu.isSelected();
+        rendererModeBox.addActionListener(e -> {
+            RendererModeOption selected = (RendererModeOption) rendererModeBox.getSelectedItem();
             submit(() -> {
-                gpuEnabled = selected;
+                rendererMode = selected != null ? selected.mode : RendererMode.RENDERER_CPU;
                 applyDisplayToggles();
             });
         });
@@ -338,7 +366,8 @@ public final class VolvoxGridDesktopExample {
             .setIndicators(VolvoxGridDesktopController.defaultIndicatorsConfig())
             .setRendering(
                 RenderConfig.newBuilder()
-                    .setRendererMode(RendererMode.RENDERER_CPU)
+                    .setRendererMode(rendererMode)
+                    .setFramePacingMode(FramePacingMode.FRAME_PACING_MODE_PLATFORM)
                     .setScrollBlit(scrollBlitEnabled)
                     .build()
             )
@@ -383,17 +412,20 @@ public final class VolvoxGridDesktopExample {
         }
 
         try {
-            if (gpuEnabled) {
-                ctrl.setRendererBackend(RendererBackend.GPU);
-            } else {
-                ctrl.setRendererBackend(RendererBackend.CPU);
+            if (isGpuRendererMode(rendererMode)) {
+                if (!gridPanel.isGpuSupported()) {
+                    rendererMode = RendererMode.RENDERER_CPU;
+                    SwingUtilities.invokeLater(() -> selectRendererModeBox(rendererMode));
+                    updateStatus("GPU renderer is not available in this native library; using CPU");
+                }
             }
+            gridPanel.setRendererMode(rendererMode);
         } catch (UnsupportedOperationException e) {
-            gpuEnabled = false;
-            SwingUtilities.invokeLater(() -> cbGpu.setSelected(false));
-            updateStatus("GPU is not implemented yet on desktop; using CPU");
+            rendererMode = RendererMode.RENDERER_CPU;
+            SwingUtilities.invokeLater(() -> selectRendererModeBox(rendererMode));
+            updateStatus(e.getMessage() + " Using CPU.");
             try {
-                ctrl.setRendererBackend(RendererBackend.CPU);
+                gridPanel.setRendererMode(RendererMode.RENDERER_CPU);
             } catch (Exception cpuErr) {
                 updateStatus("Failed to restore CPU renderer: " + cpuErr.getMessage());
             }
@@ -420,15 +452,17 @@ public final class VolvoxGridDesktopExample {
         }
 
         try {
-            ctrl.setFlingEnabled(flingEnabled);
+            // Swing has no Android-style postOnAnimation frame source. Use the
+            // desktop host momentum loop for wheel fling and keep engine fling
+            // disabled so it does not require continuous frame pumping.
+            ctrl.setFlingEnabled(false);
         } catch (Exception e) {
             updateStatus("Fling setup failed: " + e.getMessage());
         }
         if (!flingEnabled) {
             gridPanel.cancelEngineFling();
         }
-        // Desktop fling should primarily come from engine-side momentum.
-        gridPanel.setHostFlingEnabled(false);
+        gridPanel.setHostFlingEnabled(flingEnabled);
 
         try {
             ctrl.refresh();
@@ -445,7 +479,6 @@ public final class VolvoxGridDesktopExample {
         try {
             ctrl.setFlingEnabled(false);
             gridPanel.cancelEngineFling();
-            ctrl.setFlingEnabled(flingEnabled);
         } catch (Exception e) {
             updateStatus("Fling reset failed: " + e.getMessage());
         }
@@ -492,7 +525,7 @@ public final class VolvoxGridDesktopExample {
             btnStress.setEnabled(enabled);
             btnSortAsc.setEnabled(enabled);
             btnSortDesc.setEnabled(enabled);
-            cbGpu.setEnabled(enabled);
+            rendererModeBox.setEnabled(enabled && gridPanel.isGpuSupported());
             cbDebug.setEnabled(enabled);
             cbEdit.setEnabled(enabled);
             cbScrollBlit.setEnabled(enabled);
@@ -513,6 +546,37 @@ public final class VolvoxGridDesktopExample {
 
     private void updateStatus(String message) {
         SwingUtilities.invokeLater(() -> statusLabel.setText(message));
+    }
+
+    private void selectRendererModeBox(RendererMode mode) {
+        if (rendererModeBox == null) {
+            return;
+        }
+        for (int i = 0; i < rendererModeBox.getItemCount(); i++) {
+            RendererModeOption option = rendererModeBox.getItemAt(i);
+            if (option != null && option.mode == mode) {
+                rendererModeBox.setSelectedIndex(i);
+                return;
+            }
+        }
+    }
+
+    private static boolean isGpuRendererMode(RendererMode mode) {
+        switch (mode) {
+            case RENDERER_GPU:
+            case RENDERER_GPU_VULKAN:
+            case RENDERER_GPU_GLES:
+            case RENDERER_GPU_DX12:
+            case RENDERER_GPU_METAL:
+            case RENDERER_GPU_OPENGL:
+                return true;
+            case RENDERER_AUTO:
+            case RENDERER_CPU:
+            case RENDERER_TUI:
+            case UNRECOGNIZED:
+            default:
+                return false;
+        }
     }
 
     private boolean isHierarchyActionTextClick(GridEvent event) {

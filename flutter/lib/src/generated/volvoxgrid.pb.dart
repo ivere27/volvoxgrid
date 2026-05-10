@@ -1435,6 +1435,218 @@ class CellValue extends $pb.GeneratedMessage {
   void clearTimestamp() => $_clearField(5);
 }
 
+class RichText extends $pb.GeneratedMessage {
+  factory RichText({
+    $core.Iterable<TextFormatRun>? runs,
+  }) {
+    final result = create();
+    if (runs != null) result.runs.addAll(runs);
+    return result;
+  }
+
+  RichText._();
+
+  factory RichText.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory RichText.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RichText',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..pPM<TextFormatRun>(1, _omitFieldNames ? '' : 'runs',
+        subBuilder: TextFormatRun.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RichText clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RichText copyWith(void Function(RichText) updates) =>
+      super.copyWith((message) => updates(message as RichText)) as RichText;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RichText create() => RichText._();
+  @$core.override
+  RichText createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static RichText getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<RichText>(create);
+  static RichText? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<TextFormatRun> get runs => $_getList(0);
+}
+
+class TextFormatRun extends $pb.GeneratedMessage {
+  factory TextFormatRun({
+    $core.int? startIndex,
+    TextRunStyle? style,
+  }) {
+    final result = create();
+    if (startIndex != null) result.startIndex = startIndex;
+    if (style != null) result.style = style;
+    return result;
+  }
+
+  TextFormatRun._();
+
+  factory TextFormatRun.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory TextFormatRun.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TextFormatRun',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'startIndex', fieldType: $pb.PbFieldType.OU3)
+    ..aOM<TextRunStyle>(2, _omitFieldNames ? '' : 'style',
+        subBuilder: TextRunStyle.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TextFormatRun clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TextFormatRun copyWith(void Function(TextFormatRun) updates) =>
+      super.copyWith((message) => updates(message as TextFormatRun))
+          as TextFormatRun;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static TextFormatRun create() => TextFormatRun._();
+  @$core.override
+  TextFormatRun createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static TextFormatRun getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TextFormatRun>(create);
+  static TextFormatRun? _defaultInstance;
+
+  /// Zero-based UTF-16 code unit index into CellValue.text.
+  /// Style continues until the next run, or end of CellValue.text.
+  @$pb.TagNumber(1)
+  $core.int get startIndex => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set startIndex($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasStartIndex() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearStartIndex() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  TextRunStyle get style => $_getN(1);
+  @$pb.TagNumber(2)
+  set style(TextRunStyle value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasStyle() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearStyle() => $_clearField(2);
+  @$pb.TagNumber(2)
+  TextRunStyle ensureStyle() => $_ensure(1);
+}
+
+class TextRunStyle extends $pb.GeneratedMessage {
+  factory TextRunStyle({
+    $core.int? foreground,
+    Font? font,
+    TextBaseline? baseline,
+    $core.String? linkUrl,
+  }) {
+    final result = create();
+    if (foreground != null) result.foreground = foreground;
+    if (font != null) result.font = font;
+    if (baseline != null) result.baseline = baseline;
+    if (linkUrl != null) result.linkUrl = linkUrl;
+    return result;
+  }
+
+  TextRunStyle._();
+
+  factory TextRunStyle.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory TextRunStyle.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TextRunStyle',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'foreground', fieldType: $pb.PbFieldType.OU3)
+    ..aOM<Font>(2, _omitFieldNames ? '' : 'font', subBuilder: Font.create)
+    ..aE<TextBaseline>(3, _omitFieldNames ? '' : 'baseline',
+        enumValues: TextBaseline.values)
+    ..aOS(4, _omitFieldNames ? '' : 'linkUrl')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TextRunStyle clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TextRunStyle copyWith(void Function(TextRunStyle) updates) =>
+      super.copyWith((message) => updates(message as TextRunStyle))
+          as TextRunStyle;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static TextRunStyle create() => TextRunStyle._();
+  @$core.override
+  TextRunStyle createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static TextRunStyle getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TextRunStyle>(create);
+  static TextRunStyle? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get foreground => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set foreground($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasForeground() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearForeground() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  Font get font => $_getN(1);
+  @$pb.TagNumber(2)
+  set font(Font value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasFont() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearFont() => $_clearField(2);
+  @$pb.TagNumber(2)
+  Font ensureFont() => $_ensure(1);
+
+  @$pb.TagNumber(3)
+  TextBaseline get baseline => $_getN(2);
+  @$pb.TagNumber(3)
+  set baseline(TextBaseline value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasBaseline() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearBaseline() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get linkUrl => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set linkUrl($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasLinkUrl() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearLinkUrl() => $_clearField(4);
+}
+
 class Dropdown extends $pb.GeneratedMessage {
   factory Dropdown({
     $core.Iterable<DropdownItem>? items,
@@ -8314,6 +8526,7 @@ class CellUpdate extends $pb.GeneratedMessage {
     StickyEdge? stickyCol,
     CellInteraction? interaction,
     BarcodeData? barcode,
+    RichText? richText,
   }) {
     final result = create();
     if (row != null) result.row = row;
@@ -8329,6 +8542,7 @@ class CellUpdate extends $pb.GeneratedMessage {
     if (stickyCol != null) result.stickyCol = stickyCol;
     if (interaction != null) result.interaction = interaction;
     if (barcode != null) result.barcode = barcode;
+    if (richText != null) result.richText = richText;
     return result;
   }
 
@@ -8369,6 +8583,8 @@ class CellUpdate extends $pb.GeneratedMessage {
         enumValues: CellInteraction.values)
     ..aOM<BarcodeData>(13, _omitFieldNames ? '' : 'barcode',
         subBuilder: BarcodeData.create)
+    ..aOM<RichText>(14, _omitFieldNames ? '' : 'richText',
+        subBuilder: RichText.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -8519,6 +8735,18 @@ class CellUpdate extends $pb.GeneratedMessage {
   void clearBarcode() => $_clearField(13);
   @$pb.TagNumber(13)
   BarcodeData ensureBarcode() => $_ensure(12);
+
+  /// Full replacement, not a sparse patch. Empty `runs` clears rich text.
+  @$pb.TagNumber(14)
+  RichText get richText => $_getN(13);
+  @$pb.TagNumber(14)
+  set richText(RichText value) => $_setField(14, value);
+  @$pb.TagNumber(14)
+  $core.bool hasRichText() => $_has(13);
+  @$pb.TagNumber(14)
+  void clearRichText() => $_clearField(14);
+  @$pb.TagNumber(14)
+  RichText ensureRichText() => $_ensure(13);
 }
 
 class UpdateCellsRequest extends $pb.GeneratedMessage {
@@ -8607,6 +8835,7 @@ class GetCellsRequest extends $pb.GeneratedMessage {
     $core.bool? includeChecked,
     $core.bool? includeTyped,
     $core.bool? includeBarcodeStatus,
+    $core.bool? includeRichText,
   }) {
     final result = create();
     if (gridId != null) result.gridId = gridId;
@@ -8619,6 +8848,7 @@ class GetCellsRequest extends $pb.GeneratedMessage {
     if (includeTyped != null) result.includeTyped = includeTyped;
     if (includeBarcodeStatus != null)
       result.includeBarcodeStatus = includeBarcodeStatus;
+    if (includeRichText != null) result.includeRichText = includeRichText;
     return result;
   }
 
@@ -8644,6 +8874,7 @@ class GetCellsRequest extends $pb.GeneratedMessage {
     ..aOB(7, _omitFieldNames ? '' : 'includeChecked')
     ..aOB(8, _omitFieldNames ? '' : 'includeTyped')
     ..aOB(9, _omitFieldNames ? '' : 'includeBarcodeStatus')
+    ..aOB(10, _omitFieldNames ? '' : 'includeRichText')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -8747,6 +8978,15 @@ class GetCellsRequest extends $pb.GeneratedMessage {
   $core.bool hasIncludeBarcodeStatus() => $_has(8);
   @$pb.TagNumber(9)
   void clearIncludeBarcodeStatus() => $_clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.bool get includeRichText => $_getBF(9);
+  @$pb.TagNumber(10)
+  set includeRichText($core.bool value) => $_setBool(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasIncludeRichText() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearIncludeRichText() => $_clearField(10);
 }
 
 class CellData extends $pb.GeneratedMessage {
@@ -8759,6 +8999,7 @@ class CellData extends $pb.GeneratedMessage {
     CellInteraction? interaction,
     BarcodeData? barcode,
     BarcodeRenderStatus? barcodeStatus,
+    RichText? richText,
   }) {
     final result = create();
     if (row != null) result.row = row;
@@ -8769,6 +9010,7 @@ class CellData extends $pb.GeneratedMessage {
     if (interaction != null) result.interaction = interaction;
     if (barcode != null) result.barcode = barcode;
     if (barcodeStatus != null) result.barcodeStatus = barcodeStatus;
+    if (richText != null) result.richText = richText;
     return result;
   }
 
@@ -8799,6 +9041,8 @@ class CellData extends $pb.GeneratedMessage {
         subBuilder: BarcodeData.create)
     ..aE<BarcodeRenderStatus>(8, _omitFieldNames ? '' : 'barcodeStatus',
         enumValues: BarcodeRenderStatus.values)
+    ..aOM<RichText>(9, _omitFieldNames ? '' : 'richText',
+        subBuilder: RichText.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -8900,6 +9144,17 @@ class CellData extends $pb.GeneratedMessage {
   $core.bool hasBarcodeStatus() => $_has(7);
   @$pb.TagNumber(8)
   void clearBarcodeStatus() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  RichText get richText => $_getN(8);
+  @$pb.TagNumber(9)
+  set richText(RichText value) => $_setField(9, value);
+  @$pb.TagNumber(9)
+  $core.bool hasRichText() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearRichText() => $_clearField(9);
+  @$pb.TagNumber(9)
+  RichText ensureRichText() => $_ensure(8);
 }
 
 class CellsResponse extends $pb.GeneratedMessage {
@@ -17933,7 +18188,8 @@ class TerminalCommand extends $pb.GeneratedMessage {
 
 /// GPU rendering: host provides a native surface for wgpu.
 /// handle=0 means surface destroyed. See runtime/src/lib.rs GpuSurfaceReady.
-/// If GPU initialization fails, the runtime falls back to CPU mode silently.
+/// If GPU initialization or surface setup fails, the runtime returns
+/// GpuFrameDone(rendered=false); it does not render GPU mode into BufferReady.
 class GpuSurfaceReady extends $pb.GeneratedMessage {
   factory GpuSurfaceReady({
     $fixnum.Int64? surfaceHandle,

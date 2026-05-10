@@ -131,6 +131,21 @@ final $typed_data.Uint8List textHintingModeDescriptor = $convert.base64Decode(
     'Cg9UZXh0SGludGluZ01vZGUSEgoOVEVYVF9ISU5UX0FVVE8QABISCg5URVhUX0hJTlRfTk9ORR'
     'ABEhQKEFRFWFRfSElOVF9TTElHSFQQAhISCg5URVhUX0hJTlRfRlVMTBAD');
 
+@$core.Deprecated('Use textBaselineDescriptor instead')
+const TextBaseline$json = {
+  '1': 'TextBaseline',
+  '2': [
+    {'1': 'TEXT_BASELINE_NORMAL', '2': 0},
+    {'1': 'TEXT_BASELINE_SUPERSCRIPT', '2': 1},
+    {'1': 'TEXT_BASELINE_SUBSCRIPT', '2': 2},
+  ],
+};
+
+/// Descriptor for `TextBaseline`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List textBaselineDescriptor = $convert.base64Decode(
+    'CgxUZXh0QmFzZWxpbmUSGAoUVEVYVF9CQVNFTElORV9OT1JNQUwQABIdChlURVhUX0JBU0VMSU'
+    '5FX1NVUEVSU0NSSVBUEAESGwoXVEVYVF9CQVNFTElORV9TVUJTQ1JJUFQQAg==');
+
 @$core.Deprecated('Use alignDescriptor instead')
 const Align$json = {
   '1': 'Align',
@@ -888,6 +903,9 @@ const RendererMode$json = {
     {'1': 'RENDERER_GPU_VULKAN', '2': 3},
     {'1': 'RENDERER_GPU_GLES', '2': 4},
     {'1': 'RENDERER_TUI', '2': 5},
+    {'1': 'RENDERER_GPU_DX12', '2': 6},
+    {'1': 'RENDERER_GPU_METAL', '2': 7},
+    {'1': 'RENDERER_GPU_OPENGL', '2': 8},
   ],
 };
 
@@ -895,7 +913,8 @@ const RendererMode$json = {
 final $typed_data.Uint8List rendererModeDescriptor = $convert.base64Decode(
     'CgxSZW5kZXJlck1vZGUSEQoNUkVOREVSRVJfQVVUTxAAEhAKDFJFTkRFUkVSX0NQVRABEhAKDF'
     'JFTkRFUkVSX0dQVRACEhcKE1JFTkRFUkVSX0dQVV9WVUxLQU4QAxIVChFSRU5ERVJFUl9HUFVf'
-    'R0xFUxAEEhAKDFJFTkRFUkVSX1RVSRAF');
+    'R0xFUxAEEhAKDFJFTkRFUkVSX1RVSRAFEhUKEVJFTkRFUkVSX0dQVV9EWDEyEAYSFgoSUkVORE'
+    'VSRVJfR1BVX01FVEFMEAcSFwoTUkVOREVSRVJfR1BVX09QRU5HTBAI');
 
 @$core.Deprecated('Use presentModeDescriptor instead')
 const PresentMode$json = {
@@ -1980,6 +1999,103 @@ final $typed_data.Uint8List cellValueDescriptor = $convert.base64Decode(
     'CglDZWxsVmFsdWUSFAoEdGV4dBgBIAEoCUgAUgR0ZXh0EhgKBm51bWJlchgCIAEoAUgAUgZudW'
     '1iZXISFAoEZmxhZxgDIAEoCEgAUgRmbGFnEhIKA3JhdxgEIAEoDEgAUgNyYXcSHgoJdGltZXN0'
     'YW1wGAUgASgDSABSCXRpbWVzdGFtcEIHCgV2YWx1ZQ==');
+
+@$core.Deprecated('Use richTextDescriptor instead')
+const RichText$json = {
+  '1': 'RichText',
+  '2': [
+    {
+      '1': 'runs',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.volvoxgrid.v1.TextFormatRun',
+      '10': 'runs'
+    },
+  ],
+};
+
+/// Descriptor for `RichText`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List richTextDescriptor = $convert.base64Decode(
+    'CghSaWNoVGV4dBIwCgRydW5zGAEgAygLMhwudm9sdm94Z3JpZC52MS5UZXh0Rm9ybWF0UnVuUg'
+    'RydW5z');
+
+@$core.Deprecated('Use textFormatRunDescriptor instead')
+const TextFormatRun$json = {
+  '1': 'TextFormatRun',
+  '2': [
+    {'1': 'start_index', '3': 1, '4': 1, '5': 13, '10': 'startIndex'},
+    {
+      '1': 'style',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.TextRunStyle',
+      '10': 'style'
+    },
+  ],
+};
+
+/// Descriptor for `TextFormatRun`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List textFormatRunDescriptor = $convert.base64Decode(
+    'Cg1UZXh0Rm9ybWF0UnVuEh8KC3N0YXJ0X2luZGV4GAEgASgNUgpzdGFydEluZGV4EjEKBXN0eW'
+    'xlGAIgASgLMhsudm9sdm94Z3JpZC52MS5UZXh0UnVuU3R5bGVSBXN0eWxl');
+
+@$core.Deprecated('Use textRunStyleDescriptor instead')
+const TextRunStyle$json = {
+  '1': 'TextRunStyle',
+  '2': [
+    {
+      '1': 'foreground',
+      '3': 1,
+      '4': 1,
+      '5': 13,
+      '9': 0,
+      '10': 'foreground',
+      '17': true
+    },
+    {
+      '1': 'font',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.Font',
+      '10': 'font'
+    },
+    {
+      '1': 'baseline',
+      '3': 3,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.TextBaseline',
+      '9': 1,
+      '10': 'baseline',
+      '17': true
+    },
+    {
+      '1': 'link_url',
+      '3': 4,
+      '4': 1,
+      '5': 9,
+      '9': 2,
+      '10': 'linkUrl',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_foreground'},
+    {'1': '_baseline'},
+    {'1': '_link_url'},
+  ],
+};
+
+/// Descriptor for `TextRunStyle`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List textRunStyleDescriptor = $convert.base64Decode(
+    'CgxUZXh0UnVuU3R5bGUSIwoKZm9yZWdyb3VuZBgBIAEoDUgAUgpmb3JlZ3JvdW5kiAEBEicKBG'
+    'ZvbnQYAiABKAsyEy52b2x2b3hncmlkLnYxLkZvbnRSBGZvbnQSPAoIYmFzZWxpbmUYAyABKA4y'
+    'Gy52b2x2b3hncmlkLnYxLlRleHRCYXNlbGluZUgBUghiYXNlbGluZYgBARIeCghsaW5rX3VybB'
+    'gEIAEoCUgCUgdsaW5rVXJsiAEBQg0KC19mb3JlZ3JvdW5kQgsKCV9iYXNlbGluZUILCglfbGlu'
+    'a191cmw=');
 
 @$core.Deprecated('Use dropdownDescriptor instead')
 const Dropdown$json = {
@@ -6061,6 +6177,16 @@ const CellUpdate$json = {
       '10': 'barcode',
       '17': true
     },
+    {
+      '1': 'rich_text',
+      '3': 14,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.RichText',
+      '9': 7,
+      '10': 'richText',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_checked'},
@@ -6070,6 +6196,7 @@ const CellUpdate$json = {
     {'1': '_sticky_col'},
     {'1': '_interaction'},
     {'1': '_barcode'},
+    {'1': '_rich_text'},
   ],
 };
 
@@ -6087,9 +6214,10 @@ final $typed_data.Uint8List cellUpdateDescriptor = $convert.base64Decode(
     'gDUglzdGlja3lSb3eIAQESPQoKc3RpY2t5X2NvbBgLIAEoDjIZLnZvbHZveGdyaWQudjEuU3Rp'
     'Y2t5RWRnZUgEUglzdGlja3lDb2yIAQESRQoLaW50ZXJhY3Rpb24YDCABKA4yHi52b2x2b3hncm'
     'lkLnYxLkNlbGxJbnRlcmFjdGlvbkgFUgtpbnRlcmFjdGlvbogBARI5CgdiYXJjb2RlGA0gASgL'
-    'Mhoudm9sdm94Z3JpZC52MS5CYXJjb2RlRGF0YUgGUgdiYXJjb2RliAEBQgoKCF9jaGVja2VkQh'
-    'AKDl9waWN0dXJlX2FsaWduQgsKCV9kcm9wZG93bkINCgtfc3RpY2t5X3Jvd0INCgtfc3RpY2t5'
-    'X2NvbEIOCgxfaW50ZXJhY3Rpb25CCgoIX2JhcmNvZGU=');
+    'Mhoudm9sdm94Z3JpZC52MS5CYXJjb2RlRGF0YUgGUgdiYXJjb2RliAEBEjkKCXJpY2hfdGV4dB'
+    'gOIAEoCzIXLnZvbHZveGdyaWQudjEuUmljaFRleHRIB1IIcmljaFRleHSIAQFCCgoIX2NoZWNr'
+    'ZWRCEAoOX3BpY3R1cmVfYWxpZ25CCwoJX2Ryb3Bkb3duQg0KC19zdGlja3lfcm93Qg0KC19zdG'
+    'lja3lfY29sQg4KDF9pbnRlcmFjdGlvbkIKCghfYmFyY29kZUIMCgpfcmljaF90ZXh0');
 
 @$core.Deprecated('Use updateCellsRequestDescriptor instead')
 const UpdateCellsRequest$json = {
@@ -6133,6 +6261,13 @@ const GetCellsRequest$json = {
       '5': 8,
       '10': 'includeBarcodeStatus'
     },
+    {
+      '1': 'include_rich_text',
+      '3': 10,
+      '4': 1,
+      '5': 8,
+      '10': 'includeRichText'
+    },
   ],
 };
 
@@ -6143,7 +6278,8 @@ final $typed_data.Uint8List getCellsRequestDescriptor = $convert.base64Decode(
     'BSABKAVSBGNvbDISIwoNaW5jbHVkZV9zdHlsZRgGIAEoCFIMaW5jbHVkZVN0eWxlEicKD2luY2'
     'x1ZGVfY2hlY2tlZBgHIAEoCFIOaW5jbHVkZUNoZWNrZWQSIwoNaW5jbHVkZV90eXBlZBgIIAEo'
     'CFIMaW5jbHVkZVR5cGVkEjQKFmluY2x1ZGVfYmFyY29kZV9zdGF0dXMYCSABKAhSFGluY2x1ZG'
-    'VCYXJjb2RlU3RhdHVz');
+    'VCYXJjb2RlU3RhdHVzEioKEWluY2x1ZGVfcmljaF90ZXh0GAogASgIUg9pbmNsdWRlUmljaFRl'
+    'eHQ=');
 
 @$core.Deprecated('Use cellDataDescriptor instead')
 const CellData$json = {
@@ -6205,11 +6341,22 @@ const CellData$json = {
       '10': 'barcodeStatus',
       '17': true
     },
+    {
+      '1': 'rich_text',
+      '3': 9,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.RichText',
+      '9': 3,
+      '10': 'richText',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_interaction'},
     {'1': '_barcode'},
     {'1': '_barcode_status'},
+    {'1': '_rich_text'},
   ],
 };
 
@@ -6222,8 +6369,9 @@ final $typed_data.Uint8List cellDataDescriptor = $convert.base64Decode(
     'b2x2b3hncmlkLnYxLkNlbGxJbnRlcmFjdGlvbkgAUgtpbnRlcmFjdGlvbogBARI5CgdiYXJjb2'
     'RlGAcgASgLMhoudm9sdm94Z3JpZC52MS5CYXJjb2RlRGF0YUgBUgdiYXJjb2RliAEBEk4KDmJh'
     'cmNvZGVfc3RhdHVzGAggASgOMiIudm9sdm94Z3JpZC52MS5CYXJjb2RlUmVuZGVyU3RhdHVzSA'
-    'JSDWJhcmNvZGVTdGF0dXOIAQFCDgoMX2ludGVyYWN0aW9uQgoKCF9iYXJjb2RlQhEKD19iYXJj'
-    'b2RlX3N0YXR1cw==');
+    'JSDWJhcmNvZGVTdGF0dXOIAQESOQoJcmljaF90ZXh0GAkgASgLMhcudm9sdm94Z3JpZC52MS5S'
+    'aWNoVGV4dEgDUghyaWNoVGV4dIgBAUIOCgxfaW50ZXJhY3Rpb25CCgoIX2JhcmNvZGVCEQoPX2'
+    'JhcmNvZGVfc3RhdHVzQgwKCl9yaWNoX3RleHQ=');
 
 @$core.Deprecated('Use cellsResponseDescriptor instead')
 const CellsResponse$json = {
@@ -11299,6 +11447,9 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.volvoxgrid.v1.BarcodeEncodingOptions': BarcodeEncodingOptions$json,
   '.volvoxgrid.v1.BarcodeRenderOptions': BarcodeRenderOptions$json,
   '.volvoxgrid.v1.BarcodeCaptionOptions': BarcodeCaptionOptions$json,
+  '.volvoxgrid.v1.RichText': RichText$json,
+  '.volvoxgrid.v1.TextFormatRun': TextFormatRun$json,
+  '.volvoxgrid.v1.TextRunStyle': TextRunStyle$json,
   '.volvoxgrid.v1.WriteResult': WriteResult$json,
   '.volvoxgrid.v1.TypeViolation': TypeViolation$json,
   '.volvoxgrid.v1.GetCellsRequest': GetCellsRequest$json,

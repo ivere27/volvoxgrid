@@ -108,6 +108,7 @@ pub struct CellExtra {
     // Explicit per-cell control override. None means inherit column/default inference.
     pub control: Option<CellControl>,
     pub barcode: Option<Box<BarcodeSpec>>,
+    pub rich_text: Option<pb::RichText>,
 }
 
 impl Default for CellExtra {
@@ -129,6 +130,7 @@ impl Default for CellExtra {
             interaction: None,
             control: None,
             barcode: None,
+            rich_text: None,
         }
     }
 }
@@ -150,6 +152,9 @@ impl CellExtra {
         if let Some(barcode) = self.barcode.as_ref() {
             bytes += std::mem::size_of::<BarcodeSpec>();
             bytes += barcode.heap_size_bytes();
+        }
+        if let Some(rich_text) = self.rich_text.as_ref() {
+            bytes += crate::rich_text::rich_text_heap_size_bytes(rich_text);
         }
         bytes
     }
@@ -244,6 +249,10 @@ impl CellData {
 
     pub fn barcode(&self) -> Option<&BarcodeSpec> {
         self.extra.as_ref().and_then(|e| e.barcode.as_deref())
+    }
+
+    pub fn rich_text(&self) -> Option<&pb::RichText> {
+        self.extra.as_ref().and_then(|e| e.rich_text.as_ref())
     }
 
     pub fn interaction_override(&self) -> Option<i32> {
@@ -507,6 +516,13 @@ impl CellStore {
         let r = self.map_row(row);
         let c = self.map_col(col);
         self.cells.entry((r, c)).or_insert_with(CellData::default)
+    }
+
+    pub fn get_mut_existing(&mut self, row: i32, col: i32) -> Option<&mut CellData> {
+        self.invalidate_caches();
+        let r = self.map_row(row);
+        let c = self.map_col(col);
+        self.cells.get_mut(&(r, c))
     }
 
     pub fn set(&mut self, row: i32, col: i32, data: CellData) {

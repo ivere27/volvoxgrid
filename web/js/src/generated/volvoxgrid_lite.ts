@@ -1117,6 +1117,9 @@ export enum RendererMode {
   RENDERER_GPU_VULKAN = 3,
   RENDERER_GPU_GLES = 4,
   RENDERER_TUI = 5,
+  RENDERER_GPU_DX12 = 6,
+  RENDERER_GPU_METAL = 7,
+  RENDERER_GPU_OPENGL = 8,
 }
 export enum RowIndicatorSlotKind {
   ROW_INDICATOR_SLOT_NONE = 0,
@@ -1203,6 +1206,11 @@ export enum TerminalColorLevel {
 export enum TerminalCommand_Kind {
   TERMINAL_COMMAND_NONE = 0,
   TERMINAL_COMMAND_EXIT = 1,
+}
+export enum TextBaseline {
+  TEXT_BASELINE_NORMAL = 0,
+  TEXT_BASELINE_SUPERSCRIPT = 1,
+  TEXT_BASELINE_SUBSCRIPT = 2,
 }
 export enum TextEffect {
   TEXT_EFFECT_NONE = 0,
@@ -1443,6 +1451,7 @@ export const CellDataFields = {
   "interaction": 6,
   "barcode": 7,
   "barcode_status": 8,
+  "rich_text": 9,
 } as const;
 export const CellEditChangeEventFields = {
   "text": 1,
@@ -1504,6 +1513,7 @@ export const CellUpdateFields = {
   "sticky_col": 11,
   "interaction": 12,
   "barcode": 13,
+  "rich_text": 14,
 } as const;
 export const CellValueFields = {
   "text": 1,
@@ -1913,6 +1923,7 @@ export const GetCellsRequestFields = {
   "include_checked": 7,
   "include_typed": 8,
   "include_barcode_status": 9,
+  "include_rich_text": 10,
 } as const;
 export const GetConfigRequestFields = {
   "grid_id": 1,
@@ -2531,6 +2542,9 @@ export const ResizeViewportResponseFields = {
   "viewport_width": 1,
   "viewport_height": 2,
 } as const;
+export const RichTextFields = {
+  "runs": 1,
+} as const;
 export const RowDefFields = {
   "index": 1,
   "height": 2,
@@ -2783,6 +2797,10 @@ export const TerminalViewportFields = {
   "height": 4,
   "fullscreen": 5,
 } as const;
+export const TextFormatRunFields = {
+  "start_index": 1,
+  "style": 2,
+} as const;
 export const TextQueryFields = {
   "text": 1,
   "case_sensitive": 2,
@@ -2792,6 +2810,12 @@ export const TextRenderingFields = {
   "mode": 1,
   "hinting": 2,
   "pixel_snap": 3,
+} as const;
+export const TextRunStyleFields = {
+  "foreground": 1,
+  "font": 2,
+  "baseline": 3,
+  "link_url": 4,
 } as const;
 export const TooltipRequestFields = {
   "x": 1,
@@ -4903,6 +4927,15 @@ export class CellData implements LiteMessage {
       optional: true,
       enumType: BarcodeRenderStatus,
     },
+    {
+      no: 9,
+      name: "rich_text",
+      jsonName: "richText",
+      prop: "richText",
+      kind: "message" as ProtoKind,
+      optional: true,
+      messageType: "RichText",
+    },
   ];
   row: number = 0;
   col: number = 0;
@@ -4912,6 +4945,7 @@ export class CellData implements LiteMessage {
   interaction: CellInteraction = 0;
   barcode?: BarcodeData;
   barcodeStatus: BarcodeRenderStatus = 0;
+  richText?: RichText;
 
   constructor(init?: Partial<CellData>) {
     initMessage(this, CellData.fields, init as Record<string, unknown> | undefined);
@@ -5542,6 +5576,15 @@ export class CellUpdate implements LiteMessage {
       optional: true,
       messageType: "BarcodeData",
     },
+    {
+      no: 14,
+      name: "rich_text",
+      jsonName: "richText",
+      prop: "richText",
+      kind: "message" as ProtoKind,
+      optional: true,
+      messageType: "RichText",
+    },
   ];
   row: number = 0;
   col: number = 0;
@@ -5556,6 +5599,7 @@ export class CellUpdate implements LiteMessage {
   stickyCol: StickyEdge = 0;
   interaction: CellInteraction = 0;
   barcode?: BarcodeData;
+  richText?: RichText;
 
   constructor(init?: Partial<CellUpdate>) {
     initMessage(this, CellUpdate.fields, init as Record<string, unknown> | undefined);
@@ -10057,6 +10101,13 @@ export class GetCellsRequest implements LiteMessage {
       prop: "includeBarcodeStatus",
       kind: "bool" as ProtoKind,
     },
+    {
+      no: 10,
+      name: "include_rich_text",
+      jsonName: "includeRichText",
+      prop: "includeRichText",
+      kind: "bool" as ProtoKind,
+    },
   ];
   gridId: bigint = 0n;
   row1: number = 0;
@@ -10067,6 +10118,7 @@ export class GetCellsRequest implements LiteMessage {
   includeChecked: boolean = false;
   includeTyped: boolean = false;
   includeBarcodeStatus: boolean = false;
+  includeRichText: boolean = false;
 
   constructor(init?: Partial<GetCellsRequest>) {
     initMessage(this, GetCellsRequest.fields, init as Record<string, unknown> | undefined);
@@ -16897,6 +16949,46 @@ export class ResizeViewportResponse implements LiteMessage {
   }
 }
 registerMessage(ResizeViewportResponse);
+export class RichText implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.RichText" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "runs",
+      jsonName: "runs",
+      prop: "runs",
+      kind: "message" as ProtoKind,
+      repeated: true,
+      messageType: "TextFormatRun",
+    },
+  ];
+  runs: TextFormatRun[] = [];
+
+  constructor(init?: Partial<RichText>) {
+    initMessage(this, RichText.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): RichText {
+    return decodeMessage(RichText, data);
+  }
+
+  static parseFrom(data: Uint8Array): RichText {
+    return RichText.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, RichText.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, RichText.fields);
+  }
+}
+registerMessage(RichText);
 export class RowDef implements LiteMessage {
   static readonly typeName = "volvoxgrid.v1.RowDef" as const;
   static readonly fields: readonly ProtoFieldInfo[] = [
@@ -19619,6 +19711,53 @@ export class TerminalViewport implements LiteMessage {
   }
 }
 registerMessage(TerminalViewport);
+export class TextFormatRun implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.TextFormatRun" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "start_index",
+      jsonName: "startIndex",
+      prop: "startIndex",
+      kind: "uint32" as ProtoKind,
+    },
+    {
+      no: 2,
+      name: "style",
+      jsonName: "style",
+      prop: "style",
+      kind: "message" as ProtoKind,
+      messageType: "TextRunStyle",
+    },
+  ];
+  startIndex: number = 0;
+  style?: TextRunStyle;
+
+  constructor(init?: Partial<TextFormatRun>) {
+    initMessage(this, TextFormatRun.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): TextFormatRun {
+    return decodeMessage(TextFormatRun, data);
+  }
+
+  static parseFrom(data: Uint8Array): TextFormatRun {
+    return TextFormatRun.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, TextFormatRun.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, TextFormatRun.fields);
+  }
+}
+registerMessage(TextFormatRun);
 export class TextQuery implements LiteMessage {
   static readonly typeName = "volvoxgrid.v1.TextQuery" as const;
   static readonly fields: readonly ProtoFieldInfo[] = [
@@ -19732,6 +19871,73 @@ export class TextRendering implements LiteMessage {
   }
 }
 registerMessage(TextRendering);
+export class TextRunStyle implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.TextRunStyle" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "foreground",
+      jsonName: "foreground",
+      prop: "foreground",
+      kind: "uint32" as ProtoKind,
+      optional: true,
+    },
+    {
+      no: 2,
+      name: "font",
+      jsonName: "font",
+      prop: "font",
+      kind: "message" as ProtoKind,
+      messageType: "Font",
+    },
+    {
+      no: 3,
+      name: "baseline",
+      jsonName: "baseline",
+      prop: "baseline",
+      kind: "enum" as ProtoKind,
+      optional: true,
+      enumType: TextBaseline,
+    },
+    {
+      no: 4,
+      name: "link_url",
+      jsonName: "linkUrl",
+      prop: "linkUrl",
+      kind: "string" as ProtoKind,
+      optional: true,
+    },
+  ];
+  foreground: number = 0;
+  font?: Font;
+  baseline: TextBaseline = 0;
+  linkUrl: string = "";
+
+  constructor(init?: Partial<TextRunStyle>) {
+    initMessage(this, TextRunStyle.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): TextRunStyle {
+    return decodeMessage(TextRunStyle, data);
+  }
+
+  static parseFrom(data: Uint8Array): TextRunStyle {
+    return TextRunStyle.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, TextRunStyle.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, TextRunStyle.fields);
+  }
+}
+registerMessage(TextRunStyle);
 export class TooltipRequest implements LiteMessage {
   static readonly typeName = "volvoxgrid.v1.TooltipRequest" as const;
   static readonly fields: readonly ProtoFieldInfo[] = [

@@ -880,6 +880,7 @@ pub fn volvox_grid_get_cells(
     include_checked: bool,
     include_typed: bool,
     include_barcode_status: bool,
+    include_rich_text: bool,
 ) -> Vec<u8> {
     let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
@@ -898,6 +899,7 @@ pub fn volvox_grid_get_cells(
         include_checked,
         include_typed,
         include_barcode_status,
+        include_rich_text,
         ..Default::default()
     };
     match runtime.get_cells(req) {

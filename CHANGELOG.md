@@ -2,6 +2,14 @@
 
 All notable changes to VolvoxGrid are documented here. Per-package changelogs may have additional detail (e.g. [flutter/CHANGELOG.md](flutter/CHANGELOG.md)).
 
+## 0.8.8
+
+- Added full/lite artifact flows across Android, Android Compose, Java desktop, iOS, Web/WASM, and .NET, with OS/browser text-rendering fallback and engine-owned text-cache documentation.
+- Added rich-text cell runs, baselines, link metadata, and richer text rendering across native, Web/WASM, TUI, Flutter, Go, and ActiveX bindings.
+- Tightened GPU renderer mode selection and native-surface handling for platform hosts.
+- Fixed Docker desktop/all macOS dylib packaging by adding `llvm-strip` support for Zig-built dylibs.
+- Fixed mixed numeric/text and date/text auto sorting so barcode-like column values sort transitively and header toggles remain stable.
+
 ## 0.8.7
 
 - Added a Bubble Tea terminal adapter with examples, tests, and TUI demo documentation.

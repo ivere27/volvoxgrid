@@ -20,7 +20,13 @@ namespace VolvoxGrid.DotNet.Internal
         private const int WmImeChar = 0x0286;
         private const int GcsCompStr = 0x0008;
         private const int GcsResultStr = 0x0800;
-        private const int AutoFallbackFrameRateHz = 30;
+        private const uint NativeSurfaceKindWin32 = 3;
+        private const float WheelScrollGain = 3.0f;
+        private const float HostFlingImpulseGain = 0.75f;
+        private const float HostFlingDamping = 0.86f;
+        private const float HostFlingMinVelocity = 0.08f;
+        private const float HostFlingMaxVelocity = 36.0f;
+        private const int HostFlingFrameMillis = 16;
         private const long FramePacingConfigRefreshMs = 250;
         private static readonly Color EditOverlayBorderColor = Color.FromArgb(0x2D, 0x6C, 0xDF);
         private static readonly string[] ImeFriendlyFontFamilies = new[]
@@ -61,10 +67,11 @@ namespace VolvoxGrid.DotNet.Internal
         private bool _followupFrame;
         private bool _decisionChannelRequested;
         private bool _decisionChannelHandshakeSent;
-        private int _followupScheduleSeq;
-        private FramePacingMode _framePacingMode = FramePacingMode.FRAME_PACING_MODE_AUTO;
-        private int _targetFrameRateHz = AutoFallbackFrameRateHz;
+        private FramePacingMode _framePacingMode = FramePacingMode.FRAME_PACING_MODE_PLATFORM;
         private long _framePacingConfigLastRefreshTick;
+        private RendererMode _rendererMode = RendererMode.RENDERER_CPU;
+        private IntPtr _gpuSurfaceDescriptor;
+        private IntPtr _gpuSurfaceWindow;
 
         private byte[] _pixelBuffer;
         private byte[] _blitBuffer;
@@ -94,6 +101,12 @@ namespace VolvoxGrid.DotNet.Internal
         private float _editOverlayResolvedFontSize;
         private FontStyle _editOverlayResolvedFontStyle;
         private GraphicsUnit _editOverlayResolvedFontUnit;
+        private readonly object _flingLock = new object();
+        private Thread _flingThread;
+        private bool _hostFlingEnabled = true;
+        private bool _flingActive;
+        private float _flingVelocityX;
+        private float _flingVelocityY;
 
         internal Func<int, int, HorizontalAlignment> ResolveEditAlignment { get; set; }
         internal Func<int, int, System.Windows.Forms.Padding> ResolveEditPadding { get; set; }
@@ -192,6 +205,62 @@ namespace VolvoxGrid.DotNet.Internal
             Controls.Add(_editOverlayHost);
         }
 
+        public bool HostFlingEnabled
+        {
+            get
+            {
+                lock (_flingLock)
+                {
+                    return _hostFlingEnabled;
+                }
+            }
+            set
+            {
+                lock (_flingLock)
+                {
+                    _hostFlingEnabled = value;
+                }
+                if (!value)
+                {
+                    StopHostFling();
+                }
+            }
+        }
+
+        public bool IsGpuSupported
+        {
+            get
+            {
+                return _client != null
+                    && _client.SupportsGpuRenderer
+                    && _client.SupportsNativeSurfaceDescriptor
+                    && IsWindowsPlatform();
+            }
+        }
+
+        public void SetRendererMode(VolvoxGridRendererMode mode)
+        {
+            RendererMode mapped = (RendererMode)mode;
+            bool wasGpuActive = IsGpuRendererMode(_rendererMode);
+            bool nextGpuActive = IsGpuRendererMode(mapped);
+
+            _rendererMode = mapped;
+
+            if (wasGpuActive && !nextGpuActive)
+            {
+                SendGpuSurfaceDestroyed();
+                ReleaseGpuSurfaceDescriptor();
+                ResizeBuffers(Math.Max(1, ClientSize.Width), Math.Max(1, ClientSize.Height));
+            }
+
+            RequestFrame();
+        }
+
+        public void CancelHostFling()
+        {
+            StopHostFling();
+        }
+
         protected override bool IsInputKey(Keys keyData)
         {
             switch (keyData & Keys.KeyCode)
@@ -263,7 +332,7 @@ namespace VolvoxGrid.DotNet.Internal
             _pendingFrame = false;
             _followupFrame = false;
             _decisionChannelHandshakeSent = false;
-            CancelScheduledFollowupFrame();
+            StopHostFling();
             _framePacingConfigLastRefreshTick = 0;
             ClearMultiRangeDrag();
 
@@ -326,6 +395,7 @@ namespace VolvoxGrid.DotNet.Internal
             _eventThread = null;
             _eventHandler = null;
             _compareHandler = null;
+            ReleaseGpuSurfaceDescriptor();
             HideEditOverlay(false);
             return renderStopped && eventStopped;
         }
@@ -336,8 +406,6 @@ namespace VolvoxGrid.DotNet.Internal
             {
                 return;
             }
-
-            CancelScheduledFollowupFrame();
 
             lock (_frameLock)
             {
@@ -350,7 +418,7 @@ namespace VolvoxGrid.DotNet.Internal
                 _pendingFrame = true;
             }
 
-            SendBufferReady();
+            SendFrameReady();
         }
 
         public void EnableEventDecisionChannel()
@@ -411,6 +479,13 @@ namespace VolvoxGrid.DotNet.Internal
             base.Dispose(disposing);
         }
 
+        protected override void OnHandleDestroyed(EventArgs e)
+        {
+            SendGpuSurfaceDestroyed();
+            ReleaseGpuSurfaceDescriptor();
+            base.OnHandleDestroyed(e);
+        }
+
         protected override void OnResize(EventArgs e)
         {
             base.OnResize(e);
@@ -431,7 +506,10 @@ namespace VolvoxGrid.DotNet.Internal
                 return;
             }
 
-            ResizeBuffers(width, height);
+            if (!IsGpuRenderActive())
+            {
+                ResizeBuffers(width, height);
+            }
             _client.ResizeViewport(_gridId, width, height);
             RequestFrame();
         }
@@ -482,11 +560,10 @@ namespace VolvoxGrid.DotNet.Internal
         {
             base.OnMouseWheel(e);
             bool horizontal = (ModifierKeys & Keys.Shift) == Keys.Shift;
-            float dy = horizontal ? 0.0f : (-(float)e.Delta / 120.0f * 3.0f);
-            float dx = horizontal ? ((float)e.Delta / 120.0f * 3.0f) : 0.0f;
-            var payload = _client.EncodeRenderInputScroll(_gridId, dx, dy);
-            SendRenderInput(payload);
-            RequestFrame();
+            float dy = horizontal ? 0.0f : (-(float)e.Delta / 120.0f * WheelScrollGain);
+            float dx = horizontal ? ((float)e.Delta / 120.0f * WheelScrollGain) : 0.0f;
+            SendScroll(dx, dy, true);
+            BoostHostFling(dx, dy);
         }
 
         protected override void WndProc(ref Message m)
@@ -500,10 +577,9 @@ namespace VolvoxGrid.DotNet.Internal
                     int delta = GetWheelDeltaWParam(m.WParam);
                     if (delta != 0)
                     {
-                        float dx = (float)delta / 120.0f * 3.0f;
-                        var payload = _client.EncodeRenderInputScroll(_gridId, dx, 0.0f);
-                        SendRenderInput(payload);
-                        RequestFrame();
+                        float dx = (float)delta / 120.0f * WheelScrollGain;
+                        SendScroll(dx, 0.0f, true);
+                        BoostHostFling(dx, 0.0f);
                     }
                 }
                 return;
@@ -669,8 +745,23 @@ namespace VolvoxGrid.DotNet.Internal
             RequestFrame();
         }
 
+        protected override void OnPaintBackground(PaintEventArgs e)
+        {
+            if (IsGpuRenderActive())
+            {
+                return;
+            }
+
+            base.OnPaintBackground(e);
+        }
+
         protected override void OnPaint(PaintEventArgs e)
         {
+            if (IsGpuRenderActive())
+            {
+                return;
+            }
+
             base.OnPaint(e);
 
             if (_bitmap == null)
@@ -873,21 +964,23 @@ namespace VolvoxGrid.DotNet.Internal
                 BlitFrame(output.FrameDone);
             }
 
-            bool shouldRequestAnother = false;
+            bool frameCompleted = output.FrameDone != null || output.GpuFrameDone != null;
+            bool shouldRequestFollowupNow = false;
+            bool shouldScheduleFollowup = false;
             List<RetiredBuffers> retiredToFree = null;
             lock (_frameLock)
             {
-                if (output.FrameDone != null)
+                if (frameCompleted)
                 {
                     _pendingFrame = false;
                     if (_followupFrame)
                     {
                         _followupFrame = false;
-                        shouldRequestAnother = true;
+                        shouldRequestFollowupNow = true;
                     }
                     else if (output.Rendered)
                     {
-                        shouldRequestAnother = true;
+                        shouldScheduleFollowup = true;
                     }
 
                     if (_retiredBuffers.Count > 0)
@@ -906,7 +999,11 @@ namespace VolvoxGrid.DotNet.Internal
                 }
             }
 
-            if (shouldRequestAnother)
+            if (shouldRequestFollowupNow)
+            {
+                RequestFrame();
+            }
+            else if (shouldScheduleFollowup)
             {
                 ScheduleFollowupFrame();
             }
@@ -930,14 +1027,11 @@ namespace VolvoxGrid.DotNet.Internal
                 var rendering = config.Rendering ?? new RenderConfig();
                 _framePacingMode = rendering.HasFramePacingMode
                     ? rendering.FramePacingMode
-                    : FramePacingMode.FRAME_PACING_MODE_AUTO;
-                _targetFrameRateHz = NormalizeTargetFrameRateHz(
-                    rendering.HasTargetFrameRateHz ? rendering.TargetFrameRateHz : AutoFallbackFrameRateHz);
+                    : FramePacingMode.FRAME_PACING_MODE_PLATFORM;
             }
             catch
             {
-                _framePacingMode = FramePacingMode.FRAME_PACING_MODE_AUTO;
-                _targetFrameRateHz = AutoFallbackFrameRateHz;
+                _framePacingMode = FramePacingMode.FRAME_PACING_MODE_PLATFORM;
             }
             finally
             {
@@ -945,24 +1039,9 @@ namespace VolvoxGrid.DotNet.Internal
             }
         }
 
-        private static int NormalizeTargetFrameRateHz(int hz)
-        {
-            return hz > 0 ? hz : AutoFallbackFrameRateHz;
-        }
-
         private static long GetMonotonicMilliseconds()
         {
             return (long)(Stopwatch.GetTimestamp() * 1000.0 / Stopwatch.Frequency);
-        }
-
-        private int ReadFollowupScheduleSeq()
-        {
-            return Interlocked.CompareExchange(ref _followupScheduleSeq, 0, 0);
-        }
-
-        private void CancelScheduledFollowupFrame()
-        {
-            Interlocked.Increment(ref _followupScheduleSeq);
         }
 
         private void ScheduleFollowupFrame()
@@ -978,50 +1057,17 @@ namespace VolvoxGrid.DotNet.Internal
                 RequestFrame();
                 return;
             }
+        }
 
-            int hz = _framePacingMode == FramePacingMode.FRAME_PACING_MODE_FIXED
-                ? NormalizeTargetFrameRateHz(_targetFrameRateHz)
-                : AutoFallbackFrameRateHz;
-            int delayMs = Math.Max(1, (int)Math.Round(1000.0 / hz));
-            int seq = Interlocked.Increment(ref _followupScheduleSeq);
-
-            ThreadPool.QueueUserWorkItem(_ =>
+        private void SendFrameReady()
+        {
+            if (IsGpuRenderActive())
             {
-                Thread.Sleep(delayMs);
-                if (seq != ReadFollowupScheduleSeq()
-                    || !_running
-                    || _client == null
-                    || _renderStream == null
-                    || _gridId == 0)
-                {
-                    return;
-                }
+                SendGpuSurfaceReady();
+                return;
+            }
 
-                MethodInvoker request = () =>
-                {
-                    if (seq != ReadFollowupScheduleSeq())
-                    {
-                        return;
-                    }
-                    RequestFrame();
-                };
-
-                if (IsHandleCreated && InvokeRequired)
-                {
-                    try
-                    {
-                        BeginInvoke(request);
-                    }
-                    catch
-                    {
-                        // Best effort while shutting down.
-                    }
-                }
-                else
-                {
-                    request();
-                }
-            });
+            SendBufferReady();
         }
 
         private void SendBufferReady()
@@ -1038,6 +1084,248 @@ namespace VolvoxGrid.DotNet.Internal
             long ptr = _pixelBufferHandle.AddrOfPinnedObject().ToInt64();
             var payload = _client.EncodeRenderInputBufferReady(_gridId, ptr, _bufferWidth * 4, _bufferWidth, _bufferHeight);
             SendRenderInput(payload);
+        }
+
+        private void SendGpuSurfaceReady()
+        {
+            if (!IsGpuSupported || !IsHandleCreated || ClientSize.Width <= 0 || ClientSize.Height <= 0)
+            {
+                lock (_frameLock)
+                {
+                    _pendingFrame = false;
+                }
+                return;
+            }
+
+            IntPtr descriptor = EnsureGpuSurfaceDescriptor();
+            if (descriptor == IntPtr.Zero)
+            {
+                lock (_frameLock)
+                {
+                    _pendingFrame = false;
+                }
+                return;
+            }
+
+            int width = Math.Max(1, ClientSize.Width);
+            int height = Math.Max(1, ClientSize.Height);
+            var payload = _client.EncodeRenderInputGpuSurfaceReady(_gridId, descriptor.ToInt64(), width, height);
+            SendRenderInput(payload);
+        }
+
+        private void SendGpuSurfaceDestroyed()
+        {
+            if (_client == null || _renderStream == null || _gridId == 0)
+            {
+                return;
+            }
+
+            try
+            {
+                var payload = _client.EncodeRenderInputGpuSurfaceReady(_gridId, 0L, 0, 0);
+                SendRenderInput(payload);
+            }
+            catch
+            {
+                // Best effort while switching renderers or shutting down.
+            }
+        }
+
+        private IntPtr EnsureGpuSurfaceDescriptor()
+        {
+            IntPtr hwnd = Handle;
+            if (hwnd == IntPtr.Zero)
+            {
+                return IntPtr.Zero;
+            }
+
+            if (_gpuSurfaceDescriptor != IntPtr.Zero && _gpuSurfaceWindow == hwnd)
+            {
+                return _gpuSurfaceDescriptor;
+            }
+
+            ReleaseGpuSurfaceDescriptor();
+            ulong window = unchecked((ulong)hwnd.ToInt64());
+            _gpuSurfaceDescriptor = _client.CreateNativeSurfaceDescriptor(
+                NativeSurfaceKindWin32,
+                0,
+                IntPtr.Zero,
+                IntPtr.Zero,
+                window);
+            _gpuSurfaceWindow = _gpuSurfaceDescriptor == IntPtr.Zero ? IntPtr.Zero : hwnd;
+            return _gpuSurfaceDescriptor;
+        }
+
+        private void ReleaseGpuSurfaceDescriptor()
+        {
+            IntPtr descriptor = _gpuSurfaceDescriptor;
+            _gpuSurfaceDescriptor = IntPtr.Zero;
+            _gpuSurfaceWindow = IntPtr.Zero;
+
+            if (descriptor == IntPtr.Zero || _client == null)
+            {
+                return;
+            }
+
+            try
+            {
+                _client.FreeNativeSurfaceDescriptor(descriptor);
+            }
+            catch
+            {
+                // Best effort during shutdown.
+            }
+        }
+
+        private bool IsGpuRenderActive()
+        {
+            return IsGpuRendererMode(_rendererMode);
+        }
+
+        private static bool IsGpuRendererMode(RendererMode mode)
+        {
+            switch (mode)
+            {
+                case RendererMode.RENDERER_GPU:
+                case RendererMode.RENDERER_GPU_VULKAN:
+                case RendererMode.RENDERER_GPU_GLES:
+                case RendererMode.RENDERER_GPU_DX12:
+                case RendererMode.RENDERER_GPU_METAL:
+                case RendererMode.RENDERER_GPU_OPENGL:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private static bool IsWindowsPlatform()
+        {
+            PlatformID platform = Environment.OSVersion.Platform;
+            return platform == PlatformID.Win32NT
+                || platform == PlatformID.Win32S
+                || platform == PlatformID.Win32Windows
+                || platform == PlatformID.WinCE;
+        }
+
+        private void SendScroll(float dx, float dy, bool requestFrame)
+        {
+            if (_client == null || _gridId == 0)
+            {
+                return;
+            }
+
+            var payload = _client.EncodeRenderInputScroll(_gridId, dx, dy);
+            SendRenderInput(payload);
+            if (requestFrame)
+            {
+                RequestFrame();
+            }
+        }
+
+        private void BoostHostFling(float dx, float dy)
+        {
+            if (!HostFlingEnabled || (Math.Abs(dx) < 0.001f && Math.Abs(dy) < 0.001f))
+            {
+                return;
+            }
+
+            bool startThread = false;
+            lock (_flingLock)
+            {
+                _flingVelocityX = ClampFloat(_flingVelocityX + dx * HostFlingImpulseGain, -HostFlingMaxVelocity, HostFlingMaxVelocity);
+                _flingVelocityY = ClampFloat(_flingVelocityY + dy * HostFlingImpulseGain, -HostFlingMaxVelocity, HostFlingMaxVelocity);
+                if (!_flingActive)
+                {
+                    _flingActive = true;
+                    startThread = true;
+                }
+            }
+
+            if (startThread)
+            {
+                _flingThread = new Thread(RunHostFlingLoop);
+                _flingThread.IsBackground = true;
+                _flingThread.Name = "volvoxgrid-dotnet-fling";
+                _flingThread.Start();
+            }
+        }
+
+        private void RunHostFlingLoop()
+        {
+            while (true)
+            {
+                float dx;
+                float dy;
+
+                lock (_flingLock)
+                {
+                    if (!_flingActive || !_hostFlingEnabled || !_running)
+                    {
+                        _flingActive = false;
+                        _flingVelocityX = 0.0f;
+                        _flingVelocityY = 0.0f;
+                        _flingThread = null;
+                        return;
+                    }
+
+                    _flingVelocityX *= HostFlingDamping;
+                    _flingVelocityY *= HostFlingDamping;
+
+                    if (Math.Abs(_flingVelocityX) < HostFlingMinVelocity
+                        && Math.Abs(_flingVelocityY) < HostFlingMinVelocity)
+                    {
+                        _flingActive = false;
+                        _flingVelocityX = 0.0f;
+                        _flingVelocityY = 0.0f;
+                        _flingThread = null;
+                        return;
+                    }
+
+                    dx = _flingVelocityX;
+                    dy = _flingVelocityY;
+                }
+
+                SendScroll(dx, dy, true);
+                Thread.Sleep(HostFlingFrameMillis);
+            }
+        }
+
+        private void StopHostFling()
+        {
+            Thread thread;
+            lock (_flingLock)
+            {
+                _flingActive = false;
+                _flingVelocityX = 0.0f;
+                _flingVelocityY = 0.0f;
+                thread = _flingThread;
+                _flingThread = null;
+            }
+
+            if (thread != null && thread != Thread.CurrentThread)
+            {
+                try
+                {
+                    thread.Join(100);
+                }
+                catch
+                {
+                    // Best effort.
+                }
+            }
+        }
+
+        private static float ClampFloat(float value, float min, float max)
+        {
+            if (value < min)
+            {
+                return min;
+            }
+            if (value > max)
+            {
+                return max;
+            }
+            return value;
         }
 
         private void SendPointer(PointerEvent_Type type, MouseEventArgs e, bool dblClick)

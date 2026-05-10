@@ -55,14 +55,20 @@ namespace VolvoxGrid.DotNet.Internal
         {
             // Default to the engine's built-in cosmic-text path. The host-side
             // GDI bridge remains available as an opt-in for Wine-specific
-            // compatibility experiments.
+            // compatibility experiments. Lite native builds have no built-in
+            // text engine and are handled automatically in Register().
             return IsTruthyEnvironmentVariable("VOLVOXGRID_DOTNET_USE_HOST_TEXT_RENDERER")
                 && !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WINEPREFIX"));
         }
 
         public void Register(VolvoxClient client, long gridId)
         {
-            if (_disposed || client == null || gridId == 0 || !ShouldUseForCurrentProcess() || !client.SupportsHostTextRenderer)
+            if (_disposed || client == null || gridId == 0 || !client.SupportsHostTextRenderer)
+            {
+                return;
+            }
+
+            if (client.HasBuiltinTextEngine && !ShouldUseForCurrentProcess())
             {
                 return;
             }
@@ -121,17 +127,20 @@ namespace VolvoxGrid.DotNet.Internal
             out float outHeight,
             IntPtr userData)
         {
-            MeasureTextInternal(
-                textPtr,
-                textLen,
-                fontNamePtr,
-                fontNameLen,
-                fontSize,
-                bold != 0,
-                italic != 0,
-                maxWidth,
-                out outWidth,
-                out outHeight);
+            outWidth = 0.0f;
+            outHeight = FallbackHeight(fontSize);
+
+            string text = Utf8FromPtr(textPtr, textLen);
+            if (_disposed || string.IsNullOrEmpty(text))
+            {
+                return;
+            }
+
+            string fontName = Utf8FromPtr(fontNamePtr, fontNameLen);
+            Font font = GetFont(fontName, fontSize, bold != 0, italic != 0);
+            TextMeasurement measurement = MeasureTextUncached(text, font, fontSize, maxWidth);
+            outWidth = measurement.Width;
+            outHeight = measurement.Height;
         }
 
         private float RenderTextCallback(
@@ -156,22 +165,11 @@ namespace VolvoxGrid.DotNet.Internal
             float maxWidth,
             IntPtr userData)
         {
-            float measuredWidth;
-            float measuredHeight;
             string text = Utf8FromPtr(textPtr, textLen);
             string fontName = Utf8FromPtr(fontNamePtr, fontNameLen);
+            Font font = GetFont(fontName, fontSize, bold != 0, italic != 0);
 
-            MeasureTextInternal(
-                textPtr,
-                textLen,
-                fontNamePtr,
-                fontNameLen,
-                fontSize,
-                bold != 0,
-                italic != 0,
-                maxWidth,
-                out measuredWidth,
-                out measuredHeight);
+            TextMeasurement measurement = MeasureTextUncached(text, font, fontSize, maxWidth);
 
             if (_disposed
                 || buffer == IntPtr.Zero
@@ -182,69 +180,17 @@ namespace VolvoxGrid.DotNet.Internal
                 || bufHeight <= 0
                 || stride <= 0)
             {
-                return measuredWidth;
+                return measurement.Width;
             }
 
-            Font font = GetFont(fontName, fontSize, bold != 0, italic != 0);
-            using (var bitmap = new Bitmap(Math.Max(1, clipW), Math.Max(1, clipH), PixelFormat.Format32bppArgb))
-            using (var graphics = Graphics.FromImage(bitmap))
-            using (var format = CreateStringFormat(maxWidth))
-            using (var brush = new SolidBrush(ColorFromArgb(color)))
-            {
-                ConfigureGraphics(graphics);
-                graphics.Clear(Color.Transparent);
+            MaskCacheEntry mask = RasterizeMask(text, font, measurement, maxWidth);
+            BlendMaskIntoBuffer(mask, buffer, bufWidth, bufHeight, stride, x, y, clipX, clipY, clipW, clipH, color);
 
-                float localX = x - clipX;
-                float localY = y - clipY;
-                if (maxWidth > 0.0f)
-                {
-                    graphics.DrawString(
-                        text,
-                        font,
-                        brush,
-                        new RectangleF(localX, localY, maxWidth, Math.Max(clipH, measuredHeight)),
-                        format);
-                }
-                else
-                {
-                    graphics.DrawString(text, font, brush, new PointF(localX, localY), format);
-                }
-
-                BlendBitmapIntoBuffer(bitmap, buffer, bufWidth, bufHeight, stride, clipX, clipY, clipW, clipH);
-            }
-
-            return measuredWidth;
+            return measurement.Width;
         }
 
-        private void MeasureTextInternal(
-            IntPtr textPtr,
-            int textLen,
-            IntPtr fontNamePtr,
-            int fontNameLen,
-            float fontSize,
-            bool bold,
-            bool italic,
-            float maxWidth,
-            out float outWidth,
-            out float outHeight)
+        private TextMeasurement MeasureTextUncached(string text, Font font, float fontSize, float maxWidth)
         {
-            outWidth = 0.0f;
-            outHeight = fontSize > 0.0f ? fontSize * 1.2f : 0.0f;
-
-            if (_disposed)
-            {
-                return;
-            }
-
-            string text = Utf8FromPtr(textPtr, textLen);
-            if (string.IsNullOrEmpty(text))
-            {
-                return;
-            }
-
-            string fontName = Utf8FromPtr(fontNamePtr, fontNameLen);
-            Font font = GetFont(fontName, fontSize, bold, italic);
-
             using (var bitmap = new Bitmap(1, 1, PixelFormat.Format32bppArgb))
             using (var graphics = Graphics.FromImage(bitmap))
             using (var format = CreateStringFormat(maxWidth))
@@ -254,9 +200,42 @@ namespace VolvoxGrid.DotNet.Internal
                     ? new SizeF(maxWidth, 100000.0f)
                     : new SizeF(100000.0f, 100000.0f);
                 SizeF measured = graphics.MeasureString(text, font, limit, format);
-                outWidth = (float)Math.Ceiling(measured.Width);
-                outHeight = Math.Max((float)Math.Ceiling(measured.Height), font.GetHeight(graphics));
+                return new TextMeasurement(
+                    (float)Math.Ceiling(measured.Width),
+                    Math.Max((float)Math.Ceiling(measured.Height), font.GetHeight(graphics)));
             }
+        }
+
+        private MaskCacheEntry RasterizeMask(string text, Font font, TextMeasurement measurement, float maxWidth)
+        {
+            int maskW = Math.Max(1, (int)Math.Ceiling(measurement.Width));
+            int maskH = Math.Max(1, (int)Math.Ceiling(measurement.Height));
+            byte[] alpha;
+            using (var bitmap = new Bitmap(maskW, maskH, PixelFormat.Format32bppArgb))
+            using (var graphics = Graphics.FromImage(bitmap))
+            using (var format = CreateStringFormat(maxWidth))
+            using (var brush = new SolidBrush(Color.White))
+            {
+                ConfigureGraphics(graphics);
+                graphics.Clear(Color.Transparent);
+                if (maxWidth > 0.0f)
+                {
+                    graphics.DrawString(text, font, brush, new RectangleF(0.0f, 0.0f, maxWidth, maskH), format);
+                }
+                else
+                {
+                    graphics.DrawString(text, font, brush, new PointF(0.0f, 0.0f), format);
+                }
+                alpha = ExtractAlphaMask(bitmap);
+            }
+
+            return new MaskCacheEntry
+            {
+                Measurement = measurement,
+                MaskWidth = maskW,
+                MaskHeight = maskH,
+                Alpha = alpha,
+            };
         }
 
         private Font GetFont(string fontName, float fontSize, bool bold, bool italic)
@@ -326,100 +305,137 @@ namespace VolvoxGrid.DotNet.Internal
             return System.Text.Encoding.UTF8.GetString(bytes);
         }
 
-        private static Color ColorFromArgb(uint color)
-        {
-            return Color.FromArgb(
-                (int)((color >> 24) & 0xFF),
-                (int)((color >> 16) & 0xFF),
-                (int)((color >> 8) & 0xFF),
-                (int)(color & 0xFF));
-        }
-
-        private static void BlendBitmapIntoBuffer(
-            Bitmap bitmap,
-            IntPtr targetBuffer,
-            int bufWidth,
-            int bufHeight,
-            int stride,
-            int clipX,
-            int clipY,
-            int clipW,
-            int clipH)
+        private static byte[] ExtractAlphaMask(Bitmap bitmap)
         {
             Rectangle rect = new Rectangle(0, 0, bitmap.Width, bitmap.Height);
             BitmapData data = bitmap.LockBits(rect, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
             try
             {
-                int srcX = 0;
-                int srcY = 0;
-                int dstX = clipX;
-                int dstY = clipY;
-                int blendW = clipW;
-                int blendH = clipH;
-
-                if (dstX < 0)
+                byte[] alpha = new byte[bitmap.Width * bitmap.Height];
+                byte[] row = new byte[bitmap.Width * 4];
+                for (int y = 0; y < bitmap.Height; y++)
                 {
-                    srcX = -dstX;
-                    blendW += dstX;
-                    dstX = 0;
-                }
-                if (dstY < 0)
-                {
-                    srcY = -dstY;
-                    blendH += dstY;
-                    dstY = 0;
-                }
-
-                blendW = Math.Min(blendW, bufWidth - dstX);
-                blendH = Math.Min(blendH, bufHeight - dstY);
-                if (blendW <= 0 || blendH <= 0)
-                {
-                    return;
-                }
-
-                byte[] srcRow = new byte[blendW * 4];
-                byte[] dstRow = new byte[blendW * 4];
-
-                for (int row = 0; row < blendH; row++)
-                {
-                    IntPtr srcPtr = IntPtr.Add(data.Scan0, (srcY + row) * data.Stride + srcX * 4);
-                    Marshal.Copy(srcPtr, srcRow, 0, srcRow.Length);
-
-                    IntPtr dstPtr = IntPtr.Add(targetBuffer, (dstY + row) * stride + dstX * 4);
-                    Marshal.Copy(dstPtr, dstRow, 0, dstRow.Length);
-
-                    for (int i = 0; i < srcRow.Length; i += 4)
+                    IntPtr srcPtr = IntPtr.Add(data.Scan0, y * data.Stride);
+                    Marshal.Copy(srcPtr, row, 0, row.Length);
+                    for (int x = 0; x < bitmap.Width; x++)
                     {
-                        int alpha = srcRow[i + 3];
-                        if (alpha <= 0)
-                        {
-                            continue;
-                        }
-
-                        int inv = 255 - alpha;
-                        int srcB = srcRow[i];
-                        int srcG = srcRow[i + 1];
-                        int srcR = srcRow[i + 2];
-                        int dstR = dstRow[i];
-                        int dstG = dstRow[i + 1];
-                        int dstB = dstRow[i + 2];
-                        int dstA = dstRow[i + 3];
-
-                        dstRow[i] = (byte)((srcR * alpha + dstR * inv + 127) / 255);
-                        dstRow[i + 1] = (byte)((srcG * alpha + dstG * inv + 127) / 255);
-                        dstRow[i + 2] = (byte)((srcB * alpha + dstB * inv + 127) / 255);
-
-                        int outA = alpha + (dstA * inv + 127) / 255;
-                        dstRow[i + 3] = (byte)(outA > 255 ? 255 : outA);
+                        alpha[y * bitmap.Width + x] = row[x * 4 + 3];
                     }
-
-                    Marshal.Copy(dstRow, 0, dstPtr, dstRow.Length);
                 }
+                return alpha;
             }
             finally
             {
                 bitmap.UnlockBits(data);
             }
+        }
+
+        private static void BlendMaskIntoBuffer(
+            MaskCacheEntry mask,
+            IntPtr targetBuffer,
+            int bufWidth,
+            int bufHeight,
+            int stride,
+            int x,
+            int y,
+            int clipX,
+            int clipY,
+            int clipW,
+            int clipH,
+            uint color)
+        {
+            if (mask == null || mask.Alpha == null || mask.Alpha.Length == 0 || targetBuffer == IntPtr.Zero)
+            {
+                return;
+            }
+
+            int globalA = (int)((color >> 24) & 0xFF);
+            if (globalA <= 0)
+            {
+                return;
+            }
+            int srcR = (int)((color >> 16) & 0xFF);
+            int srcG = (int)((color >> 8) & 0xFF);
+            int srcB = (int)(color & 0xFF);
+
+            int minX = Math.Max(Math.Max(x, clipX), 0);
+            int minY = Math.Max(Math.Max(y, clipY), 0);
+            int maxX = Math.Min(Math.Min(x + mask.MaskWidth, clipX + clipW), bufWidth);
+            int maxY = Math.Min(Math.Min(y + mask.MaskHeight, y + clipH), bufHeight);
+            if (maxX <= minX || maxY <= minY)
+            {
+                return;
+            }
+
+            int blendW = maxX - minX;
+            byte[] dstRow = new byte[blendW * 4];
+
+            for (int row = minY; row < maxY; row++)
+            {
+                IntPtr dstPtr = IntPtr.Add(targetBuffer, row * stride + minX * 4);
+                Marshal.Copy(dstPtr, dstRow, 0, dstRow.Length);
+
+                int maskBase = (row - y) * mask.MaskWidth + (minX - x);
+                for (int col = 0; col < blendW; col++)
+                {
+                    int maskA = mask.Alpha[maskBase + col];
+                    if (maskA < 0)
+                    {
+                        maskA += 256;
+                    }
+                    if (maskA <= 0)
+                    {
+                        continue;
+                    }
+
+                    int srcA = (maskA * globalA + 127) / 255;
+                    if (srcA <= 0)
+                    {
+                        continue;
+                    }
+
+                    int i = col * 4;
+                    int inv = 255 - srcA;
+                    int dstR = dstRow[i];
+                    int dstG = dstRow[i + 1];
+                    int dstB = dstRow[i + 2];
+                    int dstA = dstRow[i + 3];
+
+                    dstRow[i] = (byte)((srcR * srcA + dstR * inv + 127) / 255);
+                    dstRow[i + 1] = (byte)((srcG * srcA + dstG * inv + 127) / 255);
+                    dstRow[i + 2] = (byte)((srcB * srcA + dstB * inv + 127) / 255);
+
+                    int outA = srcA + (dstA * inv + 127) / 255;
+                    dstRow[i + 3] = (byte)(outA > 255 ? 255 : outA);
+                }
+
+                Marshal.Copy(dstRow, 0, dstPtr, dstRow.Length);
+            }
+        }
+
+        private static float FallbackHeight(float fontSize)
+        {
+            return fontSize > 0.0f ? fontSize * 1.2f : 0.0f;
+        }
+
+        private struct TextMeasurement
+        {
+            public float Width;
+            public float Height;
+
+            public TextMeasurement(float width, float height)
+            {
+                Width = width;
+                Height = height;
+            }
+        }
+
+        private sealed class MaskCacheEntry
+        {
+            public TextMeasurement Measurement;
+            public int MaskWidth;
+            public int MaskHeight;
+            public byte[] Alpha;
         }
     }
 }

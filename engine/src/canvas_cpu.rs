@@ -222,6 +222,14 @@ impl<'a> Canvas for CpuCanvas<'a> {
         self.height
     }
 
+    fn text_cache_len(&self) -> Option<usize> {
+        Some(self.text_renderer.cache_len())
+    }
+
+    fn text_renderer_name(&self) -> Option<&str> {
+        Some(self.text_renderer.renderer_name())
+    }
+
     fn fill_rect(&mut self, x: i32, y: i32, w: i32, h: i32, color: u32) {
         let Some((x0, y0, x1, y1)) = self.clip_rect(x, y, w, h) else {
             return;

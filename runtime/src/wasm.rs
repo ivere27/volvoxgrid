@@ -9,6 +9,9 @@ use crate::shared;
 use volvoxgrid_engine::input;
 use volvoxgrid_engine::render::Renderer;
 use volvoxgrid_engine::sort;
+use volvoxgrid_engine::text::{
+    blend_external_text_mask_into_rgba, ExternalTextKey, ExternalTextMask, ExternalTextMaskCache,
+};
 use volvoxgrid_engine::GridManager;
 
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -30,6 +33,7 @@ static MANAGER: Mutex<Option<GridManager>> = Mutex::new(None);
 static RENDERER: Mutex<Option<Renderer>> = Mutex::new(None);
 static RENDER_BUF: Mutex<Vec<u8>> = Mutex::new(Vec::new());
 static RENDER_DIRTY_RECT: Mutex<(i32, i32, i32, i32)> = Mutex::new((0, 0, 0, 0));
+static ACTIVE_TEXT_CACHE_GRID_ID: Mutex<Option<i64>> = Mutex::new(None);
 static LAST_MEM_CALC_MS: LazyLock<Mutex<HashMap<i64, f64>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 static NEXT_EVENT_ID: LazyLock<Mutex<i64>> = LazyLock::new(|| Mutex::new(1));
@@ -160,6 +164,30 @@ fn ensure_renderer() {
     if r.is_none() {
         *r = Some(Renderer::new());
     }
+}
+
+fn clear_grid_text_cache(id: i64) {
+    let mgr = MANAGER.lock().unwrap();
+    if let Some(mgr) = mgr.as_ref() {
+        let _ = mgr.with_grid(id, |grid| {
+            grid.clear_text_cache();
+            grid.debug_text_cache_len = 0;
+        });
+    }
+}
+
+fn activate_text_cache_grid(id: i64) -> bool {
+    let previous = {
+        let mut active = ACTIVE_TEXT_CACHE_GRID_ID.lock().unwrap();
+        if *active == Some(id) {
+            return false;
+        }
+        active.replace(id)
+    };
+    if let Some(prev) = previous {
+        clear_grid_text_cache(prev);
+    }
+    true
 }
 
 // ---------------------------------------------------------------------------
@@ -1149,14 +1177,19 @@ pub fn load_font(data: &[u8]) {
 struct JsTextRenderer {
     measure_callback: js_sys::Function,
     render_callback: js_sys::Function,
+    cache: ExternalTextMaskCache,
 }
 
-// SAFETY: WASM is single-threaded — JsValue is not Send but there's no
-// concurrent access.
-unsafe impl Send for JsTextRenderer {}
+impl JsTextRenderer {
+    fn new(measure_callback: js_sys::Function, render_callback: js_sys::Function) -> Self {
+        Self {
+            measure_callback,
+            render_callback,
+            cache: ExternalTextMaskCache::new(volvoxgrid_engine::text::DEFAULT_LAYOUT_CACHE_CAP),
+        }
+    }
 
-impl volvoxgrid_engine::text::TextRenderer for JsTextRenderer {
-    fn measure_text(
+    fn measure_uncached(
         &mut self,
         text: &str,
         font_name: &str,
@@ -1193,7 +1226,7 @@ impl volvoxgrid_engine::text::TextRenderer for JsTextRenderer {
         }
     }
 
-    fn render_text(
+    fn render_uncached(
         &mut self,
         buffer_pixels: &mut [u8],
         buf_width: i32,
@@ -1217,7 +1250,7 @@ impl volvoxgrid_engine::text::TextRenderer for JsTextRenderer {
         // We cannot pass a &mut [u8] directly to JS effectively without
         // copying or using a shared buffer.  Since the renderer already has
         // access to the WASM memory, we can pass the pointer and length.
-        args.push(&JsValue::from(buffer_pixels.as_ptr() as u32));
+        args.push(&JsValue::from(buffer_pixels.as_mut_ptr() as u32));
         args.push(&JsValue::from(buf_width));
         args.push(&JsValue::from(buf_height));
         args.push(&JsValue::from(stride));
@@ -1242,6 +1275,229 @@ impl volvoxgrid_engine::text::TextRenderer for JsTextRenderer {
         let result = self.render_callback.apply(&JsValue::NULL, &args).ok();
         result.and_then(|v| v.as_f64()).unwrap_or(0.0) as f32
     }
+
+    fn cached_measure(
+        &mut self,
+        text: &str,
+        font_name: &str,
+        font_size: f32,
+        bold: bool,
+        italic: bool,
+        max_width: Option<f32>,
+    ) -> (f32, f32) {
+        if self.cache.is_disabled() {
+            return self.measure_uncached(text, font_name, font_size, bold, italic, max_width);
+        }
+
+        let key = ExternalTextKey::new(text, font_name, font_size, bold, italic, max_width);
+        if let Some(result) = self.cache.get_measure(&key) {
+            return result;
+        }
+
+        let (width, height) =
+            self.measure_uncached(text, font_name, font_size, bold, italic, max_width);
+        self.cache.put_measure(key, width, height);
+        (width, height)
+    }
+
+    fn ensure_cached_mask(
+        &mut self,
+        key: ExternalTextKey,
+        text: &str,
+        font_name: &str,
+        font_size: f32,
+        bold: bool,
+        italic: bool,
+        max_width: Option<f32>,
+    ) -> bool {
+        if self.cache.with_mask(&key, |_| ()).is_some() {
+            return true;
+        }
+
+        let (measured_width, measured_height) =
+            self.cached_measure(text, font_name, font_size, bold, italic, max_width);
+        let mask_width = measured_width.ceil().max(1.0) as i32;
+        let mask_height = measured_height
+            .ceil()
+            .max((font_size.max(1.0) * 1.2).ceil())
+            .max(1.0) as i32;
+        let pixels = (mask_width as usize).saturating_mul(mask_height as usize);
+        if pixels == 0 || pixels > 4 * 1024 * 1024 {
+            return false;
+        }
+
+        let stride = mask_width.saturating_mul(4);
+        let Some(byte_len) = (stride as usize).checked_mul(mask_height as usize) else {
+            return false;
+        };
+        let mut rgba = vec![0u8; byte_len];
+        let rendered_width = self.render_uncached(
+            &mut rgba,
+            mask_width,
+            mask_height,
+            stride,
+            0,
+            0,
+            0,
+            0,
+            mask_width,
+            mask_height,
+            text,
+            font_name,
+            font_size,
+            bold,
+            italic,
+            0xFFFF_FFFF,
+            max_width,
+        );
+
+        let mut alpha = vec![0u8; pixels];
+        for i in 0..pixels {
+            alpha[i] = rgba[i * 4 + 3];
+        }
+
+        self.cache.put_mask(
+            key,
+            ExternalTextMask {
+                measured_width: rendered_width.max(measured_width),
+                measured_height,
+                mask_width,
+                mask_height,
+                alpha,
+            },
+        );
+        true
+    }
+}
+
+// SAFETY: WASM is single-threaded — JsValue is not Send but there's no
+// concurrent access.
+unsafe impl Send for JsTextRenderer {}
+
+impl volvoxgrid_engine::text::TextRenderer for JsTextRenderer {
+    fn renderer_name(&self) -> &str {
+        "Browser"
+    }
+
+    fn cache_len(&self) -> usize {
+        self.cache.len()
+    }
+
+    fn set_cache_cap(&mut self, cap: usize) {
+        self.cache.set_cap(cap);
+    }
+
+    fn clear_cache(&mut self) {
+        self.cache.clear();
+    }
+
+    fn measure_text(
+        &mut self,
+        text: &str,
+        font_name: &str,
+        font_size: f32,
+        bold: bool,
+        italic: bool,
+        max_width: Option<f32>,
+    ) -> (f32, f32) {
+        self.cached_measure(text, font_name, font_size, bold, italic, max_width)
+    }
+
+    fn render_text(
+        &mut self,
+        buffer_pixels: &mut [u8],
+        buf_width: i32,
+        buf_height: i32,
+        stride: i32,
+        x: i32,
+        y: i32,
+        clip_x: i32,
+        clip_y: i32,
+        clip_w: i32,
+        clip_h: i32,
+        text: &str,
+        font_name: &str,
+        font_size: f32,
+        bold: bool,
+        italic: bool,
+        color: u32,
+        max_width: Option<f32>,
+    ) -> f32 {
+        if self.cache.is_disabled() {
+            return self.render_uncached(
+                buffer_pixels,
+                buf_width,
+                buf_height,
+                stride,
+                x,
+                y,
+                clip_x,
+                clip_y,
+                clip_w,
+                clip_h,
+                text,
+                font_name,
+                font_size,
+                bold,
+                italic,
+                color,
+                max_width,
+            );
+        }
+
+        let key = ExternalTextKey::new(text, font_name, font_size, bold, italic, max_width);
+        if self.ensure_cached_mask(
+            key.clone(),
+            text,
+            font_name,
+            font_size,
+            bold,
+            italic,
+            max_width,
+        ) {
+            if let Some(width) = self.cache.with_mask(&key, |entry| {
+                blend_external_text_mask_into_rgba(
+                    buffer_pixels,
+                    buf_width,
+                    buf_height,
+                    stride,
+                    x,
+                    y,
+                    clip_x,
+                    clip_y,
+                    clip_w,
+                    clip_h,
+                    entry.mask_width,
+                    entry.mask_height,
+                    &entry.alpha,
+                    color,
+                );
+                entry.measured_width
+            }) {
+                return width;
+            }
+        }
+
+        self.render_uncached(
+            buffer_pixels,
+            buf_width,
+            buf_height,
+            stride,
+            x,
+            y,
+            clip_x,
+            clip_y,
+            clip_w,
+            clip_h,
+            text,
+            font_name,
+            font_size,
+            bold,
+            italic,
+            color,
+            max_width,
+        )
+    }
 }
 
 /// Register JS callbacks as the external text renderer.
@@ -1251,10 +1507,23 @@ impl volvoxgrid_engine::text::TextRenderer for JsTextRenderer {
 #[wasm_bindgen]
 pub fn set_text_renderer(measure_callback: js_sys::Function, render_callback: js_sys::Function) {
     ensure_renderer();
-    let renderer = Box::new(JsTextRenderer {
-        measure_callback,
-        render_callback,
-    });
+    let renderer = Box::new(JsTextRenderer::new(measure_callback, render_callback));
+    let mut r = RENDERER.lock().unwrap();
+    if let Some(rend) = r.as_mut() {
+        rend.set_custom_text_renderer(Some(renderer));
+    }
+}
+
+/// Register JS callbacks plus cache hooks as the external text renderer.
+#[wasm_bindgen]
+pub fn set_text_renderer_with_cache(
+    measure_callback: js_sys::Function,
+    render_callback: js_sys::Function,
+    _cache_len_callback: js_sys::Function,
+    _set_cache_size_callback: js_sys::Function,
+) {
+    ensure_renderer();
+    let renderer = Box::new(JsTextRenderer::new(measure_callback, render_callback));
     let mut r = RENDERER.lock().unwrap();
     if let Some(rend) = r.as_mut() {
         rend.set_custom_text_renderer(Some(renderer));
@@ -1271,10 +1540,23 @@ pub fn set_grid_text_renderer(
 ) {
     let _ = with_grid(id, |grid| {
         let te = grid.ensure_text_engine();
-        let renderer = Box::new(JsTextRenderer {
-            measure_callback,
-            render_callback,
-        });
+        let renderer = Box::new(JsTextRenderer::new(measure_callback, render_callback));
+        te.set_external_renderer(Some(renderer));
+    });
+}
+
+/// Register JS callbacks plus cache hooks as the external text renderer for a grid.
+#[wasm_bindgen]
+pub fn set_grid_text_renderer_with_cache(
+    id: i32,
+    measure_callback: js_sys::Function,
+    render_callback: js_sys::Function,
+    _cache_len_callback: js_sys::Function,
+    _set_cache_size_callback: js_sys::Function,
+) {
+    let _ = with_grid(id, |grid| {
+        let te = grid.ensure_text_engine();
+        let renderer = Box::new(JsTextRenderer::new(measure_callback, render_callback));
         te.set_external_renderer(Some(renderer));
     });
 }
@@ -1422,12 +1704,30 @@ pub fn set_grid_scale(id: i32, scale: f32) {
 /// Destroy a grid, freeing its resources.
 #[wasm_bindgen]
 pub fn destroy_grid(id: i32) {
+    let grid_id = id as i64;
+    {
+        let mut active = ACTIVE_TEXT_CACHE_GRID_ID.lock().unwrap();
+        if *active == Some(grid_id) {
+            *active = None;
+            let mut renderer = RENDERER.lock().unwrap();
+            if let Some(r) = renderer.as_mut() {
+                r.clear_text_cache();
+            }
+            #[cfg(feature = "gpu")]
+            {
+                let mut gr = GPU_RENDERER.lock().unwrap();
+                if let Some(gpu) = gr.0.as_mut() {
+                    gpu.clear_text_cache();
+                }
+            }
+        }
+    }
     let mgr = MANAGER.lock().unwrap();
     if let Some(mgr) = mgr.as_ref() {
-        mgr.destroy_grid(id as i64);
+        mgr.destroy_grid(grid_id);
     }
-    LAST_MEM_CALC_MS.lock().unwrap().remove(&(id as i64));
-    clear_grid_decision_state(id as i64);
+    LAST_MEM_CALC_MS.lock().unwrap().remove(&grid_id);
+    clear_grid_decision_state(grid_id);
 }
 
 #[wasm_bindgen]
@@ -3730,6 +4030,7 @@ pub fn render(id: i32, width: i32, height: i32) -> i32 {
 
     let required = (width * height * 4) as usize;
     let id = id as i64;
+    let switched_grid = activate_text_cache_grid(id);
 
     let mgr = MANAGER.lock().unwrap();
     let mgr = match mgr.as_ref() {
@@ -3764,6 +4065,9 @@ pub fn render(id: i32, width: i32, height: i32) -> i32 {
     ensure_renderer();
     let mut renderer = RENDERER.lock().unwrap();
     let renderer = renderer.as_mut().unwrap();
+    if switched_grid {
+        renderer.clear_text_cache();
+    }
 
     let stride = width * 4;
     grid.debug_renderer_actual = 1; // CPU=1 (WASM always uses CPU renderer)
@@ -4014,6 +4318,7 @@ pub fn render_gpu(id: i32, w: i32, h: i32) -> i32 {
     }
 
     let id64 = id as i64;
+    let switched_grid = activate_text_cache_grid(id64);
     let mgr = MANAGER.lock().unwrap();
     let mgr = match mgr.as_ref() {
         Some(m) => m,
@@ -4039,6 +4344,9 @@ pub fn render_gpu(id: i32, w: i32, h: i32) -> i32 {
         Some(g) => g,
         None => return 0,
     };
+    if switched_grid {
+        gpu.clear_text_cache();
+    }
 
     grid.debug_renderer_actual = 2; // GPU=2
     grid.debug_gpu_backend = gpu.backend_name();

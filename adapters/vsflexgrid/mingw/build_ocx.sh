@@ -15,6 +15,9 @@ PROFILE="debug"
 CARGO_FLAGS=""
 IS_LITE=0
 IS_GPU=0
+BUILD_DEBUG_SYMBOLS="${BUILD_DEBUG_SYMBOLS:-0}"
+DEBUG_SYMBOLS_DIR="${DEBUG_SYMBOLS_DIR:-../../../target/ocx-symbols}"
+REPO_ROOT="$(cd ../../.. && pwd)"
 
 detect_cpu_count() {
     if command -v nproc >/dev/null 2>&1; then
@@ -39,6 +42,11 @@ done
 if [ "$PROFILE" = "release" ]; then
     CARGO_FLAGS="--release"
     TARGET_DIR="release"
+    case "${BUILD_DEBUG_SYMBOLS}" in
+        1|true|TRUE|yes|YES|on|ON)
+            CARGO_FLAGS="$CARGO_FLAGS --config=profile.release.debug=\"line-tables-only\" --config=profile.release.strip=\"none\""
+            ;;
+    esac
 else
     TARGET_DIR="debug"
 fi
@@ -79,6 +87,7 @@ build_arch() {
     local CC="${ARCH}-w64-mingw32-gcc"
     local STRIP="${ARCH}-w64-mingw32-strip"
     local STATIC_LIB="${CARGO_TARGET_DIR}/${TRIPLE}/${TARGET_DIR}/libvolvoxgrid_activex.a"
+    local OCX_FILE="${OUT_DIR}/VolvoxGrid_${ARCH}.ocx"
 
     echo ""
     echo "── ${ARCH} ──"
@@ -115,7 +124,7 @@ build_arch() {
     #    the Rust archive's DLL import stubs (bcryptprimitives, synch APIs)
     #    and the MinGW import libs (KERNEL32 Vista+ functions).
     echo "  Link VolvoxGrid_${ARCH}.ocx..."
-    $CC -shared -o "${OUT_DIR}/VolvoxGrid_${ARCH}.ocx" \
+    $CC -shared -o "${OCX_FILE}" \
         "${OUT_DIR}/dllexports_${ARCH}.o" \
         "${OUT_DIR}/volvoxgrid_ocx_${ARCH}.o" \
         "${OUT_DIR}/compat_shims_${ARCH}.o" \
@@ -128,11 +137,29 @@ build_arch() {
         -Wl,--enable-stdcall-fixup,--allow-multiple-definition
 
     if [ "$PROFILE" = "release" ]; then
-        $STRIP "${OUT_DIR}/VolvoxGrid_${ARCH}.ocx"
+        case "${BUILD_DEBUG_SYMBOLS}" in
+            1|true|TRUE|yes|YES|on|ON)
+                local SYMBOL_PLATFORM="windows-x86_64"
+                if [ "$ARCH" = "i686" ]; then
+                    SYMBOL_PLATFORM="windows-x86"
+                fi
+                if [ -f "${REPO_ROOT}/scripts/split_native_debug_symbols.sh" ]; then
+                    bash "${REPO_ROOT}/scripts/split_native_debug_symbols.sh" \
+                        "${SYMBOL_PLATFORM}" \
+                        "${OCX_FILE}" \
+                        "${DEBUG_SYMBOLS_DIR}/${ARCH}"
+                else
+                    $STRIP "${OCX_FILE}"
+                fi
+                ;;
+            *)
+                $STRIP "${OCX_FILE}"
+                ;;
+        esac
     fi
 
-    local SIZE=$(stat -c%s "${OUT_DIR}/VolvoxGrid_${ARCH}.ocx" 2>/dev/null || stat -f%z "${OUT_DIR}/VolvoxGrid_${ARCH}.ocx")
-    echo "  Done: ${OUT_DIR}/VolvoxGrid_${ARCH}.ocx ($(($SIZE / 1024)) KB)"
+    local SIZE=$(stat -c%s "${OCX_FILE}" 2>/dev/null || stat -f%z "${OCX_FILE}")
+    echo "  Done: ${OCX_FILE} ($(($SIZE / 1024)) KB)"
 
     # 4) Build test program
     echo "  Build grid_capture_test_${ARCH}.exe..."

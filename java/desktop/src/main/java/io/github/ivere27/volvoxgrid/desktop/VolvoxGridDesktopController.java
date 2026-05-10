@@ -1071,31 +1071,50 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
         );
     }
 
-    public void setRendererModeCpu() throws SynurangDesktopBridge.SynurangBridgeException {
+    private void setRendererMode(RendererMode mode) throws SynurangDesktopBridge.SynurangBridgeException {
         configure(
             GridConfig.newBuilder()
                 .setRendering(
-                    RenderConfig.newBuilder().setRendererMode(RendererMode.RENDERER_CPU).build()
+                    RenderConfig.newBuilder().setRendererMode(mode).build()
                 )
                 .build()
         );
+    }
+
+    public void setRendererModeAuto() throws SynurangDesktopBridge.SynurangBridgeException {
+        setRendererMode(RendererMode.RENDERER_AUTO);
+    }
+
+    public void setRendererModeCpu() throws SynurangDesktopBridge.SynurangBridgeException {
+        setRendererMode(RendererMode.RENDERER_CPU);
     }
 
     public void setRendererModeTui() throws SynurangDesktopBridge.SynurangBridgeException {
-        configure(
-            GridConfig.newBuilder()
-                .setRendering(
-                    RenderConfig.newBuilder().setRendererMode(RendererMode.RENDERER_TUI).build()
-                )
-                .build()
-        );
+        setRendererMode(RendererMode.RENDERER_TUI);
     }
 
-    /**
-     * GPU stub for future desktop implementation.
-     */
-    public void setRendererModeGpuStub() {
-        throw new UnsupportedOperationException("Desktop GPU path is not implemented yet. CPU mode only.");
+    public void setRendererModeGpu() throws SynurangDesktopBridge.SynurangBridgeException {
+        setRendererMode(RendererMode.RENDERER_GPU);
+    }
+
+    public void setRendererModeGpuVulkan() throws SynurangDesktopBridge.SynurangBridgeException {
+        setRendererMode(RendererMode.RENDERER_GPU_VULKAN);
+    }
+
+    public void setRendererModeGpuGles() throws SynurangDesktopBridge.SynurangBridgeException {
+        setRendererMode(RendererMode.RENDERER_GPU_GLES);
+    }
+
+    public void setRendererModeGpuDx12() throws SynurangDesktopBridge.SynurangBridgeException {
+        setRendererMode(RendererMode.RENDERER_GPU_DX12);
+    }
+
+    public void setRendererModeGpuMetal() throws SynurangDesktopBridge.SynurangBridgeException {
+        setRendererMode(RendererMode.RENDERER_GPU_METAL);
+    }
+
+    public void setRendererModeGpuOpenGl() throws SynurangDesktopBridge.SynurangBridgeException {
+        setRendererMode(RendererMode.RENDERER_GPU_OPENGL);
     }
 
     @Override
@@ -1106,11 +1125,10 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
                 setRendererModeCpu();
                 return;
             case GPU:
-                setRendererModeGpuStub();
+                setRendererModeGpu();
                 return;
             case AUTO:
-                // Desktop host is currently CPU-only; AUTO is treated as CPU fallback.
-                setRendererModeCpu();
+                setRendererModeAuto();
                 return;
             default:
                 throw new IllegalArgumentException("Unknown renderer backend: " + backend);
@@ -1124,9 +1142,14 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
             case RENDERER_CPU:
                 return RendererBackend.CPU;
             case RENDERER_GPU:
+            case RENDERER_GPU_VULKAN:
+            case RENDERER_GPU_GLES:
+            case RENDERER_GPU_DX12:
+            case RENDERER_GPU_METAL:
+            case RENDERER_GPU_OPENGL:
                 return RendererBackend.GPU;
             case RENDERER_AUTO:
-                return RendererBackend.CPU;
+                return RendererBackend.AUTO;
             case UNRECOGNIZED:
             default:
                 return RendererBackend.CPU;

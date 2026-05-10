@@ -5,6 +5,35 @@
     "Size": "",
     "Modified": "2025-12-01",
     "Permissions": "rwxr-xr-x",
+    "Details": {
+      "text": "Folder - directory\nfolder - rwxr-xr-x",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 9,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 19,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 10.5,
+          "italic": true
+        },
+        {
+          "start": 28,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Browse",
     "Id": "documents",
     "ParentId": null
@@ -15,6 +44,35 @@
     "Size": "",
     "Modified": "2025-11-15",
     "Permissions": "rwxr-xr-x",
+    "Details": {
+      "text": "Folder - directory\nfolder - rwxr-xr-x",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 9,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 19,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 10.5,
+          "italic": true
+        },
+        {
+          "start": 28,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Browse",
     "Id": "documents/reports",
     "ParentId": "documents"
@@ -25,6 +83,34 @@
     "Size": "245 KB",
     "Modified": "2025-03-31",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "XLSX - 245 KB\nreport - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#15803D",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 7,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 14,
+          "foreground": "#15803D",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 23,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "documents/reports/q1-report",
     "ParentId": "documents/reports"
@@ -35,6 +121,34 @@
     "Size": "312 KB",
     "Modified": "2025-06-30",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "XLSX - 312 KB\nreport - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#15803D",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 7,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 14,
+          "foreground": "#15803D",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 23,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "documents/reports/q2-report",
     "ParentId": "documents/reports"
@@ -45,6 +159,34 @@
     "Size": "1.8 MB",
     "Modified": "2025-09-30",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "PDF - 1.8 MB\nreport - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#DC2626",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 13,
+          "foreground": "#15803D",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 22,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "documents/reports/q3-report",
     "ParentId": "documents/reports"
@@ -55,6 +197,34 @@
     "Size": "178 KB",
     "Modified": "2025-12-15",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "DOCX - 178 KB\nreport - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#2563EB",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 7,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 14,
+          "foreground": "#15803D",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 23,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "documents/reports/q4-report",
     "ParentId": "documents/reports"
@@ -65,6 +235,34 @@
     "Size": "4.1 MB",
     "Modified": "2025-12-20",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "PDF - 4.1 MB\nreport - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#DC2626",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 13,
+          "foreground": "#15803D",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 22,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "documents/reports/annual-summary",
     "ParentId": "documents/reports"
@@ -75,6 +273,35 @@
     "Size": "",
     "Modified": "2025-12-10",
     "Permissions": "rwxr-xr-x",
+    "Details": {
+      "text": "Folder - directory\nfolder - rwxr-xr-x",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 9,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 19,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 10.5,
+          "italic": true
+        },
+        {
+          "start": 28,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Browse",
     "Id": "documents/invoices",
     "ParentId": "documents"
@@ -85,6 +312,35 @@
     "Size": "89 KB",
     "Modified": "2025-01-15",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "PDF - 89 KB\ninvoice - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#DC2626",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 12,
+          "foreground": "#2563EB",
+          "bold": true,
+          "size": 10.5,
+          "italic": true
+        },
+        {
+          "start": 22,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "documents/invoices/inv-001",
     "ParentId": "documents/invoices"
@@ -95,6 +351,35 @@
     "Size": "92 KB",
     "Modified": "2025-02-18",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "PDF - 92 KB\ninvoice - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#DC2626",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 12,
+          "foreground": "#2563EB",
+          "bold": true,
+          "size": 10.5,
+          "italic": true
+        },
+        {
+          "start": 22,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "documents/invoices/inv-002",
     "ParentId": "documents/invoices"
@@ -105,6 +390,35 @@
     "Size": "76 KB",
     "Modified": "2025-03-22",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "PDF - 76 KB\ninvoice - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#DC2626",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 12,
+          "foreground": "#2563EB",
+          "bold": true,
+          "size": 10.5,
+          "italic": true
+        },
+        {
+          "start": 22,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "documents/invoices/inv-003",
     "ParentId": "documents/invoices"
@@ -115,6 +429,35 @@
     "Size": "134 KB",
     "Modified": "2025-04-10",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "PDF - 134 KB\ninvoice - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#DC2626",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 13,
+          "foreground": "#2563EB",
+          "bold": true,
+          "size": 10.5,
+          "italic": true
+        },
+        {
+          "start": 23,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "documents/invoices/inv-004",
     "ParentId": "documents/invoices"
@@ -125,6 +468,35 @@
     "Size": "98 KB",
     "Modified": "2025-05-05",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "PDF - 98 KB\ninvoice - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#DC2626",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 12,
+          "foreground": "#2563EB",
+          "bold": true,
+          "size": 10.5,
+          "italic": true
+        },
+        {
+          "start": 22,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "documents/invoices/inv-005",
     "ParentId": "documents/invoices"
@@ -135,6 +507,35 @@
     "Size": "112 KB",
     "Modified": "2025-06-08",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "PDF - 112 KB\ninvoice - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#DC2626",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 13,
+          "foreground": "#2563EB",
+          "bold": true,
+          "size": 10.5,
+          "italic": true
+        },
+        {
+          "start": 23,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "documents/invoices/inv-006",
     "ParentId": "documents/invoices"
@@ -145,6 +546,35 @@
     "Size": "87 KB",
     "Modified": "2025-07-14",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "PDF - 87 KB\ninvoice - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#DC2626",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 12,
+          "foreground": "#2563EB",
+          "bold": true,
+          "size": 10.5,
+          "italic": true
+        },
+        {
+          "start": 22,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "documents/invoices/inv-007",
     "ParentId": "documents/invoices"
@@ -155,6 +585,35 @@
     "Size": "145 KB",
     "Modified": "2025-08-19",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "PDF - 145 KB\ninvoice - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#DC2626",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 13,
+          "foreground": "#2563EB",
+          "bold": true,
+          "size": 10.5,
+          "italic": true
+        },
+        {
+          "start": 23,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "documents/invoices/inv-008",
     "ParentId": "documents/invoices"
@@ -165,6 +624,35 @@
     "Size": "93 KB",
     "Modified": "2025-09-23",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "PDF - 93 KB\ninvoice - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#DC2626",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 12,
+          "foreground": "#2563EB",
+          "bold": true,
+          "size": 10.5,
+          "italic": true
+        },
+        {
+          "start": 22,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "documents/invoices/inv-009",
     "ParentId": "documents/invoices"
@@ -175,6 +663,35 @@
     "Size": "101 KB",
     "Modified": "2025-10-30",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "PDF - 101 KB\ninvoice - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#DC2626",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 13,
+          "foreground": "#2563EB",
+          "bold": true,
+          "size": 10.5,
+          "italic": true
+        },
+        {
+          "start": 23,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "documents/invoices/inv-010",
     "ParentId": "documents/invoices"
@@ -185,6 +702,35 @@
     "Size": "88 KB",
     "Modified": "2025-11-12",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "PDF - 88 KB\ninvoice - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#DC2626",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 12,
+          "foreground": "#2563EB",
+          "bold": true,
+          "size": 10.5,
+          "italic": true
+        },
+        {
+          "start": 22,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "documents/invoices/inv-011",
     "ParentId": "documents/invoices"
@@ -195,6 +741,35 @@
     "Size": "156 KB",
     "Modified": "2025-12-05",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "PDF - 156 KB\ninvoice - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#DC2626",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 13,
+          "foreground": "#2563EB",
+          "bold": true,
+          "size": 10.5,
+          "italic": true
+        },
+        {
+          "start": 23,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "documents/invoices/inv-012",
     "ParentId": "documents/invoices"
@@ -205,6 +780,35 @@
     "Size": "",
     "Modified": "2025-10-01",
     "Permissions": "rwxr-xr-x",
+    "Details": {
+      "text": "Folder - directory\nfolder - rwxr-xr-x",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 9,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 19,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 10.5,
+          "italic": true
+        },
+        {
+          "start": 28,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Browse",
     "Id": "documents/contracts",
     "ParentId": "documents"
@@ -215,6 +819,35 @@
     "Size": "2.1 MB",
     "Modified": "2025-01-20",
     "Permissions": "rw-------",
+    "Details": {
+      "text": "PDF - 2.1 MB\nconfidential - rw-------",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#DC2626",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 13,
+          "foreground": "#B91C1C",
+          "bold": true,
+          "size": 10.5,
+          "underline": true
+        },
+        {
+          "start": 28,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "documents/contracts/contract-alpha",
     "ParentId": "documents/contracts"
@@ -225,6 +858,35 @@
     "Size": "1.8 MB",
     "Modified": "2025-04-15",
     "Permissions": "rw-------",
+    "Details": {
+      "text": "PDF - 1.8 MB\nconfidential - rw-------",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#DC2626",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 13,
+          "foreground": "#B91C1C",
+          "bold": true,
+          "size": 10.5,
+          "underline": true
+        },
+        {
+          "start": 28,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "documents/contracts/contract-beta",
     "ParentId": "documents/contracts"
@@ -235,6 +897,35 @@
     "Size": "980 KB",
     "Modified": "2025-07-01",
     "Permissions": "rw-------",
+    "Details": {
+      "text": "DOCX - 980 KB\nconfidential - rw-------",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#2563EB",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 7,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 14,
+          "foreground": "#B91C1C",
+          "bold": true,
+          "size": 10.5,
+          "underline": true
+        },
+        {
+          "start": 29,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "documents/contracts/contract-gamma",
     "ParentId": "documents/contracts"
@@ -245,6 +936,34 @@
     "Size": "45 KB",
     "Modified": "2025-02-10",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "DOCX - 45 KB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#2563EB",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 7,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 13,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 20,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "documents/contracts/nda-template",
     "ParentId": "documents/contracts"
@@ -255,6 +974,35 @@
     "Size": "",
     "Modified": "2025-11-20",
     "Permissions": "rwxr-xr-x",
+    "Details": {
+      "text": "Folder - directory\nfolder - rwxr-xr-x",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 9,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 19,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 10.5,
+          "italic": true
+        },
+        {
+          "start": 28,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Browse",
     "Id": "documents/presentations",
     "ParentId": "documents"
@@ -265,6 +1013,34 @@
     "Size": "8.3 MB",
     "Modified": "2025-01-10",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "PPTX - 8.3 MB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#7C3AED",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 7,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 14,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 21,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "documents/presentations/roadmap-2025",
     "ParentId": "documents/presentations"
@@ -275,6 +1051,34 @@
     "Size": "5.1 MB",
     "Modified": "2025-03-01",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "PPTX - 5.1 MB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#7C3AED",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 7,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 14,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 21,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "documents/presentations/team-kickoff",
     "ParentId": "documents/presentations"
@@ -285,6 +1089,34 @@
     "Size": "12.1 MB",
     "Modified": "2025-06-15",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "PPTX - 12.1 MB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#7C3AED",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 7,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 15,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 22,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "documents/presentations/client-demo",
     "ParentId": "documents/presentations"
@@ -295,6 +1127,34 @@
     "Size": "9.6 MB",
     "Modified": "2025-12-18",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "PPTX - 9.6 MB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#7C3AED",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 7,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 14,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 21,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "documents/presentations/year-review",
     "ParentId": "documents/presentations"
@@ -305,6 +1165,35 @@
     "Size": "",
     "Modified": "2025-11-30",
     "Permissions": "rwxr-xr-x",
+    "Details": {
+      "text": "Folder - directory\nfolder - rwxr-xr-x",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 9,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 19,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 10.5,
+          "italic": true
+        },
+        {
+          "start": 28,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Browse",
     "Id": "photos",
     "ParentId": null
@@ -315,6 +1204,35 @@
     "Size": "",
     "Modified": "2025-08-20",
     "Permissions": "rwxr-xr-x",
+    "Details": {
+      "text": "Folder - directory\nfolder - rwxr-xr-x",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 9,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 19,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 10.5,
+          "italic": true
+        },
+        {
+          "start": 28,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Browse",
     "Id": "photos/vacation",
     "ParentId": "photos"
@@ -325,6 +1243,34 @@
     "Size": "3.1 MB",
     "Modified": "2025-08-01",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "JPG - 3.1 MB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#7C3AED",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 13,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 20,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "photos/vacation/img-001",
     "ParentId": "photos/vacation"
@@ -335,6 +1281,34 @@
     "Size": "2.7 MB",
     "Modified": "2025-08-01",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "JPG - 2.7 MB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#7C3AED",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 13,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 20,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "photos/vacation/img-002",
     "ParentId": "photos/vacation"
@@ -345,6 +1319,34 @@
     "Size": "4.0 MB",
     "Modified": "2025-08-02",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "JPG - 4.0 MB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#7C3AED",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 13,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 20,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "photos/vacation/img-003",
     "ParentId": "photos/vacation"
@@ -355,6 +1357,34 @@
     "Size": "3.5 MB",
     "Modified": "2025-08-03",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "JPG - 3.5 MB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#7C3AED",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 13,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 20,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "photos/vacation/img-004",
     "ParentId": "photos/vacation"
@@ -365,6 +1395,34 @@
     "Size": "2.9 MB",
     "Modified": "2025-08-04",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "JPG - 2.9 MB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#7C3AED",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 13,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 20,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "photos/vacation/img-005",
     "ParentId": "photos/vacation"
@@ -375,6 +1433,34 @@
     "Size": "5.0 MB",
     "Modified": "2025-08-05",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "JPG - 5.0 MB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#7C3AED",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 13,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 20,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "photos/vacation/img-006",
     "ParentId": "photos/vacation"
@@ -385,6 +1471,34 @@
     "Size": "3.7 MB",
     "Modified": "2025-08-06",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "JPG - 3.7 MB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#7C3AED",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 13,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 20,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "photos/vacation/img-007",
     "ParentId": "photos/vacation"
@@ -395,6 +1509,34 @@
     "Size": "4.1 MB",
     "Modified": "2025-08-07",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "JPG - 4.1 MB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#7C3AED",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 13,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 20,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "photos/vacation/img-008",
     "ParentId": "photos/vacation"
@@ -405,6 +1547,35 @@
     "Size": "",
     "Modified": "2025-08-10",
     "Permissions": "rwxr-xr-x",
+    "Details": {
+      "text": "Folder - directory\nfolder - rwxr-xr-x",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 9,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 19,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 10.5,
+          "italic": true
+        },
+        {
+          "start": 28,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Browse",
     "Id": "photos/vacation/panoramas",
     "ParentId": "photos/vacation"
@@ -415,6 +1586,34 @@
     "Size": "12.2 MB",
     "Modified": "2025-08-02",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "JPG - 12.2 MB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#7C3AED",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 14,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 21,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "photos/vacation/panoramas/pano-001",
     "ParentId": "photos/vacation/panoramas"
@@ -425,6 +1624,34 @@
     "Size": "14.8 MB",
     "Modified": "2025-08-04",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "JPG - 14.8 MB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#7C3AED",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 14,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 21,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "photos/vacation/panoramas/pano-002",
     "ParentId": "photos/vacation/panoramas"
@@ -435,6 +1662,34 @@
     "Size": "11.5 MB",
     "Modified": "2025-08-06",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "JPG - 11.5 MB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#7C3AED",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 14,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 21,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "photos/vacation/panoramas/pano-003",
     "ParentId": "photos/vacation/panoramas"
@@ -445,6 +1700,35 @@
     "Size": "",
     "Modified": "2025-11-10",
     "Permissions": "rwxr-xr-x",
+    "Details": {
+      "text": "Folder - directory\nfolder - rwxr-xr-x",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 9,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 19,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 10.5,
+          "italic": true
+        },
+        {
+          "start": 28,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Browse",
     "Id": "photos/events",
     "ParentId": "photos"
@@ -455,6 +1739,34 @@
     "Size": "2.3 MB",
     "Modified": "2025-05-15",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "JPG - 2.3 MB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#7C3AED",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 13,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 20,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "photos/events/conference-01",
     "ParentId": "photos/events"
@@ -465,6 +1777,34 @@
     "Size": "3.0 MB",
     "Modified": "2025-05-15",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "JPG - 3.0 MB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#7C3AED",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 13,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 20,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "photos/events/conference-02",
     "ParentId": "photos/events"
@@ -475,6 +1815,34 @@
     "Size": "2.6 MB",
     "Modified": "2025-05-16",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "JPG - 2.6 MB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#7C3AED",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 13,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 20,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "photos/events/conference-03",
     "ParentId": "photos/events"
@@ -485,6 +1853,34 @@
     "Size": "4.4 MB",
     "Modified": "2025-09-20",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "JPG - 4.4 MB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#7C3AED",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 13,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 20,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "photos/events/teamdinner",
     "ParentId": "photos/events"
@@ -495,6 +1891,34 @@
     "Size": "3.7 MB",
     "Modified": "2025-11-05",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "JPG - 3.7 MB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#7C3AED",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 13,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 20,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "photos/events/award-ceremony",
     "ParentId": "photos/events"
@@ -505,6 +1929,35 @@
     "Size": "",
     "Modified": "2025-12-15",
     "Permissions": "rwxr-xr-x",
+    "Details": {
+      "text": "Folder - directory\nfolder - rwxr-xr-x",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 9,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 19,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 10.5,
+          "italic": true
+        },
+        {
+          "start": 28,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Browse",
     "Id": "photos/screenshots",
     "ParentId": "photos"
@@ -515,6 +1968,34 @@
     "Size": "890 KB",
     "Modified": "2025-10-01",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "PNG - 890 KB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#7C3AED",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 13,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 20,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "photos/screenshots/screen-001",
     "ParentId": "photos/screenshots"
@@ -525,6 +2006,34 @@
     "Size": "1.2 MB",
     "Modified": "2025-10-15",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "PNG - 1.2 MB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#7C3AED",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 13,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 20,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "photos/screenshots/screen-002",
     "ParentId": "photos/screenshots"
@@ -535,6 +2044,34 @@
     "Size": "780 KB",
     "Modified": "2025-11-01",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "PNG - 780 KB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#7C3AED",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 13,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 20,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "photos/screenshots/screen-003",
     "ParentId": "photos/screenshots"
@@ -545,6 +2082,34 @@
     "Size": "950 KB",
     "Modified": "2025-11-20",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "PNG - 950 KB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#7C3AED",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 13,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 20,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "photos/screenshots/screen-004",
     "ParentId": "photos/screenshots"
@@ -555,6 +2120,34 @@
     "Size": "1.1 MB",
     "Modified": "2025-12-10",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "PNG - 1.1 MB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#7C3AED",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 13,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 20,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "photos/screenshots/screen-005",
     "ParentId": "photos/screenshots"
@@ -565,6 +2158,35 @@
     "Size": "",
     "Modified": "2025-12-18",
     "Permissions": "rwxr-xr-x",
+    "Details": {
+      "text": "Folder - directory\nfolder - rwxr-xr-x",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 9,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 19,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 10.5,
+          "italic": true
+        },
+        {
+          "start": 28,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Browse",
     "Id": "projects",
     "ParentId": null
@@ -575,6 +2197,35 @@
     "Size": "",
     "Modified": "2025-12-18",
     "Permissions": "rwxr-xr-x",
+    "Details": {
+      "text": "Folder - directory\nfolder - rwxr-xr-x",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 9,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 19,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 10.5,
+          "italic": true
+        },
+        {
+          "start": 28,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Browse",
     "Id": "projects/volvoxgrid",
     "ParentId": "projects"
@@ -585,6 +2236,35 @@
     "Size": "",
     "Modified": "2025-12-18",
     "Permissions": "rwxr-xr-x",
+    "Details": {
+      "text": "Folder - directory\nfolder - rwxr-xr-x",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 9,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 19,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 10.5,
+          "italic": true
+        },
+        {
+          "start": 28,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Browse",
     "Id": "projects/volvoxgrid/src",
     "ParentId": "projects/volvoxgrid"
@@ -595,6 +2275,34 @@
     "Size": "12 KB",
     "Modified": "2025-12-18",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "RS - 12 KB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#334155",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 5,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 11,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 18,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "projects/volvoxgrid/src/main",
     "ParentId": "projects/volvoxgrid/src"
@@ -605,6 +2313,34 @@
     "Size": "45 KB",
     "Modified": "2025-12-17",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "RS - 45 KB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#334155",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 5,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 11,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 18,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "projects/volvoxgrid/src/lib",
     "ParentId": "projects/volvoxgrid/src"
@@ -615,6 +2351,34 @@
     "Size": "128 KB",
     "Modified": "2025-12-16",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "RS - 128 KB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#334155",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 5,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 12,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 19,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "projects/volvoxgrid/src/grid",
     "ParentId": "projects/volvoxgrid/src"
@@ -625,6 +2389,34 @@
     "Size": "89 KB",
     "Modified": "2025-12-15",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "RS - 89 KB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#334155",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 5,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 11,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 18,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "projects/volvoxgrid/src/render",
     "ParentId": "projects/volvoxgrid/src"
@@ -635,6 +2427,34 @@
     "Size": "34 KB",
     "Modified": "2025-12-14",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "RS - 34 KB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#334155",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 5,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 11,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 18,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "projects/volvoxgrid/src/cell",
     "ParentId": "projects/volvoxgrid/src"
@@ -645,6 +2465,34 @@
     "Size": "22 KB",
     "Modified": "2025-12-13",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "RS - 22 KB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#334155",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 5,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 11,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 18,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "projects/volvoxgrid/src/style",
     "ParentId": "projects/volvoxgrid/src"
@@ -655,6 +2503,35 @@
     "Size": "",
     "Modified": "2025-12-10",
     "Permissions": "rwxr-xr-x",
+    "Details": {
+      "text": "Folder - directory\nfolder - rwxr-xr-x",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 9,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 19,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 10.5,
+          "italic": true
+        },
+        {
+          "start": 28,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Browse",
     "Id": "projects/volvoxgrid/tests",
     "ParentId": "projects/volvoxgrid"
@@ -665,6 +2542,34 @@
     "Size": "56 KB",
     "Modified": "2025-12-10",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "RS - 56 KB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#334155",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 5,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 11,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 18,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "projects/volvoxgrid/tests/test-grid",
     "ParentId": "projects/volvoxgrid/tests"
@@ -675,6 +2580,34 @@
     "Size": "78 KB",
     "Modified": "2025-12-09",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "RS - 78 KB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#334155",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 5,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 11,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 18,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "projects/volvoxgrid/tests/test-render",
     "ParentId": "projects/volvoxgrid/tests"
@@ -685,6 +2618,34 @@
     "Size": "34 KB",
     "Modified": "2025-12-08",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "RS - 34 KB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#334155",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 5,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 11,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 18,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "projects/volvoxgrid/tests/test-edit",
     "ParentId": "projects/volvoxgrid/tests"
@@ -695,6 +2656,34 @@
     "Size": "2 KB",
     "Modified": "2025-12-15",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "TOML - 2 KB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#334155",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 7,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 12,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 19,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "projects/volvoxgrid/cargo",
     "ParentId": "projects/volvoxgrid"
@@ -705,6 +2694,34 @@
     "Size": "8 KB",
     "Modified": "2025-12-01",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "MD - 8 KB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#334155",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 5,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 10,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 17,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "projects/volvoxgrid/readme",
     "ParentId": "projects/volvoxgrid"
@@ -715,6 +2732,35 @@
     "Size": "",
     "Modified": "2025-11-25",
     "Permissions": "rwxr-xr-x",
+    "Details": {
+      "text": "Folder - directory\nfolder - rwxr-xr-x",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 9,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 19,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 10.5,
+          "italic": true
+        },
+        {
+          "start": 28,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Browse",
     "Id": "projects/webapp",
     "ParentId": "projects"
@@ -725,6 +2771,35 @@
     "Size": "",
     "Modified": "2025-11-25",
     "Permissions": "rwxr-xr-x",
+    "Details": {
+      "text": "Folder - directory\nfolder - rwxr-xr-x",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 9,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 19,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 10.5,
+          "italic": true
+        },
+        {
+          "start": 28,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Browse",
     "Id": "projects/webapp/src",
     "ParentId": "projects/webapp"
@@ -735,6 +2810,34 @@
     "Size": "15 KB",
     "Modified": "2025-11-25",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "TS - 15 KB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#334155",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 5,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 11,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 18,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "projects/webapp/src/index",
     "ParentId": "projects/webapp/src"
@@ -745,6 +2848,34 @@
     "Size": "42 KB",
     "Modified": "2025-11-24",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "TS - 42 KB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#334155",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 5,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 11,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 18,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "projects/webapp/src/app",
     "ParentId": "projects/webapp/src"
@@ -755,6 +2886,34 @@
     "Size": "18 KB",
     "Modified": "2025-11-23",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "CSS - 18 KB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#334155",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 12,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 19,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "projects/webapp/src/style",
     "ParentId": "projects/webapp/src"
@@ -765,6 +2924,35 @@
     "Size": "",
     "Modified": "2025-11-20",
     "Permissions": "rwxr-xr-x",
+    "Details": {
+      "text": "Folder - directory\nfolder - rwxr-xr-x",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 9,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 19,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 10.5,
+          "italic": true
+        },
+        {
+          "start": 28,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Browse",
     "Id": "projects/webapp/public",
     "ParentId": "projects/webapp"
@@ -775,6 +2963,34 @@
     "Size": "3 KB",
     "Modified": "2025-11-20",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "HTML - 3 KB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#334155",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 7,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 12,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 19,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "projects/webapp/public/index",
     "ParentId": "projects/webapp/public"
@@ -785,6 +3001,34 @@
     "Size": "4 KB",
     "Modified": "2025-11-01",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "ICO - 4 KB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#334155",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 11,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 18,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "projects/webapp/public/favicon",
     "ParentId": "projects/webapp/public"
@@ -795,6 +3039,34 @@
     "Size": "2 KB",
     "Modified": "2025-11-15",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "JSON - 2 KB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#334155",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 7,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 12,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 19,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "projects/webapp/package",
     "ParentId": "projects/webapp"
@@ -805,6 +3077,34 @@
     "Size": "1 KB",
     "Modified": "2025-11-10",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "JSON - 1 KB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#334155",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 7,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 12,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 19,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "projects/webapp/tsconfig",
     "ParentId": "projects/webapp"
@@ -815,6 +3115,35 @@
     "Size": "",
     "Modified": "2025-10-30",
     "Permissions": "rwxr-xr-x",
+    "Details": {
+      "text": "Folder - directory\nfolder - rwxr-xr-x",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 9,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 19,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 10.5,
+          "italic": true
+        },
+        {
+          "start": 28,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Browse",
     "Id": "projects/mobileapp",
     "ParentId": "projects"
@@ -825,6 +3154,35 @@
     "Size": "",
     "Modified": "2025-10-30",
     "Permissions": "rwxr-xr-x",
+    "Details": {
+      "text": "Folder - directory\nfolder - rwxr-xr-x",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 9,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 19,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 10.5,
+          "italic": true
+        },
+        {
+          "start": 28,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Browse",
     "Id": "projects/mobileapp/android",
     "ParentId": "projects/mobileapp"
@@ -835,6 +3193,34 @@
     "Size": "28 KB",
     "Modified": "2025-10-30",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "KT - 28 KB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#334155",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 5,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 11,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 18,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "projects/mobileapp/android/mainactivity",
     "ParentId": "projects/mobileapp/android"
@@ -845,6 +3231,34 @@
     "Size": "5 KB",
     "Modified": "2025-10-25",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "KTS - 5 KB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#334155",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 11,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 18,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "projects/mobileapp/android/build-gradle",
     "ParentId": "projects/mobileapp/android"
@@ -855,6 +3269,35 @@
     "Size": "",
     "Modified": "2025-10-28",
     "Permissions": "rwxr-xr-x",
+    "Details": {
+      "text": "Folder - directory\nfolder - rwxr-xr-x",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 9,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 19,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 10.5,
+          "italic": true
+        },
+        {
+          "start": 28,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Browse",
     "Id": "projects/mobileapp/ios",
     "ParentId": "projects/mobileapp"
@@ -865,6 +3308,34 @@
     "Size": "15 KB",
     "Modified": "2025-10-28",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "SWIFT - 15 KB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#334155",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 8,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 14,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 21,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "projects/mobileapp/ios/appdelegate",
     "ParentId": "projects/mobileapp/ios"
@@ -875,6 +3346,34 @@
     "Size": "22 KB",
     "Modified": "2025-10-27",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "SWIFT - 22 KB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#334155",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 8,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 14,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 21,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "projects/mobileapp/ios/contentview",
     "ParentId": "projects/mobileapp/ios"
@@ -885,6 +3384,35 @@
     "Size": "",
     "Modified": "2025-09-15",
     "Permissions": "rwxr-xr-x",
+    "Details": {
+      "text": "Folder - directory\nfolder - rwxr-xr-x",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 9,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 19,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 10.5,
+          "italic": true
+        },
+        {
+          "start": 28,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Browse",
     "Id": "music",
     "ParentId": null
@@ -895,6 +3423,35 @@
     "Size": "",
     "Modified": "2025-06-01",
     "Permissions": "rwxr-xr-x",
+    "Details": {
+      "text": "Folder - directory\nfolder - rwxr-xr-x",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 9,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 19,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 10.5,
+          "italic": true
+        },
+        {
+          "start": 28,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Browse",
     "Id": "music/classical",
     "ParentId": "music"
@@ -905,6 +3462,34 @@
     "Size": "43.9 MB",
     "Modified": "2025-01-10",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "FLAC - 43.9 MB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#334155",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 7,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 15,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 22,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "music/classical/bach-bwv1007",
     "ParentId": "music/classical"
@@ -915,6 +3500,34 @@
     "Size": "37.1 MB",
     "Modified": "2025-02-15",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "FLAC - 37.1 MB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#334155",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 7,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 15,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 22,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "music/classical/mozart-k545",
     "ParentId": "music/classical"
@@ -925,6 +3538,34 @@
     "Size": "50.8 MB",
     "Modified": "2025-03-20",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "FLAC - 50.8 MB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#334155",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 7,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 15,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 22,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "music/classical/beethoven-op27",
     "ParentId": "music/classical"
@@ -935,6 +3576,35 @@
     "Size": "",
     "Modified": "2025-09-15",
     "Permissions": "rwxr-xr-x",
+    "Details": {
+      "text": "Folder - directory\nfolder - rwxr-xr-x",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 9,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 19,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 10.5,
+          "italic": true
+        },
+        {
+          "start": 28,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Browse",
     "Id": "music/jazz",
     "ParentId": "music"
@@ -945,6 +3615,34 @@
     "Size": "59.6 MB",
     "Modified": "2025-05-01",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "FLAC - 59.6 MB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#334155",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 7,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 15,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 22,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "music/jazz/blue-train",
     "ParentId": "music/jazz"
@@ -955,6 +3653,34 @@
     "Size": "56.6 MB",
     "Modified": "2025-06-10",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "FLAC - 56.6 MB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#334155",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 7,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 15,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 22,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "music/jazz/kind-of-blue",
     "ParentId": "music/jazz"
@@ -965,6 +3691,34 @@
     "Size": "47.9 MB",
     "Modified": "2025-07-05",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "FLAC - 47.9 MB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#334155",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 7,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 15,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 22,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "music/jazz/mingus-ah-um",
     "ParentId": "music/jazz"
@@ -975,6 +3729,35 @@
     "Size": "",
     "Modified": "2025-09-01",
     "Permissions": "rwxr-xr-x",
+    "Details": {
+      "text": "Folder - directory\nfolder - rwxr-xr-x",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 9,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 19,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 10.5,
+          "italic": true
+        },
+        {
+          "start": 28,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Browse",
     "Id": "music/playlists",
     "ParentId": "music"
@@ -985,6 +3768,34 @@
     "Size": "2 KB",
     "Modified": "2025-08-01",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "M3U - 2 KB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#334155",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 11,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 18,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "music/playlists/workfocus",
     "ParentId": "music/playlists"
@@ -995,6 +3806,34 @@
     "Size": "3 KB",
     "Modified": "2025-08-15",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "M3U - 3 KB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#334155",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 11,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 18,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "music/playlists/relaxation",
     "ParentId": "music/playlists"
@@ -1005,6 +3844,34 @@
     "Size": "2 KB",
     "Modified": "2025-09-01",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "M3U - 2 KB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#334155",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 11,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 18,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "music/playlists/running",
     "ParentId": "music/playlists"
@@ -1015,6 +3882,35 @@
     "Size": "",
     "Modified": "2025-12-20",
     "Permissions": "rwxr-xr-x",
+    "Details": {
+      "text": "Folder - directory\nfolder - rwxr-xr-x",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 9,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 19,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 10.5,
+          "italic": true
+        },
+        {
+          "start": 28,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Browse",
     "Id": "downloads",
     "ParentId": null
@@ -1025,6 +3921,34 @@
     "Size": "83.0 MB",
     "Modified": "2025-12-01",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "EXE - 83.0 MB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#334155",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 14,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 21,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "downloads/setup-v3-2",
     "ParentId": "downloads"
@@ -1035,6 +3959,34 @@
     "Size": "12.1 MB",
     "Modified": "2025-11-15",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "PDF - 12.1 MB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#DC2626",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 14,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 21,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "downloads/manual",
     "ParentId": "downloads"
@@ -1045,6 +3997,34 @@
     "Size": "33.2 MB",
     "Modified": "2025-12-10",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "CSV - 33.2 MB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#334155",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 14,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 21,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "downloads/data-export",
     "ParentId": "downloads"
@@ -1055,6 +4035,34 @@
     "Size": "8.7 MB",
     "Modified": "2025-10-20",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "JPG - 8.7 MB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#7C3AED",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 13,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 20,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "downloads/wallpaper",
     "ParentId": "downloads"
@@ -1065,6 +4073,34 @@
     "Size": "250.0 MB",
     "Modified": "2025-01-05",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "GZ - 250.0 MB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#334155",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 5,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 14,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 21,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "downloads/archive-2024-tar",
     "ParentId": "downloads"
@@ -1075,6 +4111,34 @@
     "Size": "12 KB",
     "Modified": "2025-12-20",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "TXT - 12 KB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#475569",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 12,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 19,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "downloads/notes",
     "ParentId": "downloads"
@@ -1085,6 +4149,34 @@
     "Size": "15.2 MB",
     "Modified": "2025-12-18",
     "Permissions": "rw-r--r--",
+    "Details": {
+      "text": "PPTX - 15.2 MB\nfile - rw-r--r--",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#7C3AED",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 7,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 15,
+          "foreground": "#64748B",
+          "bold": true,
+          "size": 10.5
+        },
+        {
+          "start": 22,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "downloads/presentation-draft",
     "ParentId": "downloads"
@@ -1095,6 +4187,35 @@
     "Size": "125.0 MB",
     "Modified": "2025-12-15",
     "Permissions": "rw-------",
+    "Details": {
+      "text": "SQL - 125.0 MB\nowner-only - rw-------",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#334155",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 15,
+          "foreground": "#B45309",
+          "bold": true,
+          "size": 10.5,
+          "underline": true
+        },
+        {
+          "start": 28,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "downloads/database-backup",
     "ParentId": "downloads"
@@ -1105,6 +4226,35 @@
     "Size": "",
     "Modified": "2025-12-19",
     "Permissions": "rwxr-xr-x",
+    "Details": {
+      "text": "Folder - directory\nfolder - rwxr-xr-x",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 9,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 19,
+          "foreground": "#92400E",
+          "bold": true,
+          "size": 10.5,
+          "italic": true
+        },
+        {
+          "start": 28,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Browse",
     "Id": "recycle-bin",
     "ParentId": null
@@ -1115,6 +4265,35 @@
     "Size": "340 KB",
     "Modified": "2025-06-01",
     "Permissions": "rw-------",
+    "Details": {
+      "text": "DOCX - 340 KB\nowner-only - rw-------",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#2563EB",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 7,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 14,
+          "foreground": "#B45309",
+          "bold": true,
+          "size": 10.5,
+          "underline": true
+        },
+        {
+          "start": 27,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "recycle-bin/old-report",
     "ParentId": "recycle-bin"
@@ -1125,6 +4304,35 @@
     "Size": "890 KB",
     "Modified": "2025-08-10",
     "Permissions": "rw-------",
+    "Details": {
+      "text": "XLSX - 890 KB\nowner-only - rw-------",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#15803D",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 7,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 14,
+          "foreground": "#B45309",
+          "bold": true,
+          "size": 10.5,
+          "underline": true
+        },
+        {
+          "start": 27,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "recycle-bin/temp-data",
     "ParentId": "recycle-bin"
@@ -1135,6 +4343,35 @@
     "Size": "15 KB",
     "Modified": "2025-09-22",
     "Permissions": "rw-------",
+    "Details": {
+      "text": "TXT - 15 KB\nowner-only - rw-------",
+      "richText": [
+        {
+          "start": 0,
+          "foreground": "#475569",
+          "bold": true,
+          "size": 12
+        },
+        {
+          "start": 6,
+          "foreground": "#64748B",
+          "size": 9.5
+        },
+        {
+          "start": 12,
+          "foreground": "#B45309",
+          "bold": true,
+          "size": 10.5,
+          "underline": true
+        },
+        {
+          "start": 25,
+          "foreground": "#475569",
+          "family": "monospace",
+          "size": 9
+        }
+      ]
+    },
     "Action": "Open",
     "Id": "recycle-bin/draft-v1",
     "ParentId": "recycle-bin"

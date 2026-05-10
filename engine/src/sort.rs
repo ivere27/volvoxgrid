@@ -508,7 +508,9 @@ fn sort_auto_single_key_texts(
             sort_indices!(indices, |&ia, &ib| {
                 let cmp = match (parsed[ia], parsed[ib]) {
                     (Some(a), Some(b)) => a.cmp(&b),
-                    _ => lower[ia].cmp(&lower[ib]),
+                    (Some(_), None) => std::cmp::Ordering::Less,
+                    (None, Some(_)) => std::cmp::Ordering::Greater,
+                    (None, None) => lower[ia].cmp(&lower[ib]),
                 };
                 apply_sort_direction(cmp, order)
             });
@@ -532,7 +534,9 @@ fn sort_auto_single_key_texts(
             sort_indices!(indices, |&ia, &ib| {
                 let cmp = match (parsed[ia], parsed[ib]) {
                     (Some(a), Some(b)) => compare_f64(a, b),
-                    _ => lower[ia].cmp(&lower[ib]),
+                    (Some(_), None) => std::cmp::Ordering::Less,
+                    (None, Some(_)) => std::cmp::Ordering::Greater,
+                    (None, None) => lower[ia].cmp(&lower[ib]),
                 };
                 apply_sort_direction(cmp, order)
             });
@@ -723,7 +727,9 @@ fn generic_compare(a: &str, b: &str) -> std::cmp::Ordering {
     // Try numeric first, fall back to string
     match (parse_number(a), parse_number(b)) {
         (Some(na), Some(nb)) => na.partial_cmp(&nb).unwrap_or(std::cmp::Ordering::Equal),
-        _ => a.to_lowercase().cmp(&b.to_lowercase()),
+        (Some(_), None) => std::cmp::Ordering::Less,
+        (None, Some(_)) => std::cmp::Ordering::Greater,
+        (None, None) => a.to_lowercase().cmp(&b.to_lowercase()),
     }
 }
 
@@ -751,6 +757,10 @@ fn parse_number(s: &str) -> Option<f64> {
     } else {
         inner.parse::<f64>().ok()?
     };
+
+    if !parsed.is_finite() {
+        return None;
+    }
 
     Some(if negative { -parsed } else { parsed })
 }
@@ -803,7 +813,9 @@ fn parse_date_key(s: &str) -> Option<i64> {
 fn date_compare(a: &str, b: &str) -> std::cmp::Ordering {
     match (parse_date_key(a), parse_date_key(b)) {
         (Some(na), Some(nb)) => na.cmp(&nb),
-        _ => string_nocase_compare(a, b),
+        (Some(_), None) => std::cmp::Ordering::Less,
+        (None, Some(_)) => std::cmp::Ordering::Greater,
+        (None, None) => string_nocase_compare(a, b),
     }
 }
 
@@ -1055,6 +1067,48 @@ mod tests {
         expected.sort_by(|a, b| generic_compare(a, b));
 
         assert_eq!(got, expected);
+    }
+
+    #[test]
+    fn generic_auto_compare_is_transitive_for_numeric_text_mix() {
+        assert_eq!(generic_compare("2", "10"), std::cmp::Ordering::Less);
+        assert_eq!(generic_compare("10", "15a"), std::cmp::Ordering::Less);
+        assert_eq!(generic_compare("15a", "2"), std::cmp::Ordering::Greater);
+
+        assert_eq!(
+            date_compare("2025-01-02", "not-a-date"),
+            std::cmp::Ordering::Less
+        );
+        assert_eq!(
+            date_compare("not-a-date", "2025-01-02"),
+            std::cmp::Ordering::Greater
+        );
+    }
+
+    #[test]
+    fn header_sort_can_toggle_barcode_like_mixed_payloads() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 5, 1, 0, 0);
+        grid.header_features = 1; // HEADER_SORT
+        let values = ["2", "10", "15a", "1B", "3"];
+        for (row, value) in values.iter().enumerate() {
+            grid.cells.set_text(row as i32, 0, (*value).to_string());
+        }
+
+        handle_header_click(&mut grid, 0);
+        let asc: Vec<String> = (0..5)
+            .map(|row| grid.cells.get_text(row, 0).to_string())
+            .collect();
+        assert_eq!(asc, vec!["2", "3", "10", "15a", "1B"]);
+
+        handle_header_click(&mut grid, 0);
+        let desc: Vec<String> = (0..5)
+            .map(|row| grid.cells.get_text(row, 0).to_string())
+            .collect();
+        assert_eq!(desc, vec!["1B", "15a", "10", "3", "2"]);
+
+        handle_header_click(&mut grid, 0);
+        assert_eq!(grid.sort_state.last_sort_col(), -1);
+        assert!(grid.sort_state.sort_keys.is_empty());
     }
 
     #[test]

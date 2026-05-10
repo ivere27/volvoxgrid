@@ -486,6 +486,7 @@ impl TreeState {
             picture: None,
             picture_align: None,
             dropdown: None,
+            rich_text: None,
         };
         self.update_node_cells(&[update])?;
         self.node_info_by_id(node_id, 0, false)
@@ -1991,6 +1992,7 @@ fn project_tree_state_with_write_result(
                 sticky_col: None,
                 interaction: None,
                 barcode: None,
+                rich_text: cell.rich_text.clone(),
             });
         }
     }
@@ -2103,6 +2105,7 @@ mod tests {
             picture: None,
             picture_align: None,
             dropdown: None,
+            rich_text: None,
         }
     }
 
@@ -2175,6 +2178,60 @@ mod tests {
 
         assert_eq!(response.visible_count, 1);
         assert!(grid.get_row_height(0) > before);
+    }
+
+    #[test]
+    fn load_tree_projects_rich_text_and_autosizes_it() {
+        let mut grid = VolvoxGrid::new(0, 320, 240, 1, 1, 0, 0);
+        grid.default_col_width = 12;
+        grid.default_row_height = 10;
+        grid.auto_resize = true;
+        grid.auto_size_mode = 0;
+
+        let mut cell = text_cell("root", 0, "meta\nLarge");
+        cell.rich_text = Some(pb::RichText {
+            runs: vec![
+                pb::TextFormatRun {
+                    start_index: 0,
+                    style: Some(pb::TextRunStyle {
+                        font: Some(pb::Font {
+                            size: Some(8.0),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    }),
+                },
+                pb::TextFormatRun {
+                    start_index: 5,
+                    style: Some(pb::TextRunStyle {
+                        font: Some(pb::Font {
+                            size: Some(28.0),
+                            bold: Some(true),
+                            ..Default::default()
+                        }),
+                        foreground: Some(0xFF2563EB),
+                        ..Default::default()
+                    }),
+                },
+            ],
+        });
+
+        let response = load_tree(
+            &mut grid,
+            pb::LoadTreeRequest {
+                grid_id: 0,
+                nodes: vec![node("root", "", vec![cell])],
+                replace: true,
+                collapse_initial: false,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(response.visible_count, 1);
+        let projected = grid.cells.get(0, 0).expect("projected cell should exist");
+        assert!(projected.rich_text().is_some());
+        assert!(grid.get_col_width(0) > grid.default_col_width);
+        assert!(grid.get_row_height(0) > grid.default_row_height);
     }
 
     #[test]

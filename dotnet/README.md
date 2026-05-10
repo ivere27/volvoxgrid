@@ -25,6 +25,11 @@ From a .NET developer's point of view, you work with:
 
 It is intended for apps that want VolvoxGrid selection, editing, sorting, merged cells, clipboard support, import/export, and large-data scenarios. The WinForms UI remains Windows-only; the controller API runs on native `.NET 8` platforms.
 
+Two NuGet package IDs are produced:
+
+- `VolvoxGrid.DotNet`: full native runtime with built-in Rust text rendering and GPU support where the shipped native library has it
+- `VolvoxGrid.DotNet.Lite`: lite native runtime with GDI/GDI+ host text fallback and no native GPU renderer
+
 ## Supported Targets
 
 | Target framework | Status | Notes |
@@ -42,7 +47,10 @@ Runtime notes:
   - Linux: `libvolvoxgrid.so`
   - macOS: `libvolvoxgrid.dylib`
 - the library architecture must match your process architecture
-- Linux/Wine WinForms runs use the built-in `cosmic-text` engine by default. Set `VOLVOXGRID_DOTNET_USE_HOST_TEXT_RENDERER=1` to opt into the host GDI text bridge.
+- Full builds use the built-in `cosmic-text` engine by default.
+- Lite builds register the GDI/GDI+ text bridge automatically when the native library has no built-in text engine.
+- Linux/Wine WinForms runs with the full package can opt into the GDI bridge by setting `VOLVOXGRID_DOTNET_USE_HOST_TEXT_RENDERER=1`.
+- Wine `fixme:gdiplus:*` logs come from Wine's GDI+ implementation, not from the VolvoxGrid engine.
 
 ## Main Types
 
@@ -68,19 +76,23 @@ Useful enums include:
 
 ### Option A: NuGet package (recommended)
 
-`VolvoxGrid.DotNet` is published on
-[nuget.org](https://www.nuget.org/packages/VolvoxGrid.DotNet/) with native
-binaries embedded for the supported runtimes (RIDs):
+`VolvoxGrid.DotNet` and `VolvoxGrid.DotNet.Lite` are published on nuget.org
+with native binaries embedded for the supported runtimes (RIDs):
+
+- <https://www.nuget.org/packages/VolvoxGrid.DotNet/>
+- <https://www.nuget.org/packages/VolvoxGrid.DotNet.Lite/>
 
 ```bash
-dotnet add package VolvoxGrid.DotNet --version 0.8.7
+dotnet add package VolvoxGrid.DotNet --version 0.8.8
+dotnet add package VolvoxGrid.DotNet.Lite --version 0.8.8
 ```
 
 Or in your `csproj`:
 
 ```xml
 <ItemGroup>
-  <PackageReference Include="VolvoxGrid.DotNet" Version="0.8.7" />
+  <PackageReference Include="VolvoxGrid.DotNet" Version="0.8.8" />
+  <!-- or: <PackageReference Include="VolvoxGrid.DotNet.Lite" Version="0.8.8" /> -->
 </ItemGroup>
 ```
 
@@ -108,9 +120,21 @@ Package output:
 
 - `target/dotnet/msbuild/packages/`
 
-Package ID:
+Package IDs:
 
 - `VolvoxGrid.DotNet`
+- `VolvoxGrid.DotNet.Lite` when packed with `-p:VolvoxGridPackageId=VolvoxGrid.DotNet.Lite`
+
+Lite package differences:
+
+- no built-in Rust text engine (`cosmic-text`)
+- no native GPU renderer (`wgpu`)
+- no regex search
+- no rayon parallelism
+- OS font fallback through GDI/GDI+
+- Rust-owned external text mask cache, shown as `C:<used>/<cap>` in the debug overlay
+
+See [../TEXT_RENDERING.md](../TEXT_RENDERING.md) for full/lite text rendering and cache ownership.
 
 If you reference the project directly (Option B) or pack locally without
 embedded natives, you still need to deploy the native library with your
@@ -417,6 +441,21 @@ grid.HeaderFeatures = new VolvoxGridHeaderFeatures { Sort = true, Reorder = true
 grid.DebugOverlay = false;
 ```
 
+Renderer modes:
+
+| Mode | Meaning |
+|---|---|
+| `VolvoxGridRendererMode.Auto` | Engine default selection |
+| `VolvoxGridRendererMode.Cpu` | CPU RGBA buffer rendering |
+| `VolvoxGridRendererMode.Gpu` | GPU auto backend |
+| `VolvoxGridRendererMode.GpuVulkan` | Vulkan backend |
+| `VolvoxGridRendererMode.GpuOpenGl` | OpenGL backend |
+| `VolvoxGridRendererMode.GpuGles` | OpenGL ES backend |
+| `VolvoxGridRendererMode.GpuDx12` | DirectX 12 backend |
+| `VolvoxGridRendererMode.GpuMetal` | Metal backend |
+
+GPU rendering requires a full native library with GPU support and a compatible native surface. The lite package is CPU-only. In the sample UI, Wine-hosted `Gpu` is normalized to `GpuOpenGl` because that is the practical path for the WinForms sample under Wine; real Windows can use DX12 or another native backend supported by `wgpu` and the driver.
+
 Layout-related properties:
 
 - `ShowColumnHeaders`
@@ -662,6 +701,16 @@ Solution file:
 
 - `dotnet/VolvoxGrid.DotNet.sln`
 
+Makefile helpers:
+
+```bash
+make dotnet-run-release
+make dotnet-run-release VOLVOXGRID_VARIANT=lite
+make dotnet-smoke-release VOLVOXGRID_VARIANT=lite
+```
+
+`VOLVOXGRID_VARIANT=lite` builds the native runtime with `--no-default-features --features demo` and runs the same managed sample against the lite native library.
+
 On Windows with the .NET 8 Windows Desktop SDK installed, build the library directly:
 
 ```bash
@@ -684,4 +733,13 @@ Create a local package:
 
 ```bash
 dotnet pack dotnet/src/VolvoxGrid.DotNet.csproj -c Release
+dotnet pack dotnet/src/VolvoxGrid.DotNet.csproj -c Release -p:VolvoxGridPackageId=VolvoxGrid.DotNet.Lite
 ```
+
+Release publishing:
+
+```bash
+make publish_nuget
+```
+
+`publish_nuget` publishes both `VolvoxGrid.DotNet` and `VolvoxGrid.DotNet.Lite`. Full RID coverage is staged from `make docker_all` outputs and desktop JAR backfill where available.

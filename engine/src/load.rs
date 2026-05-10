@@ -105,6 +105,10 @@ enum SourceValue {
     Text(String),
     Number(f64),
     Bool(bool),
+    RichText {
+        text: String,
+        rich_text: pb::RichText,
+    },
 }
 
 #[derive(Clone, Debug, Default)]
@@ -243,14 +247,12 @@ fn load_data_impl(
                 .get(mapping.source_index)
                 .cloned()
                 .unwrap_or(SourceValue::Null);
+            let cell_value = source_value_to_cell_value(&source, mapping.expected_type, &opts);
+            let rich_text = source_rich_text_for_cell_value(&source, &cell_value);
             updates.push(pb::CellUpdate {
                 row: row_offset + row_index as i32,
                 col: mapping.target_col,
-                value: Some(source_value_to_cell_value(
-                    &source,
-                    mapping.expected_type,
-                    &opts,
-                )),
+                value: Some(cell_value),
                 style: None,
                 checked: None,
                 picture: None,
@@ -261,6 +263,7 @@ fn load_data_impl(
                 sticky_col: None,
                 interaction: None,
                 barcode: None,
+                rich_text,
             });
         }
     }
@@ -614,7 +617,166 @@ fn json_to_source(value: &JsonValue) -> SourceValue {
             .map(SourceValue::Number)
             .unwrap_or_else(|| SourceValue::Text(number.to_string())),
         JsonValue::String(text) => SourceValue::Text(text.clone()),
-        JsonValue::Array(_) | JsonValue::Object(_) => SourceValue::Text(value.to_string()),
+        JsonValue::Object(object) => json_object_to_rich_text_source(object)
+            .unwrap_or_else(|| SourceValue::Text(value.to_string())),
+        JsonValue::Array(_) => SourceValue::Text(value.to_string()),
+    }
+}
+
+fn json_object_to_rich_text_source(
+    object: &serde_json::Map<String, JsonValue>,
+) -> Option<SourceValue> {
+    let text = json_get(object, &["text", "value"])?.as_str()?.to_string();
+    let rich_text_value = json_get(object, &["richText", "rich_text"])?;
+    let runs_value = if rich_text_value.is_array() {
+        rich_text_value
+    } else {
+        rich_text_value
+            .as_object()
+            .and_then(|rich| json_get(rich, &["runs"]))?
+    };
+    let runs = runs_value
+        .as_array()?
+        .iter()
+        .map(json_to_text_format_run)
+        .collect::<Option<Vec<_>>>()?;
+    if runs.is_empty() {
+        return Some(SourceValue::Text(text));
+    }
+    Some(SourceValue::RichText {
+        text,
+        rich_text: pb::RichText { runs },
+    })
+}
+
+fn json_to_text_format_run(value: &JsonValue) -> Option<pb::TextFormatRun> {
+    let object = value.as_object()?;
+    let start_index = json_get(object, &["start", "startIndex", "start_index"])?
+        .as_u64()
+        .and_then(|value| u32::try_from(value).ok())?;
+    let style_object = json_get(object, &["style"])
+        .and_then(JsonValue::as_object)
+        .unwrap_or(object);
+    Some(pb::TextFormatRun {
+        start_index,
+        style: Some(json_to_text_run_style(style_object)),
+    })
+}
+
+fn json_to_text_run_style(object: &serde_json::Map<String, JsonValue>) -> pb::TextRunStyle {
+    pb::TextRunStyle {
+        foreground: json_get(object, &["foreground", "color", "fg"]).and_then(json_to_argb),
+        font: json_to_font(object),
+        baseline: json_get(object, &["baseline"]).and_then(json_to_text_baseline),
+        link_url: json_get(object, &["linkUrl", "link_url", "href"])
+            .and_then(JsonValue::as_str)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string),
+    }
+}
+
+fn json_to_font(object: &serde_json::Map<String, JsonValue>) -> Option<pb::Font> {
+    let nested_font = json_get(object, &["font"]).and_then(JsonValue::as_object);
+    let font_object = nested_font.unwrap_or(object);
+    let family = json_get(font_object, &["family"])
+        .or_else(|| json_get(object, &["family"]))
+        .and_then(JsonValue::as_str)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string);
+    let families = json_get(font_object, &["families"])
+        .or_else(|| json_get(object, &["families"]))
+        .and_then(JsonValue::as_array)
+        .map(|values| {
+            values
+                .iter()
+                .filter_map(JsonValue::as_str)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let size = json_get(font_object, &["size"])
+        .or_else(|| json_get(object, &["size"]))
+        .and_then(JsonValue::as_f64)
+        .filter(|value| value.is_finite() && *value > 0.0)
+        .map(|value| value as f32);
+    let bold = json_get(font_object, &["bold"])
+        .or_else(|| json_get(object, &["bold"]))
+        .and_then(JsonValue::as_bool);
+    let italic = json_get(font_object, &["italic"])
+        .or_else(|| json_get(object, &["italic"]))
+        .and_then(JsonValue::as_bool);
+    let underline = json_get(font_object, &["underline"])
+        .or_else(|| json_get(object, &["underline"]))
+        .and_then(JsonValue::as_bool);
+    let strikethrough = json_get(font_object, &["strikethrough", "strike"])
+        .or_else(|| json_get(object, &["strikethrough", "strike"]))
+        .and_then(JsonValue::as_bool);
+    let stretch = json_get(font_object, &["stretch"])
+        .or_else(|| json_get(object, &["stretch"]))
+        .and_then(JsonValue::as_f64)
+        .filter(|value| value.is_finite() && *value > 0.0)
+        .map(|value| value as f32);
+
+    if family.is_none()
+        && families.is_empty()
+        && size.is_none()
+        && bold.is_none()
+        && italic.is_none()
+        && underline.is_none()
+        && strikethrough.is_none()
+        && stretch.is_none()
+    {
+        return None;
+    }
+
+    Some(pb::Font {
+        family,
+        families,
+        size,
+        bold,
+        italic,
+        underline,
+        strikethrough,
+        stretch,
+    })
+}
+
+fn json_get<'a>(
+    object: &'a serde_json::Map<String, JsonValue>,
+    names: &[&str],
+) -> Option<&'a JsonValue> {
+    names.iter().find_map(|name| object.get(*name))
+}
+
+fn json_to_argb(value: &JsonValue) -> Option<u32> {
+    if let Some(number) = value.as_u64() {
+        return u32::try_from(number).ok();
+    }
+    let raw = value.as_str()?.trim();
+    let hex = raw
+        .strip_prefix('#')
+        .or_else(|| raw.strip_prefix("0x"))
+        .or_else(|| raw.strip_prefix("0X"))
+        .unwrap_or(raw);
+    match hex.len() {
+        6 => u32::from_str_radix(hex, 16)
+            .ok()
+            .map(|rgb| 0xFF000000 | rgb),
+        8 => u32::from_str_radix(hex, 16).ok(),
+        _ => raw.parse::<u32>().ok(),
+    }
+}
+
+fn json_to_text_baseline(value: &JsonValue) -> Option<i32> {
+    if let Some(number) = value.as_i64() {
+        return i32::try_from(number).ok();
+    }
+    match value.as_str()?.trim().to_ascii_lowercase().as_str() {
+        "normal" => Some(pb::TextBaseline::Normal as i32),
+        "superscript" | "super" => Some(pb::TextBaseline::Superscript as i32),
+        "subscript" | "sub" => Some(pb::TextBaseline::Subscript as i32),
+        _ => None,
     }
 }
 
@@ -1075,7 +1237,7 @@ fn candidate_type(value: &SourceValue, opts: &EffectiveLoadOptions) -> Option<i3
         SourceValue::Null => None,
         SourceValue::Number(_) => Some(pb::ColumnDataType::ColumnDataNumber as i32),
         SourceValue::Bool(_) => Some(pb::ColumnDataType::ColumnDataBoolean as i32),
-        SourceValue::Text(text) => {
+        SourceValue::Text(text) | SourceValue::RichText { text, .. } => {
             if text.trim().is_empty() {
                 return None;
             }
@@ -1109,13 +1271,13 @@ fn source_value_to_cell_value(
 
     let value = match value {
         SourceValue::Null => None,
-        SourceValue::Text(text)
+        SourceValue::Text(text) | SourceValue::RichText { text, .. }
             if text.trim().is_empty()
                 && expected_type != pb::ColumnDataType::ColumnDataString as i32 =>
         {
             None
         }
-        SourceValue::Text(text) => match expected_type {
+        SourceValue::Text(text) | SourceValue::RichText { text, .. } => match expected_type {
             v if v == pb::ColumnDataType::ColumnDataString as i32 => {
                 Some(Value::Text(text.clone()))
             }
@@ -1165,6 +1327,18 @@ fn source_value_to_cell_value(
     };
 
     pb::CellValue { value }
+}
+
+fn source_rich_text_for_cell_value(
+    source: &SourceValue,
+    cell_value: &pb::CellValue,
+) -> Option<pb::RichText> {
+    match (source, cell_value.value.as_ref()) {
+        (SourceValue::RichText { rich_text, .. }, Some(pb::cell_value::Value::Text(_))) => {
+            Some(rich_text.clone())
+        }
+        _ => None,
+    }
 }
 
 fn build_preview_grid(grid: &VolvoxGrid, rows: i32, cols: i32) -> VolvoxGrid {
@@ -1308,6 +1482,7 @@ fn source_to_text(value: SourceValue) -> String {
     match value {
         SourceValue::Null => String::new(),
         SourceValue::Text(text) => text,
+        SourceValue::RichText { text, .. } => text,
         SourceValue::Number(number) => number.to_string(),
         SourceValue::Bool(flag) => {
             if flag {
@@ -1552,7 +1727,9 @@ mod tests {
             .iter()
             .position(|column| column.key == "amount")
             .expect("amount column should exist") as i32;
-        let cells = grid.get_cells(0, amount_col, 0, amount_col, false, false, true, false);
+        let cells = grid.get_cells(
+            0, amount_col, 0, amount_col, false, false, true, false, false,
+        );
         let value = cells[0].value.as_ref().and_then(|cell| cell.value.as_ref());
         assert!(matches!(value, Some(pb::cell_value::Value::Number(_))));
     }
@@ -1566,6 +1743,73 @@ mod tests {
 
         assert_eq!(result.status, pb::LoadDataStatus::LoadOk as i32);
         assert_eq!(grid.cells.get_text(0, 0), "loaded");
+    }
+
+    #[test]
+    fn load_data_json_records_apply_rich_text_cells() {
+        let mut grid = new_grid();
+        let result = load_data(
+            &mut grid,
+            br##"[{"Details":{"text":"PDF - 1.8 MB - report","richText":[{"start":0,"foreground":"#DC2626","bold":true,"size":12.0},{"start":6,"foreground":"#64748B","size":9.5},{"start":15,"foreground":"#15803D","bold":true,"size":10.5}]}}]"##,
+            Some(&json_options()),
+        );
+
+        assert_eq!(result.status, pb::LoadDataStatus::LoadOk as i32);
+        assert_eq!(grid.cells.get_text(0, 0), "PDF - 1.8 MB - report");
+        let rich_text = grid
+            .cells
+            .get(0, 0)
+            .and_then(|cell| cell.rich_text())
+            .expect("rich text should be stored");
+        assert_eq!(rich_text.runs.len(), 3);
+        assert_eq!(rich_text.runs[0].start_index, 0);
+        assert_eq!(rich_text.runs[1].start_index, 6);
+        assert_eq!(rich_text.runs[2].start_index, 15);
+        let label_style = rich_text.runs[0].style.as_ref().unwrap();
+        assert_eq!(label_style.foreground, Some(0xFFDC2626));
+        assert_eq!(
+            label_style.font.as_ref().and_then(|font| font.size),
+            Some(12.0)
+        );
+        assert_eq!(
+            label_style.font.as_ref().and_then(|font| font.bold),
+            Some(true)
+        );
+    }
+
+    #[test]
+    fn load_data_hierarchy_details_rich_text_multiline_autofits() {
+        let mut grid = new_grid();
+        grid.default_col_width = 8;
+        grid.default_row_height = 8;
+        grid.auto_resize = true;
+        grid.auto_size_mode = 0;
+
+        let result = load_data(
+            &mut grid,
+            include_bytes!("../../testdata/hierarchy.json"),
+            Some(&json_options()),
+        );
+
+        assert_eq!(result.status, pb::LoadDataStatus::LoadOk as i32);
+        assert_eq!(result.rows, 114);
+        let details_col = grid
+            .columns
+            .iter()
+            .position(|column| column.key == "Details")
+            .expect("Details column should be loaded") as i32;
+        assert!(grid.get_col_width(details_col) > grid.default_col_width);
+        assert!(grid.get_row_height(0) > grid.default_row_height);
+
+        let details_cell = grid
+            .cells
+            .get(0, details_col)
+            .expect("Details cell should exist");
+        assert!(details_cell.display_text().contains('\n'));
+        let rich_text = details_cell
+            .rich_text()
+            .expect("Details rich text should be stored");
+        assert!(rich_text.runs.len() >= 4);
     }
 
     #[test]
@@ -1637,7 +1881,7 @@ mod tests {
 
         assert_eq!(result.status, pb::LoadDataStatus::LoadOk as i32);
         assert_eq!(grid.rows, 2);
-        let cells = grid.get_cells(1, 1, 1, 1, false, false, true, false);
+        let cells = grid.get_cells(1, 1, 1, 1, false, false, true, false, false);
         let value = cells[0].value.as_ref().and_then(|cell| cell.value.as_ref());
         assert!(matches!(value, Some(pb::cell_value::Value::Number(_))));
     }
@@ -1669,6 +1913,7 @@ mod tests {
                 sticky_col: None,
                 interaction: None,
                 barcode: None,
+                rich_text: None,
             }],
             false,
         );
@@ -1682,7 +1927,7 @@ mod tests {
 
         assert_eq!(result.status, pb::LoadDataStatus::LoadFailed as i32);
         assert_eq!(result.rejected, 1);
-        let cells = grid.get_cells(0, 0, 0, 0, false, false, true, false);
+        let cells = grid.get_cells(0, 0, 0, 0, false, false, true, false, false);
         let value = cells[0].value.as_ref().and_then(|cell| cell.value.as_ref());
         match value {
             Some(pb::cell_value::Value::Number(number)) => assert_eq!(*number, 42.0),

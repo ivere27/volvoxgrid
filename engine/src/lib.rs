@@ -40,6 +40,7 @@ pub mod merge_registry;
 pub mod outline;
 pub mod print;
 pub mod render;
+pub mod rich_text;
 pub mod row;
 pub mod save;
 pub mod scroll;

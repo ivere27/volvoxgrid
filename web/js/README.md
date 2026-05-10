@@ -8,6 +8,12 @@ The `volvoxgrid` npm package wraps the Rust VolvoxGrid engine compiled to WebAss
 npm install volvoxgrid
 ```
 
+For the lite WASM runtime:
+
+```bash
+npm install volvoxgrid-lite
+```
+
 ## Quick Start
 
 ### Using `VolvoxGrid` directly
@@ -80,6 +86,24 @@ The adapter packages follow the same release shape:
 | `@volvoxgrid/sheet` | `dist/volvox-sheet.min.js` |
 
 Release demos can load these bundles from jsDelivr with import maps, while generated low-level modules remain available under `dist/generated/`.
+
+## Lite WASM Runtime
+
+`volvoxgrid-lite` contains the lite WASM runtime. Use the normal `volvoxgrid` JavaScript API and point `wasmUrl` at the lite package's WASM glue:
+
+```js
+import { VolvoxGrid } from "volvoxgrid";
+
+const grid = new VolvoxGrid(document.getElementById("grid"), {
+  wasmUrl: new URL("volvoxgrid-lite/wasm/volvoxgrid_wasm.js", import.meta.url).href,
+  rowCount: 100,
+  colCount: 5,
+});
+```
+
+Lite WASM excludes the built-in Rust text engine, GPU renderer, regex search, and rayon parallelism. Browser Canvas2D provides text measurement and rasterization on cache misses, while the WASM runtime owns the external text mask cache shown as `C:<used>/<cap>` in the debug overlay.
+
+See [../../TEXT_RENDERING.md](../../TEXT_RENDERING.md) for full/lite text rendering and cache ownership.
 
 ## Data Operations
 
@@ -165,6 +189,13 @@ npm run build:wasm:threaded
 ```
 
 These scripts build the WASM-facing target from the shared `runtime/` crate and write package-local output to `web/js/wasm/`. Repo-level `make wasm` and `make web` write demo output to `web/example/wasm/`.
+
+Repo-level lite build:
+
+```bash
+make wasm-lite
+make web-lite
+```
 
 ## Running the Example
 

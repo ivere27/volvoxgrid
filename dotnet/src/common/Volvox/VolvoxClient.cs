@@ -506,6 +506,21 @@ namespace VolvoxGrid.DotNet.Internal
             get { return _host.SupportsTextRenderer; }
         }
 
+        public bool HasBuiltinTextEngine
+        {
+            get { return _host.HasBuiltinTextEngine; }
+        }
+
+        public bool SupportsGpuRenderer
+        {
+            get { return _host.SupportsGpuRenderer; }
+        }
+
+        public bool SupportsNativeSurfaceDescriptor
+        {
+            get { return _host.SupportsNativeSurfaceDescriptor; }
+        }
+
         public void SetTextRenderer(
             long gridId,
             SynurangReflectionHost.SynMeasureTextCallback measure,
@@ -519,6 +534,16 @@ namespace VolvoxGrid.DotNet.Internal
             _host.SetTextRenderer(gridId, null, null, IntPtr.Zero);
         }
 
+        public IntPtr CreateNativeSurfaceDescriptor(uint kind, int screen, IntPtr display, IntPtr surface, ulong window)
+        {
+            return _host.CreateNativeSurfaceDescriptor(kind, screen, display, surface, window);
+        }
+
+        public void FreeNativeSurfaceDescriptor(IntPtr descriptor)
+        {
+            _host.FreeNativeSurfaceDescriptor(descriptor);
+        }
+
         // ── Render input encoding ──
 
         public byte[] EncodeRenderInputBufferReady(long gridId, long handle, int stride, int width, int height)
@@ -527,6 +552,15 @@ namespace VolvoxGrid.DotNet.Internal
             {
                 GridId = gridId,
                 Buffer = new BufferReady { Handle = handle, Stride = stride, Width = width, Height = height },
+            }.ToByteArray();
+        }
+
+        public byte[] EncodeRenderInputGpuSurfaceReady(long gridId, long surfaceHandle, int width, int height)
+        {
+            return new RenderInput
+            {
+                GridId = gridId,
+                GpuSurface = new GpuSurfaceReady { SurfaceHandle = surfaceHandle, Width = width, Height = height },
             }.ToByteArray();
         }
 

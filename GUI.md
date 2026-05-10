@@ -167,7 +167,7 @@ Important GPU-path behavior:
 - emits GPU-backed rectangles and textured quads
 - uses `GlyphAtlas` for text/image texture data
 - supports surface recreation on resize or surface loss
-- falls back to CPU mode if GPU initialization or surface configuration fails
+- reports an unrendered GPU frame if GPU initialization or surface configuration fails
 
 In practice, the GPU path is best when the platform can provide a stable native surface or platform texture.
 
@@ -268,15 +268,16 @@ Primary file:
 
 - `java/desktop/src/main/java/io/github/ivere27/volvoxgrid/desktop/VolvoxGridDesktopPanel.java`
 
-The Swing panel is a CPU shared-buffer host. It owns:
+The Swing panel is a CPU shared-buffer and native-surface GPU host. It owns:
 
 - panel lifecycle
 - buffer allocation
 - repaint scheduling
 - input forwarding
 - event-stream consumption
+- Java2D text fallback for lite builds
 
-It is a good reference for a desktop CPU host with native widget integration.
+It is a good reference for a desktop host with native widget integration.
 
 ### Flutter
 
@@ -358,7 +359,7 @@ native surface handle
     -> GpuFrameDone
 ```
 
-If surface setup fails, the runtime can drop back to CPU mode rather than leaving the grid unusable.
+If surface setup fails, the runtime returns an unrendered `GpuFrameDone`; the host must keep a valid native surface or switch to CPU mode explicitly.
 
 ## Input Lifecycle
 
@@ -432,24 +433,30 @@ Use `EventDecision` when the host needs to cancel a cancelable event such as:
 
 Text is part of the GUI engine contract, but it has extension points.
 
+The full cross-platform design is documented in [TEXT_RENDERING.md](TEXT_RENDERING.md).
+
 ### Default path
 
-The engine normally uses `TextEngine` for measurement and shaping.
+The engine normally uses `TextEngine` for measurement, shaping, caching, and rendering.
 
 ### Full replacement: `TextRenderer`
 
-A platform can replace the whole text pipeline with a custom renderer. This is used when the host has a better or more appropriate native text stack.
+A platform can replace the whole text pipeline with a custom renderer. This is used by lite builds, where the host provides OS/browser font fallback and the engine still owns cache policy.
 
 Examples in the repo:
 
 - Web Canvas2D text renderer
 - Android Canvas text renderer for lite builds
-- optional GDI-based bridge on `.NET`
+- CoreText/CoreGraphics renderer for macOS and iOS lite native runtimes
+- Java2D text renderer for Java desktop lite builds
+- GDI-based bridge on `.NET` lite builds and optional Wine experiments
 
 Use this when the host should handle both:
 
 - text measurement
 - glyph rasterization or text drawing
+
+The debug overlay shows the active text backend as `Text:Engine`, `Text:Android`, `Text:Browser`, `Text:CoreText`, `Text:Java2D`, or `Text:GDI`. The `C:<used>/<cap>` value reports the engine-owned text cache.
 
 ### Fallback path: `ExternalGlyphRasterizer`
 
@@ -509,6 +516,7 @@ Useful constraints to keep in mind:
 - not every host exposes both CPU and GPU paths
 - Flutter desktop currently uses CPU mode
 - GPU surface handling is platform-specific even though the engine contract is shared
+- lite text fallback uses the host font stack, so exact glyph selection can vary by OS
 - edit/dropdown overlays are host-driven, so exact UX can vary by platform
 - some hosts may redraw full surfaces even when the runtime reports only a dirty rect
 
