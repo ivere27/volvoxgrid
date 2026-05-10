@@ -83,6 +83,35 @@ should_build_dotnet() {
   return 1
 }
 
+file_size_bytes() {
+  stat -c%s "$1"
+}
+
+strip_macos_dylib() {
+  local dylib="$1"
+  local tmp="${dylib}.stripped"
+
+  if ! command -v llvm-strip >/dev/null 2>&1; then
+    echo "Warning: llvm-strip not found; keeping macOS dylib unstripped: ${dylib}" >&2
+    return 0
+  fi
+
+  local before
+  before="$(file_size_bytes "${dylib}")"
+
+  rm -f "${tmp}"
+  if ! llvm-strip --strip-all -o "${tmp}" "${dylib}"; then
+    echo "Warning: llvm-strip failed; keeping macOS dylib unstripped: ${dylib}" >&2
+    rm -f "${tmp}"
+    return 0
+  fi
+  mv -f "${tmp}" "${dylib}"
+
+  local after
+  after="$(file_size_bytes "${dylib}")"
+  echo "Stripped macOS dylib: ${dylib} (${before} -> ${after} bytes)"
+}
+
 LIBRARY_CRATE="${REPO_ROOT}/runtime"
 if [[ ! -f "${LIBRARY_CRATE}/Cargo.toml" ]]; then
   echo "Error: native library crate not found at ${LIBRARY_CRATE}" >&2
@@ -204,11 +233,13 @@ if command -v zig >/dev/null 2>&1; then
   (cd "${LIBRARY_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target x86_64-apple-darwin "${LIBRARY_FEATURE_ARGS[@]}")
   mkdir -p "${NATIVES_DIR}/macos-x86_64"
   cp "${CARGO_TARGET_DIR}/x86_64-apple-darwin/release/libvolvoxgrid.dylib" "${NATIVES_DIR}/macos-x86_64/"
+  strip_macos_dylib "${NATIVES_DIR}/macos-x86_64/libvolvoxgrid.dylib"
 
   echo "Building library: macos-aarch64..."
   (cd "${LIBRARY_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target aarch64-apple-darwin "${LIBRARY_FEATURE_ARGS[@]}")
   mkdir -p "${NATIVES_DIR}/macos-aarch64"
   cp "${CARGO_TARGET_DIR}/aarch64-apple-darwin/release/libvolvoxgrid.dylib" "${NATIVES_DIR}/macos-aarch64/"
+  strip_macos_dylib "${NATIVES_DIR}/macos-aarch64/libvolvoxgrid.dylib"
 else
   echo "SKIP: macos-x86_64, macos-aarch64 (zig not found)"
 fi

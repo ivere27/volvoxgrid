@@ -27,7 +27,8 @@ for arg in "$@"; do
     continue
   fi
   case "$arg" in
-    # -exported_symbols_list not supported by zig/lld
+    # Zig 0.13 rejects Darwin export-list flags. The packaging script
+    # post-strips macOS dylibs to remove the extra symbol table this leaves.
     -Wl,-exported_symbols_list)
       SKIP_NEXT=true
       continue

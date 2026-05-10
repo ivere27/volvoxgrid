@@ -19,6 +19,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc-mingw-w64-i686 \
     gcc-mingw-w64-x86-64 \
     git \
+    llvm \
     nodejs \
     npm \
     openjdk-17-jdk \
