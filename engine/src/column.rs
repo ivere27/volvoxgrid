@@ -17,7 +17,7 @@ pub struct ColumnProps {
     /// True when sort metadata was explicitly set through ColumnDef.sort.
     pub sort_defined: bool,
     pub edit_mask: String,
-    pub dropdown: Option<pb::Dropdown>,
+    pub editor: Option<pb::EditorSpec>,
     pub dropdown_items: String,
     pub image_list: Vec<Vec<u8>>,
     pub span: bool,
@@ -62,7 +62,7 @@ impl Default for ColumnProps {
             sort_type: 0,
             sort_defined: false,
             edit_mask: String::new(),
-            dropdown: None,
+            editor: None,
             dropdown_items: String::new(),
             image_list: Vec::new(),
             span: false,
@@ -94,8 +94,8 @@ impl ColumnProps {
         bytes += self.format.capacity();
         bytes += self.key.capacity();
         bytes += self.edit_mask.capacity();
-        if let Some(dropdown) = &self.dropdown {
-            bytes += dropdown_heap_size_bytes(dropdown);
+        if let Some(editor) = &self.editor {
+            bytes += editor_heap_size_bytes(editor);
         }
         bytes += self.dropdown_items.capacity();
         bytes += self.image_list.capacity() * std::mem::size_of::<Vec<u8>>();
@@ -109,14 +109,35 @@ impl ColumnProps {
     }
 }
 
-fn dropdown_heap_size_bytes(dropdown: &pb::Dropdown) -> usize {
-    let mut bytes = dropdown.items.capacity() * std::mem::size_of::<pb::DropdownItem>();
-    for item in &dropdown.items {
-        bytes += item.value.as_ref().map_or(0, String::capacity);
-        bytes += item.label.as_ref().map_or(0, String::capacity);
-        bytes += item.details.capacity() * std::mem::size_of::<String>();
-        for detail in &item.details {
-            bytes += detail.capacity();
+fn editor_heap_size_bytes(editor: &pb::EditorSpec) -> usize {
+    let mut bytes = editor.custom_editor_id.as_ref().map_or(0, String::capacity);
+    if let Some(text) = &editor.text {
+        bytes += text.mask.capacity();
+    }
+    if let Some(number) = &editor.number {
+        bytes += number.format.capacity();
+    }
+    if let Some(date_time) = &editor.date_time {
+        bytes += date_time.format.capacity();
+    }
+    if let Some(list) = &editor.list {
+        bytes += list.static_items.capacity() * std::mem::size_of::<pb::ListItem>();
+        for item in &list.static_items {
+            bytes += item.label.capacity();
+            bytes += item.details.capacity() * std::mem::size_of::<String>();
+            for detail in &item.details {
+                bytes += detail.capacity();
+            }
+        }
+        if let Some(source) = &list.data_source {
+            bytes += source.data_source_id.capacity();
+        }
+    }
+    for action in &editor.actions {
+        bytes += action.action_id.capacity();
+        bytes += action.label.capacity();
+        if let Some(icon) = &action.icon {
+            bytes += icon.data.capacity() + icon.format.capacity();
         }
     }
     bytes

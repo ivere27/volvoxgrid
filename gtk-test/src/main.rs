@@ -116,16 +116,43 @@ button.volvox-demo-active label {
 }
 "#;
 
-fn dropdown_from_labels(items: &str) -> pb::Dropdown {
-    pb::Dropdown {
-        items: items
-            .split('|')
-            .filter(|label| !label.is_empty())
-            .map(|label| pb::DropdownItem {
-                label: Some(label.to_string()),
-                ..Default::default()
-            })
-            .collect(),
+fn editor_value_from_text(text: String) -> pb::EditorValue {
+    pb::EditorValue {
+        value: Some(pb::CellValue {
+            value: Some(pb::cell_value::Value::Text(text.clone())),
+        }),
+        edit_text: Some(text.clone()),
+        display_text: Some(text),
+    }
+}
+
+fn dropdown_from_labels(items: &str) -> pb::EditorSpec {
+    pb::EditorSpec {
+        kind: pb::EditorKind::EditorSelect as i32,
+        owner: pb::EditorOwner::Engine as i32,
+        presentation: pb::EditorPresentation::EditorCanvas as i32,
+        list: Some(pb::ListEditorParams {
+            static_items: items
+                .split('|')
+                .filter(|label| !label.is_empty())
+                .map(|label| pb::ListItem {
+                    label: label.to_string(),
+                    ..Default::default()
+                })
+                .collect(),
+            ..Default::default()
+        }),
+        ..Default::default()
+    }
+}
+
+fn edit_config(trigger: i32, tab_behavior: i32) -> pb::EditConfig {
+    pb::EditConfig {
+        activation: Some(pb::EditActivation {
+            trigger: Some(trigger),
+            tab_behavior: Some(tab_behavior),
+            ..Default::default()
+        }),
         ..Default::default()
     }
 }
@@ -520,6 +547,7 @@ struct State {
     followup_schedule_seq: u64,
     debug_overlay: bool,
     scroll_blit_enabled: bool,
+    edit_enabled: bool,
     hover_enabled: bool,
     col_hidden: bool,
     suppress_entry_changed: bool,
@@ -528,6 +556,7 @@ struct State {
     render_layer_mask: u64,
     /// Tracks whether the engine is in edit mode (for IME commit/preedit).
     engine_editing: bool,
+    space_key_down_forwarded_from_capture: bool,
 }
 
 fn main() {
@@ -603,6 +632,7 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
         followup_schedule_seq: 0,
         debug_overlay: false,
         scroll_blit_enabled: false,
+        edit_enabled: true,
         hover_enabled: true,
         col_hidden: false,
         suppress_entry_changed: false,
@@ -610,6 +640,7 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
         edit_overlay_cell: None,
         render_layer_mask: ALL_LAYER_MASK,
         engine_editing: false,
+        space_key_down_forwarded_from_capture: false,
     };
 
     apply_initial_config(&mut state)?;
@@ -667,6 +698,7 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
     selection_mode.set_selected(0);
     let chk_debug = CheckButton::with_label("Debug");
     let chk_scroll_blit = CheckButton::with_label("ScrollBlit");
+    let chk_edit = CheckButton::with_label("Edit");
     let frame_pacing_box = GtkBox::new(Orientation::Horizontal, 4);
     let frame_pacing_label = Label::new(Some("Pacing"));
     let frame_pacing_mode = DropDown::from_strings(&FRAME_PACING_LABELS);
@@ -693,6 +725,7 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
     let btn_sort_desc = Button::with_label("SortDesc");
     let chk_hover = CheckButton::with_label("Hover");
     chk_hover.set_active(true);
+    chk_edit.set_active(state.borrow().edit_enabled);
     chk_scroll_blit.set_active(state.borrow().scroll_blit_enabled);
 
     let btn_save = Button::with_label("SaveCSV");
@@ -714,6 +747,7 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
     toolbar_row1.append(&frame_pacing_box);
     toolbar_row1.append(&btn_sort_asc);
     toolbar_row1.append(&btn_sort_desc);
+    toolbar_row1.append(&chk_edit);
     toolbar_row1.append(&chk_hover);
 
     toolbar_row2.append(&btn_save);
@@ -1140,6 +1174,48 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
     let key = EventControllerKey::new();
     key.set_im_context(Some(&im_context));
 
+    // GTK IM contexts commonly consume Space and emit it as committed text.
+    // Forward the key-down as well so checkbox/select cells still get their
+    // command-style Space handling; the later commit remains useful for normal
+    // text cells.
+    {
+        let state = Rc::clone(&state);
+        let status = status_label.clone();
+        let area = drawing_area.clone();
+        let capture = EventControllerKey::new();
+        capture.set_propagation_phase(gtk4::PropagationPhase::Capture);
+        capture.connect_key_pressed(move |_ctrl, keyval, _keycode, modifier| {
+            if keyval != gdk::Key::space {
+                return glib::Propagation::Proceed;
+            }
+            let flags = gdk_modifier_to_flags(modifier);
+            if flags & (2 | 4 | 8) != 0 {
+                return glib::Propagation::Proceed;
+            }
+
+            let Ok(mut st) = state.try_borrow_mut() else {
+                return glib::Propagation::Proceed;
+            };
+            if let Err(err) = send_key_input(
+                &mut st,
+                pb::key_event::Type::KeyDown,
+                32,
+                flags,
+                String::new(),
+            ) {
+                st.status_note = format!("Key down failed: {err}");
+            } else {
+                st.space_key_down_forwarded_from_capture = true;
+            }
+            update_status_label(&st, &status);
+            let _ = request_frame(&mut st);
+            drop(st);
+            area.queue_draw();
+            glib::Propagation::Proceed
+        });
+        drawing_area.add_controller(capture);
+    }
+
     // IME commit: final text from IME (e.g. "a" for English, "한" for Korean).
     {
         let state = Rc::clone(&state);
@@ -1162,15 +1238,32 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
                         0,
                         first.to_string(),
                     );
-                    // The engine processes KeyPress synchronously on the render
-                    // thread, entering edit mode. Mark it here so subsequent
-                    // commits in the same pump don't re-trigger auto-edit.
-                    st.engine_editing = true;
+                    // ASCII Space may be a command for checkbox/select cells.
+                    // Let EditorStarted update state for that case; other
+                    // printable commits start text editing.
+                    if first != ' ' {
+                        st.engine_editing = true;
+                    }
                 }
                 // Remaining chars: engine is already editing, insert directly.
                 let rest: String = chars.collect();
                 if !rest.is_empty() {
-                    let _ = st.client.edit_commit_preedit(st.grid_id, &rest);
+                    if st.engine_editing {
+                        let _ = st.client.edit_commit_preedit(st.grid_id, &rest);
+                    } else {
+                        let mut saw_non_space = false;
+                        for ch in rest.chars() {
+                            saw_non_space |= ch != ' ';
+                            let _ = send_key_input(
+                                &mut st,
+                                pb::key_event::Type::KeyPress,
+                                0,
+                                0,
+                                ch.to_string(),
+                            );
+                        }
+                        st.engine_editing = saw_non_space;
+                    }
                 }
             } else {
                 // Editing: commit preedit text into edit_text.
@@ -1224,16 +1317,64 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
     {
         let state = Rc::clone(&state);
         let status = status_label.clone();
+        let area = drawing_area.clone();
         key.connect_key_pressed(move |_ctrl, keyval, _keycode, modifier| {
             let key_code = gdk_keyval_to_vk(keyval);
             if key_code == 0 {
                 return glib::Propagation::Proceed;
             }
 
+            let flags = gdk_modifier_to_flags(modifier);
+            if is_clipboard_paste_shortcut(key_code, flags) {
+                let Ok(mut st) = state.try_borrow_mut() else {
+                    return glib::Propagation::Stop;
+                };
+                match active_readonly_select_editor(&mut st) {
+                    Ok(true) => {
+                        st.status_note = "Select dropdown is read-only".to_string();
+                        update_status_label(&st, &status);
+                        let _ = request_frame(&mut st);
+                        drop(st);
+                        area.queue_draw();
+                        return glib::Propagation::Stop;
+                    }
+                    Ok(false) => {}
+                    Err(err) => {
+                        st.status_note = format!("Edit state failed: {err}");
+                        update_status_label(&st, &status);
+                        drop(st);
+                        return glib::Propagation::Stop;
+                    }
+                }
+                drop(st);
+                request_system_clipboard_paste(&state, &area, &status);
+                return glib::Propagation::Stop;
+            }
+
             let Ok(mut st) = state.try_borrow_mut() else {
                 return glib::Propagation::Stop;
             };
-            let flags = gdk_modifier_to_flags(modifier);
+            if key_code == 32 && st.space_key_down_forwarded_from_capture {
+                st.space_key_down_forwarded_from_capture = false;
+                return glib::Propagation::Stop;
+            }
+            match handle_clipboard_key_shortcut(&mut st, key_code, flags) {
+                Ok(Some(note)) => {
+                    st.status_note = note;
+                    update_status_label(&st, &status);
+                    let _ = request_frame(&mut st);
+                    drop(st);
+                    return glib::Propagation::Stop;
+                }
+                Ok(None) => {}
+                Err(err) => {
+                    st.status_note = err;
+                    update_status_label(&st, &status);
+                    let _ = request_frame(&mut st);
+                    drop(st);
+                    return glib::Propagation::Stop;
+                }
+            }
             if let Err(err) = send_key_input(
                 &mut st,
                 pb::key_event::Type::KeyDown,
@@ -1262,6 +1403,9 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
                 return;
             };
             let flags = gdk_modifier_to_flags(modifier);
+            if key_code == 32 {
+                st.space_key_down_forwarded_from_capture = false;
+            }
             if let Err(err) = send_key_input(
                 &mut st,
                 pb::key_event::Type::KeyUp,
@@ -1475,6 +1619,33 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
         let state = Rc::clone(&state);
         let area = drawing_area.clone();
         let status = status_label.clone();
+        let entry = edit_entry.clone();
+        let combo = dropdown_combo.clone();
+        let combo_editable = dropdown_combo_editable.clone();
+        chk_edit.connect_toggled(move |chk| {
+            run_action(&state, &area, &status, |st| {
+                st.edit_enabled = chk.is_active();
+                if !st.edit_enabled {
+                    let _ = st.client.edit_cancel(st.grid_id);
+                    st.engine_editing = false;
+                    st.edit_overlay_cell = None;
+                    hide_host_editors(&entry, &combo, &combo_editable);
+                    area.grab_focus();
+                }
+                apply_host_runtime_config(st, st.grid_id)?;
+                Ok(if st.edit_enabled {
+                    "Editing enabled".to_string()
+                } else {
+                    "Editing disabled".to_string()
+                })
+            });
+        });
+    }
+
+    {
+        let state = Rc::clone(&state);
+        let area = drawing_area.clone();
+        let status = status_label.clone();
         chk_hover.connect_toggled(move |chk| {
             run_action(&state, &area, &status, |st| {
                 st.hover_enabled = chk.is_active();
@@ -1538,14 +1709,7 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
         let area = drawing_area.clone();
         let status = status_label.clone();
         btn_paste.connect_clicked(move |_| {
-            run_action(&state, &area, &status, |st| {
-                if st.clipboard_text.is_empty() {
-                    return Ok("Clipboard cache is empty".to_string());
-                }
-                let text = st.clipboard_text.clone();
-                st.client.clipboard_paste(st.grid_id, text)?;
-                Ok("Pasted cached clipboard text".to_string())
-            });
+            request_system_clipboard_paste(&state, &area, &status);
         });
     }
     {
@@ -1879,10 +2043,9 @@ impl VolvoxServiceClient {
                 command: Some(pb::edit_command::Command::Start(pb::EditStart {
                     row,
                     col,
-                    select_all: Some(true),
-                    caret_end: Some(true),
-                    seed_text: None,
-                    formula_mode: None,
+                    reason: pb::EditStartReason::EditStartProgrammatic as i32,
+                    seed_value: None,
+                    caret_position: None,
                 })),
             },
         )?;
@@ -1890,50 +2053,68 @@ impl VolvoxServiceClient {
     }
 
     fn edit_commit(&self, grid_id: i64, text: String) -> Result<(), String> {
+        let session = self.edit_session_command(
+            grid_id,
+            pb::editor_session_command::Command::Commit(pb::EditCommit {
+                value: Some(editor_value_from_text(text)),
+            }),
+        )?;
         let _: pb::EditState = self.invoke(
             "/volvoxgrid.v1.VolvoxGridService/Edit",
             &pb::EditCommand {
                 grid_id,
-                command: Some(pb::edit_command::Command::Commit(pb::EditCommit {
-                    text: Some(text),
-                })),
+                command: Some(pb::edit_command::Command::Session(session)),
             },
         )?;
         Ok(())
     }
 
     fn edit_cancel(&self, grid_id: i64) -> Result<(), String> {
+        let session = self.edit_session_command(
+            grid_id,
+            pb::editor_session_command::Command::Cancel(pb::EditCancel {}),
+        )?;
         let _: pb::EditState = self.invoke(
             "/volvoxgrid.v1.VolvoxGridService/Edit",
             &pb::EditCommand {
                 grid_id,
-                command: Some(pb::edit_command::Command::Cancel(pb::EditCancel {})),
+                command: Some(pb::edit_command::Command::Session(session)),
             },
         )?;
         Ok(())
     }
 
     fn edit_set_text(&self, grid_id: i64, text: String) -> Result<(), String> {
+        let session = self.edit_session_command(
+            grid_id,
+            pb::editor_session_command::Command::ValueChanged(pb::EditorValueChanged {
+                value: Some(editor_value_from_text(text)),
+            }),
+        )?;
         let _: pb::EditState = self.invoke(
             "/volvoxgrid.v1.VolvoxGridService/Edit",
             &pb::EditCommand {
                 grid_id,
-                command: Some(pb::edit_command::Command::SetText(pb::EditSetText { text })),
+                command: Some(pb::edit_command::Command::Session(session)),
             },
         )?;
         Ok(())
     }
 
     fn edit_set_preedit(&self, grid_id: i64, text: String, cursor: i32) -> Result<(), String> {
+        let session = self.edit_session_command(
+            grid_id,
+            pb::editor_session_command::Command::PreeditChanged(pb::EditorPreeditChanged {
+                text,
+                cursor,
+                commit: false,
+            }),
+        )?;
         let _: pb::EditState = self.invoke(
             "/volvoxgrid.v1.VolvoxGridService/Edit",
             &pb::EditCommand {
                 grid_id,
-                command: Some(pb::edit_command::Command::SetPreedit(pb::EditSetPreedit {
-                    text,
-                    cursor,
-                    commit: false,
-                })),
+                command: Some(pb::edit_command::Command::Session(session)),
             },
         )?;
         Ok(())
@@ -1947,10 +2128,9 @@ impl VolvoxServiceClient {
                 command: Some(pb::edit_command::Command::Start(pb::EditStart {
                     row,
                     col,
-                    select_all: None,
-                    caret_end: None,
-                    seed_text: Some(String::new()),
-                    formula_mode: None,
+                    reason: pb::EditStartReason::EditStartProgrammatic as i32,
+                    seed_value: Some(editor_value_from_text(String::new())),
+                    caret_position: None,
                 })),
             },
         )?;
@@ -1958,18 +2138,51 @@ impl VolvoxServiceClient {
     }
 
     fn edit_commit_preedit(&self, grid_id: i64, committed_text: &str) -> Result<(), String> {
+        let session = self.edit_session_command(
+            grid_id,
+            pb::editor_session_command::Command::PreeditChanged(pb::EditorPreeditChanged {
+                text: committed_text.to_string(),
+                cursor: 0,
+                commit: true,
+            }),
+        )?;
         let _: pb::EditState = self.invoke(
             "/volvoxgrid.v1.VolvoxGridService/Edit",
             &pb::EditCommand {
                 grid_id,
-                command: Some(pb::edit_command::Command::SetPreedit(pb::EditSetPreedit {
-                    text: committed_text.to_string(),
-                    cursor: 0,
-                    commit: true,
-                })),
+                command: Some(pb::edit_command::Command::Session(session)),
             },
         )?;
         Ok(())
+    }
+
+    fn edit_state(&self, grid_id: i64) -> Result<pb::EditState, String> {
+        self.invoke(
+            "/volvoxgrid.v1.VolvoxGridService/Edit",
+            &pb::EditCommand {
+                grid_id,
+                command: Some(pb::edit_command::Command::GetState(pb::EditGetState {})),
+            },
+        )
+    }
+
+    fn edit_session_command(
+        &self,
+        grid_id: i64,
+        command: pb::editor_session_command::Command,
+    ) -> Result<pb::EditorSessionCommand, String> {
+        let state = self.edit_state(grid_id)?;
+        let (session_id, state_version) = state
+            .session
+            .as_ref()
+            .filter(|_| state.active)
+            .map(|s| (s.session_id, s.state_version))
+            .unwrap_or((0, 0));
+        Ok(pb::EditorSessionCommand {
+            session_id,
+            state_version,
+            command: Some(command),
+        })
     }
 
     fn find_text(&self, grid_id: i64, col: i32, start_row: i32, text: &str) -> Result<i32, String> {
@@ -2123,6 +2336,16 @@ impl VolvoxServiceClient {
         )
     }
 
+    fn clipboard_cut(&self, grid_id: i64) -> Result<pb::ClipboardResponse, String> {
+        self.invoke(
+            "/volvoxgrid.v1.VolvoxGridService/Clipboard",
+            &pb::ClipboardCommand {
+                grid_id,
+                command: Some(pb::clipboard_command::Command::Cut(pb::ClipboardCut {})),
+            },
+        )
+    }
+
     fn clipboard_paste(&self, grid_id: i64, text: String) -> Result<(), String> {
         let _: pb::ClipboardResponse = self.invoke(
             "/volvoxgrid.v1.VolvoxGridService/Clipboard",
@@ -2253,11 +2476,7 @@ fn apply_initial_config_for_grid(
                 scroll_blit: Some(scroll_blit_enabled),
                 ..Default::default()
             }),
-            editing: Some(pb::EditConfig {
-                host_key_dispatch: Some(false),
-                host_pointer_dispatch: Some(false),
-                ..Default::default()
-            }),
+            editing: Some(pb::EditConfig::default()),
             interaction: Some(pb::InteractionConfig {
                 header_features: Some(pb::HeaderFeatures {
                     sort: Some(true),
@@ -2273,7 +2492,8 @@ fn apply_initial_config_for_grid(
 }
 
 fn apply_initial_config(state: &mut State) -> Result<(), String> {
-    apply_initial_config_for_grid(&state.client, state.grid_id, state.scroll_blit_enabled)
+    apply_initial_config_for_grid(&state.client, state.grid_id, state.scroll_blit_enabled)?;
+    apply_host_runtime_config(state, state.grid_id)
 }
 
 fn apply_host_runtime_config(state: &State, grid_id: i64) -> Result<(), String> {
@@ -2298,6 +2518,14 @@ fn apply_host_runtime_config(state: &State, grid_id: i64) -> Result<(), String> 
                 }),
                 ..Default::default()
             }),
+            editing: Some(edit_config(
+                if state.edit_enabled {
+                    pb::EditTrigger::KeyClick as i32
+                } else {
+                    pb::EditTrigger::None as i32
+                },
+                pb::TabBehavior::TabCells as i32,
+            )),
             ..Default::default()
         },
     )?;
@@ -2413,13 +2641,10 @@ fn sales_theme_config() -> pb::GridConfig {
             }),
             ..Default::default()
         }),
-        editing: Some(pb::EditConfig {
-            trigger: Some(pb::EditTrigger::None as i32),
-            tab_behavior: Some(pb::TabBehavior::TabCells as i32),
-            dropdown_trigger: Some(pb::DropdownTrigger::DropdownAlways as i32),
-            dropdown_search: Some(false),
-            ..Default::default()
-        }),
+        editing: Some(edit_config(
+            pb::EditTrigger::None as i32,
+            pb::TabBehavior::TabCells as i32,
+        )),
         scrolling: Some(pb::ScrollConfig {
             scrollbars: Some(pb::ScrollBarsMode::ScrollbarBoth as i32),
             fling_enabled: Some(true),
@@ -2586,12 +2811,10 @@ fn hierarchy_theme_config(max_outline_depth: i32, max_outline_level: i32) -> pb:
             }),
             ..Default::default()
         }),
-        editing: Some(pb::EditConfig {
-            trigger: Some(pb::EditTrigger::None as i32),
-            tab_behavior: Some(pb::TabBehavior::TabCells as i32),
-            dropdown_trigger: Some(pb::DropdownTrigger::DropdownNever as i32),
-            ..Default::default()
-        }),
+        editing: Some(edit_config(
+            pb::EditTrigger::None as i32,
+            pb::TabBehavior::TabCells as i32,
+        )),
         scrolling: Some(pb::ScrollConfig {
             scrollbars: Some(pb::ScrollBarsMode::ScrollbarBoth as i32),
             fling_enabled: Some(true),
@@ -2763,7 +2986,7 @@ fn load_sales_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Result<()
                 width: Some(80),
                 caption: Some("Status".to_string()),
                 key: Some("Status".to_string()),
-                dropdown: Some(dropdown_from_labels(SALES_STATUS_ITEMS)),
+                editor: Some(dropdown_from_labels(SALES_STATUS_ITEMS)),
                 ..Default::default()
             },
             pb::ColumnDef {
@@ -2797,7 +3020,7 @@ fn load_sales_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Result<()
             },
             pb::ColumnDef {
                 index: 8,
-                dropdown: Some(dropdown_from_labels(SALES_STATUS_ITEMS)),
+                editor: Some(dropdown_from_labels(SALES_STATUS_ITEMS)),
                 ..Default::default()
             },
         ],
@@ -3785,7 +4008,8 @@ fn handle_render_output(
                 };
                 area.set_cursor_from_name(name);
             }
-            pb::render_output::Event::EditRequest(_request) => {
+            pb::render_output::Event::EditorStarted(_)
+            | pb::render_output::Event::EditorUpdated(_) => {
                 // Don't show the host GtkEntry overlay. The engine renders the
                 // editor itself in the canvas and the IMContext on the drawing
                 // area handles text input (including CJK composition). Showing
@@ -3793,14 +4017,9 @@ fn handle_render_output(
                 // IME support.
                 state.engine_editing = true;
             }
-            pb::render_output::Event::DropdownRequest(request) => {
-                show_combo_overlay(
-                    state,
-                    edit_entry,
-                    dropdown_combo,
-                    dropdown_combo_editable,
-                    request,
-                )?;
+            pb::render_output::Event::EditorEnded(_) => {
+                state.engine_editing = false;
+                hide_host_editors(edit_entry, dropdown_combo, dropdown_combo_editable);
             }
             pb::render_output::Event::TooltipRequest(request) => {
                 area.set_tooltip_text(Some(&request.text));
@@ -4045,19 +4264,29 @@ fn show_edit_overlay(
     edit_entry: &Entry,
     dropdown_combo: &ComboBoxText,
     dropdown_combo_editable: &ComboBoxText,
-    request: &pb::EditRequest,
+    request: &pb::EditorSessionStarted,
 ) {
+    let session = match request.session.as_ref() {
+        Some(s) => s,
+        None => return,
+    };
+    let rect = session.viewport_rect.as_ref().cloned().unwrap_or_default();
+    let text = session
+        .value
+        .as_ref()
+        .and_then(|value| value.edit_text.clone())
+        .unwrap_or_default();
     hide_combo_overlay(dropdown_combo);
     hide_combo_overlay(dropdown_combo_editable);
     state.suppress_entry_changed = true;
-    state.edit_overlay_cell = Some((request.row, request.col));
-    edit_entry.set_text(&request.current_value);
-    edit_entry.set_position(request.current_value.chars().count() as i32);
-    edit_entry.set_max_length(request.max_length.max(0));
-    edit_entry.set_width_request(request.width.max(1.0).round() as i32);
-    edit_entry.set_height_request(request.height.max(1.0).round() as i32);
-    edit_entry.set_margin_start(request.x.max(0.0).round() as i32);
-    edit_entry.set_margin_top(request.y.max(0.0).round() as i32);
+    state.edit_overlay_cell = Some((session.row, session.col));
+    edit_entry.set_text(&text);
+    edit_entry.set_position(text.chars().count() as i32);
+    edit_entry.set_max_length(0);
+    edit_entry.set_width_request(rect.width.max(1.0).round() as i32);
+    edit_entry.set_height_request(rect.height.max(1.0).round() as i32);
+    edit_entry.set_margin_start(rect.x.max(0.0).round() as i32);
+    edit_entry.set_margin_top(rect.y.max(0.0).round() as i32);
     edit_entry.set_visible(true);
     edit_entry.grab_focus();
     state.suppress_entry_changed = false;
@@ -4091,7 +4320,7 @@ fn show_combo_overlay(
     edit_entry: &Entry,
     dropdown_combo: &ComboBoxText,
     dropdown_combo_editable: &ComboBoxText,
-    _request: &pb::DropdownRequest,
+    _request: &pb::EditorSessionStarted,
 ) -> Result<(), String> {
     // Let the engine render and handle the active dropdown list.
     hide_host_editors(edit_entry, dropdown_combo, dropdown_combo_editable);
@@ -4387,6 +4616,114 @@ fn set_system_clipboard_text(text: &str) {
     }
 }
 
+fn set_status_note(state: &Rc<RefCell<State>>, status: &Label, note: impl Into<String>) {
+    let Ok(mut st) = state.try_borrow_mut() else {
+        return;
+    };
+    st.status_note = note.into();
+    update_status_label(&st, status);
+}
+
+fn is_clipboard_shortcut(key_code: i32, modifier: i32) -> bool {
+    let shortcut = (modifier & 2 != 0 || modifier & 8 != 0) && modifier & 4 == 0;
+    shortcut && matches!(key_code, 67 | 86 | 88)
+}
+
+fn is_clipboard_paste_shortcut(key_code: i32, modifier: i32) -> bool {
+    is_clipboard_shortcut(key_code, modifier) && key_code == 86
+}
+
+fn is_readonly_select_edit_state(state: &pb::EditState) -> bool {
+    if !state.active {
+        return false;
+    }
+    let Some(editor) = state
+        .session
+        .as_ref()
+        .and_then(|session| session.editor.as_ref())
+    else {
+        return false;
+    };
+    editor.kind == pb::EditorKind::EditorSelect as i32
+        || (editor.list.is_some()
+            && !editor
+                .list
+                .as_ref()
+                .is_some_and(|list| list.allow_custom_value)
+            && editor.kind != pb::EditorKind::EditorCombo as i32)
+}
+
+fn active_readonly_select_editor(state: &mut State) -> Result<bool, String> {
+    if !state.engine_editing {
+        return Ok(false);
+    }
+    Ok(is_readonly_select_edit_state(
+        &state.client.edit_state(state.grid_id)?,
+    ))
+}
+
+fn request_system_clipboard_paste(state: &Rc<RefCell<State>>, area: &DrawingArea, status: &Label) {
+    let Some(display) = gdk::Display::default() else {
+        set_status_note(state, status, "No display clipboard is available");
+        return;
+    };
+
+    let clipboard = display.clipboard();
+    let state = Rc::clone(state);
+    let area = area.clone();
+    let status = status.clone();
+    set_status_note(&state, &status, "Reading system clipboard...");
+
+    glib::MainContext::default().spawn_local(async move {
+        let clipboard_text = clipboard.read_text_future().await;
+        run_action(&state, &area, &status, move |st| {
+            let text = match clipboard_text {
+                Ok(Some(text)) => text.to_string(),
+                Ok(None) => return Ok("System clipboard has no text".to_string()),
+                Err(err) => return Err(format!("Read system clipboard failed: {err}")),
+            };
+            if text.is_empty() {
+                return Ok("System clipboard text is empty".to_string());
+            }
+
+            let char_count = text.chars().count();
+            st.clipboard_text = text.clone();
+            st.client.clipboard_paste(st.grid_id, text)?;
+            Ok(format!("Pasted {char_count} chars from system clipboard"))
+        });
+        area.queue_draw();
+    });
+}
+
+fn handle_clipboard_key_shortcut(
+    state: &mut State,
+    key_code: i32,
+    modifier: i32,
+) -> Result<Option<String>, String> {
+    if !is_clipboard_shortcut(key_code, modifier) {
+        return Ok(None);
+    }
+
+    match key_code {
+        67 => {
+            let resp = state.client.clipboard_copy(state.grid_id)?;
+            state.clipboard_text = resp.text.clone();
+            set_system_clipboard_text(&resp.text);
+            Ok(Some("Copied to clipboard".to_string()))
+        }
+        88 => {
+            if active_readonly_select_editor(state)? {
+                return Ok(Some("Select dropdown is read-only".to_string()));
+            }
+            let resp = state.client.clipboard_cut(state.grid_id)?;
+            state.clipboard_text = resp.text.clone();
+            set_system_clipboard_text(&resp.text);
+            Ok(Some("Cut to clipboard".to_string()))
+        }
+        _ => Ok(None),
+    }
+}
+
 fn truncated_text(text: &str, max_length: i32) -> String {
     if max_length <= 0 {
         return text.to_string();
@@ -4442,6 +4779,12 @@ fn gdk_modifier_to_flags(state: gdk::ModifierType) -> i32 {
     }
     if state.contains(gdk::ModifierType::ALT_MASK) {
         flags |= 4;
+    }
+    if state.contains(gdk::ModifierType::META_MASK)
+        || state.contains(gdk::ModifierType::SUPER_MASK)
+        || state.contains(gdk::ModifierType::HYPER_MASK)
+    {
+        flags |= 8;
     }
     flags
 }

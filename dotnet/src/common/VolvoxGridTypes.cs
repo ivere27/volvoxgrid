@@ -70,13 +70,6 @@ namespace VolvoxGrid.DotNet
         Cells = 1,
     }
 
-    public enum VolvoxGridDropdownTrigger
-    {
-        Never = 0,
-        Always = 1,
-        OnEdit = 2,
-    }
-
     public enum VolvoxGridCellHitArea
     {
         None = 0,
@@ -394,44 +387,6 @@ namespace VolvoxGrid.DotNet
             RowIndex = rowIndex;
             ColumnIndex = columnIndex;
             FieldName = fieldName ?? string.Empty;
-        }
-    }
-
-    public sealed class VolvoxGridBeforeDropdownOpenEventArgs : CancelEventArgs
-    {
-        public int RowIndex { get; private set; }
-        public int ColumnIndex { get; private set; }
-        public string FieldName { get; private set; }
-        public float X { get; private set; }
-        public float Y { get; private set; }
-        public float Width { get; private set; }
-        public float Height { get; private set; }
-        public Dropdown Dropdown { get; private set; }
-        public string CurrentValue { get; private set; }
-        public int SelectedIndex { get; private set; }
-
-        public VolvoxGridBeforeDropdownOpenEventArgs(
-            int rowIndex,
-            int columnIndex,
-            string fieldName,
-            float x,
-            float y,
-            float width,
-            float height,
-            Dropdown dropdown,
-            string currentValue,
-            int selectedIndex)
-        {
-            RowIndex = rowIndex;
-            ColumnIndex = columnIndex;
-            FieldName = fieldName ?? string.Empty;
-            X = x;
-            Y = y;
-            Width = width;
-            Height = height;
-            Dropdown = dropdown ?? new Dropdown();
-            CurrentValue = currentValue ?? string.Empty;
-            SelectedIndex = selectedIndex;
         }
     }
 

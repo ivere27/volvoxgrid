@@ -42,7 +42,6 @@ namespace VolvoxGrid.DotNet
         private bool _cancelableEventChannelRequested;
 
         private EventHandler<VolvoxGridBeforeEditEventArgs> _beforeEdit;
-        private EventHandler<VolvoxGridBeforeDropdownOpenEventArgs> _beforeDropdownOpen;
         private EventHandler<VolvoxGridCellEditValidatingEventArgs> _cellEditValidating;
         private EventHandler<VolvoxGridBeforeSortEventArgs> _beforeSort;
         private EventHandler<VolvoxGridCompareEventArgs> _compare;
@@ -88,7 +87,8 @@ namespace VolvoxGrid.DotNet
             _focusedColIndex = 0;
 
             _config = new GridConfig();
-            EnsureEditConfig().Trigger = (EditTrigger)VolvoxGridEditTrigger.KeyClick;
+            EnsureEditActivation().Trigger = (EditTrigger)VolvoxGridEditTrigger.KeyClick;
+            EnsureEditConfig().DefaultEditor = DefaultHostTextEditorSpec();
             EnsureSelectionConfig().Mode = (Volvoxgrid.V1.SelectionMode)VolvoxGridSelectionMode.Free;
             EnsureSelectionConfig().Visibility = (Volvoxgrid.V1.SelectionVisibility)VolvoxGridSelectionVisibility.Always;
             EnsureSelectionConfig().Allow = true;
@@ -131,16 +131,6 @@ namespace VolvoxGrid.DotNet
                 EnableCancelableEventChannel();
             }
             remove { _beforeEdit -= value; }
-        }
-
-        public event EventHandler<VolvoxGridBeforeDropdownOpenEventArgs> BeforeDropdownOpen
-        {
-            add
-            {
-                _beforeDropdownOpen += value;
-                EnableCancelableEventChannel();
-            }
-            remove { _beforeDropdownOpen -= value; }
         }
 
         public event EventHandler<VolvoxGridCellEditValidatingEventArgs> CellEditValidating
@@ -305,43 +295,14 @@ namespace VolvoxGrid.DotNet
 
         public bool Editable
         {
-            get { return _config.Editing != null && (!_config.Editing.HasTrigger || _config.Editing.Trigger != EditTrigger.EDIT_TRIGGER_NONE); }
+            get { return _config.Editing != null && _config.Editing.Activation != null && _config.Editing.Activation.Trigger != EditTrigger.EDIT_TRIGGER_NONE; }
             set
             {
-                var cfg = EnsureEditConfig();
+                var cfg = EnsureEditActivation();
                 var trigger = value ? EditTrigger.EDIT_TRIGGER_KEY_CLICK : EditTrigger.EDIT_TRIGGER_NONE;
-                if (!cfg.HasTrigger || cfg.Trigger != trigger)
+                if (cfg.Trigger != trigger)
                 {
                     cfg.Trigger = trigger;
-                    ApplyEngineConfig();
-                }
-            }
-        }
-
-        public VolvoxGridDropdownTrigger DropdownTrigger
-        {
-            get { return _config.Editing != null && _config.Editing.HasDropdownTrigger ? (VolvoxGridDropdownTrigger)_config.Editing.DropdownTrigger : VolvoxGridDropdownTrigger.Never; }
-            set
-            {
-                var cfg = EnsureEditConfig();
-                var mapped = (Volvoxgrid.V1.DropdownTrigger)value;
-                if (!cfg.HasDropdownTrigger || cfg.DropdownTrigger != mapped)
-                {
-                    cfg.DropdownTrigger = mapped;
-                    ApplyEngineConfig();
-                }
-            }
-        }
-
-        public bool DropdownSearch
-        {
-            get { return _config.Editing != null && _config.Editing.HasDropdownSearch && _config.Editing.DropdownSearch; }
-            set
-            {
-                var cfg = EnsureEditConfig();
-                if (!cfg.HasDropdownSearch || cfg.DropdownSearch != value)
-                {
-                    cfg.DropdownSearch = value;
                     ApplyEngineConfig();
                 }
             }
@@ -351,15 +312,15 @@ namespace VolvoxGrid.DotNet
         {
             get
             {
-                return _config.Editing != null && _config.Editing.HasTabBehavior
-                    ? (VolvoxGridTabBehavior)_config.Editing.TabBehavior
+                return _config.Editing != null && _config.Editing.Activation != null && _config.Editing.Activation.HasTabBehavior
+                    ? (VolvoxGridTabBehavior)_config.Editing.Activation.TabBehavior
                     : VolvoxGridTabBehavior.Cells;
             }
             set
             {
-                var cfg = EnsureEditConfig();
+                var cfg = EnsureEditActivation();
                 var mapped = (Volvoxgrid.V1.TabBehavior)value;
-                if (!cfg.HasTabBehavior || cfg.TabBehavior != mapped)
+                if (cfg.TabBehavior != mapped)
                 {
                     cfg.TabBehavior = mapped;
                     ApplyEngineConfig();
@@ -1150,6 +1111,13 @@ namespace VolvoxGrid.DotNet
             return _config.Editing;
         }
 
+        private EditActivation EnsureEditActivation()
+        {
+            var cfg = EnsureEditConfig();
+            if (cfg.Activation == null) cfg.Activation = new EditActivation();
+            return cfg.Activation;
+        }
+
         private ScrollConfig EnsureScrollConfig()
         {
             if (_config.Scrolling == null) _config.Scrolling = new ScrollConfig();
@@ -1687,11 +1655,10 @@ namespace VolvoxGrid.DotNet
             VolvoxGridCellInteraction? interaction = null,
             string format = null,
             string key = null,
-            string dropdownItems = null,
             uint? progressColor = null,
             bool? span = null,
             VolvoxGridStickyEdge? sticky = null,
-            Dropdown dropdown = null)
+            ListEditorParams dropdown = null)
         {
             if (!EnsureEngine()) return;
             try
@@ -1706,8 +1673,7 @@ namespace VolvoxGrid.DotNet
                 if (interaction.HasValue) def.Interaction = (CellInteraction)interaction.Value;
                 if (format != null) def.Format = format;
                 if (!string.IsNullOrEmpty(key)) def.Key = key;
-                if (dropdown != null) def.Dropdown = dropdown;
-                else if (dropdownItems != null) def.Dropdown = DropdownFromLegacyItems(dropdownItems);
+                if (dropdown != null) def.Editor = ListEditorSpec(dropdown);
                 if (progressColor.HasValue) def.ProgressColor = progressColor.Value;
                 if (span.HasValue) def.Span = span.Value;
                 if (sticky.HasValue) def.Sticky = (StickyEdge)sticky.Value;
@@ -1790,14 +1756,9 @@ namespace VolvoxGrid.DotNet
             DefineColumns(col, span: span);
         }
 
-        public void SetColDropdownItems(int col, string items)
+        public void SetColDropdown(int col, ListEditorParams dropdown)
         {
-            DefineColumns(col, dropdownItems: items ?? string.Empty);
-        }
-
-        public void SetColDropdown(int col, Dropdown dropdown)
-        {
-            DefineColumns(col, dropdown: dropdown ?? new Dropdown());
+            DefineColumns(col, dropdown: dropdown ?? new ListEditorParams());
         }
 
         public void SetColAlignment(int col, VolvoxGridAlign alignment)
@@ -1862,60 +1823,39 @@ namespace VolvoxGrid.DotNet
             catch (Exception ex) { _lastError = ex.Message; }
         }
 
-        public void SetCellDropdownItems(int row, int col, string items)
+        public void SetCellDropdown(int row, int col, ListEditorParams dropdown)
         {
             if (row < 0 || col < 0 || !EnsureEngine()) return;
             try
             {
                 _client.UpdateCells(
                     _gridId,
-                    new[] { new CellUpdate { Row = row, Col = col, Dropdown = DropdownFromLegacyItems(items ?? string.Empty) } },
+                    new[] { new CellUpdate { Row = row, Col = col, Editor = ListEditorSpec(dropdown ?? new ListEditorParams()) } },
                     false);
                 _renderHost.RequestFrame();
             }
             catch (Exception ex) { _lastError = ex.Message; }
         }
 
-        public void SetCellDropdown(int row, int col, Dropdown dropdown)
+        private static EditorSpec ListEditorSpec(ListEditorParams list)
         {
-            if (row < 0 || col < 0 || !EnsureEngine()) return;
-            try
+            return new EditorSpec
             {
-                _client.UpdateCells(
-                    _gridId,
-                    new[] { new CellUpdate { Row = row, Col = col, Dropdown = dropdown ?? new Dropdown() } },
-                    false);
-                _renderHost.RequestFrame();
-            }
-            catch (Exception ex) { _lastError = ex.Message; }
+                Kind = list != null && list.AllowCustomValue ? EditorKind.EDITOR_COMBO : EditorKind.EDITOR_SELECT,
+                Owner = EditorOwner.EDITOR_OWNER_ENGINE,
+                Presentation = EditorPresentation.EDITOR_CANVAS,
+                List = list ?? new ListEditorParams(),
+            };
         }
 
-        private static Dropdown DropdownFromLegacyItems(string items)
+        private static EditorSpec DefaultHostTextEditorSpec()
         {
-            var dropdown = new Dropdown();
-            if (items == null) return dropdown;
-            if (items.StartsWith("|", StringComparison.Ordinal))
+            return new EditorSpec
             {
-                dropdown.AllowCustomValue = true;
-                items = items.Substring(1);
-            }
-            foreach (var raw in items.Split('|'))
-            {
-                if (string.IsNullOrEmpty(raw)) continue;
-                string value = null;
-                var label = raw;
-                if (raw.StartsWith("#", StringComparison.Ordinal))
-                {
-                    var semi = raw.IndexOf(';');
-                    if (semi > 1)
-                    {
-                        value = raw.Substring(1, semi - 1);
-                        label = raw.Substring(semi + 1);
-                    }
-                }
-                dropdown.Items.Add(new DropdownItem { Value = value, Label = label });
-            }
-            return dropdown;
+                Kind = EditorKind.EDITOR_TEXT,
+                Owner = EditorOwner.EDITOR_OWNER_HOST_NATIVE,
+                Presentation = EditorPresentation.EDITOR_INLINE,
+            };
         }
 
         public void SetCellCheckedState(int row, int col, VolvoxGridCheckedState state)
@@ -2434,10 +2374,10 @@ namespace VolvoxGrid.DotNet
             catch (Exception ex) { _lastError = ex.Message; return new byte[0]; }
         }
 
-        public void BeginEdit(int row, int col, bool? selectAll = null, bool? caretEnd = null, string seedText = null)
+        public void BeginEdit(int row, int col, EditStartReason reason = EditStartReason.EDIT_START_PROGRAMMATIC, string seedText = null, int? caretPosition = null)
         {
             if (row < 0 || col < 0 || !EnsureEngine()) return;
-            try { _client.EditStart(_gridId, row, col, selectAll, caretEnd, seedText); _renderHost.RequestFrame(); }
+            try { _client.EditStart(_gridId, row, col, reason, seedText, caretPosition); _renderHost.RequestFrame(); }
             catch (Exception ex) { _lastError = ex.Message; }
         }
 
@@ -2749,8 +2689,6 @@ namespace VolvoxGrid.DotNet
             {
                 case GridEvent.EventOneofCase.BeforeEdit:
                     return OnBeforeEdit(evt);
-                case GridEvent.EventOneofCase.BeforeDropdownOpen:
-                    return OnBeforeDropdownOpen(evt);
                 case GridEvent.EventOneofCase.CellEditValidate:
                     return OnCellEditValidating(evt);
                 case GridEvent.EventOneofCase.BeforeSort:
@@ -2788,7 +2726,6 @@ namespace VolvoxGrid.DotNet
             switch (evt.EventCase)
             {
                 case GridEvent.EventOneofCase.BeforeEdit:
-                case GridEvent.EventOneofCase.BeforeDropdownOpen:
                 case GridEvent.EventOneofCase.CellEditValidate:
                 case GridEvent.EventOneofCase.BeforeSort:
                 case GridEvent.EventOneofCase.BeforeNodeToggle:
@@ -2909,29 +2846,6 @@ namespace VolvoxGrid.DotNet
 
             var args = new VolvoxGridBeforeEditEventArgs(evt.BeforeEdit.Row, evt.BeforeEdit.Col, GetFieldName(evt.BeforeEdit.Col));
             _beforeEdit.Invoke(this, args);
-            return args.Cancel;
-        }
-
-        private bool? OnBeforeDropdownOpen(GridEvent evt)
-        {
-            if (_beforeDropdownOpen == null)
-            {
-                return _cancelableEventChannelRequested ? (bool?)false : null;
-            }
-
-            var before = evt.BeforeDropdownOpen;
-            var args = new VolvoxGridBeforeDropdownOpenEventArgs(
-                before.Row,
-                before.Col,
-                GetFieldName(before.Col),
-                before.X,
-                before.Y,
-                before.Width,
-                before.Height,
-                before.Dropdown,
-                before.CurrentValue,
-                before.SelectedIndex);
-            _beforeDropdownOpen.Invoke(this, args);
             return args.Cancel;
         }
 

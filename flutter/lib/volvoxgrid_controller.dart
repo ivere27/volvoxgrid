@@ -40,6 +40,30 @@ class EditCellStyle {
   });
 }
 
+EditorValue _editorValueFromText(String text) {
+  return EditorValue()
+    ..value = (CellValue()..text = text)
+    ..editText = text
+    ..displayText = text;
+}
+
+EditorSpec _listEditorSpec(ListEditorParams list) {
+  return EditorSpec()
+    ..kind = list.allowCustomValue
+        ? EditorKind.EDITOR_COMBO
+        : EditorKind.EDITOR_SELECT
+    ..owner = EditorOwner.EDITOR_OWNER_ENGINE
+    ..presentation = EditorPresentation.EDITOR_CANVAS
+    ..list = list;
+}
+
+EditorSpec _defaultHostTextEditorSpec() {
+  return EditorSpec()
+    ..kind = EditorKind.EDITOR_TEXT
+    ..owner = EditorOwner.EDITOR_OWNER_HOST_NATIVE
+    ..presentation = EditorPresentation.EDITOR_INLINE;
+}
+
 /// Simple row/col/text entry used by [setCells] batch operations.
 class CellTextEntry {
   final int row;
@@ -164,6 +188,7 @@ class VolvoxGridController extends ChangeNotifier {
         ..layout = (LayoutConfig()
           ..rows = rows
           ..cols = cols)
+        ..editing = (EditConfig()..defaultEditor = _defaultHostTextEditorSpec())
         ..indicators = _defaultIndicatorsConfig());
     final response = await VolvoxGridService.Create(req);
     _gridId = response.gridId;
@@ -925,58 +950,27 @@ class VolvoxGridController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ── Column Combo Lists ──────────────────────────────────────────────────
-
-  Dropdown _dropdownFromLegacyItems(String items) {
-    final dropdown = Dropdown()..allowCustomValue = items.startsWith('|');
-    final source = dropdown.allowCustomValue ? items.substring(1) : items;
-    for (final raw in source.split('|')) {
-      if (raw.isEmpty) continue;
-      String? value;
-      var label = raw;
-      final semi = raw.indexOf(';');
-      if (semi > 1 && raw.startsWith('#')) {
-        value = raw.substring(1, semi);
-        label = raw.substring(semi + 1);
-      }
-      dropdown.items.add(DropdownItem()
-        ..label = label
-        ..value = (value ?? ''));
-      if (value == null) {
-        dropdown.items.last.clearValue();
-      }
-    }
-    return dropdown;
-  }
+  // ── Column List Editors ─────────────────────────────────────────────────
 
   /// Set the typed dropdown for a column.
-  Future<void> setColDropdown(int col, Dropdown dropdown) async {
+  Future<void> setColDropdown(int col, ListEditorParams dropdown) async {
     await VolvoxGridService.DefineColumns(DefineColumnsRequest()
       ..gridId = _gridId
       ..columns.add(ColumnDef()
         ..index = col
-        ..dropdown = dropdown));
-  }
-
-  /// Set the dropdown items for a column (pipe-delimited, e.g. "A|B|C").
-  Future<void> setColDropdownItems(int col, String items) async {
-    await setColDropdown(col, _dropdownFromLegacyItems(items));
+        ..editor = _listEditorSpec(dropdown)));
   }
 
   /// Set the typed dropdown for an individual cell.
-  Future<void> setCellDropdown(int row, int col, Dropdown dropdown) async {
+  Future<void> setCellDropdown(
+      int row, int col, ListEditorParams dropdown) async {
     await VolvoxGridService.UpdateCells(UpdateCellsRequest()
       ..gridId = _gridId
       ..cells.add(CellUpdate()
         ..row = row
         ..col = col
-        ..dropdown = dropdown));
+        ..editor = _listEditorSpec(dropdown)));
     notifyListeners();
-  }
-
-  /// Set dropdown items for an individual cell.
-  Future<void> setCellDropdownItems(int row, int col, String items) async {
-    await setCellDropdown(row, col, _dropdownFromLegacyItems(items));
   }
 
   // ── Editing ───────────────────────────────────────────────────────────────
@@ -1003,37 +997,36 @@ class VolvoxGridController extends ChangeNotifier {
     if (!config.hasEditing()) {
       return EditTrigger.EDIT_TRIGGER_NONE;
     }
-    return config.editing.trigger;
+    return config.editing.hasActivation()
+        ? config.editing.activation.trigger
+        : EditTrigger.EDIT_TRIGGER_NONE;
   }
 
   /// Set the edit trigger mode for the grid.
   Future<void> setEditTrigger(EditTrigger mode) async {
-    await _configure(GridConfig()..editing = (EditConfig()..trigger = mode));
+    await _configure(GridConfig()
+      ..editing =
+          (EditConfig()..activation = (EditActivation()..trigger = mode)));
   }
 
   /// Begin editing the given cell.
   Future<void> beginEdit(
     int row,
     int col, {
-    bool? selectAll,
-    bool? caretEnd,
+    EditStartReason reason = EditStartReason.EDIT_START_PROGRAMMATIC,
     String? seedText,
+    int? caretPosition,
     bool? formulaMode,
   }) async {
     final start = EditStart()
       ..row = row
-      ..col = col;
-    if (selectAll != null) {
-      start.selectAll = selectAll;
-    }
-    if (caretEnd != null) {
-      start.caretEnd = caretEnd;
-    }
+      ..col = col
+      ..reason = reason;
     if (seedText != null) {
-      start.seedText = seedText;
+      start.seedValue = _editorValueFromText(seedText);
     }
-    if (formulaMode != null) {
-      start.formulaMode = formulaMode;
+    if (caretPosition != null) {
+      start.caretPosition = caretPosition;
     }
     await VolvoxGridService.Edit(EditCommand()
       ..gridId = _gridId
@@ -1041,31 +1034,84 @@ class VolvoxGridController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<EditorSessionCommand> _prepareSessionCommand(
+    EditorSessionCommand command, {
+    Int64? sessionId,
+    Int64? stateVersion,
+  }) async {
+    if (sessionId != null && sessionId != Int64.ZERO) {
+      command.sessionId = sessionId;
+    }
+    if (stateVersion != null && stateVersion != Int64.ZERO) {
+      command.stateVersion = stateVersion;
+    }
+    if ((command.sessionId == Int64.ZERO ||
+            command.stateVersion == Int64.ZERO) &&
+        _gridId != 0) {
+      try {
+        final state = await getEditState();
+        if (state.active && state.hasSession()) {
+          command.sessionId = state.session.sessionId;
+          command.stateVersion = state.session.stateVersion;
+        }
+      } catch (_) {
+        // Preserve the legacy best-effort behavior if the state probe fails.
+      }
+    }
+    return command;
+  }
+
   /// Commit or cancel the current cell edit.
-  Future<void> commitEdit(String text, {bool cancel = false}) async {
+  Future<void> commitEdit(
+    String text, {
+    bool cancel = false,
+    Int64? sessionId,
+    Int64? stateVersion,
+  }) async {
     if (cancel) {
+      final session = await _prepareSessionCommand(
+        EditorSessionCommand()..cancel = EditCancel(),
+        sessionId: sessionId,
+        stateVersion: stateVersion,
+      );
       await VolvoxGridService.Edit(EditCommand()
         ..gridId = _gridId
-        ..cancel = EditCancel());
+        ..session = session);
     } else {
+      final session = await _prepareSessionCommand(
+        EditorSessionCommand()
+          ..commit = (EditCommit()..value = _editorValueFromText(text)),
+        sessionId: sessionId,
+        stateVersion: stateVersion,
+      );
       await VolvoxGridService.Edit(EditCommand()
         ..gridId = _gridId
-        ..commit = (EditCommit()..text = text));
+        ..session = session);
     }
     notifyListeners();
   }
 
   /// Cancel the current cell edit.
-  Future<void> cancelEdit() async {
+  Future<void> cancelEdit({
+    Int64? sessionId,
+    Int64? stateVersion,
+  }) async {
+    final session = await _prepareSessionCommand(
+      EditorSessionCommand()..cancel = EditCancel(),
+      sessionId: sessionId,
+      stateVersion: stateVersion,
+    );
     await VolvoxGridService.Edit(EditCommand()
       ..gridId = _gridId
-      ..cancel = EditCancel());
+      ..session = session);
     notifyListeners();
   }
 
   /// Query the current edit session state without changing it.
   Future<EditState> getEditState() {
-    return VolvoxGridService.Edit(EditCommand()..gridId = _gridId);
+    return VolvoxGridService.Edit(EditCommand()
+      ..gridId = _gridId
+      ..getState = EditGetState());
   }
 
   /// Update IME preedit/composition state for the active edit session.
@@ -1073,13 +1119,21 @@ class VolvoxGridController extends ChangeNotifier {
     String text, {
     int cursor = 0,
     bool commit = false,
+    Int64? sessionId,
+    Int64? stateVersion,
   }) async {
+    final session = await _prepareSessionCommand(
+      EditorSessionCommand()
+        ..preeditChanged = (EditorPreeditChanged()
+          ..text = text
+          ..cursor = cursor
+          ..commit = commit),
+      sessionId: sessionId,
+      stateVersion: stateVersion,
+    );
     final state = await VolvoxGridService.Edit(EditCommand()
       ..gridId = _gridId
-      ..setPreedit = (EditSetPreedit()
-        ..text = text
-        ..cursor = cursor
-        ..commit = commit));
+      ..session = session);
     notifyListeners();
     return state;
   }

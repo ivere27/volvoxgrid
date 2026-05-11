@@ -7,10 +7,26 @@
  */
 import {
   ArchiveRequest_Action,
+  CellValueFields,
   ClearScope,
   DropdownItemLayout,
+  EditConfigFields,
+  EditEndReason,
+  EditorKind,
+  EditorOwner,
+  EditorPresentation,
+  EditorSessionEndedFields,
+  EditorSessionFields,
+  EditorSessionStartedFields,
+  EditorSessionUpdatedFields,
+  EditorSpecFields,
+  EditorValueFields,
   GridEventFields,
+  GridConfigFields,
+  ListEditorParamsFields,
+  ListItemFields,
   RenderLayerBit,
+  RenderOutputFields,
 } from "./generated/volvoxgrid_ffi.js";
 
 export { DropdownItemLayout } from "./generated/volvoxgrid_ffi.js";
@@ -127,6 +143,10 @@ export interface VolvoxGridDropdown {
   searchable?: boolean;
 }
 
+/**
+ * @deprecated Dropdown-open cancellation is no longer emitted. Use `onBeforeEdit`
+ * or editor list data-source APIs instead.
+ */
 export interface VolvoxGridBeforeDropdownOpenDetails {
   eventId: bigint;
   rawEvent: Uint8Array;
@@ -150,6 +170,37 @@ export interface VolvoxGridCellEditValidatingDetails {
   editText: string;
   cancel: boolean;
 }
+
+export interface VolvoxGridEditorSessionStartedDetails {
+  sessionId: bigint;
+  row: number;
+  col: number;
+  initialText: string;
+  presentation: EditorPresentation;
+  stateVersion: bigint;
+  rawEvent: Uint8Array;
+}
+
+export interface VolvoxGridEditorSessionUpdatedDetails {
+  sessionId: bigint;
+  text?: string;
+  visible?: boolean;
+  stateVersion: bigint;
+  rawEvent: Uint8Array;
+}
+
+export interface VolvoxGridEditorSessionEndedDetails {
+  sessionId: bigint;
+  reason: EditEndReason;
+  committedText?: string;
+  stateVersion: bigint;
+  rawEvent: Uint8Array;
+}
+
+type VolvoxGridEditorSessionRenderEvent =
+  | { kind: "started"; details: VolvoxGridEditorSessionStartedDetails }
+  | { kind: "updated"; details: VolvoxGridEditorSessionUpdatedDetails }
+  | { kind: "ended"; details: VolvoxGridEditorSessionEndedDetails };
 
 export interface VolvoxGridBeforeSortDetails {
   eventId: bigint;
@@ -541,7 +592,6 @@ const PB_TEXT_DECODER = new TextDecoder();
 const GRID_EVENT_BEFORE_EDIT = GridEventFields["before_edit"];
 const GRID_EVENT_CELL_EDIT_VALIDATE = GridEventFields["cell_edit_validate"];
 const GRID_EVENT_BEFORE_SORT = GridEventFields["before_sort"];
-const GRID_EVENT_BEFORE_DROPDOWN_OPEN = GridEventFields["before_dropdown_open"];
 const STREAM_STATUS_DATA = 0;
 const STREAM_STATUS_EOF = 1;
 const STREAM_STATUS_PENDING = 2;
@@ -826,58 +876,69 @@ function pbEncodeMessageField(field: number, payload: Uint8Array): number[] {
   ];
 }
 
-function pbEncodeDropdownItem(item: VolvoxGridDropdownItem): Uint8Array {
+function pbEncodeCellTextValue(value: string): Uint8Array {
+  return new Uint8Array(pbEncodeStringField(CellValueFields.text, value));
+}
+
+function pbEncodeListItem(item: VolvoxGridDropdownItem): Uint8Array {
   const out: number[] = [];
   if (item.value != null) {
-    out.push(...pbEncodeStringField(1, item.value));
+    out.push(...pbEncodeMessageField(ListItemFields.value, pbEncodeCellTextValue(item.value)));
   }
   if (item.label != null) {
-    out.push(...pbEncodeStringField(2, item.label));
+    out.push(...pbEncodeStringField(ListItemFields.label, item.label));
   }
   for (const detail of item.details ?? []) {
-    out.push(...pbEncodeStringField(3, detail));
+    out.push(...pbEncodeStringField(ListItemFields.details, detail));
   }
   if (item.disabled === true) {
-    out.push(...pbEncodeTag(4, 0), ...pbEncodeBool(true));
+    out.push(...pbEncodeTag(ListItemFields.disabled, 0), ...pbEncodeBool(true));
   }
   return new Uint8Array(out);
 }
 
-function pbEncodeDropdown(dropdown: VolvoxGridDropdown): Uint8Array {
+function pbEncodeListEditorParams(dropdown: VolvoxGridDropdown): Uint8Array {
   const out: number[] = [];
   for (const item of dropdown.items ?? []) {
-    out.push(...pbEncodeMessageField(1, pbEncodeDropdownItem(item)));
+    out.push(...pbEncodeMessageField(ListEditorParamsFields.static_items, pbEncodeListItem(item)));
   }
   if (dropdown.allowCustomValue === true) {
-    out.push(...pbEncodeTag(2, 0), ...pbEncodeBool(true));
+    out.push(...pbEncodeTag(ListEditorParamsFields.allow_custom_value, 0), ...pbEncodeBool(true));
   }
   if (dropdown.itemLayout != null && dropdown.itemLayout !== DropdownItemLayout.DROPDOWN_ITEM_AUTO) {
-    out.push(...pbEncodeTag(3, 0), ...pbEncodeInt32(dropdown.itemLayout));
+    out.push(...pbEncodeTag(ListEditorParamsFields.item_layout, 0), ...pbEncodeInt32(dropdown.itemLayout));
   }
   if (dropdown.searchable != null) {
-    out.push(...pbEncodeTag(4, 0), ...pbEncodeBool(dropdown.searchable));
+    out.push(...pbEncodeTag(ListEditorParamsFields.searchable, 0), ...pbEncodeBool(dropdown.searchable));
   }
   return new Uint8Array(out);
 }
 
-function dropdownFromLegacyItems(items: string): VolvoxGridDropdown {
-  const dropdown: VolvoxGridDropdown = {
-    items: [],
-    allowCustomValue: items.startsWith("|"),
-  };
-  const source = dropdown.allowCustomValue ? items.slice(1) : items;
-  for (const raw of source.split("|")) {
-    if (!raw) continue;
-    let value: string | undefined;
-    let label = raw;
-    const semi = raw.indexOf(";");
-    if (raw.startsWith("#") && semi > 1) {
-      value = raw.slice(1, semi);
-      label = raw.slice(semi + 1);
-    }
-    dropdown.items.push(value == null ? { label } : { value, label });
-  }
-  return dropdown;
+function pbEncodeDropdownEditor(dropdown: VolvoxGridDropdown): Uint8Array {
+  const out: number[] = [];
+  out.push(...pbEncodeTag(EditorSpecFields.kind, 0), ...pbEncodeInt32(
+    dropdown.allowCustomValue === true ? EditorKind.EDITOR_COMBO : EditorKind.EDITOR_SELECT,
+  ));
+  out.push(...pbEncodeTag(EditorSpecFields.owner, 0), ...pbEncodeInt32(EditorOwner.EDITOR_OWNER_ENGINE));
+  out.push(...pbEncodeTag(EditorSpecFields.presentation, 0), ...pbEncodeInt32(EditorPresentation.EDITOR_CANVAS));
+  out.push(...pbEncodeMessageField(EditorSpecFields.list, pbEncodeListEditorParams(dropdown)));
+  return new Uint8Array(out);
+}
+
+function pbEncodeHostTextEditor(): Uint8Array {
+  const out: number[] = [];
+  out.push(...pbEncodeTag(EditorSpecFields.kind, 0), ...pbEncodeInt32(EditorKind.EDITOR_TEXT));
+  out.push(...pbEncodeTag(EditorSpecFields.owner, 0), ...pbEncodeInt32(EditorOwner.EDITOR_OWNER_HOST_NATIVE));
+  out.push(...pbEncodeTag(EditorSpecFields.presentation, 0), ...pbEncodeInt32(EditorPresentation.EDITOR_INLINE));
+  return new Uint8Array(out);
+}
+
+function pbEncodeDefaultHostTextEditConfig(): Uint8Array {
+  const editing: number[] = [];
+  editing.push(...pbEncodeMessageField(EditConfigFields.default_editor, pbEncodeHostTextEditor()));
+  const gridConfig: number[] = [];
+  gridConfig.push(...pbEncodeMessageField(GridConfigFields.editing, new Uint8Array(editing)));
+  return new Uint8Array(gridConfig);
 }
 
 function dropdownToLegacyItems(dropdown: VolvoxGridDropdown): string {
@@ -1843,73 +1904,6 @@ function pbDecodeBeforeSortPayload(data: Uint8Array): { col: number } {
   return { col };
 }
 
-function pbDecodeBeforeDropdownOpenPayload(data: Uint8Array): {
-  row: number;
-  col: number;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  dropdown: VolvoxGridDropdown;
-  currentValue: string;
-  selectedIndex: number;
-} {
-  let row = 0;
-  let col = 0;
-  let x = 0;
-  let y = 0;
-  let width = 0;
-  let height = 0;
-  let dropdown: VolvoxGridDropdown = { items: [] };
-  let currentValue = "";
-  let selectedIndex = -1;
-  let offset = 0;
-  while (offset < data.length) {
-    const tag = pbReadVarint(data, offset);
-    offset = tag.next;
-    const field = Number(tag.value >> 3n);
-    const wire = Number(tag.value & 0x7n);
-    if (wire === 0) {
-      const value = pbReadVarint(data, offset);
-      const n = pbAsInt32(value.value);
-      offset = value.next;
-      if (field === 1) row = n;
-      else if (field === 2) col = n;
-      else if (field === 9) selectedIndex = n;
-      continue;
-    }
-    if (wire === 5 && offset + 4 <= data.length) {
-      const n = new DataView(data.buffer, data.byteOffset + offset, 4).getFloat32(0, true);
-      offset += 4;
-      if (field === 3) x = n;
-      else if (field === 4) y = n;
-      else if (field === 5) width = n;
-      else if (field === 6) height = n;
-      continue;
-    }
-    if (wire === 2 && field === 8) {
-      const len = pbReadVarint(data, offset);
-      const n = Number(len.value);
-      const start = len.next;
-      const end = Math.min(data.length, start + n);
-      currentValue = PB_TEXT_DECODER.decode(data.slice(start, end));
-      offset = end;
-      continue;
-    }
-    if (wire === 2 && field === 7) {
-      const len = pbReadVarint(data, offset);
-      const n = Number(len.value);
-      const start = len.next;
-      const end = Math.min(data.length, start + n);
-      dropdown = pbDecodeDropdown(data.slice(start, end));
-      offset = end;
-      continue;
-    }
-    offset = pbSkipField(data, offset, wire);
-  }
-  return { row, col, x, y, width, height, dropdown, currentValue, selectedIndex };
-}
-
 function pbDecodeDropdown(data: Uint8Array): VolvoxGridDropdown {
   const dropdown: VolvoxGridDropdown = { items: [] };
   let offset = 0;
@@ -2006,24 +2000,261 @@ function pbDecodeFrameDoneRect(
   return rect.w > 0 && rect.h > 0 ? rect : null;
 }
 
-function pbDecodeRenderOutput(
-  data: Uint8Array,
-): { rendered: boolean; dirtyRect: { x: number; y: number; w: number; h: number } | null } {
+function pbDecodeEditorValueText(data: Uint8Array): string | undefined {
   let offset = 0;
-  let rendered = false;
-  let dirtyRect: { x: number; y: number; w: number; h: number } | null = null;
+  let cellText: string | undefined;
+  let editText: string | undefined;
+  let displayText: string | undefined;
   while (offset < data.length) {
     const tag = pbReadVarint(data, offset);
     offset = tag.next;
     const field = Number(tag.value >> 3n);
     const wire = Number(tag.value & 0x7n);
-    if (field === 1 && wire === 0) {
+    if (wire === 2 && field === EditorValueFields.value) {
+      const len = pbReadVarint(data, offset);
+      const n = Number(len.value);
+      const start = len.next;
+      const end = Math.min(data.length, start + n);
+      if (Number.isFinite(n) && n >= 0) {
+        const value = pbDecodeCellValue(data.slice(start, end));
+        if (value?.kind === "text") {
+          cellText = value.text;
+        }
+      }
+      offset = end;
+      continue;
+    }
+    if (wire === 2
+      && (field === EditorValueFields.edit_text || field === EditorValueFields.display_text)) {
+      const len = pbReadVarint(data, offset);
+      const n = Number(len.value);
+      const start = len.next;
+      const end = Math.min(data.length, start + n);
+      const text = Number.isFinite(n) && n >= 0
+        ? PB_TEXT_DECODER.decode(data.slice(start, end))
+        : "";
+      if (field === EditorValueFields.edit_text) {
+        editText = text;
+      } else {
+        displayText = text;
+      }
+      offset = end;
+      continue;
+    }
+    offset = pbSkipField(data, offset, wire);
+  }
+  return editText ?? displayText ?? cellText;
+}
+
+function pbDecodeEditorSpecPresentation(data: Uint8Array): EditorPresentation {
+  let offset = 0;
+  let presentation = EditorPresentation.EDITOR_CANVAS;
+  while (offset < data.length) {
+    const tag = pbReadVarint(data, offset);
+    offset = tag.next;
+    const field = Number(tag.value >> 3n);
+    const wire = Number(tag.value & 0x7n);
+    if (wire === 0 && field === EditorSpecFields.presentation) {
+      const v = pbReadVarint(data, offset);
+      offset = v.next;
+      presentation = Number(v.value) as EditorPresentation;
+      continue;
+    }
+    offset = pbSkipField(data, offset, wire);
+  }
+  return presentation;
+}
+
+function pbDecodeEditorSession(data: Uint8Array): {
+  sessionId: bigint;
+  row: number;
+  col: number;
+  initialText: string;
+  presentation: EditorPresentation;
+  stateVersion: bigint;
+} {
+  let offset = 0;
+  let sessionId = 0n;
+  let row = -1;
+  let col = -1;
+  let initialText = "";
+  let presentation = EditorPresentation.EDITOR_CANVAS;
+  let stateVersion = 0n;
+  while (offset < data.length) {
+    const tag = pbReadVarint(data, offset);
+    offset = tag.next;
+    const field = Number(tag.value >> 3n);
+    const wire = Number(tag.value & 0x7n);
+    if (wire === 0) {
+      const v = pbReadVarint(data, offset);
+      offset = v.next;
+      if (field === EditorSessionFields.session_id) sessionId = BigInt.asIntN(64, v.value);
+      if (field === EditorSessionFields.row) row = pbAsInt32(v.value);
+      if (field === EditorSessionFields.col) col = pbAsInt32(v.value);
+      if (field === EditorSessionFields.state_version) stateVersion = v.value;
+      continue;
+    }
+    if (wire === 2 && field === EditorSessionFields.value) {
+      const len = pbReadVarint(data, offset);
+      const n = Number(len.value);
+      const start = len.next;
+      const end = Math.min(data.length, start + n);
+      if (Number.isFinite(n) && n >= 0) {
+        initialText = pbDecodeEditorValueText(data.slice(start, end)) ?? "";
+      }
+      offset = end;
+      continue;
+    }
+    if (wire === 2 && field === EditorSessionFields.editor) {
+      const len = pbReadVarint(data, offset);
+      const n = Number(len.value);
+      const start = len.next;
+      const end = Math.min(data.length, start + n);
+      if (Number.isFinite(n) && n >= 0) {
+        presentation = pbDecodeEditorSpecPresentation(data.slice(start, end));
+      }
+      offset = end;
+      continue;
+    }
+    offset = pbSkipField(data, offset, wire);
+  }
+  return { sessionId, row, col, initialText, presentation, stateVersion };
+}
+
+function pbDecodeEditorSessionStarted(
+  data: Uint8Array,
+): VolvoxGridEditorSessionStartedDetails {
+  let offset = 0;
+  let sessionId = 0n;
+  let row = -1;
+  let col = -1;
+  let initialText = "";
+  let presentation = EditorPresentation.EDITOR_CANVAS;
+  let stateVersion = 0n;
+  while (offset < data.length) {
+    const tag = pbReadVarint(data, offset);
+    offset = tag.next;
+    const field = Number(tag.value >> 3n);
+    const wire = Number(tag.value & 0x7n);
+    if (wire === 2 && field === EditorSessionStartedFields.session) {
+      const len = pbReadVarint(data, offset);
+      const n = Number(len.value);
+      const start = len.next;
+      const end = Math.min(data.length, start + n);
+      if (Number.isFinite(n) && n >= 0) {
+        const inner = pbDecodeEditorSession(data.slice(start, end));
+        sessionId = inner.sessionId;
+        row = inner.row;
+        col = inner.col;
+        initialText = inner.initialText;
+        presentation = inner.presentation;
+        stateVersion = inner.stateVersion;
+      }
+      offset = end;
+      continue;
+    }
+    offset = pbSkipField(data, offset, wire);
+  }
+  return { sessionId, row, col, initialText, presentation, stateVersion, rawEvent: data };
+}
+
+function pbDecodeEditorSessionUpdated(
+  data: Uint8Array,
+): VolvoxGridEditorSessionUpdatedDetails {
+  let offset = 0;
+  let sessionId = 0n;
+  let stateVersion = 0n;
+  let text: string | undefined;
+  let visible: boolean | undefined;
+  while (offset < data.length) {
+    const tag = pbReadVarint(data, offset);
+    offset = tag.next;
+    const field = Number(tag.value >> 3n);
+    const wire = Number(tag.value & 0x7n);
+    if (wire === 0) {
+      const v = pbReadVarint(data, offset);
+      offset = v.next;
+      if (field === EditorSessionUpdatedFields.session_id) sessionId = BigInt.asIntN(64, v.value);
+      if (field === EditorSessionUpdatedFields.state_version) stateVersion = v.value;
+      if (field === EditorSessionUpdatedFields.visible) visible = v.value !== 0n;
+      continue;
+    }
+    if (wire === 2 && field === EditorSessionUpdatedFields.value) {
+      const len = pbReadVarint(data, offset);
+      const n = Number(len.value);
+      const start = len.next;
+      const end = Math.min(data.length, start + n);
+      if (Number.isFinite(n) && n >= 0) {
+        text = pbDecodeEditorValueText(data.slice(start, end));
+      }
+      offset = end;
+      continue;
+    }
+    offset = pbSkipField(data, offset, wire);
+  }
+  return { sessionId, text, visible, stateVersion, rawEvent: data };
+}
+
+function pbDecodeEditorSessionEnded(
+  data: Uint8Array,
+): VolvoxGridEditorSessionEndedDetails {
+  let offset = 0;
+  let sessionId = 0n;
+  let reason = EditEndReason.EDIT_END_UNSPECIFIED;
+  let committedText: string | undefined;
+  let stateVersion = 0n;
+  while (offset < data.length) {
+    const tag = pbReadVarint(data, offset);
+    offset = tag.next;
+    const field = Number(tag.value >> 3n);
+    const wire = Number(tag.value & 0x7n);
+    if (wire === 0) {
+      const v = pbReadVarint(data, offset);
+      offset = v.next;
+      if (field === EditorSessionEndedFields.session_id) sessionId = BigInt.asIntN(64, v.value);
+      if (field === EditorSessionEndedFields.reason) reason = pbAsInt32(v.value) as EditEndReason;
+      if (field === EditorSessionEndedFields.state_version) stateVersion = v.value;
+      continue;
+    }
+    if (wire === 2 && field === EditorSessionEndedFields.committed_value) {
+      const len = pbReadVarint(data, offset);
+      const n = Number(len.value);
+      const start = len.next;
+      const end = Math.min(data.length, start + n);
+      if (Number.isFinite(n) && n >= 0) {
+        committedText = pbDecodeEditorValueText(data.slice(start, end));
+      }
+      offset = end;
+      continue;
+    }
+    offset = pbSkipField(data, offset, wire);
+  }
+  return { sessionId, reason, committedText, stateVersion, rawEvent: data };
+}
+
+function pbDecodeRenderOutput(
+  data: Uint8Array,
+): {
+  rendered: boolean;
+  dirtyRect: { x: number; y: number; w: number; h: number } | null;
+  editorEvents: VolvoxGridEditorSessionRenderEvent[];
+} {
+  let offset = 0;
+  let rendered = false;
+  let dirtyRect: { x: number; y: number; w: number; h: number } | null = null;
+  const editorEvents: VolvoxGridEditorSessionRenderEvent[] = [];
+  while (offset < data.length) {
+    const tag = pbReadVarint(data, offset);
+    offset = tag.next;
+    const field = Number(tag.value >> 3n);
+    const wire = Number(tag.value & 0x7n);
+    if (field === RenderOutputFields.rendered && wire === 0) {
       const v = pbReadVarint(data, offset);
       offset = v.next;
       rendered = v.value !== 0n;
       continue;
     }
-    if (field === 2 && wire === 2) {
+    if (field === RenderOutputFields.frame_done && wire === 2) {
       const len = pbReadVarint(data, offset);
       const n = Number(len.value);
       if (Number.isFinite(n) && n > 0) {
@@ -2033,9 +2264,30 @@ function pbDecodeRenderOutput(
       offset = pbSkipField(data, offset, wire);
       continue;
     }
+    if (wire === 2
+      && (field === RenderOutputFields.editor_started
+        || field === RenderOutputFields.editor_updated
+        || field === RenderOutputFields.editor_ended)) {
+      const len = pbReadVarint(data, offset);
+      const n = Number(len.value);
+      const start = len.next;
+      const end = Math.min(data.length, start + n);
+      if (Number.isFinite(n) && n >= 0) {
+        const payload = data.slice(start, end);
+        if (field === RenderOutputFields.editor_started) {
+          editorEvents.push({ kind: "started", details: pbDecodeEditorSessionStarted(payload) });
+        } else if (field === RenderOutputFields.editor_updated) {
+          editorEvents.push({ kind: "updated", details: pbDecodeEditorSessionUpdated(payload) });
+        } else {
+          editorEvents.push({ kind: "ended", details: pbDecodeEditorSessionEnded(payload) });
+        }
+      }
+      offset = end;
+      continue;
+    }
     offset = pbSkipField(data, offset, wire);
   }
-  return { rendered, dirtyRect };
+  return { rendered, dirtyRect, editorEvents };
 }
 
 function pbDecodePrintPage(
@@ -2505,6 +2757,13 @@ export class VolvoxGrid {
     ((details: VolvoxGridBeforeDropdownOpenDetails) => void) | null = null;
   private cellEditValidatingListener:
     ((details: VolvoxGridCellEditValidatingDetails) => void) | null = null;
+  private activeEditorSessionPresentation: EditorPresentation | null = null;
+  private editorSessionStartedListener:
+    ((details: VolvoxGridEditorSessionStartedDetails) => void) | null = null;
+  private editorSessionUpdatedListener:
+    ((details: VolvoxGridEditorSessionUpdatedDetails) => void) | null = null;
+  private editorSessionEndedListener:
+    ((details: VolvoxGridEditorSessionEndedDetails) => void) | null = null;
   private beforeSortListener: ((details: VolvoxGridBeforeSortDetails) => void) | null = null;
   private compareListener: VolvoxGridCompareCallback | null = null;
   private manualEventDecisionEnabled: boolean = false;
@@ -2524,6 +2783,7 @@ export class VolvoxGrid {
 
   // Host-side editors for full caret/IME/text-selection UX.
   private editInput!: HTMLInputElement;
+  private editTextArea!: HTMLTextAreaElement;
   private editSelect!: HTMLSelectElement;
   private editDataList!: HTMLDataListElement;
   private editDataListId!: string;
@@ -2568,8 +2828,6 @@ export class VolvoxGrid {
   private cellSpanModeValue: number = 0;
   private editTriggerValue: number = 2;
   private tabBehaviorValue: number = 1;
-  private dropdownTriggerValue: number = 1;
-  private dropdownSearchValue: boolean = true;
   private scrollBarsValue: number = 3;
   private animationEnabledValue: boolean = false;
   private animationDurationMsValue: number = 0;
@@ -2585,7 +2843,10 @@ export class VolvoxGrid {
     this.syncCancelableEventDecisionSupport();
   }
 
-  /** Cancelable dropdown-open hook. Set cancel=true to render a host picker. */
+  /**
+   * @deprecated Dropdown-open cancellation is no longer emitted. Use `onBeforeEdit`
+   * or editor list data-source APIs instead.
+   */
   get onBeforeDropdownOpen():
     ((details: VolvoxGridBeforeDropdownOpenDetails) => void) | null {
     return this.beforeDropdownOpenListener;
@@ -2595,7 +2856,6 @@ export class VolvoxGrid {
     listener: ((details: VolvoxGridBeforeDropdownOpenDetails) => void) | null,
   ) {
     this.beforeDropdownOpenListener = listener;
-    this.syncCancelableEventDecisionSupport();
   }
 
   /** Cancelable edit-commit validation hook for the web canvas host. */
@@ -2608,6 +2868,42 @@ export class VolvoxGrid {
   ) {
     this.cellEditValidatingListener = listener;
     this.syncCancelableEventDecisionSupport();
+  }
+
+  /** Render-session editor lifecycle hook. Fired when the engine starts editing a cell. */
+  get onEditorSessionStarted():
+    ((details: VolvoxGridEditorSessionStartedDetails) => void) | null {
+    return this.editorSessionStartedListener;
+  }
+
+  set onEditorSessionStarted(
+    listener: ((details: VolvoxGridEditorSessionStartedDetails) => void) | null,
+  ) {
+    this.editorSessionStartedListener = listener;
+  }
+
+  /** Render-session editor lifecycle hook. Fired for geometry/value/visibility updates. */
+  get onEditorSessionUpdated():
+    ((details: VolvoxGridEditorSessionUpdatedDetails) => void) | null {
+    return this.editorSessionUpdatedListener;
+  }
+
+  set onEditorSessionUpdated(
+    listener: ((details: VolvoxGridEditorSessionUpdatedDetails) => void) | null,
+  ) {
+    this.editorSessionUpdatedListener = listener;
+  }
+
+  /** Render-session editor lifecycle hook. Fired when the engine ends an edit session. */
+  get onEditorSessionEnded():
+    ((details: VolvoxGridEditorSessionEndedDetails) => void) | null {
+    return this.editorSessionEndedListener;
+  }
+
+  set onEditorSessionEnded(
+    listener: ((details: VolvoxGridEditorSessionEndedDetails) => void) | null,
+  ) {
+    this.editorSessionEndedListener = listener;
   }
 
   /** Cancelable header-sort hook for the web canvas host. */
@@ -2795,21 +3091,12 @@ export class VolvoxGrid {
     } else {
       this.wasm.set_editable_mode(this.gridId, 2);
     }
-    if (typeof this.wasm.set_dropdown_trigger === "function") {
-      this.wasm.set_dropdown_trigger(this.gridId, 1);
-    } else {
-      this.wasm.set_show_combo_button(this.gridId, 1);
-    }
-    if (typeof this.wasm.set_dropdown_search === "function") {
-      this.wasm.set_dropdown_search(this.gridId, 1);
-    } else {
-      this.wasm.set_combo_search(this.gridId, 1);
-    }
     if (typeof this.wasm.set_host_dropdown_overlay === "function") {
       this.wasm.set_host_dropdown_overlay(this.gridId, 0);
     } else {
       this.wasm.set_host_combo_overlay(this.gridId, 0);
     } // engine renders the combo dropdown instead of a host overlay
+    this.applyProtoConfig(pbEncodeDefaultHostTextEditConfig(), "DefaultHostTextEditor");
     this.wasm.set_fling_enabled(this.gridId, 1); // inertial scroll
     if (typeof this.wasm.set_fast_scroll_enabled === "function") {
       this.wasm.set_fast_scroll_enabled(this.gridId, true);
@@ -2828,6 +3115,7 @@ export class VolvoxGrid {
 
     this.editDataListId = `volvoxgrid-edit-list-${Math.random().toString(36).slice(2)}`;
     this.editInput = document.createElement("input");
+    this.editTextArea = document.createElement("textarea");
     this.editSelect = document.createElement("select");
     this.editDataList = document.createElement("datalist");
     this.initHostEditors();
@@ -3744,44 +4032,6 @@ export class VolvoxGrid {
     this.dirty = true;
   }
 
-  get dropdownTrigger(): number {
-    if (typeof this.wasm.get_dropdown_trigger === "function") {
-      this.dropdownTriggerValue = Number(this.wasm.get_dropdown_trigger(this.gridId));
-    } else if (typeof this.wasm.get_show_combo_button === "function") {
-      this.dropdownTriggerValue = Number(this.wasm.get_show_combo_button(this.gridId));
-    }
-    return this.dropdownTriggerValue;
-  }
-
-  set dropdownTrigger(mode: number) {
-    this.dropdownTriggerValue = Math.trunc(mode);
-    if (typeof this.wasm.set_dropdown_trigger === "function") {
-      this.wasm.set_dropdown_trigger(this.gridId, this.dropdownTriggerValue);
-    } else {
-      this.wasm.set_show_combo_button(this.gridId, this.dropdownTriggerValue);
-    }
-    this.dirty = true;
-  }
-
-  get dropdownSearch(): boolean {
-    if (typeof this.wasm.get_dropdown_search === "function") {
-      this.dropdownSearchValue = Boolean(this.wasm.get_dropdown_search(this.gridId));
-    } else if (typeof this.wasm.get_combo_search === "function") {
-      this.dropdownSearchValue = Boolean(this.wasm.get_combo_search(this.gridId));
-    }
-    return this.dropdownSearchValue;
-  }
-
-  set dropdownSearch(enabled: boolean) {
-    this.dropdownSearchValue = Boolean(enabled);
-    if (typeof this.wasm.set_dropdown_search === "function") {
-      this.wasm.set_dropdown_search(this.gridId, this.dropdownSearchValue ? 1 : 0);
-    } else {
-      this.wasm.set_combo_search(this.gridId, this.dropdownSearchValue ? 1 : 0);
-    }
-    this.dirty = true;
-  }
-
   get editMaxLength(): number {
     if (typeof this.wasm.get_edit_max_length === "function") {
       return Number(this.wasm.get_edit_max_length(this.gridId));
@@ -4413,68 +4663,38 @@ export class VolvoxGrid {
   }
 
   setColDropdown(col: number, dropdown: VolvoxGridDropdown): void {
-    if (typeof this.wasm.volvox_grid_define_columns_pb === "function") {
-      const colDef: number[] = [];
-      colDef.push(...pbEncodeTag(1, 0), ...pbEncodeInt32(col));
-      colDef.push(...pbEncodeMessageField(13, pbEncodeDropdown(dropdown)));
-
-      const request: number[] = [];
-      request.push(...pbEncodeTag(1, 0), ...pbEncodeInt64(BigInt(this.gridId)));
-      request.push(...pbEncodeMessageField(2, new Uint8Array(colDef)));
-
-      this.wasm.volvox_grid_define_columns_pb(new Uint8Array(request));
-      this.dirty = true;
-      return;
+    if (typeof this.wasm.volvox_grid_define_columns_pb !== "function") {
+      throw new Error("Typed editor API is not available in this VolvoxGrid runtime");
     }
 
-    const items = dropdownToLegacyItems(dropdown);
-    if (typeof this.wasm.set_col_dropdown_items === "function") {
-      this.wasm.set_col_dropdown_items(this.gridId, col, items);
-    } else {
-      this.wasm.set_col_combo_list(this.gridId, col, items);
-    }
+    const colDef: number[] = [];
+    colDef.push(...pbEncodeTag(1, 0), ...pbEncodeInt32(col));
+    colDef.push(...pbEncodeMessageField(13, pbEncodeDropdownEditor(dropdown)));
+
+    const request: number[] = [];
+    request.push(...pbEncodeTag(1, 0), ...pbEncodeInt64(BigInt(this.gridId)));
+    request.push(...pbEncodeMessageField(2, new Uint8Array(colDef)));
+
+    this.wasm.volvox_grid_define_columns_pb(new Uint8Array(request));
     this.dirty = true;
-  }
-
-  setColDropdownItems(col: number, items: string): void {
-    this.setColDropdown(col, dropdownFromLegacyItems(items));
-  }
-
-  setColComboList(col: number, list: string): void {
-    this.setColDropdownItems(col, list);
   }
 
   setCellDropdown(row: number, col: number, dropdown: VolvoxGridDropdown): void {
-    if (typeof this.wasm.volvox_grid_update_cells_pb === "function") {
-      const cellUpdate: number[] = [];
-      cellUpdate.push(...pbEncodeTag(1, 0), ...pbEncodeInt32(row));
-      cellUpdate.push(...pbEncodeTag(2, 0), ...pbEncodeInt32(col));
-      cellUpdate.push(...pbEncodeMessageField(9, pbEncodeDropdown(dropdown)));
-
-      const request: number[] = [];
-      request.push(...pbEncodeTag(1, 0), ...pbEncodeInt64(BigInt(this.gridId)));
-      request.push(...pbEncodeMessageField(2, new Uint8Array(cellUpdate)));
-
-      this.wasm.volvox_grid_update_cells_pb(new Uint8Array(request));
-      this.dirty = true;
-      return;
+    if (typeof this.wasm.volvox_grid_update_cells_pb !== "function") {
+      throw new Error("Typed editor API is not available in this VolvoxGrid runtime");
     }
 
-    const items = dropdownToLegacyItems(dropdown);
-    if (typeof this.wasm.set_cell_dropdown_items === "function") {
-      this.wasm.set_cell_dropdown_items(this.gridId, row, col, items);
-    } else {
-      this.wasm.set_cell_combo_list(this.gridId, row, col, items);
-    }
+    const cellUpdate: number[] = [];
+    cellUpdate.push(...pbEncodeTag(1, 0), ...pbEncodeInt32(row));
+    cellUpdate.push(...pbEncodeTag(2, 0), ...pbEncodeInt32(col));
+    cellUpdate.push(...pbEncodeMessageField(9, pbEncodeDropdownEditor(dropdown)));
+
+    const request: number[] = [];
+    request.push(...pbEncodeTag(1, 0), ...pbEncodeInt64(BigInt(this.gridId)));
+    request.push(...pbEncodeMessageField(2, new Uint8Array(cellUpdate)));
+
+    this.wasm.volvox_grid_update_cells_pb(new Uint8Array(request));
     this.dirty = true;
-  }
-
-  setCellDropdownItems(row: number, col: number, items: string): void {
-    this.setCellDropdown(row, col, dropdownFromLegacyItems(items));
-  }
-
-  setCellComboList(row: number, col: number, list: string): void {
-    this.setCellDropdownItems(row, col, list);
   }
 
   set flingImpulseGain(gain: number) {
@@ -4847,7 +5067,6 @@ export class VolvoxGrid {
 
   private hasCancelableEventListeners(): boolean {
     return this.beforeEditListener != null
-      || this.beforeDropdownOpenListener != null
       || this.cellEditValidatingListener != null
       || this.beforeSortListener != null;
   }
@@ -4946,26 +5165,6 @@ export class VolvoxGrid {
           cancel: false,
         };
         this.cellEditValidatingListener?.(details);
-        return details.cancel;
-      }
-
-      if (decoded.eventField === GRID_EVENT_BEFORE_DROPDOWN_OPEN) {
-        const payload = pbDecodeBeforeDropdownOpenPayload(decoded.payload);
-        const details: VolvoxGridBeforeDropdownOpenDetails = {
-          eventId: decoded.eventId,
-          rawEvent,
-          row: payload.row,
-          col: payload.col,
-          x: payload.x,
-          y: payload.y,
-          width: payload.width,
-          height: payload.height,
-          dropdown: payload.dropdown,
-          currentValue: payload.currentValue,
-          selectedIndex: payload.selectedIndex,
-          cancel: false,
-        };
-        this.beforeDropdownOpenListener?.(details);
         return details.cancel;
       }
 
@@ -5626,6 +5825,7 @@ export class VolvoxGrid {
       this.wasm.set_fling_enabled(this.gridId, 0);
     }
     this.hideHostEditors(false);
+    this.activeEditorSessionPresentation = null;
     this.gridId = nextId;
     if (this._presentMode !== 0) {
       this.presentMode = this._presentMode;
@@ -5952,6 +6152,18 @@ export class VolvoxGrid {
     }
   }
 
+  private dispatchEditorSessionEvent(event: VolvoxGridEditorSessionRenderEvent): void {
+    if (event.kind === "started") {
+      this.activeEditorSessionPresentation = event.details.presentation;
+      this.editorSessionStartedListener?.(event.details);
+    } else if (event.kind === "updated") {
+      this.editorSessionUpdatedListener?.(event.details);
+    } else {
+      this.activeEditorSessionPresentation = null;
+      this.editorSessionEndedListener?.(event.details);
+    }
+  }
+
   private renderViaRenderSession(
     width: number,
     height: number,
@@ -5995,6 +6207,9 @@ export class VolvoxGrid {
           }
           if (decoded.dirtyRect) {
             dirtyRect = decoded.dirtyRect;
+          }
+          for (const editorEvent of decoded.editorEvents) {
+            this.dispatchEditorSessionEvent(editorEvent);
           }
           continue;
         }
@@ -6330,14 +6545,11 @@ export class VolvoxGrid {
     const r = this.canvas.getBoundingClientRect();
     const x = e.clientX - r.left;
     const y = e.clientY - r.top;
-    const hostPointerDispatch = typeof this.wasm.get_host_pointer_dispatch === "function"
-      && this.wasm.get_host_pointer_dispatch(this.gridId) !== 0;
     const touchGestureDismissesEditor = e.pointerType === "touch"
-      && this.activeEditor !== "none"
-      && !hostPointerDispatch;
+      && this.activeEditor !== "none";
     // Commit host-side editors before the grid handles the click so the old
     // value cannot be applied to a newly selected/editing cell.
-    if (this.activeEditor !== "none" && !hostPointerDispatch) {
+    if (this.activeEditor !== "none") {
       const editingWithHostEditor = this.wasm.is_editing(this.gridId) !== 0;
       if (editingWithHostEditor) {
         this.commitEditFromHost();
@@ -6402,9 +6614,7 @@ export class VolvoxGrid {
     const wasEditing = this.wasm.is_editing(this.gridId) !== 0;
 
     // Engine-rendered combo dropdown path (non-editable combos).
-    // Skip when host_pointer_dispatch is active — the host adapter owns
-    // edit commit/cancel in that mode.
-    if (wasEditing && this.activeEditor === "none" && !hostPointerDispatch) {
+    if (wasEditing && this.activeEditor === "none") {
       const idx =
         typeof this.wasm.dropdown_hit_index === "function"
           ? Number(this.wasm.dropdown_hit_index(this.gridId, ex, ey))
@@ -6769,6 +6979,15 @@ export class VolvoxGrid {
     this.editInput.setAttribute("data-volvoxgrid-editor", "text");
     commonStyle(this.editInput);
 
+    this.editTextArea.autocomplete = "off";
+    this.editTextArea.autocapitalize = "off";
+    this.editTextArea.spellcheck = false;
+    this.editTextArea.wrap = "soft";
+    this.editTextArea.setAttribute("data-volvoxgrid-editor", "textarea");
+    commonStyle(this.editTextArea);
+    this.editTextArea.style.resize = "none";
+    this.editTextArea.style.overflow = "hidden";
+
     this.editSelect.setAttribute("data-volvoxgrid-editor", "combo");
     commonStyle(this.editSelect);
     this.editSelect.style.padding = "0";
@@ -6777,82 +6996,96 @@ export class VolvoxGrid {
     this.editDataList.setAttribute("data-volvoxgrid-editor", "datalist");
 
     document.body.appendChild(this.editInput);
+    document.body.appendChild(this.editTextArea);
     document.body.appendChild(this.editSelect);
     document.body.appendChild(this.editDataList);
 
-    this.editInput.addEventListener("compositionstart", () => {
-      this.editComposing = true;
-      // Snapshot committed text at composition start
-      if (typeof this.wasm.set_edit_preedit === "function") {
-        this.editComposingBaseText = this.wasm.is_editing(this.gridId) ? String(this.wasm.get_edit_text(this.gridId) || "") : "";
-      }
-    });
-    this.editInput.addEventListener("compositionupdate", (e: CompositionEvent) => {
-      if (typeof this.wasm.set_edit_preedit === "function" && this.wasm.is_editing(this.gridId)) {
-        this.wasm.set_edit_preedit(this.gridId, e.data || "", (e.data || "").length);
-        this.dirty = true;
-      }
-    });
-    this.editInput.addEventListener("compositionend", (e: CompositionEvent) => {
-      this.editComposing = false;
-      if (typeof this.wasm.commit_edit_preedit === "function" && this.wasm.is_editing(this.gridId)) {
-        this.wasm.commit_edit_preedit(this.gridId, e.data || "");
-        this.dirty = true;
-        // Sync host input from engine state after commit
-        this.suppressEditorInput = true;
-        this.editInput.value = String(this.wasm.get_edit_text(this.gridId) || "");
-        this.suppressEditorInput = false;
-      } else {
+    const attachTextEditorHandlers = (editor: HTMLInputElement | HTMLTextAreaElement) => {
+      const addEditorListener = <K extends keyof HTMLElementEventMap>(
+        type: K,
+        handler: (event: HTMLElementEventMap[K]) => void,
+      ) => {
+        editor.addEventListener(type, handler as EventListener);
+      };
+
+      addEditorListener("compositionstart", () => {
+        this.editComposing = true;
+        // Snapshot committed text at composition start
+        if (typeof this.wasm.set_edit_preedit === "function") {
+          this.editComposingBaseText = this.wasm.is_editing(this.gridId) ? String(this.wasm.get_edit_text(this.gridId) || "") : "";
+        }
+      });
+      addEditorListener("compositionupdate", (e: CompositionEvent) => {
+        if (typeof this.wasm.set_edit_preedit === "function" && this.wasm.is_editing(this.gridId)) {
+          this.wasm.set_edit_preedit(this.gridId, e.data || "", (e.data || "").length);
+          this.dirty = true;
+        }
+      });
+      addEditorListener("compositionend", (e: CompositionEvent) => {
+        this.editComposing = false;
+        if (typeof this.wasm.commit_edit_preedit === "function" && this.wasm.is_editing(this.gridId)) {
+          this.wasm.commit_edit_preedit(this.gridId, e.data || "");
+          this.dirty = true;
+          // Sync host input from engine state after commit
+          this.suppressEditorInput = true;
+          this.activeInputEditorElement().value = String(this.wasm.get_edit_text(this.gridId) || "");
+          this.suppressEditorInput = false;
+        } else {
+          this.pushInputValueToEngine();
+        }
+      });
+      addEditorListener("input", (e: Event) => {
+        if (this.suppressEditorInput) return;
+        // Skip during IME composition — preedit is handled by compositionupdate/end.
+        // Check both our flag and the native isComposing for edge cases where
+        // compositionstart hasn't fired yet (e.g. some Android IMEs).
+        if (this.editComposing || (e as InputEvent).isComposing) return;
         this.pushInputValueToEngine();
-      }
-    });
-    this.editInput.addEventListener("input", (e: Event) => {
-      if (this.suppressEditorInput) return;
-      // Skip during IME composition — preedit is handled by compositionupdate/end.
-      // Check both our flag and the native isComposing for edge cases where
-      // compositionstart hasn't fired yet (e.g. some Android IMEs).
-      if (this.editComposing || (e as InputEvent).isComposing) return;
-      this.pushInputValueToEngine();
-    });
-    this.editInput.addEventListener("keydown", (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        this.cancelEditFromHost();
-        return;
-      }
-      if (e.key === "Tab") {
-        e.preventDefault();
-        this.commitEditFromHost(9, this.modifierBits(e));
-        return;
-      }
-      const isArrow = e.key === "ArrowLeft" || e.key === "ArrowRight"
-        || e.key === "ArrowUp" || e.key === "ArrowDown";
-      if (!(e as any).isComposing && isArrow && this.getEditUiMode() !== "edit") {
-        e.preventDefault();
-        const navigateKeyCode = e.key === "ArrowLeft" ? 37
-          : e.key === "ArrowUp" ? 38
-          : e.key === "ArrowRight" ? 39
-          : 40;
-        this.commitEditFromHost(navigateKeyCode, 0);
-        return;
-      }
-      if (e.key === "Enter" && !(e as any).isComposing) {
-        e.preventDefault();
-        this.commitEditFromHost(e.shiftKey ? 38 : 40, 0);
-      }
-    });
-    this.editInput.addEventListener("blur", () => {
-      if (this.suppressBlurCommit) return;
-      // When host_pointer_dispatch is active, the host adapter (e.g. Sheet)
-      // owns edit commit/cancel — don't auto-commit on blur.
-      if (typeof this.wasm.get_host_pointer_dispatch === "function"
-        && this.wasm.get_host_pointer_dispatch(this.gridId) !== 0) {
-        return;
-      }
-      if (this.activeEditor === "text" || this.activeEditor === "combo-input") {
-        this.commitEditFromHost();
-      }
-    });
+      });
+      addEditorListener("keydown", (e: KeyboardEvent) => {
+        const editor = e.currentTarget as HTMLInputElement | HTMLTextAreaElement;
+        const isTextAreaEditor = editor === this.editTextArea;
+        if (e.key === "Escape") {
+          e.preventDefault();
+          this.cancelEditFromHost();
+          return;
+        }
+        if (e.key === "Tab") {
+          e.preventDefault();
+          this.commitEditFromHost(9, this.modifierBits(e));
+          return;
+        }
+        const isArrow = e.key === "ArrowLeft" || e.key === "ArrowRight"
+          || e.key === "ArrowUp" || e.key === "ArrowDown";
+        const hasLineBreak = isTextAreaEditor && editor.value.includes("\n");
+        if (!(e as any).isComposing && isArrow && !hasLineBreak && this.getEditUiMode() !== "edit") {
+          e.preventDefault();
+          const navigateKeyCode = e.key === "ArrowLeft" ? 37
+            : e.key === "ArrowUp" ? 38
+            : e.key === "ArrowRight" ? 39
+            : 40;
+          this.commitEditFromHost(navigateKeyCode, 0);
+          return;
+        }
+        if (e.key === "Enter" && !(e as any).isComposing) {
+          if (e.altKey && isTextAreaEditor) {
+            e.preventDefault();
+            this.insertInputEditorText(editor, "\n");
+            return;
+          }
+          e.preventDefault();
+          this.commitEditFromHost(e.shiftKey ? 38 : 40, 0);
+        }
+      });
+      addEditorListener("blur", () => {
+        if (this.suppressBlurCommit) return;
+        if (this.activeEditor === "text" || this.activeEditor === "combo-input") {
+          this.commitEditFromHost();
+        }
+      });
+    };
+    attachTextEditorHandlers(this.editInput);
+    attachTextEditorHandlers(this.editTextArea);
 
     this.editSelect.addEventListener("change", () => {
       if (!this.wasm.is_editing(this.gridId)) return;
@@ -7020,6 +7253,7 @@ export class VolvoxGrid {
   private removeHostEditors(): void {
     this.hideHostEditors(false);
     this.editInput.remove();
+    this.editTextArea.remove();
     this.editSelect.remove();
     this.editDataList.remove();
     this.canvas.removeEventListener("focus", this.onCanvasFocusForIme);
@@ -7040,12 +7274,25 @@ export class VolvoxGrid {
     if (this.imeComposing) return;
     const editing = this.wasm.is_editing(this.gridId) !== 0;
     if (!editing) {
+      this.activeEditorSessionPresentation = null;
       this.hideHostEditors(false);
       return;
     }
 
     const row = Number(this.wasm.get_edit_row(this.gridId));
     const col = Number(this.wasm.get_edit_col(this.gridId));
+    const editorPresentation = this.currentEditorPresentation();
+    if (editorPresentation === EditorPresentation.EDITOR_CANVAS) {
+      this.hideHostEditors(false);
+      return;
+    }
+    const editorOwner = typeof this.wasm.get_edit_editor_owner === "function"
+      ? Number(this.wasm.get_edit_editor_owner(this.gridId))
+      : EditorOwner.EDITOR_OWNER_ENGINE;
+    if (editorOwner === EditorOwner.EDITOR_OWNER_CUSTOM) {
+      this.hideHostEditors(false);
+      return;
+    }
     const x = Number(this.wasm.get_edit_cell_x(this.gridId));
     const y = Number(this.wasm.get_edit_cell_y(this.gridId));
     const w = Number(this.wasm.get_edit_cell_w(this.gridId));
@@ -7077,7 +7324,7 @@ export class VolvoxGrid {
 
     const applyEditStyle = (el: HTMLElement) => {
       el.style.fontSize = `${cssFontSize}px`;
-      el.style.lineHeight = "1";
+      el.style.lineHeight = el === this.editTextArea ? "1.2" : "1";
       if (fontName) el.style.fontFamily = `"${fontName}", sans-serif`;
       el.style.fontWeight = fontBold ? "bold" : "normal";
       el.style.fontStyle = fontItalic ? "italic" : "normal";
@@ -7103,8 +7350,26 @@ export class VolvoxGrid {
     }
 
     const text = String(this.wasm.get_edit_text(this.gridId) || "");
-    applyEditStyle(this.editInput);
+    applyEditStyle(this.editTextArea);
     this.syncInputEditor("text", cellKey, left, top, width, height, text, null);
+  }
+
+  private currentEditorPresentation(): EditorPresentation | null {
+    const getPresentation = this.wasm.get_edit_editor_presentation as
+      | ((gridId: number) => number)
+      | undefined;
+    if (typeof getPresentation === "function") {
+      return Number(getPresentation(this.gridId)) as EditorPresentation;
+    }
+    return this.activeEditorSessionPresentation;
+  }
+
+  private inputEditorElement(kind: "text" | "combo-input"): HTMLInputElement | HTMLTextAreaElement {
+    return kind === "text" ? this.editTextArea : this.editInput;
+  }
+
+  private activeInputEditorElement(): HTMLInputElement | HTMLTextAreaElement {
+    return this.activeEditor === "text" ? this.editTextArea : this.editInput;
   }
 
   private syncInputEditor(
@@ -7117,8 +7382,9 @@ export class VolvoxGrid {
     text: string,
     comboItems: string[] | null,
   ): void {
+    const editor = this.inputEditorElement(kind);
     if (this.activeEditor !== kind || this.editorCellKey !== cellKey) {
-      if (comboItems) {
+      if (kind === "combo-input" && comboItems) {
         this.populateDataList(comboItems);
         this.editInput.setAttribute("list", this.editDataListId);
       } else {
@@ -7126,9 +7392,9 @@ export class VolvoxGrid {
         this.editDataList.replaceChildren();
       }
       this.suppressEditorInput = true;
-      this.editInput.value = text;
+      editor.value = text;
       if (!this.suppressEditorSelect) {
-        this.editInput.select();
+        editor.select();
       }
       this.suppressEditorInput = false;
       this.showInputEditor(kind, cellKey, left, top, width, height);
@@ -7136,13 +7402,18 @@ export class VolvoxGrid {
       return;
     }
 
-    this.positionEditor(this.editInput, left, top, width, height);
-    this.editInput.style.display = "block";
+    this.positionEditor(editor, left, top, width, height);
+    editor.style.display = "block";
+    if (kind === "text") {
+      this.editInput.style.display = "none";
+    } else {
+      this.editTextArea.style.display = "none";
+    }
     this.editSelect.style.display = "none";
-    if (!this.editComposing && document.activeElement !== this.editInput) {
-      if (this.editInput.value !== text) {
+    if (!this.editComposing && document.activeElement !== editor) {
+      if (editor.value !== text) {
         this.suppressEditorInput = true;
-        this.editInput.value = text;
+        editor.value = text;
         this.suppressEditorInput = false;
       }
     }
@@ -7165,6 +7436,7 @@ export class VolvoxGrid {
       this.positionEditor(this.editSelect, left, top, width, height);
       this.editSelect.style.display = "block";
       this.editInput.style.display = "none";
+      this.editTextArea.style.display = "none";
     }
 
     if (idx >= 0 && idx < this.editSelect.options.length) {
@@ -7191,14 +7463,20 @@ export class VolvoxGrid {
     width: number,
     height: number,
   ): void {
-    this.positionEditor(this.editInput, left, top, width, height);
-    this.editInput.style.display = "block";
+    const editor = this.inputEditorElement(kind);
+    this.positionEditor(editor, left, top, width, height);
+    editor.style.display = "block";
+    if (kind === "text") {
+      this.editInput.style.display = "none";
+    } else {
+      this.editTextArea.style.display = "none";
+    }
     this.editSelect.style.display = "none";
     this.activeEditor = kind;
     this.editorCellKey = cellKey;
-    this.editInput.focus();
+    editor.focus();
     if (!this.suppressEditorSelect) {
-      this.editInput.select();
+      editor.select();
     }
   }
 
@@ -7212,6 +7490,7 @@ export class VolvoxGrid {
     this.positionEditor(this.editSelect, left, top, width, height);
     this.editSelect.style.display = "block";
     this.editInput.style.display = "none";
+    this.editTextArea.style.display = "none";
     this.activeEditor = "combo-select";
     this.editorCellKey = cellKey;
     this.editSelect.focus();
@@ -7220,6 +7499,7 @@ export class VolvoxGrid {
   private hideHostEditors(focusCanvas: boolean): void {
     if (this.activeEditor === "none"
       && this.editInput.style.display === "none"
+      && this.editTextArea.style.display === "none"
       && this.editSelect.style.display === "none") {
       if (focusCanvas) this.focusImeProxyOrCanvas();
       return;
@@ -7227,9 +7507,13 @@ export class VolvoxGrid {
 
     this.suppressBlurCommit = true;
     this.editInput.style.display = "none";
+    this.editTextArea.style.display = "none";
     this.editSelect.style.display = "none";
     if (document.activeElement === this.editInput) {
       this.editInput.blur();
+    }
+    if (document.activeElement === this.editTextArea) {
+      this.editTextArea.blur();
     }
     if (document.activeElement === this.editSelect) {
       this.editSelect.blur();
@@ -7326,20 +7610,57 @@ export class VolvoxGrid {
     const endChars = Math.max(startChars, Math.min(chars.length, startChars + rawLength));
     const startUnits = chars.slice(0, startChars).join("").length;
     const endUnits = chars.slice(0, endChars).join("").length;
-    this.editInput.setSelectionRange(startUnits, endUnits);
+    this.activeInputEditorElement().setSelectionRange(startUnits, endUnits);
   }
 
   private pushInputValueToEngine(): void {
     if (!this.wasm.is_editing(this.gridId)) return;
-    const value = this.editInput.value;
+    const editor = this.activeInputEditorElement();
+    const value = editor.value;
     this.wasm.set_edit_text(this.gridId, value);
 
-    const startUnits = this.editInput.selectionStart ?? value.length;
-    const endUnits = this.editInput.selectionEnd ?? startUnits;
+    const startUnits = editor.selectionStart ?? value.length;
+    const endUnits = editor.selectionEnd ?? startUnits;
     const a = Array.from(value.slice(0, startUnits)).length;
     const b = Array.from(value.slice(0, endUnits)).length;
     this.wasm.set_edit_selection(this.gridId, a, Math.max(0, b - a));
     this.dirty = true;
+  }
+
+  private insertInputEditorText(
+    editor: HTMLInputElement | HTMLTextAreaElement,
+    text: string,
+  ): void {
+    const start = editor.selectionStart ?? editor.value.length;
+    const end = editor.selectionEnd ?? start;
+    editor.setRangeText(text, start, end, "end");
+    this.pushInputValueToEngine();
+    if (editor === this.editTextArea) {
+      this.scrollTextAreaCaretIntoView(editor);
+    }
+  }
+
+  private scrollTextAreaCaretIntoView(editor: HTMLTextAreaElement): void {
+    const caret = editor.selectionStart ?? editor.value.length;
+    const lineIndex = editor.value.slice(0, caret).split("\n").length - 1;
+    const style = window.getComputedStyle(editor);
+    let lineHeight = Number.parseFloat(style.lineHeight);
+    if (!Number.isFinite(lineHeight) || lineHeight <= 0) {
+      const fontSize = Number.parseFloat(style.fontSize);
+      lineHeight = Number.isFinite(fontSize) && fontSize > 0 ? fontSize * 1.2 : 16;
+    }
+    const paddingTop = Number.parseFloat(style.paddingTop) || 0;
+    const paddingBottom = Number.parseFloat(style.paddingBottom) || 0;
+    const visibleHeight = Math.max(1, editor.clientHeight - paddingTop - paddingBottom);
+    const caretTop = paddingTop + lineIndex * lineHeight;
+    const caretBottom = caretTop + lineHeight;
+    const visibleTop = editor.scrollTop;
+    const visibleBottom = visibleTop + visibleHeight;
+    if (caretTop < visibleTop) {
+      editor.scrollTop = Math.max(0, caretTop);
+    } else if (caretBottom > visibleBottom) {
+      editor.scrollTop = Math.max(0, caretBottom - visibleHeight);
+    }
   }
 
   private readComboItems(count: number): string[] {
@@ -7384,7 +7705,9 @@ export class VolvoxGrid {
     el.style.top = `${Math.round(top)}px`;
     el.style.width = `${Math.round(width)}px`;
     el.style.height = `${Math.round(height)}px`;
-    el.style.lineHeight = `${Math.max(1, Math.round(height - 2))}px`;
+    if (el !== this.editTextArea) {
+      el.style.lineHeight = `${Math.max(1, Math.round(height - 2))}px`;
+    }
   }
 
 }

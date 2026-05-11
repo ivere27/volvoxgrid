@@ -159,6 +159,28 @@ private fun renderLayerFlag(layer: Int): Long {
     return 1L shl layer
 }
 
+private fun editorValueFromText(text: String): EditorValue =
+    EditorValue.newBuilder()
+        .setValue(CellValue.newBuilder().setText(text).build())
+        .setEditText(text)
+        .setDisplayText(text)
+        .build()
+
+private fun listEditorSpec(list: ListEditorParams): EditorSpec =
+    EditorSpec.newBuilder()
+        .setKind(EditorKind.EDITOR_SELECT)
+        .setOwner(EditorOwner.EDITOR_OWNER_ENGINE)
+        .setPresentation(EditorPresentation.EDITOR_CANVAS)
+        .setList(list)
+        .build()
+
+private fun defaultHostTextEditorSpec(): EditorSpec =
+    EditorSpec.newBuilder()
+        .setKind(EditorKind.EDITOR_TEXT)
+        .setOwner(EditorOwner.EDITOR_OWNER_HOST_NATIVE)
+        .setPresentation(EditorPresentation.EDITOR_INLINE)
+        .build()
+
 /**
  * High-level Kotlin API wrapping the VolvoxGrid FFI calls.
  *
@@ -202,6 +224,11 @@ class VolvoxGridController(
                         .setRendering(
                             RenderConfig.newBuilder()
                                 .setFramePacingMode(FramePacingMode.FRAME_PACING_MODE_PLATFORM)
+                                .build()
+                        )
+                        .setEditing(
+                            EditConfig.newBuilder()
+                                .setDefaultEditor(defaultHostTextEditorSpec())
                                 .build()
                         )
                         .setIndicators(defaultIndicatorsConfig())
@@ -1021,26 +1048,26 @@ class VolvoxGridController(
         )
     }
 
-    fun setColDropdown(col: Int, dropdown: Dropdown) {
+    fun setColDropdown(col: Int, list: ListEditorParams) {
         service.DefineColumns(
             DefineColumnsRequest.newBuilder()
                 .setGridId(gridId)
                 .addColumns(ColumnDef.newBuilder()
                     .setIndex(col)
-                    .setDropdown(dropdown)
+                    .setEditor(listEditorSpec(list))
                     .build())
                 .build()
         )
     }
 
-    fun setCellDropdown(row: Int, col: Int, dropdown: Dropdown) {
+    fun setCellDropdown(row: Int, col: Int, list: ListEditorParams) {
         service.UpdateCells(
             UpdateCellsRequest.newBuilder()
                 .setGridId(gridId)
                 .addCells(CellUpdate.newBuilder()
                     .setRow(row)
                     .setCol(col)
-                    .setDropdown(dropdown)
+                    .setEditor(listEditorSpec(list))
                     .build())
                 .build()
         )
@@ -1071,33 +1098,62 @@ class VolvoxGridController(
         if (!config.hasEditing()) {
             return EditTrigger.EDIT_TRIGGER_NONE
         }
-        return config.editing.trigger
+        if (!config.editing.hasActivation()) {
+            return EditTrigger.EDIT_TRIGGER_NONE
+        }
+        return config.editing.activation.trigger
     }
 
     fun setEditTrigger(mode: EditTrigger) {
         configure(GridConfig.newBuilder()
-            .setEditing(EditConfig.newBuilder().setTrigger(mode).build())
+            .setEditing(EditConfig.newBuilder()
+                .setActivation(EditActivation.newBuilder().setTrigger(mode).build())
+                .build())
             .build())
     }
 
-    fun beginEdit(row: Int, col: Int) {
+    fun beginEdit(row: Int, col: Int, reason: EditStartReason = EditStartReason.EDIT_START_PROGRAMMATIC) {
         service.Edit(
             EditCommand.newBuilder()
                 .setGridId(gridId)
-                .setStart(EditStart.newBuilder().setRow(row).setCol(col).build())
+                .setStart(
+                    EditStart.newBuilder()
+                        .setRow(row)
+                        .setCol(col)
+                        .setReason(reason)
+                        .build()
+                )
                 .build()
         )
+    }
+
+    private fun currentEditSessionCommandBuilder(): EditorSessionCommand.Builder {
+        val builder = EditorSessionCommand.newBuilder()
+        val state = service.Edit(
+            EditCommand.newBuilder()
+                .setGridId(gridId)
+                .setGetState(EditGetState.newBuilder().build())
+                .build()
+        )
+        if (state.active && state.hasSession()) {
+            val session = state.session
+            builder.setSessionId(session.sessionId)
+            builder.setStateVersion(session.stateVersion)
+        }
+        return builder
     }
 
     fun commitEdit(text: String? = null) {
         val commit = EditCommit.newBuilder()
         if (text != null) {
-            commit.setText(text)
+            commit.setValue(editorValueFromText(text))
         }
         service.Edit(
             EditCommand.newBuilder()
                 .setGridId(gridId)
-                .setCommit(commit.build())
+                .setSession(currentEditSessionCommandBuilder()
+                    .setCommit(commit.build())
+                    .build())
                 .build()
         )
     }
@@ -1106,7 +1162,9 @@ class VolvoxGridController(
         service.Edit(
             EditCommand.newBuilder()
                 .setGridId(gridId)
-                .setCancel(EditCancel.newBuilder().build())
+                .setSession(currentEditSessionCommandBuilder()
+                    .setCancel(EditCancel.newBuilder().build())
+                    .build())
                 .build()
         )
     }

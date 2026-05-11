@@ -346,10 +346,7 @@ func ModeLabel(state *pb.EditState) string {
 	if state == nil || !state.GetActive() {
 		return "Ready"
 	}
-	if state.GetUiMode() == pb.EditUiMode_EDIT_UI_MODE_EDIT {
-		return "Edit"
-	}
-	return "Enter"
+	return "Edit"
 }
 
 type ShortcutResult struct {

@@ -187,7 +187,7 @@ VolvoxGridWidget(
 )
 ```
 
-Cancelable Flutter hooks currently cover `onBeforeEdit`, `onBeforeDropdownOpen`, `onCellEditValidating`, and `onBeforeSort`. The legacy raw `onCancelableEvent` callback is still available, but the event-specific `details.cancel = true` API is clearer for app code. If no hook is registered, the widget does not pause the engine for a decision; if a raw cancelable event is unhandled while the decision channel is active, the widget allows it with `cancel=false`.
+Cancelable Flutter hooks currently cover `onBeforeEdit`, `onCellEditValidating`, and `onBeforeSort`. The legacy raw `onCancelableEvent` callback is still available, but the event-specific `details.cancel = true` API is clearer for app code. If no hook is registered, the widget does not pause the engine for a decision; if a raw cancelable event is unhandled while the decision channel is active, the widget allows it with `cancel=false`.
 
 ### VolvoxGridController
 
@@ -380,11 +380,20 @@ await controller.setEditTrigger(EditTrigger.EDIT_TRIGGER_KEY_CLICK);
 await controller.commitEdit('new value');
 await controller.cancelEdit();
 
-// Column dropdown lists (pipe-delimited)
-await controller.setColDropdownItems(2, 'Option A|Option B|Option C');
+// Column list editor
+await controller.setColDropdown(2, ListEditorParams()
+  ..staticItems.addAll([
+    ListItem()..label = 'Option A',
+    ListItem()..label = 'Option B',
+    ListItem()..label = 'Option C',
+  ]));
 
-// Per-cell dropdown
-await controller.setCellDropdownItems(1, 2, 'Yes|No');
+// Per-cell list editor
+await controller.setCellDropdown(1, 2, ListEditorParams()
+  ..staticItems.addAll([
+    ListItem()..label = 'Yes',
+    ListItem()..label = 'No',
+  ]));
 ```
 
 #### Styling

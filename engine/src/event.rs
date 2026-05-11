@@ -132,15 +132,33 @@ pub enum GridEventData {
         text: String,
     },
     KeyDownEdit {
+        session_id: i64,
         key_code: i32,
         modifier: i32,
     },
     KeyPressEdit {
+        session_id: i64,
         key_ascii: i32,
     },
     KeyUpEdit {
+        session_id: i64,
         key_code: i32,
         modifier: i32,
+    },
+    EditValidationRequest {
+        request_id: i64,
+        session_id: i64,
+        row: i32,
+        col: i32,
+        value: pb::EditorValue,
+    },
+    EditorListItemsRequest {
+        request_id: i64,
+        session_id: i64,
+        data_source_id: String,
+        filter_text: String,
+        offset: i32,
+        limit: i32,
     },
     CellEditConfigureStyle {
         row: i32,
@@ -157,12 +175,19 @@ pub enum GridEventData {
         y: f32,
         width: f32,
         height: f32,
-        dropdown: pb::Dropdown,
+        dropdown: pb::ListEditorParams,
         current_value: String,
         selected_index: i32,
     },
     DropdownClosed,
     DropdownOpened,
+    CustomEditorAction {
+        session_id: i64,
+        row: i32,
+        col: i32,
+        action_id: String,
+        payload: Option<pb::StructValue>,
+    },
     CellChanged {
         row: i32,
         col: i32,
@@ -382,6 +407,11 @@ impl GridEventData {
             } => old_text.capacity() + new_text.capacity(),
             GridEventData::CellEditValidate { edit_text, .. } => edit_text.capacity(),
             GridEventData::CellEditChange { text } => text.capacity(),
+            GridEventData::EditorListItemsRequest {
+                data_source_id,
+                filter_text,
+                ..
+            } => data_source_id.capacity() + filter_text.capacity(),
             GridEventData::CellChanged {
                 old_text, new_text, ..
             } => old_text.capacity() + new_text.capacity(),

@@ -90,7 +90,6 @@ namespace VolvoxGrid.DotNet.Sample
             grid.GroupTotalPosition = VolvoxGridGroupTotalPosition.Above;
             grid.MultiTotals = false;
             grid.TreeIndicator = VolvoxGridTreeIndicatorStyle.ArrowsLeaf;
-            grid.Editable = false;
 
             for (int row = 0; row < levels.Count; row++)
             {

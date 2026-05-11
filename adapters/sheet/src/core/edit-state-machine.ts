@@ -9,9 +9,31 @@ import {
   encodeEditStart,
   encodeEditCommit,
   encodeEditCancel,
+  type EditSessionIdentity,
 } from "../proto/proto-utils.js";
 
 export type EditPhase = "idle" | "editing";
+
+/**
+ * Read a u64-shaped wasm return value into a bigint. The wasm-bindgen layer
+ * marshals u64 as f64, which is lossy above 2^53. Callers receive bigint
+ * directly when the bridge upgrades to a BigInt return; otherwise we fall
+ * back to Number → BigInt with a safe-range check.
+ */
+function readWasmU64(raw: unknown): bigint {
+  if (typeof raw === "bigint") {
+    return raw < 0n ? 0n : raw;
+  }
+  if (typeof raw === "number" && Number.isFinite(raw) && raw >= 0) {
+    if (raw <= Number.MAX_SAFE_INTEGER) {
+      return BigInt(Math.trunc(raw));
+    }
+    // Above 2^53 the f64 has lost precision. Round-trip through string so we
+    // do not silently produce a near-miss session id.
+    return BigInt(Math.trunc(raw).toString());
+  }
+  return 0n;
+}
 
 export class EditStateMachine {
   private _phase: EditPhase = "idle";
@@ -24,11 +46,21 @@ export class EditStateMachine {
   private wasm: any;
   private gridId: number;
   private readonly flushPendingDecisions: (() => void) | null;
+  private readonly supportsSessionIdentity: boolean;
 
   constructor(wasm: any, gridId: number, flushPendingDecisions?: () => void) {
     this.wasm = wasm;
     this.gridId = gridId;
     this.flushPendingDecisions = flushPendingDecisions ?? null;
+    this.supportsSessionIdentity =
+      typeof wasm.get_edit_session_id === "function"
+      && typeof wasm.get_edit_state_version === "function";
+    if (!this.supportsSessionIdentity && typeof console !== "undefined") {
+      console.warn(
+        "[volvox-sheet] wasm bridge is missing get_edit_session_id/get_edit_state_version; "
+        + "edit commands will not be staleness-checked. Rebuild the runtime to match the proto schema.",
+      );
+    }
   }
 
   get phase(): EditPhase { return this._phase; }
@@ -38,6 +70,21 @@ export class EditStateMachine {
   get col(): number { return this._col; }
   get originalText(): string { return this._originalText; }
   get currentText(): string { return this._currentText; }
+
+  sessionIdentity(): EditSessionIdentity | undefined {
+    if (!this.supportsSessionIdentity) {
+      return undefined;
+    }
+    if (typeof this.wasm.is_editing === "function" && this.wasm.is_editing(this.gridId) === 0) {
+      return undefined;
+    }
+    const sessionId = readWasmU64(this.wasm.get_edit_session_id(this.gridId));
+    const stateVersion = readWasmU64(this.wasm.get_edit_state_version(this.gridId));
+    if (sessionId <= 0n || stateVersion <= 0n) {
+      return undefined;
+    }
+    return { sessionId, stateVersion };
+  }
 
   /** Sync local state to an already-active engine edit session without dispatching another start command. */
   syncActiveEdit(row: number, col: number, currentText: string, opts?: {
@@ -103,7 +150,11 @@ export class EditStateMachine {
     const newText = text ?? this._currentText;
 
     if (typeof this.wasm.volvox_grid_edit_pb === "function") {
-      const req = encodeEditCommit({ gridId: this.gridId, text });
+      const req = encodeEditCommit({
+        gridId: this.gridId,
+        text,
+        ...this.sessionIdentity(),
+      });
       this.wasm.volvox_grid_edit_pb(req);
       this.flushPendingDecisions?.();
       if (typeof this.wasm.is_editing === "function" && this.wasm.is_editing(this.gridId) !== 0) {
@@ -122,7 +173,7 @@ export class EditStateMachine {
     if (this._phase !== "editing") return;
 
     if (typeof this.wasm.volvox_grid_edit_pb === "function") {
-      const req = encodeEditCancel(this.gridId);
+      const req = encodeEditCancel(this.gridId, this.sessionIdentity());
       this.wasm.volvox_grid_edit_pb(req);
     }
 

@@ -4,7 +4,7 @@
 //! production builds. It keeps shared demo helpers, stress-demo setup,
 //! and embedded fixture access for `GetDemoData`.
 
-use crate::grid::VolvoxGrid;
+use crate::grid::{VolvoxGrid, EDITOR_BUTTON_ALWAYS};
 use crate::indicator::{RowIndicatorSlotState, DEFAULT_ROW_INDICATOR_WIDTH};
 use crate::proto::volvoxgrid::v1 as pb;
 use crate::scrollbar::{
@@ -534,7 +534,7 @@ fn setup_stress_grid(grid: &mut VolvoxGrid, data_rows: i32, cell_capacity: usize
     grid.allow_user_resizing = 3;
     grid.tab_behavior = 1;
     grid.edit_trigger_mode = 0; // read-only by default; host demos may enable edit
-    grid.dropdown_trigger = 1;
+    grid.dropdown_trigger = EDITOR_BUTTON_ALWAYS;
     grid.dropdown_search = false;
     grid.fling_enabled = true;
     grid.fling_impulse_gain = 220.0;

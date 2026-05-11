@@ -23,7 +23,8 @@
 // 3. Two streaming interfaces.
 //    - RenderSession: bidirectional stream for the real-time render loop.
 //      The host sends input (viewport, pointer, key, buffer) and receives
-//      immediate render-coupled outputs (FrameDone, EditRequest, CursorChange).
+//      immediate render-coupled outputs (FrameDone, EditorSessionStarted,
+//      EditorSessionUpdated, CursorChange).
 //    - EventStream: server-streaming for semantic grid events (selection
 //      changed, before/after edit, sort, scroll, etc.).
 //    The split ensures that frame-rate-sensitive rendering is never blocked

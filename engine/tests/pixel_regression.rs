@@ -5,7 +5,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use volvoxgrid_engine::cell::CellValueData;
-use volvoxgrid_engine::grid::VolvoxGrid;
+use volvoxgrid_engine::grid::{VolvoxGrid, EDITOR_BUTTON_ALWAYS};
 use volvoxgrid_engine::indicator::{RowIndicatorSlotState, DEFAULT_ROW_INDICATOR_WIDTH};
 use volvoxgrid_engine::load::load_data;
 use volvoxgrid_engine::outline::{subtotal, subtotal_ex};
@@ -166,9 +166,13 @@ fn sales_demo_column_defs(scale: f32) -> Vec<pb::ColumnDef> {
                 def.data_type = Some(pb::ColumnDataType::ColumnDataBoolean as i32);
             }
             8 => {
-                def.dropdown = Some(volvoxgrid_engine::edit::legacy_dropdown_items_to_dropdown(
-                    "Active|Pending|Shipped|Returned|Cancelled",
-                ));
+                def.editor = Some(pb::EditorSpec {
+                    kind: pb::EditorKind::EditorSelect as i32,
+                    list: Some(volvoxgrid_engine::edit::legacy_dropdown_items_to_dropdown(
+                        "Active|Pending|Shipped|Returned|Cancelled",
+                    )),
+                    ..Default::default()
+                });
             }
             _ => {}
         }
@@ -278,7 +282,7 @@ fn apply_sales_demo_chrome(grid: &mut VolvoxGrid) {
     grid.allow_user_resizing = 3;
     grid.tab_behavior = 1;
     grid.edit_trigger_mode = 0;
-    grid.dropdown_trigger = 1;
+    grid.dropdown_trigger = EDITOR_BUTTON_ALWAYS;
     grid.dropdown_search = false;
     grid.fling_enabled = true;
     grid.fling_impulse_gain = 220.0;

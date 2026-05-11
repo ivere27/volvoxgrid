@@ -34,6 +34,15 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
             .build();
     }
 
+    private static EditorValue editorValueFromText(String text) {
+        String value = text == null ? "" : text;
+        return EditorValue.newBuilder()
+            .setValue(CellValue.newBuilder().setText(value).build())
+            .setEditText(value)
+            .setDisplayText(value)
+            .build();
+    }
+
     private static List<RowIndicatorSlot> defaultRowIndicatorSlots() {
         ArrayList<RowIndicatorSlot> slots = new ArrayList<>();
         slots.add(rowIndicatorSlot(RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CURRENT, 18));
@@ -468,36 +477,65 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
         if (!config.hasEditing()) {
             return EditTrigger.EDIT_TRIGGER_NONE;
         }
-        return config.getEditing().getTrigger();
+        return config.getEditing().hasActivation()
+            ? config.getEditing().getActivation().getTrigger()
+            : EditTrigger.EDIT_TRIGGER_NONE;
     }
 
     public void setEditTrigger(EditTrigger value) throws SynurangDesktopBridge.SynurangBridgeException {
         Objects.requireNonNull(value, "value");
         configure(
             GridConfig.newBuilder()
-                .setEditing(EditConfig.newBuilder().setTrigger(value).build())
+                .setEditing(EditConfig.newBuilder()
+                    .setActivation(EditActivation.newBuilder().setTrigger(value).build())
+                    .build())
                 .build()
         );
     }
 
     public void beginEdit(int row, int col) throws SynurangDesktopBridge.SynurangBridgeException {
+        beginEdit(row, col, EditStartReason.EDIT_START_PROGRAMMATIC);
+    }
+
+    public void beginEdit(int row, int col, EditStartReason reason)
+        throws SynurangDesktopBridge.SynurangBridgeException {
         client.edit(
             EditCommand.newBuilder()
                 .setGridId(gridId)
-                .setStart(EditStart.newBuilder().setRow(row).setCol(col).build())
+                .setStart(
+                    EditStart.newBuilder()
+                        .setRow(row)
+                        .setCol(col)
+                        .setReason(reason)
+                        .build()
+                )
                 .build()
         );
     }
 
-    public void commitEdit(String text) throws SynurangDesktopBridge.SynurangBridgeException {
-        EditCommit.Builder commit = EditCommit.newBuilder();
-        if (text != null) {
-            commit.setText(text);
+    private EditorSessionCommand.Builder currentEditSessionCommandBuilder()
+        throws SynurangDesktopBridge.SynurangBridgeException {
+        EditorSessionCommand.Builder builder = EditorSessionCommand.newBuilder();
+        EditState state = client.edit(
+            EditCommand.newBuilder()
+                .setGridId(gridId)
+                .build()
+        );
+        if (state != null && state.getActive() && state.hasSession()) {
+            EditorSession session = state.getSession();
+            builder.setSessionId(session.getSessionId());
+            builder.setStateVersion(session.getStateVersion());
         }
+        return builder;
+    }
+
+    public void commitEdit(String text) throws SynurangDesktopBridge.SynurangBridgeException {
         client.edit(
             EditCommand.newBuilder()
                 .setGridId(gridId)
-                .setCommit(commit.build())
+                .setSession(currentEditSessionCommandBuilder()
+                    .setCommit(EditCommit.newBuilder().setValue(editorValueFromText(text)).build())
+                    .build())
                 .build()
         );
     }
@@ -506,7 +544,9 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
         client.edit(
             EditCommand.newBuilder()
                 .setGridId(gridId)
-                .setCancel(EditCancel.newBuilder().build())
+                .setSession(currentEditSessionCommandBuilder()
+                    .setCancel(EditCancel.newBuilder().build())
+                    .build())
                 .build()
         );
     }

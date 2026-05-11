@@ -44,11 +44,13 @@ import {
   CornerIndicatorSlotFields,
   DefineColumnsRequestFields,
   DefineRowsRequestFields,
-  DropdownFields,
-  DropdownItemFields,
-  DropdownTrigger,
+  EditActivationFields,
   EditConfigFields,
   EditTrigger,
+  EditorKind,
+  EditorOwner,
+  EditorPresentation,
+  EditorSpecFields,
   FillHandlePosition,
   FocusBorderStyle,
   FontFields,
@@ -68,6 +70,8 @@ import {
   IndicatorsConfigFields,
   InteractionConfigFields,
   LayoutConfigFields,
+  ListEditorParamsFields,
+  ListItemFields,
   LoadDataStatus,
   OutlineConfigFields,
   PaddingFields,
@@ -1302,7 +1306,7 @@ function pbEncodeColumnDef(
   }
   out.push(...pbEncodeStringField(ColumnDefFields.key, setup.key));
   if (setup.dropdownItems != null) {
-    out.push(...pbEncodeMessageField(ColumnDefFields.dropdown, pbEncodeDropdownFromLabels(setup.dropdownItems)));
+    out.push(...pbEncodeMessageField(ColumnDefFields.editor, pbEncodeDropdownEditorFromLabels(setup.dropdownItems)));
   }
   if (setup.hidden != null) {
     out.push(...pbEncodeTag(ColumnDefFields.hidden, 0), ...pbEncodeBool(setup.hidden));
@@ -1316,21 +1320,38 @@ function pbEncodeColumnDef(
   return new Uint8Array(out);
 }
 
-function pbEncodeDropdownFromLabels(items: string): Uint8Array {
-  const out: number[] = [];
+function pbEncodeDropdownEditorFromLabels(items: string): Uint8Array {
+  const list: number[] = [];
   let source = items;
+  const allowCustomValue = source.startsWith("|");
   if (source.startsWith("|")) {
-    out.push(...pbEncodeTag(DropdownFields.allow_custom_value, 0), ...pbEncodeBool(true));
+    list.push(...pbEncodeTag(ListEditorParamsFields.allow_custom_value, 0), ...pbEncodeBool(true));
     source = source.slice(1);
   }
   for (const label of source.split("|")) {
     if (!label) continue;
-    out.push(...pbEncodeMessageField(
-      DropdownFields.items,
-      new Uint8Array(pbEncodeStringField(DropdownItemFields.label, label)),
+    list.push(...pbEncodeMessageField(
+      ListEditorParamsFields.static_items,
+      new Uint8Array(pbEncodeStringField(ListItemFields.label, label)),
     ));
   }
-  return new Uint8Array(out);
+  const editor: number[] = [];
+  editor.push(...pbEncodeInt32Field(
+    EditorSpecFields.kind,
+    allowCustomValue ? EditorKind.EDITOR_COMBO : EditorKind.EDITOR_SELECT,
+  ));
+  editor.push(...pbEncodeInt32Field(EditorSpecFields.owner, EditorOwner.EDITOR_OWNER_ENGINE));
+  editor.push(...pbEncodeInt32Field(EditorSpecFields.presentation, EditorPresentation.EDITOR_CANVAS));
+  editor.push(...pbEncodeMessageField(EditorSpecFields.list, new Uint8Array(list)));
+  return new Uint8Array(editor);
+}
+
+function defaultHostTextEditor(): Uint8Array {
+  const editor: number[] = [];
+  editor.push(...pbEncodeInt32Field(EditorSpecFields.kind, EditorKind.EDITOR_TEXT));
+  editor.push(...pbEncodeInt32Field(EditorSpecFields.owner, EditorOwner.EDITOR_OWNER_HOST_NATIVE));
+  editor.push(...pbEncodeInt32Field(EditorSpecFields.presentation, EditorPresentation.EDITOR_INLINE));
+  return new Uint8Array(editor);
 }
 
 function dropdownFromLabels(items: string): VolvoxGridDropdown {
@@ -1464,9 +1485,11 @@ function pbEncodeHierarchyOutlineConfig(maxOutlineDepth: number, maxOutlineLevel
   selection.push(...pbEncodeMessageField(SelectionConfigFields.active_cell_style, activeCellStyle));
 
   const editing: number[] = [];
-  editing.push(...pbEncodeInt32Field(EditConfigFields.trigger, EditTrigger.EDIT_TRIGGER_NONE));
-  editing.push(...pbEncodeInt32Field(EditConfigFields.tab_behavior, TabBehavior.TAB_CELLS));
-  editing.push(...pbEncodeInt32Field(EditConfigFields.dropdown_trigger, DropdownTrigger.DROPDOWN_NEVER));
+  const activation: number[] = [];
+  activation.push(...pbEncodeInt32Field(EditActivationFields.trigger, EditTrigger.EDIT_TRIGGER_NONE));
+  activation.push(...pbEncodeInt32Field(EditActivationFields.tab_behavior, TabBehavior.TAB_CELLS));
+  editing.push(...pbEncodeMessageField(EditConfigFields.activation, new Uint8Array(activation)));
+  editing.push(...pbEncodeMessageField(EditConfigFields.default_editor, defaultHostTextEditor()));
 
   const scrolling: number[] = [];
   scrolling.push(...pbEncodeInt32Field(ScrollConfigFields.scrollbars, ScrollBarsMode.SCROLLBAR_BOTH));
@@ -1595,10 +1618,11 @@ function pbEncodeSalesDemoConfig(): Uint8Array {
   selection.push(...pbEncodeMessageField(SelectionConfigFields.active_cell_style, activeCellStyle));
 
   const editing: number[] = [];
-  editing.push(...pbEncodeInt32Field(EditConfigFields.trigger, EditTrigger.EDIT_TRIGGER_NONE));
-  editing.push(...pbEncodeInt32Field(EditConfigFields.tab_behavior, TabBehavior.TAB_CELLS));
-  editing.push(...pbEncodeInt32Field(EditConfigFields.dropdown_trigger, DropdownTrigger.DROPDOWN_ALWAYS));
-  editing.push(...pbEncodeTag(EditConfigFields.dropdown_search, 0), ...pbEncodeBool(false));
+  const activation: number[] = [];
+  activation.push(...pbEncodeInt32Field(EditActivationFields.trigger, EditTrigger.EDIT_TRIGGER_NONE));
+  activation.push(...pbEncodeInt32Field(EditActivationFields.tab_behavior, TabBehavior.TAB_CELLS));
+  editing.push(...pbEncodeMessageField(EditConfigFields.activation, new Uint8Array(activation)));
+  editing.push(...pbEncodeMessageField(EditConfigFields.default_editor, defaultHostTextEditor()));
 
   const scrolling: number[] = [];
   scrolling.push(...pbEncodeInt32Field(ScrollConfigFields.scrollbars, ScrollBarsMode.SCROLLBAR_BOTH));
@@ -1708,8 +1732,6 @@ function setupSalesJsonDemo(grid: VolvoxGrid, wasmModule: WasmModule, id: number
       wasmModule.volvox_grid_configure(gridHandle, pbEncodeSalesDemoConfig());
     }
     grid.selectionMode = SelectionMode.SELECTION_FREE;
-    grid.dropdownTrigger = DropdownTrigger.DROPDOWN_ALWAYS;
-    grid.dropdownSearch = false;
     grid.setHeaderFeatures({ sort: true, reorder: true, chooser: false });
     grid.setColFormat(4, "$#,##0");
     grid.setColFormat(5, "$#,##0");

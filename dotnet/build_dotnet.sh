@@ -492,8 +492,6 @@ if [ ! -f "$LIBRARY_ARTIFACT" ]; then
     exit 1
 fi
 
-cp -f "$LIBRARY_ARTIFACT" "$STAGE_DIR/$LIBRARY_BASENAME"
-
 if [ "$TARGET_TFM" = "net40" ]; then
     # net40 authoritative compile outputs are under obj/, while bin/ may keep stale arch copies.
     copy_required_artifact "$SAMPLE_OBJ_DIR/${SAMPLE_BASENAME}.exe"
@@ -504,6 +502,10 @@ else
     find "$SAMPLE_DIR" -maxdepth 1 -type f -exec cp -f {} "$STAGE_DIR/" \;
     SAMPLE_ENTRY="$SAMPLE_DIR/${SAMPLE_BASENAME}.dll"
 fi
+
+# Sample outputs may include packaged native assets for multiple RIDs. Copy the
+# cargo-built host artifact last so the staged library always matches this run.
+cp -f "$LIBRARY_ARTIFACT" "$STAGE_DIR/$LIBRARY_BASENAME"
 
 echo ""
 echo "=== Build Complete ==="

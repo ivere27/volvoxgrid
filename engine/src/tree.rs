@@ -132,8 +132,8 @@ impl TreeNodeRecord {
             if let Some(picture) = &cell.picture {
                 bytes += picture.data.capacity() + picture.format.capacity();
             }
-            if let Some(dropdown) = &cell.dropdown {
-                bytes += dropdown_heap_size(dropdown);
+            if let Some(editor) = &cell.editor {
+                bytes += editor_heap_size(editor);
             }
         }
         bytes += string_heap_bytes(&self.icon_name);
@@ -162,18 +162,32 @@ fn cell_value_heap_size(value: &pb::CellValue) -> usize {
     }
 }
 
-fn dropdown_heap_size(dropdown: &pb::Dropdown) -> usize {
-    let mut bytes = dropdown.items.capacity() * std::mem::size_of::<pb::DropdownItem>();
-    for item in &dropdown.items {
-        bytes += item.value.as_ref().map_or(0, String::capacity);
-        bytes += item.label.as_ref().map_or(0, String::capacity);
-        for detail in &item.details {
-            bytes += detail.capacity();
+fn editor_heap_size(editor: &pb::EditorSpec) -> usize {
+    let mut bytes = editor.custom_editor_id.as_ref().map_or(0, String::capacity);
+    if let Some(list) = &editor.list {
+        bytes += list.static_items.capacity() * std::mem::size_of::<pb::ListItem>();
+        for item in &list.static_items {
+            bytes += item.label.capacity();
+            for detail in &item.details {
+                bytes += detail.capacity();
+            }
         }
+    }
+    for action in &editor.actions {
+        bytes += action.action_id.capacity();
+        bytes += action.label.capacity();
+    }
+    if let Some(text) = &editor.text {
+        bytes += text.mask.capacity();
+    }
+    if let Some(number) = &editor.number {
+        bytes += number.format.capacity();
+    }
+    if let Some(date_time) = &editor.date_time {
+        bytes += date_time.format.capacity();
     }
     bytes
 }
-
 struct FlatTreeNode {
     node: pb::TreeNode,
     parent_id: String,
@@ -485,7 +499,7 @@ impl TreeState {
             checked: None,
             picture: None,
             picture_align: None,
-            dropdown: None,
+            editor: None,
             rich_text: None,
         };
         self.update_node_cells(&[update])?;
@@ -1987,7 +2001,7 @@ fn project_tree_state_with_write_result(
                 picture: cell.picture.clone(),
                 picture_align: cell.picture_align,
                 button_picture: None,
-                dropdown: cell.dropdown.clone(),
+                editor: cell.editor.clone(),
                 sticky_row: None,
                 sticky_col: None,
                 interaction: None,
@@ -2104,7 +2118,7 @@ mod tests {
             checked: None,
             picture: None,
             picture_align: None,
-            dropdown: None,
+            editor: None,
             rich_text: None,
         }
     }

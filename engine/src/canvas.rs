@@ -9,6 +9,7 @@
 
 use crate::cell::BarcodeSpec;
 use crate::control::CellControl;
+use crate::edit::{editor_line_index_for_char, editor_visual_lines};
 use crate::grid::{PullToRefreshState, VolvoxGrid};
 use crate::indicator::col_indicator_modes_contain;
 use crate::proto::volvoxgrid::v1 as pb;
@@ -990,6 +991,20 @@ struct RichTextLayout {
     height: f32,
 }
 
+#[derive(Clone, Debug)]
+struct PlainTextLine {
+    text: String,
+    width: f32,
+    y: f32,
+}
+
+#[derive(Clone, Debug)]
+struct PlainTextLayout {
+    lines: Vec<PlainTextLine>,
+    width: f32,
+    height: f32,
+}
+
 fn resolve_rich_text_run_style(
     base: &RichTextDrawStyle,
     run_style: Option<&pb::TextRunStyle>,
@@ -1095,6 +1110,26 @@ fn finish_rich_text_line(
     *line_h = 0.0;
 }
 
+fn finish_plain_text_line(
+    layout: &mut PlainTextLayout,
+    line: &mut String,
+    line_w: &mut f32,
+    line_h: &mut f32,
+    y: &mut f32,
+    default_line_h: f32,
+) {
+    let h = (*line_h).max(default_line_h);
+    layout.width = layout.width.max(line_w.ceil());
+    layout.lines.push(PlainTextLine {
+        text: std::mem::take(line),
+        width: *line_w,
+        y: *y,
+    });
+    *y += h.ceil();
+    *line_w = 0.0;
+    *line_h = 0.0;
+}
+
 fn add_rich_text_piece<C: Canvas>(
     canvas: &mut C,
     layout: &mut RichTextLayout,
@@ -1129,6 +1164,29 @@ fn add_rich_text_piece<C: Canvas>(
     *line_h = line_h.max(h);
 }
 
+#[allow(clippy::too_many_arguments)]
+fn add_plain_text_fragment<C: Canvas>(
+    canvas: &mut C,
+    line: &mut String,
+    line_w: &mut f32,
+    line_h: &mut f32,
+    text: &str,
+    font_name: &str,
+    font_size: f32,
+    bold: bool,
+    italic: bool,
+    stretch: f32,
+) {
+    if text.is_empty() {
+        return;
+    }
+    let (w, h) =
+        canvas.measure_text_stretched(text, font_name, font_size, bold, italic, stretch, None);
+    line.push_str(text);
+    *line_w += w;
+    *line_h = (*line_h).max(h);
+}
+
 fn rich_text_tokens(text: &str) -> Vec<String> {
     let mut tokens = Vec::new();
     let mut current = String::new();
@@ -1155,6 +1213,139 @@ fn rich_text_tokens(text: &str) -> Vec<String> {
         tokens.push(current);
     }
     tokens
+}
+
+#[allow(clippy::too_many_arguments)]
+fn layout_plain_text<C: Canvas>(
+    canvas: &mut C,
+    text: &str,
+    font_name: &str,
+    font_size: f32,
+    bold: bool,
+    italic: bool,
+    stretch: f32,
+    wrap_width: Option<f32>,
+    default_line_h: f32,
+) -> PlainTextLayout {
+    let mut layout = PlainTextLayout {
+        lines: Vec::new(),
+        width: 0.0,
+        height: 0.0,
+    };
+    let mut line = String::new();
+    let mut line_w = 0.0;
+    let mut line_h = 0.0;
+    let mut y = 0.0;
+
+    if let Some(wrap_width) = wrap_width {
+        for token in rich_text_tokens(text) {
+            if token == "\n" {
+                finish_plain_text_line(
+                    &mut layout,
+                    &mut line,
+                    &mut line_w,
+                    &mut line_h,
+                    &mut y,
+                    default_line_h,
+                );
+                continue;
+            }
+
+            let (token_w, _) = canvas
+                .measure_text_stretched(&token, font_name, font_size, bold, italic, stretch, None);
+            if line_w > 0.0 && line_w + token_w > wrap_width {
+                finish_plain_text_line(
+                    &mut layout,
+                    &mut line,
+                    &mut line_w,
+                    &mut line_h,
+                    &mut y,
+                    default_line_h,
+                );
+            }
+
+            if token_w > wrap_width && token.chars().count() > 1 {
+                for ch in token.chars() {
+                    let part = ch.to_string();
+                    let (part_w, _) = canvas.measure_text_stretched(
+                        &part, font_name, font_size, bold, italic, stretch, None,
+                    );
+                    if line_w > 0.0 && line_w + part_w > wrap_width {
+                        finish_plain_text_line(
+                            &mut layout,
+                            &mut line,
+                            &mut line_w,
+                            &mut line_h,
+                            &mut y,
+                            default_line_h,
+                        );
+                    }
+                    add_plain_text_fragment(
+                        canvas,
+                        &mut line,
+                        &mut line_w,
+                        &mut line_h,
+                        &part,
+                        font_name,
+                        font_size,
+                        bold,
+                        italic,
+                        stretch,
+                    );
+                }
+            } else {
+                add_plain_text_fragment(
+                    canvas,
+                    &mut line,
+                    &mut line_w,
+                    &mut line_h,
+                    &token,
+                    font_name,
+                    font_size,
+                    bold,
+                    italic,
+                    stretch,
+                );
+            }
+        }
+    } else {
+        let mut parts = text.split('\n').peekable();
+        while let Some(part) = parts.next() {
+            add_plain_text_fragment(
+                canvas,
+                &mut line,
+                &mut line_w,
+                &mut line_h,
+                part,
+                font_name,
+                font_size,
+                bold,
+                italic,
+                stretch,
+            );
+            if parts.peek().is_some() {
+                finish_plain_text_line(
+                    &mut layout,
+                    &mut line,
+                    &mut line_w,
+                    &mut line_h,
+                    &mut y,
+                    default_line_h,
+                );
+            }
+        }
+    }
+
+    finish_plain_text_line(
+        &mut layout,
+        &mut line,
+        &mut line_w,
+        &mut line_h,
+        &mut y,
+        default_line_h,
+    );
+    layout.height = y.max(default_line_h).ceil();
+    layout
 }
 
 fn layout_rich_text<C: Canvas>(
@@ -1287,6 +1478,74 @@ fn layout_rich_text<C: Canvas>(
     );
     layout.height = y.max(default_line_h).ceil();
     layout
+}
+
+#[allow(clippy::too_many_arguments)]
+fn draw_plain_text_layout<C: Canvas>(
+    canvas: &mut C,
+    layout: &PlainTextLayout,
+    y: i32,
+    inner_left: i32,
+    inner_right: i32,
+    halign: i32,
+    clip_x: i32,
+    clip_y: i32,
+    clip_w: i32,
+    clip_h: i32,
+    font_name: &str,
+    font_size: f32,
+    bold: bool,
+    italic: bool,
+    stretch: f32,
+    color: u32,
+    text_style: i32,
+    underline: bool,
+    strikethrough: bool,
+) {
+    let inner_w = (inner_right - inner_left).max(1);
+    for line in &layout.lines {
+        let line_x = match halign {
+            0 => inner_left,
+            1 => inner_left + (inner_w - line.width.ceil() as i32) / 2,
+            _ => inner_right - line.width.ceil() as i32,
+        };
+        let line_y = y + line.y.round() as i32;
+        let draw_clip_h = text_clip_h_for_draw(line_y, clip_y, clip_h);
+        if draw_clip_h <= 0 || line.text.is_empty() {
+            continue;
+        }
+        canvas.draw_text_styled_stretched_fast(
+            line_x,
+            line_y,
+            &line.text,
+            font_name,
+            font_size,
+            bold,
+            italic,
+            stretch,
+            color,
+            clip_x,
+            clip_y,
+            clip_w,
+            draw_clip_h,
+            text_style,
+            None,
+        );
+        draw_text_decorations(
+            canvas,
+            line_x,
+            line_y,
+            line.width,
+            font_size,
+            color,
+            clip_x,
+            clip_y,
+            clip_w,
+            clip_h,
+            underline,
+            strikethrough,
+        );
+    }
 }
 
 fn draw_rich_text_layout<C: Canvas>(
@@ -2466,13 +2725,14 @@ pub(crate) fn cell_rect(
 /// edges.
 ///
 /// Clipping in `cell_rect` is axis-independent:
-///   * X is clipped when the column is scrollable AND not sticky/pinned.
+///   * X is clipped when the column is scrollable AND not sticky.
 ///   * Y is clipped when the row is scrollable AND not sticky/pinned.
 ///
 /// So a sticky-left column with a scrollable row needs original Y but
 /// keeps the sticky X.  A sticky-top row with a scrollable column needs
-/// original X but keeps the sticky Y.  Pinned rows return from
-/// `cell_rect` before any clipping, so they are never adjusted here.
+/// original X but keeps the sticky Y.  Pinned rows keep their pinned Y,
+/// but scrollable pinned-row columns still need original X because
+/// `cell_rect` clips them against the horizontal viewport/sticky bands.
 fn original_cell_bounds(
     grid: &VolvoxGrid,
     row: i32,
@@ -2491,8 +2751,8 @@ fn original_cell_bounds(
 
     // cell_rect clips X when: is_col_scrollable && !is_sticky_col
     // cell_rect clips Y when: is_row_scrollable && !is_sticky_row
-    // Pinned rows return before clipping → never clipped.
-    let need_orig_x = is_col_scrollable && !is_sticky_col && !is_pinned;
+    // Pinned rows are still clipped horizontally, but keep their pinned Y.
+    let need_orig_x = is_col_scrollable && !is_sticky_col;
     let need_orig_y = is_row_scrollable && !is_sticky_row && !is_pinned;
 
     if !need_orig_x && !need_orig_y {
@@ -2781,15 +3041,7 @@ fn should_show_dropdown_button_for_control(
     if control == CellControl::None {
         return false;
     }
-    match grid.dropdown_trigger {
-        b if b == pb::DropdownTrigger::DropdownAlways as i32 => true,
-        b if b == pb::DropdownTrigger::DropdownOnEdit as i32 => {
-            grid.edit.is_active() && grid.edit.edit_row == row && grid.edit.edit_col == col
-        }
-        /* ActiveX compatibility: show on current cell when button-like controls exist. */
-        3 => grid.selection.row == row && grid.selection.col == col,
-        _ => false,
-    }
+    grid.editor_button_visible_for_control(row, col, control)
 }
 
 pub(crate) fn show_dropdown_button_for_cell(grid: &VolvoxGrid, row: i32, col: i32) -> bool {
@@ -6304,6 +6556,8 @@ fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
             || (grid.text_overflow && !grid.word_wrap && !shrink_to_fit && !is_merged_cell);
         let mut rich_font_scale = 1.0f32;
         let mut rich_layout = None;
+        let plain_multiline = display_text.contains('\n');
+        let mut plain_layout = None;
         let (tw, th) = if let Some(segments) = rich_segments.as_ref() {
             let layout = layout_rich_text(
                 canvas,
@@ -6314,6 +6568,21 @@ fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
             );
             let measured = (layout.width, layout.height);
             rich_layout = Some(layout);
+            measured
+        } else if plain_multiline {
+            let layout = layout_plain_text(
+                canvas,
+                display_text,
+                font_name,
+                font_size,
+                font_bold,
+                font_italic,
+                font_stretch,
+                wrap_width,
+                default_line_h,
+            );
+            let measured = (layout.width, layout.height);
+            plain_layout = Some(layout);
             measured
         } else if needs_measure {
             canvas.measure_text_stretched(
@@ -6349,6 +6618,21 @@ fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
                     );
                     let measured = (layout.width, layout.height);
                     rich_layout = Some(layout);
+                    (shrunk, measured.0, measured.1)
+                } else if plain_multiline {
+                    let layout = layout_plain_text(
+                        canvas,
+                        display_text,
+                        font_name,
+                        shrunk,
+                        font_bold,
+                        font_italic,
+                        font_stretch,
+                        None,
+                        (shrunk * TEXT_LINE_HEIGHT_FACTOR).ceil(),
+                    );
+                    let measured = (layout.width, layout.height);
+                    plain_layout = Some(layout);
                     (shrunk, measured.0, measured.1)
                 } else {
                     let (stw, sth) = canvas.measure_text_stretched(
@@ -6564,6 +6848,45 @@ fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
                 clip_y_cell,
                 clip_w,
                 clip_h,
+            );
+        } else if plain_multiline {
+            let fallback_layout;
+            let layout = if let Some(layout) = plain_layout.as_ref() {
+                layout
+            } else {
+                fallback_layout = layout_plain_text(
+                    canvas,
+                    display_text,
+                    font_name,
+                    effective_font_size,
+                    font_bold,
+                    font_italic,
+                    font_stretch,
+                    wrap_width,
+                    (effective_font_size * TEXT_LINE_HEIGHT_FACTOR).ceil(),
+                );
+                &fallback_layout
+            };
+            draw_plain_text_layout(
+                canvas,
+                layout,
+                text_y,
+                inner_left,
+                inner_right,
+                halign,
+                clip_x,
+                clip_y_cell,
+                clip_w,
+                clip_h,
+                font_name,
+                effective_font_size,
+                font_bold,
+                font_italic,
+                font_stretch,
+                fore,
+                text_style,
+                font_underline,
+                font_strikethrough,
             );
         } else {
             canvas.draw_text_styled_stretched_fast(
@@ -9585,6 +9908,223 @@ fn aligned_editor_draw_x(
     draw_x
 }
 
+fn editor_caret_span(
+    anchor_y: i32,
+    available_h: i32,
+    font_size: f32,
+    clip_y: i32,
+    clip_h: i32,
+) -> Option<(i32, i32)> {
+    let caret_h = (font_size * TEXT_LINE_HEIGHT_FACTOR).ceil().max(1.0) as i32;
+    let caret_y = anchor_y + ((available_h - caret_h) / 2).max(0);
+    let clip_bottom = clip_y + clip_h.max(0);
+    let top = caret_y.max(clip_y);
+    let bottom = (caret_y + caret_h).min(clip_bottom);
+    (bottom > top).then_some((top, bottom - top))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn render_multiline_editor_text<C: Canvas>(
+    canvas: &mut C,
+    text: &str,
+    font_name: &str,
+    font_size: f32,
+    font_bold: bool,
+    font_italic: bool,
+    fore: u32,
+    text_style: i32,
+    text_x: i32,
+    text_clip_y: i32,
+    clip_w: i32,
+    clip_h: i32,
+    halign: i32,
+    scroll_margin: i32,
+    caret_char: i32,
+    selection: Option<(i32, i32)>,
+    underline: Option<(i32, i32)>,
+) {
+    let lines = editor_visual_lines(text);
+    let line_h = (font_size * TEXT_LINE_HEIGHT_FACTOR).ceil().max(1.0) as i32;
+    let total_h = line_h * lines.len().max(1) as i32;
+    let text_char_count = text.chars().count() as i32;
+    let caret_char = caret_char.clamp(0, text_char_count);
+    let caret_line_index = editor_line_index_for_char(&lines, caret_char);
+
+    let mut base_y = text_clip_y + ((clip_h - total_h) / 2).max(0);
+    if total_h > clip_h {
+        let caret_y = base_y + caret_line_index as i32 * line_h;
+        let clip_bottom = text_clip_y + clip_h;
+        if caret_y < text_clip_y {
+            base_y += text_clip_y - caret_y;
+        } else if caret_y + line_h > clip_bottom {
+            base_y -= caret_y + line_h - clip_bottom;
+        }
+    }
+
+    let selection = selection.and_then(|(start, end)| {
+        let start = start.clamp(0, text_char_count);
+        let end = end.clamp(start, text_char_count);
+        (end > start).then_some((start, end))
+    });
+    let underline = underline.and_then(|(start, end)| {
+        let start = start.clamp(0, text_char_count);
+        let end = end.clamp(start, text_char_count);
+        (end > start).then_some((start, end))
+    });
+
+    for (line_index, line) in lines.iter().enumerate() {
+        let line_y = base_y + line_index as i32 * line_h;
+        if line_y >= text_clip_y + clip_h || line_y + line_h <= text_clip_y {
+            continue;
+        }
+
+        let (line_w, _) = canvas.measure_text(
+            line.text,
+            font_name,
+            font_size,
+            font_bold,
+            font_italic,
+            None,
+        );
+        let line_w = line_w.ceil() as i32;
+        let local_caret = if line_index == caret_line_index {
+            (caret_char.clamp(line.start_char, line.end_char) - line.start_char).max(0)
+        } else {
+            0
+        };
+        let caret_prefix = &line.text[..byte_index_at_char(line.text, local_caret)];
+        let (caret_prefix_w, _) = canvas.measure_text(
+            caret_prefix,
+            font_name,
+            font_size,
+            font_bold,
+            font_italic,
+            None,
+        );
+        let caret_px = caret_prefix_w.ceil() as i32;
+        let draw_x = aligned_editor_draw_x(text_x, clip_w, line_w, caret_px, halign, scroll_margin);
+
+        if let Some((sel_start, sel_end)) = selection {
+            let line_sel_start = sel_start.max(line.start_char);
+            let line_sel_end = sel_end.min(line.end_char);
+            if line_sel_end > line_sel_start {
+                let prefix_chars = line_sel_start - line.start_char;
+                let selected_chars = line_sel_end - line_sel_start;
+                let prefix = &line.text[..byte_index_at_char(line.text, prefix_chars)];
+                let selected = &line.text[byte_index_at_char(line.text, prefix_chars)
+                    ..byte_index_at_char(line.text, prefix_chars + selected_chars)];
+                let (prefix_w, _) =
+                    canvas.measure_text(prefix, font_name, font_size, font_bold, font_italic, None);
+                let (selected_w, _) = canvas.measure_text(
+                    selected,
+                    font_name,
+                    font_size,
+                    font_bold,
+                    font_italic,
+                    None,
+                );
+                let sel_x = draw_x + prefix_w.ceil() as i32;
+                let sel_w = selected_w.ceil() as i32;
+                let sel_left = sel_x.max(text_x);
+                let sel_right = (sel_x + sel_w).min(text_x + clip_w);
+                if sel_right > sel_left {
+                    if let Some((sel_y, sel_h)) =
+                        editor_caret_span(line_y, line_h, font_size, text_clip_y, clip_h)
+                    {
+                        canvas.fill_rect(sel_left, sel_y, sel_right - sel_left, sel_h, 0xFFBDD7FF);
+                    }
+                }
+            }
+        }
+
+        canvas.draw_text_styled_fast(
+            draw_x,
+            line_y,
+            line.text,
+            font_name,
+            font_size,
+            font_bold,
+            font_italic,
+            fore,
+            text_x,
+            text_clip_y,
+            clip_w,
+            clip_h,
+            text_style,
+            None,
+        );
+
+        if let Some((sel_start, sel_end)) = selection {
+            let line_sel_start = sel_start.max(line.start_char);
+            let line_sel_end = sel_end.min(line.end_char);
+            if line_sel_end > line_sel_start {
+                let prefix_chars = line_sel_start - line.start_char;
+                let selected_chars = line_sel_end - line_sel_start;
+                let prefix = &line.text[..byte_index_at_char(line.text, prefix_chars)];
+                let selected = &line.text[byte_index_at_char(line.text, prefix_chars)
+                    ..byte_index_at_char(line.text, prefix_chars + selected_chars)];
+                let (prefix_w, _) =
+                    canvas.measure_text(prefix, font_name, font_size, font_bold, font_italic, None);
+                canvas.draw_text_styled_fast(
+                    draw_x + prefix_w.ceil() as i32,
+                    line_y,
+                    selected,
+                    font_name,
+                    font_size,
+                    font_bold,
+                    font_italic,
+                    0xFF000000,
+                    text_x,
+                    text_clip_y,
+                    clip_w,
+                    clip_h,
+                    text_style,
+                    None,
+                );
+            }
+        }
+
+        if let Some((underline_start, underline_end)) = underline {
+            let line_ul_start = underline_start.max(line.start_char);
+            let line_ul_end = underline_end.min(line.end_char);
+            if line_ul_end > line_ul_start {
+                let prefix_chars = line_ul_start - line.start_char;
+                let underlined_chars = line_ul_end - line_ul_start;
+                let prefix = &line.text[..byte_index_at_char(line.text, prefix_chars)];
+                let underlined = &line.text[byte_index_at_char(line.text, prefix_chars)
+                    ..byte_index_at_char(line.text, prefix_chars + underlined_chars)];
+                let (prefix_w, _) =
+                    canvas.measure_text(prefix, font_name, font_size, font_bold, font_italic, None);
+                let (underlined_w, _) = canvas.measure_text(
+                    underlined,
+                    font_name,
+                    font_size,
+                    font_bold,
+                    font_italic,
+                    None,
+                );
+                let ul_x = draw_x + prefix_w.ceil() as i32;
+                let ul_w = underlined_w.ceil() as i32;
+                let ul_left = ul_x.max(text_x);
+                let ul_right = (ul_x + ul_w).min(text_x + clip_w);
+                let ul_y = line_y + line_h - 2;
+                if ul_right > ul_left && ul_y >= text_clip_y && ul_y < text_clip_y + clip_h {
+                    canvas.hline(ul_left, ul_y, ul_right - ul_left, fore);
+                }
+            }
+        }
+
+        if selection.is_none() && line_index == caret_line_index {
+            let caret_x = (draw_x + caret_px).clamp(text_x, (text_x + clip_w).max(text_x));
+            if let Some((caret_y, caret_h)) =
+                editor_caret_span(line_y, line_h, font_size, text_clip_y, clip_h)
+            {
+                canvas.vline(caret_x, caret_y, caret_h, 0xFF000000);
+            }
+        }
+    }
+}
+
 fn render_active_editor<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
     let vp = &ctx.vp;
     if !grid.edit.is_active() {
@@ -9594,6 +10134,9 @@ fn render_active_editor<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
     let row = grid.edit.edit_row;
     let col = grid.edit.edit_col;
     if row < 0 || row >= grid.rows || col < 0 || col >= grid.cols {
+        return;
+    }
+    if !grid.active_editor_is_canvas_presented(row, col) {
         return;
     }
 
@@ -9670,6 +10213,35 @@ fn render_active_editor<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
         let preedit = grid.edit.preedit_text.as_str();
         let before_preedit_byte = byte_index_at_char(text, sel_start);
         let composite = compose_preedit_display_text(text, sel_start, sel_end, preedit);
+        let preedit_cursor = grid
+            .edit
+            .preedit_cursor
+            .clamp(0, preedit.chars().count() as i32);
+
+        if composite.contains('\n') {
+            let preedit_start = sel_start;
+            let preedit_end = preedit_start + preedit.chars().count() as i32;
+            render_multiline_editor_text(
+                canvas,
+                &composite,
+                font_name,
+                font_size,
+                font_bold,
+                font_italic,
+                fore,
+                text_style,
+                text_x,
+                text_clip_y,
+                clip_w,
+                clip_h,
+                halign,
+                scroll_margin,
+                preedit_start + preedit_cursor,
+                None,
+                Some((preedit_start, preedit_end)),
+            );
+            return;
+        }
 
         let (tw, th) = canvas.measure_text(
             &composite,
@@ -9693,10 +10265,6 @@ fn render_active_editor<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
         );
         let (preedit_w, _) =
             canvas.measure_text(preedit, font_name, font_size, font_bold, font_italic, None);
-        let preedit_cursor = grid
-            .edit
-            .preedit_cursor
-            .clamp(0, preedit.chars().count() as i32);
         let cursor_prefix = &preedit[..byte_index_at_char(preedit, preedit_cursor)];
         let (cursor_w, _) = canvas.measure_text(
             cursor_prefix,
@@ -9748,9 +10316,36 @@ fn render_active_editor<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
 
         // Caret within the preedit.
         let caret_x = (draw_x + caret_px).clamp(text_x, (text_x + clip_w).max(text_x));
-        canvas.vline(caret_x, cy + top_padding, inner_h, 0xFF000000);
+        if let Some((caret_y, caret_h)) =
+            editor_caret_span(cy + top_padding, inner_h, font_size, text_clip_y, clip_h)
+        {
+            canvas.vline(caret_x, caret_y, caret_h, 0xFF000000);
+        }
     } else {
         // Normal editing mode (no IME composition).
+        if text.contains('\n') {
+            render_multiline_editor_text(
+                canvas,
+                text,
+                font_name,
+                font_size,
+                font_bold,
+                font_italic,
+                fore,
+                text_style,
+                text_x,
+                text_clip_y,
+                clip_w,
+                clip_h,
+                halign,
+                scroll_margin,
+                grid.edit.current_caret_char().clamp(sel_start, sel_end),
+                Some((sel_start, sel_end)),
+                None,
+            );
+            return;
+        }
+
         let prefix = &text[..byte_index_at_char(text, sel_start)];
         let selected =
             &text[byte_index_at_char(text, sel_start)..byte_index_at_char(text, sel_end)];
@@ -9790,13 +10385,11 @@ fn render_active_editor<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
             let sel_left = sel_x.max(text_x);
             let sel_right = (sel_x + sel_w_px).min(text_x + clip_w);
             if sel_right > sel_left {
-                canvas.fill_rect(
-                    sel_left,
-                    cy + top_padding,
-                    sel_right - sel_left,
-                    inner_h,
-                    0xFFBDD7FF,
-                );
+                if let Some((sel_y, sel_h)) =
+                    editor_caret_span(cy + top_padding, inner_h, font_size, text_clip_y, clip_h)
+                {
+                    canvas.fill_rect(sel_left, sel_y, sel_right - sel_left, sel_h, 0xFFBDD7FF);
+                }
             }
         }
 
@@ -9844,7 +10437,11 @@ fn render_active_editor<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
         // Caret (when no range is selected)
         if sel_end == sel_start {
             let caret_x = (draw_x + caret_px).clamp(text_x, (text_x + clip_w).max(text_x));
-            canvas.vline(caret_x, cy + top_padding, inner_h, 0xFF000000);
+            if let Some((caret_y, caret_h)) =
+                editor_caret_span(cy + top_padding, inner_h, font_size, text_clip_y, clip_h)
+            {
+                canvas.vline(caret_x, caret_y, caret_h, 0xFF000000);
+            }
         }
     }
 }
@@ -9929,6 +10526,9 @@ fn render_active_dropdown<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Re
     let row = grid.edit.edit_row;
     let col = grid.edit.edit_col;
     if row < 0 || row >= grid.rows || col < 0 || col >= grid.cols {
+        return;
+    }
+    if !grid.active_editor_is_canvas_presented(row, col) {
         return;
     }
 
@@ -11133,14 +11733,15 @@ mod tests {
         checkbox_box_size, checkbox_box_size_for_rect, checkbox_layer_needed,
         compose_preedit_display_text, draw_linear_barcode, draw_outline_toggle, draw_qr_barcode,
         draw_tree_guide_hline_except_rect, draw_tree_guide_vline_except_rect, dropdown_button_rect,
-        dropdown_glyph_metrics, dropdown_layer_needed, encode_linear_barcode,
+        dropdown_glyph_metrics, dropdown_layer_needed, editor_caret_span, encode_linear_barcode,
         linear_barcode_preview_rect, normalized_code128_payload, parse_progress_percent,
         picture_layer_needed, progress_layer_needed, render_fast_scroll, render_grid,
         show_dropdown_button_for_cell, sort_arrow_box_size, BarcodeDrawRect, CellKey,
         RenderContext, RenderCtxCacheKey, RenderCtxCached, VisibleRange,
-        DEFAULT_BARCODE_SIZE_WARNING_COLOR,
+        DEFAULT_BARCODE_SIZE_WARNING_COLOR, TEXT_LINE_HEIGHT_FACTOR,
     };
     use crate::canvas_cpu::CpuCanvas;
+    use crate::edit::{editor_line_index_for_char, editor_visual_lines};
     use crate::grid::VolvoxGrid;
     use crate::text::TextRenderer;
     use std::sync::{Arc, Mutex};
@@ -11326,6 +11927,7 @@ mod tests {
 
     #[derive(Clone, Debug, PartialEq)]
     struct TextDrawCall {
+        x: i32,
         y: i32,
         clip_y: i32,
         clip_h: i32,
@@ -11360,7 +11962,7 @@ mod tests {
             _buf_width: i32,
             _buf_height: i32,
             _stride: i32,
-            _x: i32,
+            x: i32,
             y: i32,
             _clip_x: i32,
             clip_y: i32,
@@ -11375,6 +11977,7 @@ mod tests {
             _max_width: Option<f32>,
         ) -> f32 {
             self.draws.lock().unwrap().push(TextDrawCall {
+                x,
                 y,
                 clip_y,
                 clip_h,
@@ -11608,6 +12211,48 @@ mod tests {
         assert_eq!(first.y, -10);
         assert_eq!(first.clip_y, 0);
         assert_eq!(first.clip_h, 26);
+    }
+
+    #[test]
+    fn plain_multiline_cell_centers_the_full_text_block() {
+        let width = 140;
+        let height = 80;
+        let stride = width * 4;
+        let draws = Arc::new(Mutex::new(Vec::new()));
+        let mut text = RecordingTextDrawRenderer {
+            draws: draws.clone(),
+        };
+        let mut buffer = vec![0; (height * stride) as usize];
+        let mut canvas = CpuCanvas::new(&mut buffer, width, height, stride, &mut text);
+        let mut grid = VolvoxGrid::new(1, width, height, 1, 1, 0, 0);
+        grid.render_layer_mask = 1u64 << super::layer::CELL_TEXT;
+        grid.style.font_size = 10.0;
+        grid.columns[0].alignment = pb::Align::CenterCenter as i32;
+        grid.set_row_height(0, 80);
+        grid.cells.set_text(0, 0, "A\nLong".to_string());
+
+        render_grid(&grid, &mut canvas);
+
+        let draws = draws.lock().unwrap();
+        let first = draws
+            .iter()
+            .find(|draw| draw.text == "A")
+            .expect("first line should render as a separate line");
+        let second = draws
+            .iter()
+            .find(|draw| draw.text == "Long")
+            .expect("second line should render as a separate line");
+        let line_h = (grid.style.font_size * TEXT_LINE_HEIGHT_FACTOR).ceil() as i32;
+
+        assert_eq!(second.y - first.y, line_h);
+        assert!(
+            first.y < height / 2,
+            "first line should not start at cell center"
+        );
+        assert!(
+            second.x < first.x,
+            "shorter centered line should be indented relative to the longer line"
+        );
     }
 
     #[test]
@@ -12360,6 +13005,45 @@ mod tests {
     }
 
     #[test]
+    fn editor_caret_span_uses_font_size_not_cell_height() {
+        assert_eq!(editor_caret_span(10, 40, 13.0, 10, 40), Some((22, 16)));
+    }
+
+    #[test]
+    fn editor_caret_span_clips_when_font_is_taller_than_editor() {
+        assert_eq!(editor_caret_span(10, 8, 13.0, 10, 8), Some((10, 8)));
+    }
+
+    #[test]
+    fn editor_visual_lines_preserve_newline_caret_positions() {
+        let lines = editor_visual_lines("ab\ncd\n");
+        assert_eq!(lines.len(), 3);
+        assert_eq!(lines[0].text, "ab");
+        assert_eq!(lines[0].start_char, 0);
+        assert_eq!(lines[0].end_char, 2);
+        assert_eq!(lines[1].text, "cd");
+        assert_eq!(lines[1].start_char, 3);
+        assert_eq!(lines[1].end_char, 5);
+        assert_eq!(lines[2].text, "");
+        assert_eq!(lines[2].start_char, 6);
+        assert_eq!(lines[2].end_char, 6);
+
+        assert_eq!(editor_line_index_for_char(&lines, 2), 0);
+        assert_eq!(editor_line_index_for_char(&lines, 3), 1);
+        assert_eq!(editor_line_index_for_char(&lines, 6), 2);
+    }
+
+    #[test]
+    fn editor_visual_lines_empty_text_has_one_line() {
+        let lines = editor_visual_lines("");
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0].text, "");
+        assert_eq!(lines[0].start_char, 0);
+        assert_eq!(lines[0].end_char, 0);
+        assert_eq!(editor_line_index_for_char(&lines, 0), 0);
+    }
+
+    #[test]
     fn active_editor_selection_repaint_stays_inside_cell_bounds() {
         let width = 180;
         let height = 24;
@@ -12379,12 +13063,12 @@ mod tests {
 
         let mut base = make_grid();
         let mut grid = make_grid();
-        grid.edit.start_edit_with_options(
+        grid.edit.start_edit_with(
             0,
             1,
+            pb::EditStartReason::EditStartF2,
             "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
             None,
-            Some(true),
             None,
             None,
         );
@@ -12413,6 +13097,31 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn active_editor_selection_highlight_uses_font_line_height_not_cell_height() {
+        let width = 120;
+        let height = 64;
+        let stride = width * 4;
+        let mut buffer = vec![0u8; (stride * height) as usize];
+        let mut text = MeasureOnlyTextRenderer;
+        let mut canvas = CpuCanvas::new(&mut buffer, width, height, stride, &mut text);
+        let mut grid = VolvoxGrid::new(1, width, height, 1, 1, 0, 0);
+        grid.render_layer_mask = 1u64 << super::layer::ACTIVE_EDITOR;
+        grid.style.font_size = 10.0;
+        grid.set_col_width(0, 120);
+        grid.set_row_height(0, 60);
+        grid.edit
+            .start_edit(0, 0, pb::EditStartReason::EditStartUnspecified, "abcdef");
+
+        render_grid(&grid, &mut canvas);
+
+        let bounds = color_bounds(&buffer, width, height, 0xFFBDD7FF)
+            .expect("selection highlight should render");
+        let expected_h = (grid.style.font_size * TEXT_LINE_HEIGHT_FACTOR).ceil() as i32;
+        assert_eq!(bounds.h, expected_h);
+        assert!(bounds.h < grid.get_row_height(0) / 2);
     }
 
     #[test]
@@ -12635,7 +13344,7 @@ mod tests {
     #[test]
     fn dropdown_layer_guard_is_viewport_aware() {
         let mut grid = VolvoxGrid::new(1, 68, 160, 3, 12, 1, 0);
-        grid.dropdown_trigger = pb::DropdownTrigger::DropdownAlways as i32;
+        grid.dropdown_trigger = crate::grid::EDITOR_BUTTON_ALWAYS;
         grid.columns[10].dropdown_items = "A|B".to_string();
         assert!(!dropdown_layer_needed(&grid, &render_ctx(&grid)));
 
@@ -12649,7 +13358,7 @@ mod tests {
     #[test]
     fn dropdown_button_hidden_for_header_and_subtotal_rows() {
         let mut grid = VolvoxGrid::new(1, 640, 480, 4, 1, 1, 0);
-        grid.dropdown_trigger = pb::DropdownTrigger::DropdownAlways as i32;
+        grid.dropdown_trigger = crate::grid::EDITOR_BUTTON_ALWAYS;
         grid.columns[0].dropdown_items = "A|B".to_string();
         grid.row_props.entry(2).or_default().is_subtotal = true;
 
@@ -12794,6 +13503,57 @@ mod tests {
         assert_eq!(text_cell.meta.alignment, pb::Align::RightCenter as i32);
         assert_eq!(text_cell.vis_rect.w, 140);
         assert_eq!(text_cell.orig_rect.w, 140);
+    }
+
+    #[test]
+    fn pinned_row_text_uses_original_x_when_left_clipped_by_horizontal_scroll() {
+        let mut grid = VolvoxGrid::new(1, 75, 60, 2, 3, 0, 0);
+        grid.auto_resize = false;
+        for col in 0..grid.cols {
+            grid.set_col_width(col, 50);
+        }
+        grid.cells.set_text(1, 0, "abcdef".to_string());
+        grid.pin_row(1, 1);
+        grid.scroll.scroll_x = 25.0;
+        grid.ensure_layout();
+
+        let ctx = render_ctx(&grid);
+        let text_cell = ctx
+            .text_cells
+            .iter()
+            .find(|cell| cell.source_key == CellKey { row: 1, col: 0 })
+            .expect("pinned row text cell");
+
+        assert_eq!(text_cell.vis_rect.x, 0);
+        assert_eq!(text_cell.vis_rect.w, 25);
+        assert_eq!(text_cell.orig_rect.x, -25);
+        assert_eq!(text_cell.orig_rect.w, 50);
+        assert_eq!(text_cell.orig_rect.y, text_cell.vis_rect.y);
+    }
+
+    #[test]
+    fn pinned_row_text_uses_original_x_when_right_clipped_by_viewport() {
+        let mut grid = VolvoxGrid::new(1, 75, 60, 2, 3, 0, 0);
+        grid.auto_resize = false;
+        for col in 0..grid.cols {
+            grid.set_col_width(col, 50);
+        }
+        grid.cells.set_text(1, 1, "abcdef".to_string());
+        grid.pin_row(1, 1);
+        grid.ensure_layout();
+
+        let ctx = render_ctx(&grid);
+        let text_cell = ctx
+            .text_cells
+            .iter()
+            .find(|cell| cell.source_key == CellKey { row: 1, col: 1 })
+            .expect("pinned row text cell");
+
+        assert_eq!(text_cell.vis_rect.x, 50);
+        assert_eq!(text_cell.vis_rect.w, 25);
+        assert_eq!(text_cell.orig_rect.x, 50);
+        assert_eq!(text_cell.orig_rect.w, 50);
+        assert_eq!(text_cell.orig_rect.y, text_cell.vis_rect.y);
     }
 
     #[test]

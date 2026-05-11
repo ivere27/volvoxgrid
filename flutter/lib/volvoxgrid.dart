@@ -43,6 +43,26 @@ void _debugLog(String Function() messageBuilder) {
   }
 }
 
+String _editorValueText(pb.EditorValue value) {
+  if (value.hasEditText()) return value.editText;
+  if (!value.hasValue()) return '';
+  final cellValue = value.value;
+  switch (cellValue.whichValue()) {
+    case pb.CellValue_Value.text:
+      return cellValue.text;
+    case pb.CellValue_Value.number:
+      return cellValue.number.toString();
+    case pb.CellValue_Value.flag:
+      return cellValue.flag.toString();
+    case pb.CellValue_Value.raw:
+      return String.fromCharCodes(cellValue.raw);
+    case pb.CellValue_Value.timestamp:
+      return cellValue.timestamp.toString();
+    case pb.CellValue_Value.notSet:
+      return '';
+  }
+}
+
 typedef VolvoxGridCompareCallback = int Function(pb.CompareEvent request);
 
 class VolvoxGridBeforeEditDetails {
@@ -59,6 +79,9 @@ class VolvoxGridBeforeEditDetails {
   });
 }
 
+@Deprecated(
+  'Dropdown-open cancellation is no longer emitted. Use onBeforeEdit or editor list data-source APIs.',
+)
 class VolvoxGridBeforeDropdownOpenDetails {
   final pb.GridEvent rawEvent;
   final int row;
@@ -67,7 +90,7 @@ class VolvoxGridBeforeDropdownOpenDetails {
   final double y;
   final double width;
   final double height;
-  final pb.Dropdown dropdown;
+  final pb.ListEditorParams dropdown;
   final String currentValue;
   final int selectedIndex;
   bool cancel;
@@ -207,10 +230,11 @@ class VolvoxGridWidget extends StatefulWidget {
   /// This is one of the currently supported cancelable widget hooks.
   final ValueChanged<VolvoxGridBeforeEditDetails>? onBeforeEdit;
 
-  /// Optional callback fired before the engine opens a dropdown list.
-  ///
-  /// Set [VolvoxGridBeforeDropdownOpenDetails.cancel] to true to suppress the
-  /// engine list and render a host picker instead.
+  /// Deprecated source-compatible callback. Dropdown-open cancellation is no
+  /// longer emitted by the native engine.
+  @Deprecated(
+    'Dropdown-open cancellation is no longer emitted. Use onBeforeEdit or editor list data-source APIs.',
+  )
   final ValueChanged<VolvoxGridBeforeDropdownOpenDetails>? onBeforeDropdownOpen;
 
   /// Optional callback fired before an edited value is committed.
@@ -251,8 +275,8 @@ class VolvoxGridWidget extends StatefulWidget {
 
   /// Legacy raw callback for cancelable events.
   ///
-  /// Prefer [onBeforeEdit], [onBeforeDropdownOpen], [onCellEditValidating],
-  /// and [onBeforeSort] for a clearer cancel-style API. Returning true here
+  /// Prefer [onBeforeEdit], [onCellEditValidating], and [onBeforeSort] for a
+  /// clearer cancel-style API. Returning true here
   /// still cancels the corresponding native action; unhandled cancelable events
   /// are allowed with cancel=false.
   final bool Function(pb.GridEvent event)? onCancelableEvent;
@@ -344,7 +368,10 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
   bool _editFontItalic = false;
   EdgeInsets _editPadding = EdgeInsets.zero;
   _HostEditUiMode _editUiMode = _HostEditUiMode.enter;
+  TextInputType _editKeyboardType = TextInputType.text;
   int _editSessionToken = 0;
+  Int64 _editSessionId = Int64.ZERO;
+  Int64 _editStateVersion = Int64.ZERO;
   bool _editCommitReplayActive = false;
   _DeferredPointerCompletion? _deferredPointerCompletionAfterEditCommit;
 
@@ -352,7 +379,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
   final FocusNode _editFocusNode = FocusNode();
   final TextEditingController _imeProxyController = TextEditingController();
   final FocusNode _imeProxyFocusNode = FocusNode();
-  pb.EditRequest? _deferredEditRequest;
+  pb.EditorSessionStarted? _deferredEditorSessionStart;
   Timer? _imeProxyRevealTimer;
   Future<void> _queuedEditCommand = Future<void>.value();
   bool _deferOverlayWhileImeProxyActive = false;
@@ -588,7 +615,6 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     }
     if (oldWidget.onGridEvent != widget.onGridEvent ||
         oldWidget.onBeforeEdit != widget.onBeforeEdit ||
-        oldWidget.onBeforeDropdownOpen != widget.onBeforeDropdownOpen ||
         oldWidget.onCellEditValidating != widget.onCellEditValidating ||
         oldWidget.onBeforeSort != widget.onBeforeSort ||
         oldWidget.onCustomRenderCell != widget.onCustomRenderCell ||
@@ -709,7 +735,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     _decisionChannelEnabled = false;
     _imeProxyRevealTimer?.cancel();
     _imeProxyRevealTimer = null;
-    _deferredEditRequest = null;
+    _deferredEditorSessionStart = null;
     _deferOverlayWhileImeProxyActive = false;
     _imeProxySessionActive = false;
     _editOverlayPendingReveal = false;
@@ -776,7 +802,6 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
   bool get _wantsGridEvents =>
       widget.onGridEvent != null ||
       widget.onBeforeEdit != null ||
-      widget.onBeforeDropdownOpen != null ||
       widget.onCellEditValidating != null ||
       widget.onBeforeSort != null ||
       widget.onCustomRenderCell != null ||
@@ -786,7 +811,6 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
 
   bool get _wantsCancelableGridEvents =>
       widget.onBeforeEdit != null ||
-      widget.onBeforeDropdownOpen != null ||
       widget.onCellEditValidating != null ||
       widget.onBeforeSort != null ||
       widget.onCancelableEvent != null;
@@ -841,7 +865,6 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
 
   bool _isCancelableGridEvent(pb.GridEvent event) {
     if (event.hasBeforeEdit() ||
-        event.hasBeforeDropdownOpen() ||
         event.hasBeforeSort() ||
         event.hasBeforeNodeToggle() ||
         event.hasBeforeScroll() ||
@@ -972,24 +995,6 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
         col: event.beforeEdit.col,
       );
       widget.onBeforeEdit?.call(details);
-      cancel = cancel || details.cancel;
-    }
-
-    if (event.hasBeforeDropdownOpen()) {
-      final before = event.beforeDropdownOpen;
-      final details = VolvoxGridBeforeDropdownOpenDetails(
-        rawEvent: event,
-        row: before.row,
-        col: before.col,
-        x: before.x,
-        y: before.y,
-        width: before.width,
-        height: before.height,
-        dropdown: before.hasDropdown() ? before.dropdown : pb.Dropdown(),
-        currentValue: before.currentValue,
-        selectedIndex: before.selectedIndex,
-      );
-      widget.onBeforeDropdownOpen?.call(details);
       cancel = cancel || details.cancel;
     }
 
@@ -1461,20 +1466,46 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     if (output.hasCursor()) {
       _applyEngineCursor(output.cursor.cursor);
     }
-    if (output.hasEditRequest() && output.editRequest.width > 0) {
+    if (output.hasEditorStarted() &&
+        output.editorStarted.hasSession() &&
+        output.editorStarted.session.hasViewportRect() &&
+        output.editorStarted.session.viewportRect.width > 0) {
       if (_deferOverlayWhileImeProxyActive) {
-        _deferredEditRequest = pb.EditRequest()
-          ..mergeFromMessage(output.editRequest);
+        _deferredEditorSessionStart = pb.EditorSessionStarted()
+          ..mergeFromMessage(output.editorStarted);
       } else {
-        _showEditOverlay(output.editRequest);
+        _showEditOverlay(output.editorStarted);
       }
     }
-    if (output.hasDropdownRequest() && output.dropdownRequest.width > 0) {
-      if (output.dropdownRequest.editable) {
-        unawaited(_showEditableDropdownOverlay(output.dropdownRequest));
-      } else {
-        _showReadonlyDropdownOverlay(output.dropdownRequest);
+    if (output.hasEditorUpdated() && _editing) {
+      final update = output.editorUpdated;
+      if (_editSessionId == Int64.ZERO || update.sessionId == _editSessionId) {
+        _editSessionId = update.sessionId;
+        _editStateVersion = update.stateVersion;
       }
+      if (update.hasVisible() && !update.visible) {
+        setState(() {
+          _editOverlayVisible = false;
+          _editOverlayPendingReveal = false;
+        });
+      } else if (update.hasViewportRect()) {
+        final dpr = _devicePixelRatio <= 0 ? 1.0 : _devicePixelRatio;
+        final rect = update.viewportRect;
+        setState(() {
+          _editRect = Rect.fromLTWH(
+            rect.x / dpr,
+            rect.y / dpr,
+            rect.width / dpr,
+            rect.height / dpr,
+          );
+          if (!update.hasVisible() || update.visible) {
+            _editOverlayVisible = true;
+          }
+        });
+      }
+    }
+    if (output.hasEditorEnded()) {
+      _closeLocalEditOverlay();
     }
     if (output.rendered) {
       _sendBufferReady();
@@ -1754,14 +1785,47 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     return codeUnitOffset.clamp(0, text.length);
   }
 
-  TextSelection _textSelectionFromEditRequest(pb.EditRequest req) {
+  String _editSessionText(pb.EditorSessionStarted req) {
+    if (!req.hasSession() || !req.session.hasValue()) return '';
+    return _editorValueText(req.session.value);
+  }
+
+  TextInputType _keyboardTypeForEditor(pb.EditorSpec editor) {
+    if (!editor.hasText()) {
+      return TextInputType.text;
+    }
+    switch (editor.text.inputType) {
+      case pb.InputType.INPUT_TYPE_NUMBER:
+        return TextInputType.number;
+      case pb.InputType.INPUT_TYPE_EMAIL:
+        return TextInputType.emailAddress;
+      case pb.InputType.INPUT_TYPE_URL:
+        return TextInputType.url;
+      case pb.InputType.INPUT_TYPE_PHONE:
+        return TextInputType.phone;
+      case pb.InputType.INPUT_TYPE_PASSWORD:
+      case pb.InputType.INPUT_TYPE_TEXT:
+      default:
+        return editor.text.allowNewlines
+            ? TextInputType.multiline
+            : TextInputType.text;
+    }
+  }
+
+  TextSelection _textSelectionFromEditorSessionStart(
+      pb.EditorSessionStarted req) {
+    final text = _editSessionText(req);
+    final hasSel = req.hasSession() && req.session.hasSelection();
+    final startCodePoint = hasSel ? req.session.selection.start : 0;
+    final lengthCodePoint =
+        hasSel ? req.session.selection.length : text.runes.length;
     final start = _codeUnitOffsetFromCodePointOffset(
-      req.currentValue,
-      req.selStart,
+      text,
+      startCodePoint,
     );
     final extent = _codeUnitOffsetFromCodePointOffset(
-      req.currentValue,
-      req.selStart + req.selLength,
+      text,
+      startCodePoint + lengthCodePoint,
     );
     return TextSelection(
       baseOffset: start,
@@ -1769,8 +1833,8 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     );
   }
 
-  void _applyEditRequestSelection(pb.EditRequest req) {
-    final selection = _textSelectionFromEditRequest(req);
+  void _applyEditorSessionStartSelection(pb.EditorSessionStarted req) {
+    final selection = _textSelectionFromEditorSessionStart(req);
     final text = _editTextController.text;
     final clampedBase = selection.baseOffset.clamp(0, text.length);
     final clampedExtent = selection.extentOffset.clamp(0, text.length);
@@ -1810,27 +1874,37 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     });
   }
 
-  void _showEditOverlay(pb.EditRequest req) {
+  void _showEditOverlay(pb.EditorSessionStarted req) {
+    // Engine-drawn editor: host MUST NOT mount an overlay.
+    if (req.hasSession() &&
+        req.session.editor.presentation == pb.EditorPresentation.EDITOR_CANVAS) {
+      return;
+    }
+
     _imeProxyRevealTimer?.cancel();
     _imeProxyRevealTimer = null;
-    _deferredEditRequest = null;
+    _deferredEditorSessionStart = null;
     _deferOverlayWhileImeProxyActive = false;
     _imeProxySessionActive = false;
     _imeProxyCommittedText = '';
     _suppressedPlainProxyText = null;
     _clearImeProxyValue();
 
+    if (!req.hasSession()) return;
+    final session = req.session;
     final dpr = _devicePixelRatio <= 0 ? 1.0 : _devicePixelRatio;
+    final viewportRect = session.viewportRect;
     final nextRect = Rect.fromLTWH(
-      req.x.toDouble() / dpr,
-      req.y.toDouble() / dpr,
-      req.width.toDouble() / dpr,
-      req.height.toDouble() / dpr,
+      viewportRect.x / dpr,
+      viewportRect.y / dpr,
+      viewportRect.width / dpr,
+      viewportRect.height / dpr,
     );
-    final nextMode = req.uiMode == pb.EditUiMode.EDIT_UI_MODE_EDIT
+    final nextMode = session.uiMode == pb.EditUiMode.EDIT_UI_MODE_EDIT
         ? _HostEditUiMode.edit
         : _HostEditUiMode.enter;
-    final sameSession = _editing && _editRow == req.row && _editCol == req.col;
+    final sameSession =
+        _editing && _editRow == session.row && _editCol == session.col;
 
     if (sameSession) {
       final shouldHideDuringMove =
@@ -1839,6 +1913,8 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
       setState(() {
         _editRect = nextRect;
         _editUiMode = nextMode;
+        _editSessionId = session.sessionId;
+        _editStateVersion = session.stateVersion;
         if (shouldHideDuringMove) {
           _editOverlayVisible = false;
           _editOverlayPendingReveal = true;
@@ -1847,45 +1923,48 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
       return;
     }
 
-    final selection = _textSelectionFromEditRequest(req);
+    final selection = _textSelectionFromEditorSessionStart(req);
+    final editText = _editSessionText(req);
     setState(() {
       _editing = true;
       _editOverlayVisible = true;
       _editOverlayPendingReveal = false;
-      _editRow = req.row;
-      _editCol = req.col;
+      _editRow = session.row;
+      _editCol = session.col;
       _editRect = nextRect;
       _editUiMode = nextMode;
       _editSessionToken += 1;
-      // Reset style state so stale values from a previous cell don't flash.
+      _editSessionId = session.sessionId;
+      _editStateVersion = session.stateVersion;
       _editFontSize = 13.0;
       _editFontFamily = null;
       _editFontBold = false;
       _editFontItalic = false;
       _editPadding = EdgeInsets.zero;
+      _editKeyboardType = _keyboardTypeForEditor(session.editor);
       _editTextController.value = TextEditingValue(
-        text: req.currentValue,
+        text: editText,
         selection: selection,
       );
     });
-    // Resolve the cell's effective style asynchronously.
-    _resolveEditCellStyle(req.row, req.col);
+    _resolveEditCellStyle(session.row, session.col);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_editing || _editRow != req.row || _editCol != req.col) {
+      if (!mounted ||
+          !_editing ||
+          _editRow != session.row ||
+          _editCol != session.col) {
         return;
       }
       _editFocusNode.requestFocus();
-      _applyEditRequestSelection(req);
-      // Re-apply after another frame — on desktop, requestFocus() can
-      // trigger an async selection-all that overrides our caret position.
+      _applyEditorSessionStartSelection(req);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted ||
             !_editing ||
-            _editRow != req.row ||
-            _editCol != req.col) {
+            _editRow != session.row ||
+            _editCol != session.col) {
           return;
         }
-        _applyEditRequestSelection(req);
+        _applyEditorSessionStartSelection(req);
       });
     });
   }
@@ -1919,8 +1998,8 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
       }
       _deferOverlayWhileImeProxyActive = false;
       _imeProxySessionActive = false;
-      final pending = _deferredEditRequest;
-      _deferredEditRequest = null;
+      final pending = _deferredEditorSessionStart;
+      _deferredEditorSessionStart = null;
       if (pending != null) {
         _showEditOverlay(pending);
       } else {
@@ -1963,7 +2042,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
       if (!_imeProxySessionActive) {
         _imeProxySessionActive = true;
         _imeProxyCommittedText = '';
-        _deferredEditRequest = null;
+        _deferredEditorSessionStart = null;
         final row = _selRow;
         final col = _selCol;
         _queueEditCommand(() async {
@@ -2039,7 +2118,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     _deferOverlayWhileImeProxyActive = true;
     _imeProxySessionActive = true;
     _imeProxyCommittedText = '';
-    _deferredEditRequest = null;
+    _deferredEditorSessionStart = null;
     _clearImeProxyValue();
     _queueEditCommand(() async {
       await widget.controller.beginEdit(row, col, seedText: seedText);
@@ -2050,23 +2129,88 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
 
   void _forwardRawKeyEvent(KeyEvent event) {
     final pb.KeyEvent_Type type;
-    if (event is KeyDownEvent) {
+    if (event is KeyDownEvent || event is KeyRepeatEvent) {
       type = pb.KeyEvent_Type.KEY_DOWN;
     } else if (event is KeyUpEvent) {
       type = pb.KeyEvent_Type.KEY_UP;
     } else {
       return;
     }
+    final keyCode = _engineKeyCodeFor(event);
     _sendInput(
       pb.RenderInput()
         ..key = (pb.KeyEvent()
           ..type = type
-          ..keyCode = (event.logicalKey.keyId & 0x7FFFFFFF).toInt()
+          ..keyCode = keyCode
           ..character = event.character ?? ''
           ..modifier = _modifiers()),
     );
     _requestRender();
   }
+
+  int _engineKeyCodeFor(KeyEvent event) {
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.arrowLeft) return 37;
+    if (key == LogicalKeyboardKey.arrowUp) return 38;
+    if (key == LogicalKeyboardKey.arrowRight) return 39;
+    if (key == LogicalKeyboardKey.arrowDown) return 40;
+    if (key == LogicalKeyboardKey.pageUp) return 33;
+    if (key == LogicalKeyboardKey.pageDown) return 34;
+    if (key == LogicalKeyboardKey.home) return 36;
+    if (key == LogicalKeyboardKey.end) return 35;
+    if (key == LogicalKeyboardKey.tab) return 9;
+    if (key == LogicalKeyboardKey.enter ||
+        key == LogicalKeyboardKey.numpadEnter) {
+      return 13;
+    }
+    if (key == LogicalKeyboardKey.escape) return 27;
+    if (key == LogicalKeyboardKey.backspace) return 8;
+    if (key == LogicalKeyboardKey.delete) return 46;
+    if (key == LogicalKeyboardKey.insert) return 45;
+    if (key == LogicalKeyboardKey.space) return 32;
+    if (key == LogicalKeyboardKey.shiftLeft ||
+        key == LogicalKeyboardKey.shiftRight) {
+      return 16;
+    }
+    if (key == LogicalKeyboardKey.controlLeft ||
+        key == LogicalKeyboardKey.controlRight) {
+      return 17;
+    }
+    if (key == LogicalKeyboardKey.altLeft ||
+        key == LogicalKeyboardKey.altRight) {
+      return 18;
+    }
+    if (key == LogicalKeyboardKey.metaLeft ||
+        key == LogicalKeyboardKey.metaRight) {
+      return 91;
+    }
+
+    final keyLabel = key.keyLabel;
+    if (keyLabel.length == 1) {
+      final rune = keyLabel.runes.first;
+      if (rune >= 0x30 && rune <= 0x39) return rune;
+      if (rune >= 0x41 && rune <= 0x5A) return rune;
+      if (rune >= 0x61 && rune <= 0x7A) return rune - 0x20;
+    }
+    if (keyLabel.length > 1 && keyLabel.startsWith('F')) {
+      final functionKey = int.tryParse(keyLabel.substring(1));
+      if (functionKey != null && functionKey >= 1 && functionKey <= 24) {
+        return 111 + functionKey;
+      }
+    }
+
+    final character = event.character;
+    if (character != null && character.length == 1) {
+      final rune = character.runes.first;
+      if (rune >= 0x30 && rune <= 0x39) return rune;
+      if (rune >= 0x41 && rune <= 0x5A) return rune;
+      if (rune >= 0x61 && rune <= 0x7A) return rune - 0x20;
+    }
+    return (key.keyId & 0x7FFFFFFF).toInt();
+  }
+
+  bool _isRawKeyEventForEngine(KeyEvent event) =>
+      event is KeyDownEvent || event is KeyRepeatEvent || event is KeyUpEvent;
 
   bool _isPrintableKey(KeyEvent event) {
     final character = event.character;
@@ -2093,7 +2237,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
         !_imeProxyFocusNode.hasFocus) {
       return false;
     }
-    if (event is! KeyDownEvent && event is! KeyUpEvent) {
+    if (!_isRawKeyEventForEngine(event)) {
       return false;
     }
     if (_shouldLetImeProxyHandleText(event)) {
@@ -2109,7 +2253,20 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
         _deferOverlayWhileImeProxyActive) {
       return KeyEventResult.ignored;
     }
-    if (event is! KeyDownEvent && event is! KeyUpEvent) {
+    if (!_isRawKeyEventForEngine(event)) {
+      return KeyEventResult.ignored;
+    }
+    if (_imeProxyFocusNode.hasFocus) {
+      // While the hidden IME proxy owns focus, non-text keys are forwarded by
+      // the global HardwareKeyboard bridge. Only plain text still comes
+      // through this Focus handler so the proxy can suppress its duplicate
+      // TextField insertion after the engine sees the key.
+      if (_shouldLetImeProxyHandleText(event)) {
+        if (event is KeyDownEvent) {
+          _suppressedPlainProxyText = event.character;
+          _forwardRawKeyEvent(event);
+        }
+      }
       return KeyEventResult.ignored;
     }
     if (_shouldLetImeProxyHandleText(event) && event is KeyDownEvent) {
@@ -2122,6 +2279,24 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
   void _moveEditCaretToEdge({required bool end}) {
     final offset = end ? _editTextController.text.length : 0;
     _editTextController.selection = TextSelection.collapsed(offset: offset);
+  }
+
+  void _insertEditOverlayText(String insertedText) {
+    final value = _editTextController.value;
+    final text = value.text;
+    final selection = value.selection;
+    final start = selection.isValid
+        ? selection.start.clamp(0, text.length).toInt()
+        : text.length;
+    final end = selection.isValid
+        ? selection.end.clamp(start, text.length).toInt()
+        : text.length;
+    final nextText = text.replaceRange(start, end, insertedText);
+    final nextOffset = start + insertedText.length;
+    _editTextController.value = TextEditingValue(
+      text: nextText,
+      selection: TextSelection.collapsed(offset: nextOffset),
+    );
   }
 
   KeyEventResult _onEditOverlayKeyEvent(FocusNode node, KeyEvent event) {
@@ -2137,8 +2312,22 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
       _cancelEdit();
       return KeyEventResult.handled;
     }
+    if (event.logicalKey == LogicalKeyboardKey.enter ||
+        event.logicalKey == LogicalKeyboardKey.numpadEnter) {
+      if (HardwareKeyboard.instance.isAltPressed) {
+        _insertEditOverlayText('\n');
+        return KeyEventResult.handled;
+      }
+      if (HardwareKeyboard.instance.isShiftPressed) {
+        return KeyEventResult.ignored;
+      }
+      _commitEdit();
+      return KeyEventResult.handled;
+    }
     if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-      if (_editUiMode == _HostEditUiMode.edit) {
+      if (_editTextController.text.contains('\n')) {
+        return KeyEventResult.ignored;
+      } else if (_editUiMode == _HostEditUiMode.edit) {
         _moveEditCaretToEdge(end: false);
       } else {
         unawaited(_commitEditAndMove(-1));
@@ -2146,7 +2335,9 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
       return KeyEventResult.handled;
     }
     if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-      if (_editUiMode == _HostEditUiMode.edit) {
+      if (_editTextController.text.contains('\n')) {
+        return KeyEventResult.ignored;
+      } else if (_editUiMode == _HostEditUiMode.edit) {
         _moveEditCaretToEdge(end: true);
       } else {
         unawaited(_commitEditAndMove(1));
@@ -2159,7 +2350,11 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
   Future<void> _commitEditAndMove(int rowDelta) async {
     final currentRow = _editRow >= 0 ? _editRow : _selRow;
     final currentCol = _editCol >= 0 ? _editCol : _selCol;
-    await widget.controller.commitEdit(_editTextController.text);
+    await widget.controller.commitEdit(
+      _editTextController.text,
+      sessionId: _editSessionId,
+      stateVersion: _editStateVersion,
+    );
 
     if (currentRow >= 0 && currentCol >= 0) {
       try {
@@ -2188,7 +2383,11 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
   }
 
   Future<void> _commitActiveEdit() async {
-    await widget.controller.commitEdit(_editTextController.text);
+    await widget.controller.commitEdit(
+      _editTextController.text,
+      sessionId: _editSessionId,
+      stateVersion: _editStateVersion,
+    );
     if (!mounted) {
       return;
     }
@@ -2201,7 +2400,10 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
   }
 
   Future<void> _cancelActiveEdit() async {
-    await widget.controller.cancelEdit();
+    await widget.controller.cancelEdit(
+      sessionId: _editSessionId,
+      stateVersion: _editStateVersion,
+    );
     if (!mounted) {
       return;
     }
@@ -2211,45 +2413,6 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
 
   void _cancelEdit() {
     unawaited(_cancelActiveEdit());
-  }
-
-  void _showReadonlyDropdownOverlay(pb.DropdownRequest req) {
-    if (_editing) {
-      _closeLocalEditOverlay(requestIdleInputFocus: false);
-    }
-    _editFocusNode.unfocus();
-    _imeProxyFocusNode.unfocus();
-    _requestRender();
-  }
-
-  Future<void> _showEditableDropdownOverlay(pb.DropdownRequest req) async {
-    var text = "";
-    if (req.selected >= 0 && req.selected < req.items.length) {
-      text = req.items[req.selected];
-    }
-    try {
-      final state = await widget.controller.getEditState();
-      if (state.active && state.row == req.row && state.col == req.col) {
-        text = state.text;
-      }
-    } catch (_) {
-      // Fall back to the selected item text when the current edit state is unavailable.
-    }
-    if (!mounted) {
-      return;
-    }
-    final codePointLength = text.runes.length;
-    _showEditOverlay(pb.EditRequest()
-      ..row = req.row
-      ..col = req.col
-      ..x = req.x
-      ..y = req.y
-      ..width = req.width
-      ..height = req.height
-      ..currentValue = text
-      ..selStart = codePointLength
-      ..selLength = 0
-      ..uiMode = pb.EditUiMode.EDIT_UI_MODE_ENTER);
   }
 
   bool _isPointerWithinActiveEditOverlay(Offset localPosition) {
@@ -2270,6 +2433,8 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
       _editRow = -1;
       _editCol = -1;
       _editSessionToken += 1;
+      _editSessionId = Int64.ZERO;
+      _editStateVersion = Int64.ZERO;
     });
     if (requestIdleInputFocus) {
       _requestIdleInputFocus();
@@ -2301,7 +2466,11 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     final col = _editCol;
     final textValue = _editTextController.text;
     try {
-      await widget.controller.commitEdit(textValue);
+      await widget.controller.commitEdit(
+        textValue,
+        sessionId: _editSessionId,
+        stateVersion: _editStateVersion,
+      );
       final state = await widget.controller.getEditState();
       if (!mounted) {
         return;
@@ -3113,7 +3282,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
                                     ),
                                     style: TextStyle(
                                       fontSize: _editFontSize,
-                                      height: 1.0,
+                                      height: 1.2,
                                       fontFamily: _editFontFamily,
                                       fontWeight: _editFontBold
                                           ? FontWeight.bold
@@ -3122,8 +3291,10 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
                                           ? FontStyle.italic
                                           : FontStyle.normal,
                                     ),
-                                    textAlignVertical: TextAlignVertical.center,
-                                    maxLines: 1,
+                                    keyboardType: _editKeyboardType,
+                                    textInputAction: TextInputAction.done,
+                                    minLines: 1,
+                                    maxLines: null,
                                     onSubmitted: (_) =>
                                         _commitEditIfSessionCurrent(
                                       currentEditSessionToken,

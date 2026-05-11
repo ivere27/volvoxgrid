@@ -3,6 +3,66 @@ use crate::proto::volvoxgrid::v1 as pb;
 use crate::style::HighlightStyle;
 use std::time::Instant;
 
+/// Per-adapter editor support matrix.
+///
+/// Each adapter (sfdatagrid, xtragrid, vsflexgrid, terminal TUI, web canvas,
+/// flutter, .NET WinForms, etc.) advertises which `(EditorKind, EditorOwner)`
+/// combinations it can actually render. The engine consults this matrix at
+/// configuration time and rejects unsupported combinations before the host
+/// has to handle a session it cannot draw.
+///
+/// `None` capability slots fall back to "permit anything that passes the
+/// universal checks." Adapters that fully own their editor model can leave
+/// `host_editor_capabilities = None`.
+#[derive(Clone, Debug, Default)]
+pub struct HostEditorCapabilities {
+    /// Adapter identifier (for diagnostic messages). E.g. "sfdatagrid", "tui".
+    pub adapter_id: String,
+    /// Explicit allow-list of `(kind, owner)` pairs. Empty = no restriction.
+    pub allowed: Vec<(pb::EditorKind, pb::EditorOwner)>,
+    /// Owners that the adapter implements via a host-rendered surface.
+    /// HOST_NATIVE on adapters not in this list is rejected.
+    pub host_native_supported: bool,
+    /// Whether the adapter can route CustomEditorAction through to a custom
+    /// host editor (e.g. a popup widget). Affects `EDITOR_OWNER_CUSTOM`.
+    pub custom_owner_supported: bool,
+}
+
+impl HostEditorCapabilities {
+    /// Returns `Ok(())` when this adapter advertises support for the given
+    /// `(kind, owner)` pair, or an error string describing why the
+    /// configuration is rejected.
+    pub fn accepts(&self, kind: pb::EditorKind, owner: pb::EditorOwner) -> Result<(), String> {
+        if matches!(owner, pb::EditorOwner::HostNative) && !self.host_native_supported {
+            return Err(format!(
+                "adapter '{}' does not support EDITOR_OWNER_HOST_NATIVE",
+                self.adapter_id
+            ));
+        }
+        if matches!(owner, pb::EditorOwner::Custom) && !self.custom_owner_supported {
+            return Err(format!(
+                "adapter '{}' does not support EDITOR_OWNER_CUSTOM",
+                self.adapter_id
+            ));
+        }
+        if self.allowed.is_empty() {
+            return Ok(());
+        }
+        let pair_listed = self
+            .allowed
+            .iter()
+            .any(|(k, o)| (*k == kind || *k == pb::EditorKind::Unspecified) && *o == owner);
+        if pair_listed {
+            Ok(())
+        } else {
+            Err(format!(
+                "adapter '{}' does not support (kind={:?}, owner={:?})",
+                self.adapter_id, kind, owner
+            ))
+        }
+    }
+}
+
 /// Edit state machine for in-place cell editing.
 ///
 /// Tracks whether editing is active, which cell is being edited,
@@ -134,47 +194,65 @@ fn parse_dropdown_entries(list: &str) -> Vec<ParsedDropdownItem> {
     entries
 }
 
-fn dropdown_item_label(item: &pb::DropdownItem) -> String {
-    item.label
-        .clone()
-        .or_else(|| item.value.clone())
-        .or_else(|| item.details.first().cloned())
+fn cell_value_to_edit_string(value: &pb::CellValue) -> String {
+    match value.value.as_ref() {
+        Some(pb::cell_value::Value::Text(v)) => v.clone(),
+        Some(pb::cell_value::Value::Number(v)) => v.to_string(),
+        Some(pb::cell_value::Value::Flag(v)) => v.to_string(),
+        Some(pb::cell_value::Value::Raw(v)) => String::from_utf8_lossy(v).into_owned(),
+        Some(pb::cell_value::Value::Timestamp(v)) => v.to_string(),
+        None => String::new(),
+    }
+}
+
+fn dropdown_item_label(item: &pb::ListItem) -> String {
+    if !item.label.is_empty() {
+        item.label.clone()
+    } else if let Some(value) = item.value.as_ref() {
+        cell_value_to_edit_string(value)
+    } else if let Some(detail) = item.details.first() {
+        detail.clone()
+    } else {
+        String::new()
+    }
+}
+
+fn dropdown_item_value(item: &pb::ListItem) -> String {
+    item.value
+        .as_ref()
+        .map(cell_value_to_edit_string)
         .unwrap_or_default()
 }
 
-fn dropdown_entries(dropdown: &pb::Dropdown) -> Vec<ParsedDropdownItem> {
+fn dropdown_entries(dropdown: &pb::ListEditorParams) -> Vec<ParsedDropdownItem> {
     dropdown
-        .items
+        .static_items
         .iter()
         .filter(|item| !item.disabled)
         .map(|item| ParsedDropdownItem {
             display: dropdown_item_label(item),
-            data: item.value.clone().unwrap_or_default(),
+            data: dropdown_item_value(item),
         })
         .filter(|entry| !entry.display.is_empty() || !entry.data.is_empty())
         .collect()
 }
 
-pub fn legacy_dropdown_items_to_dropdown(list: &str) -> pb::Dropdown {
-    let mut dropdown = pb::Dropdown {
-        items: Vec::new(),
+pub fn legacy_dropdown_items_to_dropdown(list: &str) -> pb::ListEditorParams {
+    let mut dropdown = pb::ListEditorParams {
+        static_items: Vec::new(),
+        data_source: None,
         allow_custom_value: list.starts_with('|'),
+        searchable: false,
+        multi_select: false,
         item_layout: pb::DropdownItemLayout::DropdownItemAuto as i32,
-        searchable: None,
     };
 
     for entry in parse_dropdown_entries(list) {
-        dropdown.items.push(pb::DropdownItem {
-            value: if entry.data.is_empty() {
-                None
-            } else {
-                Some(entry.data)
-            },
-            label: if entry.display.is_empty() {
-                None
-            } else {
-                Some(entry.display)
-            },
+        dropdown.static_items.push(pb::ListItem {
+            value: (!entry.data.is_empty()).then_some(pb::CellValue {
+                value: Some(pb::cell_value::Value::Text(entry.data)),
+            }),
+            label: entry.display,
             details: Vec::new(),
             disabled: false,
         });
@@ -183,20 +261,21 @@ pub fn legacy_dropdown_items_to_dropdown(list: &str) -> pb::Dropdown {
     dropdown
 }
 
-pub fn dropdown_to_legacy_items(dropdown: &pb::Dropdown) -> String {
+pub fn dropdown_to_legacy_items(dropdown: &pb::ListEditorParams) -> String {
     let mut parts = Vec::new();
     if dropdown.allow_custom_value {
         parts.push(String::new());
     }
-    for item in &dropdown.items {
+    for item in &dropdown.static_items {
         if item.disabled {
             continue;
         }
         let label = dropdown_item_label(item);
-        if label.is_empty() && item.value.as_deref().unwrap_or("").is_empty() {
+        let value = dropdown_item_value(item);
+        if label.is_empty() && value.is_empty() {
             continue;
         }
-        if let Some(value) = item.value.as_deref().filter(|v| !v.is_empty()) {
+        if !value.is_empty() {
             parts.push(format!("#{value};{label}"));
         } else {
             parts.push(label);
@@ -222,7 +301,7 @@ pub fn translate_dropdown_value_to_display(list: &str, stored_value: &str) -> Op
 }
 
 pub fn translate_dropdown_value_to_display_typed(
-    dropdown: &pb::Dropdown,
+    dropdown: &pb::ListEditorParams,
     stored_value: &str,
 ) -> Option<String> {
     if stored_value.is_empty() {
@@ -253,7 +332,7 @@ pub fn translate_dropdown_display_to_value(list: &str, display_value: &str) -> O
 }
 
 pub fn translate_dropdown_display_to_value_typed(
-    dropdown: &pb::Dropdown,
+    dropdown: &pb::ListEditorParams,
     display_value: &str,
 ) -> Option<String> {
     if display_value.is_empty() {
@@ -267,6 +346,24 @@ pub fn translate_dropdown_display_to_value_typed(
     None
 }
 
+pub fn dropdown_text_matches_item(list: &str, text: &str) -> bool {
+    if text.is_empty() {
+        return false;
+    }
+    parse_dropdown_entries(list)
+        .into_iter()
+        .any(|entry| entry.display == text || (!entry.data.is_empty() && entry.data == text))
+}
+
+pub fn dropdown_text_matches_item_typed(dropdown: &pb::ListEditorParams, text: &str) -> bool {
+    if text.is_empty() {
+        return false;
+    }
+    dropdown_entries(dropdown)
+        .into_iter()
+        .any(|entry| entry.display == text || (!entry.data.is_empty() && entry.data == text))
+}
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum EditUiMode {
     #[default]
@@ -274,24 +371,112 @@ pub enum EditUiMode {
     EditMode,
 }
 
+/// Derive `EditUiMode` from the gesture that initiated the edit session.
+///
+/// `F2`, `DOUBLE_CLICK`, and `CLICK_CARET` produce `EditMode` (caret-positioned,
+/// no select-all). Every other reason — including the default `Unspecified` —
+/// produces `EnterMode` (select-all, first printable key replaces content).
+pub fn ui_mode_from_reason(reason: pb::EditStartReason) -> EditUiMode {
+    match reason {
+        pb::EditStartReason::EditStartF2
+        | pb::EditStartReason::EditStartDoubleClick
+        | pb::EditStartReason::EditStartClickCaret => EditUiMode::EditMode,
+        _ => EditUiMode::EnterMode,
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct EditorVisualLine<'a> {
+    pub text: &'a str,
+    pub start_char: i32,
+    pub end_char: i32,
+}
+
+pub(crate) fn editor_visual_lines(text: &str) -> Vec<EditorVisualLine<'_>> {
+    let mut lines = Vec::new();
+    let mut line_start_byte = 0;
+    let mut line_start_char = 0;
+    let mut char_index = 0;
+
+    for (byte_index, ch) in text.char_indices() {
+        if ch == '\n' {
+            lines.push(EditorVisualLine {
+                text: &text[line_start_byte..byte_index],
+                start_char: line_start_char,
+                end_char: char_index,
+            });
+            char_index += 1;
+            line_start_byte = byte_index + ch.len_utf8();
+            line_start_char = char_index;
+        } else {
+            char_index += 1;
+        }
+    }
+
+    lines.push(EditorVisualLine {
+        text: &text[line_start_byte..],
+        start_char: line_start_char,
+        end_char: char_index,
+    });
+    lines
+}
+
+pub(crate) fn editor_line_index_for_char(lines: &[EditorVisualLine<'_>], char_index: i32) -> usize {
+    let char_index = char_index.max(0);
+    lines
+        .iter()
+        .position(|line| char_index <= line.end_char)
+        .unwrap_or_else(|| lines.len().saturating_sub(1))
+}
+
+#[derive(Clone, Debug)]
+struct EndedEditSession {
+    session_id: u64,
+    reason: i32,
+    committed_text: Option<String>,
+    state_version: u64,
+}
+
+/// Maximum number of ended edit sessions retained for late `EditorSessionEnded`
+/// emission. The render-session refresh path emits `EditorSessionEnded` after
+/// the engine has already cleared `EditState`, so we need to look up the reason
+/// and committed_value of the prior session by its `session_id`. The cap bounds
+/// memory in pathological cases (e.g. host programmatically opening and
+/// canceling editors in a tight loop); once exceeded, the oldest entry is
+/// dropped and `build_editor_ended` falls back to `EditEndUnspecified`.
+const ENDED_EDIT_SESSION_HISTORY_CAP: usize = 8;
+
 #[derive(Clone, Debug)]
 pub struct EditState {
     pub editing: bool,
     pub edit_row: i32,
     pub edit_col: i32,
     pub session_serial: u64,
+    pub state_version: u64,
+    pub last_ended_session_id: u64,
+    pub last_end_reason: i32,
+    pub last_end_text: Option<String>,
+    pub last_end_state_version: u64,
+    ended_sessions: Vec<EndedEditSession>,
+    pub validation_errors: Vec<pb::ValidationError>,
+    pub last_validation_request_id: i64,
+    pub last_list_items_request_id: i64,
     pub edit_text: String,
     pub original_text: String,
     pub formula_mode: bool,
     pub formula_highlights: Vec<EditHighlightRegion>,
     /// Whether the current edit session is Excel-style Enter mode or F2 edit mode.
     pub ui_mode: EditUiMode,
+    /// Gesture or trigger that opened the current session.
+    pub start_reason: pb::EditStartReason,
     /// Start position of selected text in editor (EditSelStart).
     pub sel_start: i32,
     /// Length of selected text in editor (EditSelLength).
     pub sel_length: i32,
     /// Active caret edge within the selection; equal to `sel_start` when collapsed.
     pub sel_caret: i32,
+    /// Desired visual-line column while moving repeatedly with Up/Down.
+    vertical_caret_goal: Option<i32>,
     /// Currently selected dropdown item index (DropdownIndex).
     pub dropdown_index: i32,
     /// Parsed dropdown list display values for the current editing cell.
@@ -321,14 +506,25 @@ impl Default for EditState {
             edit_row: -1,
             edit_col: -1,
             session_serial: 0,
+            state_version: 0,
+            last_ended_session_id: 0,
+            last_end_reason: pb::EditEndReason::EditEndUnspecified as i32,
+            last_end_text: None,
+            last_end_state_version: 0,
+            ended_sessions: Vec::new(),
+            validation_errors: Vec::new(),
+            last_validation_request_id: 0,
+            last_list_items_request_id: 0,
             edit_text: String::new(),
             original_text: String::new(),
             formula_mode: false,
             formula_highlights: Vec::new(),
             ui_mode: EditUiMode::EnterMode,
+            start_reason: pb::EditStartReason::EditStartUnspecified,
             sel_start: 0,
             sel_length: 0,
             sel_caret: 0,
+            vertical_caret_goal: None,
             dropdown_index: -1,
             dropdown_items: Vec::new(),
             dropdown_data: Vec::new(),
@@ -386,13 +582,19 @@ impl EditState {
         }
     }
 
-    fn set_selection_from_anchor_and_caret(&mut self, anchor: i32, caret: i32) {
+    fn set_selection_from_anchor_and_caret_internal(&mut self, anchor: i32, caret: i32) {
         let total = self.text_char_len();
         let anchor = anchor.clamp(0, total);
         let caret = caret.clamp(0, total);
         self.sel_start = anchor.min(caret);
         self.sel_length = (anchor - caret).abs();
         self.sel_caret = caret;
+    }
+
+    fn set_selection_from_anchor_and_caret(&mut self, anchor: i32, caret: i32) {
+        self.set_selection_from_anchor_and_caret_internal(anchor, caret);
+        self.vertical_caret_goal = None;
+        self.bump_state_version();
     }
 
     pub fn set_selection_anchor_and_caret(&mut self, anchor: i32, caret: i32) {
@@ -450,6 +652,46 @@ impl EditState {
         Self::default()
     }
 
+    pub fn bump_state_version(&mut self) {
+        if self.editing {
+            self.state_version = self.state_version.wrapping_add(1).max(1);
+        }
+    }
+
+    fn reset_session_version(&mut self) {
+        self.state_version = 1;
+    }
+
+    fn record_session_end(&mut self, reason: pb::EditEndReason, committed_text: Option<String>) {
+        self.last_ended_session_id = self.session_serial;
+        self.last_end_reason = reason as i32;
+        self.last_end_state_version = self.state_version.max(1);
+        self.last_end_text = committed_text;
+        self.ended_sessions.push(EndedEditSession {
+            session_id: self.last_ended_session_id,
+            reason: self.last_end_reason,
+            committed_text: self.last_end_text.clone(),
+            state_version: self.last_end_state_version,
+        });
+        if self.ended_sessions.len() > ENDED_EDIT_SESSION_HISTORY_CAP {
+            self.ended_sessions.remove(0);
+        }
+    }
+
+    pub fn ended_session_details(&self, session_id: u64) -> Option<(i32, Option<&str>, u64)> {
+        self.ended_sessions
+            .iter()
+            .rev()
+            .find(|ended| ended.session_id == session_id)
+            .map(|ended| {
+                (
+                    ended.reason,
+                    ended.committed_text.as_deref(),
+                    ended.state_version,
+                )
+            })
+    }
+
     pub fn heap_size_bytes(&self) -> usize {
         let mut bytes = 0usize;
         bytes += self.edit_text.capacity();
@@ -458,6 +700,16 @@ impl EditState {
         bytes += self.compose.heap_size_bytes();
         bytes += self.dropdown_search_text.capacity();
         bytes += self.formula_highlights.capacity() * std::mem::size_of::<EditHighlightRegion>();
+        bytes += self.validation_errors.capacity() * std::mem::size_of::<pb::ValidationError>();
+        bytes += self.ended_sessions.capacity() * std::mem::size_of::<EndedEditSession>();
+        for ended in &self.ended_sessions {
+            if let Some(text) = &ended.committed_text {
+                bytes += text.capacity();
+            }
+        }
+        for error in &self.validation_errors {
+            bytes += error.code.capacity() + error.message.capacity();
+        }
 
         bytes += self.dropdown_items.capacity() * std::mem::size_of::<String>();
         for item in &self.dropdown_items {
@@ -477,42 +729,33 @@ impl EditState {
         self.editing
     }
 
-    /// Begin editing the cell at (row, col) with the given current text.
-    ///
-    /// Sets `editing = true`, records the cell coordinates, and saves
-    /// both the original text (for cancel) and the current edit text.
-    pub fn start_edit(&mut self, row: i32, col: i32, current_text: &str) {
-        self.cancel_preedit();
-        self.compose.reset();
-        self.editing = true;
-        self.edit_row = row;
-        self.edit_col = col;
-        self.session_serial = self.session_serial.wrapping_add(1);
-        self.original_text = current_text.to_string();
-        self.ui_mode = EditUiMode::EnterMode;
-        self.edit_text = current_text.to_string();
-        self.formula_mode = self.edit_text.trim_start().starts_with('=');
-        self.formula_highlights.clear();
-        self.clear_dropdown_search();
-        // Select all text when entering edit mode.
-        self.sel_start = 0;
-        self.sel_length = self.text_char_len();
-        self.sel_caret = self.sel_length;
-    }
-
-    /// Begin editing with extended options for host-driven key dispatch.
-    ///
-    /// - `seed_text` set → use seed as edit text, caret at end
-    /// - `caret_end` → keep current value, caret at end, no selection
-    /// - default / `select_all` → keep current value, select all text
-    pub fn start_edit_with_options(
+    /// Begin editing the cell at (row, col). UI mode and initial selection are
+    /// derived from `reason` via [`ui_mode_from_reason`]: EDIT places the caret
+    /// at the end of `current_text` with no selection; ENTER selects all so the
+    /// first printable key replaces the cell content.
+    pub fn start_edit(
         &mut self,
         row: i32,
         col: i32,
+        reason: pb::EditStartReason,
         current_text: &str,
-        select_all: Option<bool>,
-        caret_end: Option<bool>,
+    ) {
+        self.start_edit_with(row, col, reason, current_text, None, None, None);
+    }
+
+    /// Begin editing with explicit overrides:
+    /// - `seed_text` — replace cell content with this seed (e.g. first typed char)
+    /// - `caret_position` — explicit caret offset (only used when `reason` is
+    ///   `EditStartClickCaret`; otherwise the position is derived from ui_mode)
+    /// - `formula_mode` — force formula mode on/off (default: infer from text)
+    pub fn start_edit_with(
+        &mut self,
+        row: i32,
+        col: i32,
+        reason: pb::EditStartReason,
+        current_text: &str,
         seed_text: Option<&str>,
+        caret_position: Option<i32>,
         formula_mode: Option<bool>,
     ) {
         self.cancel_preedit();
@@ -521,37 +764,44 @@ impl EditState {
         self.edit_row = row;
         self.edit_col = col;
         self.session_serial = self.session_serial.wrapping_add(1);
+        self.reset_session_version();
         self.original_text = current_text.to_string();
-        self.ui_mode = if caret_end == Some(true) {
-            EditUiMode::EditMode
-        } else {
-            EditUiMode::EnterMode
-        };
+        self.start_reason = reason;
+        self.ui_mode = ui_mode_from_reason(reason);
 
         if let Some(seed) = seed_text {
-            // seed_text: replace cell text with seed, caret at end
             self.edit_text = seed.to_string();
             self.sel_start = self.text_char_len();
             self.sel_length = 0;
             self.sel_caret = self.sel_start;
-        } else if caret_end == Some(true) {
-            // caret_end: keep value, caret at end, no selection
-            self.edit_text = current_text.to_string();
-            self.sel_start = self.text_char_len();
-            self.sel_length = 0;
-            self.sel_caret = self.sel_start;
         } else {
-            // default / select_all: keep value, select all
             self.edit_text = current_text.to_string();
-            self.sel_start = 0;
-            self.sel_length = self.text_char_len();
-            self.sel_caret = self.sel_length;
+            match self.ui_mode {
+                EditUiMode::EditMode => {
+                    let len = self.text_char_len();
+                    let pos = match (reason, caret_position) {
+                        (pb::EditStartReason::EditStartClickCaret, Some(p)) => p.clamp(0, len),
+                        _ => len,
+                    };
+                    self.sel_start = pos;
+                    self.sel_length = 0;
+                    self.sel_caret = pos;
+                }
+                EditUiMode::EnterMode => {
+                    self.sel_start = 0;
+                    self.sel_length = self.text_char_len();
+                    self.sel_caret = self.sel_length;
+                }
+            }
         }
+        self.vertical_caret_goal = None;
         self.formula_mode =
             formula_mode.unwrap_or_else(|| self.edit_text.trim_start().starts_with('='));
         self.formula_highlights.clear();
+        self.validation_errors.clear();
+        self.last_validation_request_id = 0;
+        self.last_list_items_request_id = 0;
         self.clear_dropdown_search();
-        let _ = select_all; // used implicitly as the default path
     }
 
     /// Select all text in the editor.
@@ -559,6 +809,8 @@ impl EditState {
         self.sel_start = 0;
         self.sel_length = self.text_char_len();
         self.sel_caret = self.sel_length;
+        self.vertical_caret_goal = None;
+        self.bump_state_version();
     }
 
     /// If an IME preedit is active, commit it into `edit_text` so the
@@ -594,9 +846,14 @@ impl EditState {
         self.edit_col = -1;
         self.formula_mode = false;
         self.formula_highlights.clear();
+        self.validation_errors.clear();
+        self.last_validation_request_id = 0;
+        self.last_list_items_request_id = 0;
         self.clear_dropdown_search();
         self.compose.reset();
         self.cancel_preedit();
+        self.vertical_caret_goal = None;
+        self.record_session_end(pb::EditEndReason::EditEndCommitted, Some(result.3.clone()));
         Some(result)
     }
 
@@ -613,9 +870,14 @@ impl EditState {
         self.edit_col = -1;
         self.formula_mode = false;
         self.formula_highlights.clear();
+        self.validation_errors.clear();
+        self.last_validation_request_id = 0;
+        self.last_list_items_request_id = 0;
         self.clear_dropdown_search();
         self.compose.reset();
         self.cancel_preedit();
+        self.vertical_caret_goal = None;
+        self.record_session_end(pb::EditEndReason::EditEndCanceled, None);
         Some(result)
     }
 
@@ -624,20 +886,31 @@ impl EditState {
         if !enabled {
             self.formula_highlights.clear();
         }
+        self.bump_state_version();
     }
 
     pub fn set_highlights(&mut self, highlights: Vec<EditHighlightRegion>) {
         self.formula_highlights = highlights;
+        self.bump_state_version();
     }
 
     pub fn clear_highlights(&mut self) {
         self.formula_highlights.clear();
+        self.bump_state_version();
     }
 
     /// Update the in-progress edit text (e.g., as the user types).
     pub fn update_text(&mut self, text: String) {
         self.edit_text = text;
+        self.validation_errors.clear();
+        self.vertical_caret_goal = None;
         self.sync_formula_mode_from_text();
+        self.bump_state_version();
+    }
+
+    pub fn set_validation_errors(&mut self, errors: Vec<pb::ValidationError>) {
+        self.validation_errors = errors;
+        self.bump_state_version();
     }
 
     pub fn configure_compose(&mut self, enabled: bool, method: i32) {
@@ -696,6 +969,7 @@ impl EditState {
         } else {
             self.sel_start
         };
+        self.bump_state_version();
     }
 
     /// Set the length of selected text in the editor.
@@ -707,6 +981,7 @@ impl EditState {
         } else {
             self.sel_start
         };
+        self.bump_state_version();
     }
 
     /// Get the currently selected text in the editor.
@@ -741,10 +1016,11 @@ impl EditState {
             self.dropdown_data.push(entry.data);
         }
         self.dropdown_index = -1;
+        self.bump_state_version();
     }
 
     /// Parse a typed dropdown into the active edit list.
-    pub fn parse_dropdown(&mut self, dropdown: &pb::Dropdown) {
+    pub fn parse_dropdown(&mut self, dropdown: &pb::ListEditorParams) {
         self.dropdown_items.clear();
         self.dropdown_data.clear();
         self.dropdown_editable = dropdown.allow_custom_value;
@@ -755,6 +1031,7 @@ impl EditState {
             self.dropdown_data.push(entry.data);
         }
         self.dropdown_index = -1;
+        self.bump_state_version();
     }
 
     /// Returns the number of items in the parsed dropdown list.
@@ -793,30 +1070,66 @@ impl EditState {
             // Update edit text to match selected dropdown item
             if idx >= 0 {
                 self.edit_text = self.get_dropdown_item(idx).to_string();
+                self.vertical_caret_goal = None;
                 self.sync_formula_mode_from_text();
             }
         }
+        self.bump_state_version();
     }
 
     // ── Text Manipulation (character-level editing) ────────────────────
 
     /// Insert a character at the current cursor position, replacing any selection.
     pub fn insert_char(&mut self, ch: char) {
+        let mut text = String::new();
+        text.push(ch);
+        self.insert_text(&text);
+    }
+
+    /// Insert text at the current cursor position, replacing any selection.
+    pub fn insert_text(&mut self, text: &str) {
         let chars: Vec<char> = self.edit_text.chars().collect();
         let total = chars.len() as i32;
         let sel_start = self.sel_start.clamp(0, total);
         let sel_end = (self.sel_start + self.sel_length.max(0)).clamp(sel_start, total);
+        let insert_chars: Vec<char> = text.chars().collect();
 
-        let mut result: Vec<char> = Vec::with_capacity(chars.len() + 1);
+        let mut result: Vec<char> = Vec::with_capacity(chars.len() + insert_chars.len());
         result.extend_from_slice(&chars[..sel_start as usize]);
-        result.push(ch);
+        result.extend_from_slice(&insert_chars);
         result.extend_from_slice(&chars[sel_end as usize..]);
 
         self.edit_text = result.into_iter().collect();
-        self.sel_start = sel_start + 1;
+        self.sel_start = sel_start + insert_chars.len() as i32;
         self.sel_length = 0;
         self.sel_caret = self.sel_start;
+        self.vertical_caret_goal = None;
         self.sync_formula_mode_from_text();
+        self.bump_state_version();
+    }
+
+    /// Delete the current text selection, returning whether anything changed.
+    pub fn delete_selection(&mut self) -> bool {
+        let chars: Vec<char> = self.edit_text.chars().collect();
+        let total = chars.len() as i32;
+        let sel_start = self.sel_start.clamp(0, total);
+        let sel_end = (self.sel_start + self.sel_length.max(0)).clamp(sel_start, total);
+        if sel_end <= sel_start {
+            return false;
+        }
+
+        let mut result: Vec<char> =
+            Vec::with_capacity(chars.len() - (sel_end - sel_start) as usize);
+        result.extend_from_slice(&chars[..sel_start as usize]);
+        result.extend_from_slice(&chars[sel_end as usize..]);
+        self.edit_text = result.into_iter().collect();
+        self.sel_start = sel_start;
+        self.sel_length = 0;
+        self.sel_caret = self.sel_start;
+        self.vertical_caret_goal = None;
+        self.sync_formula_mode_from_text();
+        self.bump_state_version();
+        true
     }
 
     /// Delete the character before the cursor (Backspace behavior).
@@ -834,7 +1147,9 @@ impl EditState {
             self.edit_text = result.into_iter().collect();
             self.sel_length = 0;
             self.sel_caret = self.sel_start;
+            self.vertical_caret_goal = None;
             self.sync_formula_mode_from_text();
+            self.bump_state_version();
         } else if sel_start > 0 {
             // Delete char before cursor
             let mut result: Vec<char> = Vec::new();
@@ -844,7 +1159,9 @@ impl EditState {
             self.sel_start = sel_start - 1;
             self.sel_length = 0;
             self.sel_caret = self.sel_start;
+            self.vertical_caret_goal = None;
             self.sync_formula_mode_from_text();
+            self.bump_state_version();
         }
     }
 
@@ -863,7 +1180,9 @@ impl EditState {
             self.edit_text = result.into_iter().collect();
             self.sel_length = 0;
             self.sel_caret = self.sel_start;
+            self.vertical_caret_goal = None;
             self.sync_formula_mode_from_text();
+            self.bump_state_version();
         } else if (sel_start as usize) < chars.len() {
             // Delete char at cursor
             let mut result: Vec<char> = Vec::new();
@@ -872,7 +1191,9 @@ impl EditState {
             self.edit_text = result.into_iter().collect();
             self.sel_length = 0;
             self.sel_caret = self.sel_start;
+            self.vertical_caret_goal = None;
             self.sync_formula_mode_from_text();
+            self.bump_state_version();
         }
     }
 
@@ -886,6 +1207,8 @@ impl EditState {
             self.sel_start -= 1;
             self.sel_caret = self.sel_start;
         }
+        self.vertical_caret_goal = None;
+        self.bump_state_version();
     }
 
     /// Move cursor right by one character.
@@ -900,6 +1223,8 @@ impl EditState {
             self.sel_start += 1;
             self.sel_caret = self.sel_start;
         }
+        self.vertical_caret_goal = None;
+        self.bump_state_version();
     }
 
     /// Move cursor to the beginning of the text.
@@ -907,6 +1232,8 @@ impl EditState {
         self.sel_start = 0;
         self.sel_length = 0;
         self.sel_caret = 0;
+        self.vertical_caret_goal = None;
+        self.bump_state_version();
     }
 
     /// Move cursor to the end of the text.
@@ -914,6 +1241,8 @@ impl EditState {
         self.sel_start = self.text_char_len();
         self.sel_length = 0;
         self.sel_caret = self.sel_start;
+        self.vertical_caret_goal = None;
+        self.bump_state_version();
     }
 
     /// Move cursor to the previous word boundary.
@@ -922,6 +1251,8 @@ impl EditState {
         self.sel_start = caret;
         self.sel_length = 0;
         self.sel_caret = caret;
+        self.vertical_caret_goal = None;
+        self.bump_state_version();
     }
 
     /// Move cursor to the next word boundary.
@@ -930,6 +1261,46 @@ impl EditState {
         self.sel_start = caret;
         self.sel_length = 0;
         self.sel_caret = caret;
+        self.vertical_caret_goal = None;
+        self.bump_state_version();
+    }
+
+    fn vertical_line_target(&mut self, delta: i32) -> i32 {
+        let lines = editor_visual_lines(&self.edit_text);
+        if lines.len() <= 1 {
+            return if delta < 0 { 0 } else { self.text_char_len() };
+        }
+
+        let caret = self.current_caret().clamp(0, self.text_char_len());
+        let line_index = editor_line_index_for_char(&lines, caret);
+        let current_line = lines[line_index];
+        let current_col = (caret - current_line.start_char)
+            .clamp(0, current_line.end_char - current_line.start_char);
+        let goal = self.vertical_caret_goal.unwrap_or(current_col);
+        self.vertical_caret_goal = Some(goal);
+
+        let target_index = if delta < 0 {
+            line_index.saturating_sub(1)
+        } else {
+            (line_index + 1).min(lines.len() - 1)
+        };
+        let target_line = lines[target_index];
+        let target_col = goal.clamp(0, target_line.end_char - target_line.start_char);
+        target_line.start_char + target_col
+    }
+
+    /// Move cursor to the nearest caret column on the previous visual line.
+    pub fn move_line_up(&mut self) {
+        let caret = self.vertical_line_target(-1);
+        self.set_selection_from_anchor_and_caret_internal(caret, caret);
+        self.bump_state_version();
+    }
+
+    /// Move cursor to the nearest caret column on the next visual line.
+    pub fn move_line_down(&mut self) {
+        let caret = self.vertical_line_target(1);
+        self.set_selection_from_anchor_and_caret_internal(caret, caret);
+        self.bump_state_version();
     }
 
     /// Extend or shrink the selection one character to the left.
@@ -944,6 +1315,22 @@ impl EditState {
         let anchor = self.selection_anchor();
         let caret = (self.current_caret() + 1).min(self.text_char_len());
         self.set_selection_from_anchor_and_caret(anchor, caret);
+    }
+
+    /// Extend or shrink the selection to the nearest column on the previous visual line.
+    pub fn select_line_up(&mut self) {
+        let anchor = self.selection_anchor();
+        let caret = self.vertical_line_target(-1);
+        self.set_selection_from_anchor_and_caret_internal(anchor, caret);
+        self.bump_state_version();
+    }
+
+    /// Extend or shrink the selection to the nearest column on the next visual line.
+    pub fn select_line_down(&mut self) {
+        let anchor = self.selection_anchor();
+        let caret = self.vertical_line_target(1);
+        self.set_selection_from_anchor_and_caret_internal(anchor, caret);
+        self.bump_state_version();
     }
 
     /// Extend or shrink the selection to the beginning of the text.
@@ -995,10 +1382,12 @@ impl EditState {
             self.edit_text = result.into_iter().collect();
             self.sel_length = 0;
             self.sel_caret = self.sel_start;
+            self.vertical_caret_goal = None;
         }
         self.preedit_text = text.to_string();
         self.preedit_cursor = cursor;
         self.composing = !text.is_empty();
+        self.bump_state_version();
     }
 
     /// Commit the preedit text: insert it into edit_text at the cursor,
@@ -1019,17 +1408,23 @@ impl EditState {
         self.sel_start = sel_start + committed_chars.len() as i32;
         self.sel_length = 0;
         self.sel_caret = self.sel_start;
+        self.vertical_caret_goal = None;
         self.composing = false;
         self.preedit_text.clear();
         self.preedit_cursor = 0;
         self.sync_formula_mode_from_text();
+        self.bump_state_version();
     }
 
     /// Cancel preedit without modifying edit_text.
     pub fn cancel_preedit(&mut self) {
+        let changed = self.composing || !self.preedit_text.is_empty() || self.preedit_cursor != 0;
         self.composing = false;
         self.preedit_text.clear();
         self.preedit_cursor = 0;
+        if changed {
+            self.bump_state_version();
+        }
     }
 
     /// Search dropdown items for a prefix match, returning the index or -1.
@@ -1051,7 +1446,39 @@ impl EditState {
         self.dropdown_search_last_input = None;
     }
 
-    pub fn select_readonly_dropdown_char(&mut self, ch: char, delay_ms: u128) -> bool {
+    /// True when the active edit state exposes a mutable text buffer.
+    ///
+    /// Select-only editors (read-only dropdowns) still have an edit session for
+    /// list navigation, but must not expose caret movement, text selection, or
+    /// mutating clipboard operations.
+    pub fn accepts_text_input(&self) -> bool {
+        self.editing && (self.dropdown_items.is_empty() || self.dropdown_editable)
+    }
+
+    /// True when the editor exposes a movable caret / text selection.
+    pub fn supports_selection(&self) -> bool {
+        self.accepts_text_input()
+    }
+
+    /// True when Cut may mutate the editor buffer (text editors only).
+    pub fn supports_cut(&self) -> bool {
+        self.accepts_text_input()
+    }
+
+    /// True when Paste may mutate the editor buffer (text editors only).
+    pub fn supports_paste(&self) -> bool {
+        self.accepts_text_input()
+    }
+
+    /// True when the editor maintains an undoable history.
+    pub fn supports_undo(&self) -> bool {
+        self.accepts_text_input()
+    }
+
+    /// Apply one character of type-ahead search to a select-only dropdown.
+    /// Returns `true` if the search advanced (and possibly changed the
+    /// selected index); `false` if the editor isn't a select-only dropdown.
+    pub fn apply_select_type_ahead_char(&mut self, ch: char, delay_ms: u128) -> bool {
         if self.dropdown_items.is_empty() || self.dropdown_editable {
             return false;
         }
@@ -1225,7 +1652,7 @@ mod tests {
     #[test]
     fn insert_char_at_cursor() {
         let mut edit = EditState::default();
-        edit.start_edit(1, 0, "hello");
+        edit.start_edit(1, 0, pb::EditStartReason::EditStartUnspecified, "hello");
         edit.sel_start = 5;
         edit.sel_length = 0;
         edit.insert_char('!');
@@ -1236,7 +1663,7 @@ mod tests {
     #[test]
     fn insert_char_replaces_selection() {
         let mut edit = EditState::default();
-        edit.start_edit(1, 0, "hello");
+        edit.start_edit(1, 0, pb::EditStartReason::EditStartUnspecified, "hello");
         edit.sel_start = 0;
         edit.sel_length = 5;
         edit.insert_char('X');
@@ -1248,7 +1675,7 @@ mod tests {
     #[test]
     fn delete_back_removes_char_before_cursor() {
         let mut edit = EditState::default();
-        edit.start_edit(1, 0, "abc");
+        edit.start_edit(1, 0, pb::EditStartReason::EditStartUnspecified, "abc");
         edit.sel_start = 2;
         edit.sel_length = 0;
         edit.delete_back();
@@ -1259,7 +1686,7 @@ mod tests {
     #[test]
     fn delete_back_removes_selection() {
         let mut edit = EditState::default();
-        edit.start_edit(1, 0, "abcdef");
+        edit.start_edit(1, 0, pb::EditStartReason::EditStartUnspecified, "abcdef");
         edit.sel_start = 1;
         edit.sel_length = 3;
         edit.delete_back();
@@ -1271,7 +1698,7 @@ mod tests {
     #[test]
     fn delete_forward_removes_char_at_cursor() {
         let mut edit = EditState::default();
-        edit.start_edit(1, 0, "abc");
+        edit.start_edit(1, 0, pb::EditStartReason::EditStartUnspecified, "abc");
         edit.sel_start = 1;
         edit.sel_length = 0;
         edit.delete_forward();
@@ -1281,7 +1708,7 @@ mod tests {
     #[test]
     fn move_left_right() {
         let mut edit = EditState::default();
-        edit.start_edit(1, 0, "abc");
+        edit.start_edit(1, 0, pb::EditStartReason::EditStartUnspecified, "abc");
         edit.sel_start = 1;
         edit.sel_length = 0;
         edit.move_right();
@@ -1293,7 +1720,7 @@ mod tests {
     #[test]
     fn move_home_end() {
         let mut edit = EditState::default();
-        edit.start_edit(1, 0, "abc");
+        edit.start_edit(1, 0, pb::EditStartReason::EditStartUnspecified, "abc");
         edit.sel_start = 1;
         edit.sel_length = 0;
         edit.move_end();
@@ -1305,7 +1732,7 @@ mod tests {
     #[test]
     fn shift_selection_tracks_caret_edge() {
         let mut edit = EditState::default();
-        edit.start_edit(1, 0, "abcd");
+        edit.start_edit(1, 0, pb::EditStartReason::EditStartUnspecified, "abcd");
         edit.move_end();
 
         edit.select_left();
@@ -1328,7 +1755,7 @@ mod tests {
     #[test]
     fn selected_text_uses_char_offsets() {
         let mut edit = EditState::default();
-        edit.start_edit(1, 0, "가나다");
+        edit.start_edit(1, 0, pb::EditStartReason::EditStartUnspecified, "가나다");
         edit.set_sel_start(1);
         edit.set_sel_length(1);
 
@@ -1338,7 +1765,12 @@ mod tests {
     #[test]
     fn move_word_left_right_uses_word_boundaries() {
         let mut edit = EditState::default();
-        edit.start_edit(1, 0, "abc def! ghi");
+        edit.start_edit(
+            1,
+            0,
+            pb::EditStartReason::EditStartUnspecified,
+            "abc def! ghi",
+        );
         edit.move_end();
 
         edit.move_word_left();
@@ -1357,7 +1789,12 @@ mod tests {
     #[test]
     fn shift_word_selection_tracks_active_caret_edge() {
         let mut edit = EditState::default();
-        edit.start_edit(1, 0, "abc def ghi");
+        edit.start_edit(
+            1,
+            0,
+            pb::EditStartReason::EditStartUnspecified,
+            "abc def ghi",
+        );
         edit.move_end();
 
         edit.select_word_left();
@@ -1419,7 +1856,15 @@ mod tests {
     #[test]
     fn formula_mode_tracks_text_and_clears_highlights() {
         let mut edit = EditState::default();
-        edit.start_edit_with_options(1, 1, "", None, None, Some("=SUM("), Some(true));
+        edit.start_edit_with(
+            1,
+            1,
+            pb::EditStartReason::EditStartUnspecified,
+            "",
+            Some("=SUM("),
+            None,
+            Some(true),
+        );
         assert!(edit.formula_mode);
 
         edit.set_highlights(vec![EditHighlightRegion {
@@ -1446,13 +1891,29 @@ mod tests {
     #[test]
     fn commit_and_cancel_clear_formula_highlights() {
         let mut edit = EditState::default();
-        edit.start_edit_with_options(1, 1, "=A1", None, None, None, Some(true));
+        edit.start_edit_with(
+            1,
+            1,
+            pb::EditStartReason::EditStartUnspecified,
+            "=A1",
+            None,
+            None,
+            Some(true),
+        );
         edit.set_highlights(vec![EditHighlightRegion::default()]);
         let _ = edit.commit();
         assert!(!edit.formula_mode);
         assert!(edit.formula_highlights.is_empty());
 
-        edit.start_edit_with_options(1, 1, "=A1", None, None, None, Some(true));
+        edit.start_edit_with(
+            1,
+            1,
+            pb::EditStartReason::EditStartUnspecified,
+            "=A1",
+            None,
+            None,
+            Some(true),
+        );
         edit.set_highlights(vec![EditHighlightRegion::default()]);
         let _ = edit.cancel();
         assert!(!edit.formula_mode);
@@ -1462,7 +1923,7 @@ mod tests {
     #[test]
     fn commit_flushes_pending_preedit() {
         let mut edit = EditState::default();
-        edit.start_edit(0, 0, "");
+        edit.start_edit(0, 0, pb::EditStartReason::EditStartUnspecified, "");
         edit.update_text(String::new());
         edit.sel_start = 0;
         edit.sel_length = 0;
@@ -1487,7 +1948,7 @@ mod tests {
     #[test]
     fn flush_preedit_inserts_at_cursor() {
         let mut edit = EditState::default();
-        edit.start_edit(0, 0, "abc");
+        edit.start_edit(0, 0, pb::EditStartReason::EditStartUnspecified, "abc");
         edit.sel_start = 1;
         edit.sel_length = 0;
         edit.set_preedit("X", 1);
@@ -1501,7 +1962,7 @@ mod tests {
     #[test]
     fn flush_preedit_noop_when_not_composing() {
         let mut edit = EditState::default();
-        edit.start_edit(0, 0, "hello");
+        edit.start_edit(0, 0, pb::EditStartReason::EditStartUnspecified, "hello");
         let before = edit.edit_text.clone();
         edit.flush_preedit();
         assert_eq!(edit.edit_text, before);
@@ -1575,7 +2036,7 @@ mod tests {
         // 6. set_preedit("리") → compositionupdate
         // 7. commit_preedit("리") → compositionend
         let mut edit = EditState::default();
-        edit.start_edit(0, 0, "");
+        edit.start_edit(0, 0, pb::EditStartReason::EditStartUnspecified, "");
         edit.sel_start = 0;
         edit.sel_length = 0;
 
@@ -1609,7 +2070,7 @@ mod tests {
     fn ime_multi_segment_composition() {
         // Simulate Japanese IME: type "nihon" → preedit "にほん" → commit "日本"
         let mut edit = EditState::default();
-        edit.start_edit(0, 0, "prefix");
+        edit.start_edit(0, 0, pb::EditStartReason::EditStartUnspecified, "prefix");
         edit.sel_start = 6; // caret at end
         edit.sel_length = 0;
 
@@ -1631,7 +2092,7 @@ mod tests {
     fn ime_cancel_mid_preedit() {
         // Start composition, then cancel (Escape)
         let mut edit = EditState::default();
-        edit.start_edit(0, 0, "hello");
+        edit.start_edit(0, 0, pb::EditStartReason::EditStartUnspecified, "hello");
         edit.sel_start = 5;
         edit.sel_length = 0;
 
@@ -1650,7 +2111,7 @@ mod tests {
     fn ime_preedit_with_active_selection_deletes_selection() {
         // When composition starts with text selected, the selection is deleted
         let mut edit = EditState::default();
-        edit.start_edit(0, 0, "abcdef");
+        edit.start_edit(0, 0, pb::EditStartReason::EditStartUnspecified, "abcdef");
         edit.sel_start = 1;
         edit.sel_length = 3; // "bcd" selected
 
@@ -1672,7 +2133,7 @@ mod tests {
     #[test]
     fn ime_preedit_on_empty_text() {
         let mut edit = EditState::default();
-        edit.start_edit(0, 0, "");
+        edit.start_edit(0, 0, pb::EditStartReason::EditStartUnspecified, "");
         edit.sel_start = 0;
         edit.sel_length = 0;
 
@@ -1689,7 +2150,7 @@ mod tests {
     fn ime_commit_flushes_preedit_on_edit_commit() {
         // Full flow: start edit → type with IME → commit edit
         let mut edit = EditState::default();
-        edit.start_edit(0, 0, "");
+        edit.start_edit(0, 0, pb::EditStartReason::EditStartUnspecified, "");
         edit.sel_start = 0;
         edit.sel_length = 0;
 
@@ -1710,7 +2171,7 @@ mod tests {
         // After the first set_preedit deletes the selection,
         // subsequent calls should NOT delete more text
         let mut edit = EditState::default();
-        edit.start_edit(0, 0, "abcdef");
+        edit.start_edit(0, 0, pb::EditStartReason::EditStartUnspecified, "abcdef");
         edit.sel_start = 2;
         edit.sel_length = 2; // "cd" selected
 

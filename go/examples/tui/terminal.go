@@ -853,40 +853,86 @@ func debugEditCellLabel(state *pb.EditState) string {
 	if state == nil || !state.GetActive() {
 		return "--"
 	}
-	return debugCellLabel(state.GetRow(), state.GetCol())
+	session := state.GetSession()
+	if session == nil {
+		return "--"
+	}
+	return debugCellLabel(session.GetRow(), session.GetCol())
 }
 
 func debugEditSelectionLabel(state *pb.EditState) string {
 	if state == nil || !state.GetActive() {
 		return "--"
 	}
-	return fmt.Sprintf("%d+%d", state.GetSelStart(), state.GetSelLength())
+	session := state.GetSession()
+	if session == nil {
+		return "--"
+	}
+	selection := session.GetSelection()
+	return fmt.Sprintf("%d+%d", selection.GetStart(), selection.GetLength())
 }
 
 func debugEditComposing(state *pb.EditState) bool {
-	return state != nil && state.GetComposing()
+	return state != nil && state.GetActive() && state.GetSession().GetComposing()
 }
 
 func debugEditUIMode(state *pb.EditState) string {
 	if state == nil || !state.GetActive() {
 		return "--"
 	}
-	if state.GetUiMode() == pb.EditUiMode_EDIT_UI_MODE_EDIT {
+	switch state.GetSession().GetUiMode() {
+	case pb.EditUiMode_EDIT_UI_MODE_ENTER:
+		return "ENTER"
+	case pb.EditUiMode_EDIT_UI_MODE_EDIT:
 		return "EDIT"
+	default:
+		return "--"
 	}
-	return "ENTER"
 }
 
 func debugEditTextLabel(state *pb.EditState) string {
 	if state == nil || !state.GetActive() {
 		return "--"
 	}
-	return debugCompactText(state.GetText(), 20)
+	return debugCompactText(editorValueText(state.GetSession().GetValue()), 20)
 }
 
 func debugEditPreeditLabel(state *pb.EditState) string {
 	if state == nil || !state.GetActive() {
 		return "--"
 	}
-	return debugCompactText(state.GetPreeditText(), 16)
+	return debugCompactText(state.GetSession().GetPreeditText(), 16)
+}
+
+func editorValueText(value *pb.EditorValue) string {
+	if value == nil {
+		return ""
+	}
+	if value.EditText != nil {
+		return value.GetEditText()
+	}
+	if value.DisplayText != nil {
+		return value.GetDisplayText()
+	}
+	cellValue := value.GetValue()
+	if cellValue == nil {
+		return ""
+	}
+	switch cellValue.GetValue().(type) {
+	case *pb.CellValue_Text:
+		return cellValue.GetText()
+	case *pb.CellValue_Number:
+		return fmt.Sprintf("%g", cellValue.GetNumber())
+	case *pb.CellValue_Flag:
+		if cellValue.GetFlag() {
+			return "true"
+		}
+		return "false"
+	case *pb.CellValue_Timestamp:
+		return fmt.Sprintf("%d", cellValue.GetTimestamp())
+	case *pb.CellValue_Raw:
+		return string(cellValue.GetRaw())
+	default:
+		return ""
+	}
 }

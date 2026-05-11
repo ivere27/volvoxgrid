@@ -53,7 +53,7 @@ import kotlin.math.roundToInt
  * 5. The view blits the buffer to the SurfaceView canvas.
  *
  * Android touch/key events are forwarded as protobuf [PointerEvent] / [KeyEvent].
- * When the native service sends an [EditRequest], an [EditText] overlay is shown for cell editing.
+ * When the native service starts an editor session, an [EditText] overlay is shown for cell editing.
  * An [EventStream] is opened for grid events (BeforeEdit, AfterEdit, etc.).
  */
 class VolvoxGridView @JvmOverloads constructor(
@@ -130,17 +130,18 @@ class VolvoxGridView @JvmOverloads constructor(
     private var suppressImeProxyWatcher = false
 
     // Edit overlay IME state
-    private var currentEditUiMode = EditUiMode.EDIT_UI_MODE_ENTER
     private var suppressEditorSync = false
     private var editOverlayComposing = false
 
     // Editing cell tracking (for scroll-into-view after resize)
     private var editingRow = -1
     private var editingCol = -1
+    private var activeEditorSessionId = 0L
+    private var activeEditorStateVersion = 0L
 
     // Deferred overlay reveal
     private var deferOverlayWhileImeActive = false
-    private var pendingEditRequest: EditRequest? = null
+    private var pendingEditorStarted: EditorSessionStarted? = null
     private val deferOverlayHandler = Handler(Looper.getMainLooper())
     @Volatile
     private var gesturePreviewActive = false
@@ -506,7 +507,11 @@ class VolvoxGridView @JvmOverloads constructor(
                             ffiClient?.Edit(
                                 EditCommand.newBuilder()
                                     .setGridId(gridId)
-                                    .setStart(EditStart.newBuilder().build())
+                                    .setStart(
+                                        EditStart.newBuilder()
+                                            .setReason(EditStartReason.EDIT_START_IME_COMPOSITION)
+                                            .build()
+                                    )
                                     .build()
                             )
                         } catch (_: FfiError) {}
@@ -527,9 +532,9 @@ class VolvoxGridView @JvmOverloads constructor(
                     imeProxyLastCommittedLen = fullText.length
                     // Schedule deferred overlay reveal
                     deferOverlayHandler.postDelayed({
-                        val pending = pendingEditRequest
+                        val pending = pendingEditorStarted
                         if (pending != null) {
-                            pendingEditRequest = null
+                            pendingEditorStarted = null
                             deferOverlayWhileImeActive = false
                             showEditOverlay(pending)
                         } else {
@@ -549,15 +554,16 @@ class VolvoxGridView @JvmOverloads constructor(
                                 EditCommand.newBuilder()
                                     .setGridId(gridId)
                                     .setStart(EditStart.newBuilder()
-                                        .setSeedText(delta)
+                                        .setReason(EditStartReason.EDIT_START_PRINTABLE_KEY)
+                                        .setSeedValue(editorValueFromText(delta))
                                         .build())
                                     .build()
                             )
                         } catch (_: FfiError) {}
                         deferOverlayHandler.postDelayed({
-                            val pending = pendingEditRequest
+                            val pending = pendingEditorStarted
                             if (pending != null) {
-                                pendingEditRequest = null
+                                pendingEditorStarted = null
                                 deferOverlayWhileImeActive = false
                                 showEditOverlay(pending)
                             } else {
@@ -621,20 +627,61 @@ class VolvoxGridView @JvmOverloads constructor(
         suppressImeProxyWatcher = false
     }
 
+    private fun editorSessionCommandBuilder(): EditorSessionCommand.Builder {
+        if ((activeEditorSessionId == 0L || activeEditorStateVersion == 0L) && gridId != 0L) {
+            try {
+                updateEditorSessionFromState(
+                    ffiClient?.Edit(
+                        EditCommand.newBuilder()
+                            .setGridId(gridId)
+                            .setGetState(EditGetState.newBuilder().build())
+                            .build()
+                    )
+                )
+            } catch (_: FfiError) {}
+        }
+        val builder = EditorSessionCommand.newBuilder()
+        if (activeEditorSessionId != 0L) {
+            builder.setSessionId(activeEditorSessionId)
+        }
+        if (activeEditorStateVersion != 0L) {
+            builder.setStateVersion(activeEditorStateVersion)
+        }
+        return builder
+    }
+
+    private fun updateEditorSessionFromState(state: EditState?) {
+        if (state != null && state.active && state.hasSession()) {
+            val session = state.session
+            activeEditorSessionId = session.sessionId
+            activeEditorStateVersion = session.stateVersion
+        }
+    }
+
+    private fun clearEditorSessionTracking() {
+        activeEditorSessionId = 0L
+        activeEditorStateVersion = 0L
+    }
+
     private fun sendPreedit(text: String, cursor: Int, commit: Boolean) {
         try {
-            ffiClient?.Edit(
+            val state = ffiClient?.Edit(
                 EditCommand.newBuilder()
                     .setGridId(gridId)
-                    .setSetPreedit(
-                        EditSetPreedit.newBuilder()
-                            .setText(text)
-                            .setCursor(cursor)
-                            .setCommit(commit)
+                    .setSession(
+                        editorSessionCommandBuilder()
+                            .setPreeditChanged(
+                                EditorPreeditChanged.newBuilder()
+                                    .setText(text)
+                                    .setCursor(cursor)
+                                    .setCommit(commit)
+                                    .build()
+                            )
                             .build()
                     )
                     .build()
             )
+            updateEditorSessionFromState(state)
         } catch (_: FfiError) {}
         requestRenderFrame()
     }
@@ -653,6 +700,28 @@ class VolvoxGridView @JvmOverloads constructor(
             cpCount++
         }
         return i.coerceAtMost(len)
+    }
+
+    private fun editorValueFromText(text: String): EditorValue =
+        EditorValue.newBuilder()
+            .setValue(CellValue.newBuilder().setText(text).build())
+            .setEditText(text)
+            .setDisplayText(text)
+            .build()
+
+    private fun editorValueToText(value: EditorValue): String {
+        if (value.hasEditText()) return value.editText
+        if (value.hasDisplayText()) return value.displayText
+        if (!value.hasValue()) return ""
+        val cell = value.value
+        return when (cell.valueCase) {
+            CellValue.ValueCase.TEXT -> cell.text
+            CellValue.ValueCase.NUMBER -> cell.number.toString()
+            CellValue.ValueCase.FLAG -> cell.flag.toString()
+            CellValue.ValueCase.TIMESTAMP -> cell.timestamp.toString()
+            CellValue.ValueCase.RAW -> cell.raw.toStringUtf8()
+            else -> ""
+        }
     }
 
     // =========================================================================
@@ -794,7 +863,7 @@ class VolvoxGridView @JvmOverloads constructor(
         needsFollowupRender.set(false)
         renderRequestPending.set(false)
         deferOverlayWhileImeActive = false
-        pendingEditRequest = null
+        pendingEditorStarted = null
         deferOverlayHandler.removeCallbacksAndMessages(null)
         clearImeProxy()
         dismissEditOverlay()
@@ -935,7 +1004,7 @@ class VolvoxGridView @JvmOverloads constructor(
         stopGesturePreview()
         knownRows = 0
         deferOverlayWhileImeActive = false
-        pendingEditRequest = null
+        pendingEditorStarted = null
         deferOverlayHandler.removeCallbacksAndMessages(null)
         clearImeProxy()
         dismissEditOverlay()
@@ -2182,14 +2251,15 @@ class VolvoxGridView @JvmOverloads constructor(
                     stopGesturePreview()
                 }
             }
-            output.hasEditRequest() -> {
+            output.hasEditorStarted() -> {
                 if (deferOverlayWhileImeActive) {
-                    pendingEditRequest = output.editRequest
+                    pendingEditorStarted = output.editorStarted
                 } else {
-                    showEditOverlay(output.editRequest)
+                    showEditOverlay(output.editorStarted)
                 }
             }
-            output.hasDropdownRequest() -> handleDropdownRequest(output.dropdownRequest)
+            output.hasEditorUpdated() -> handleEditorUpdated(output.editorUpdated)
+            output.hasEditorEnded() -> dismissEditOverlay()
             output.hasTooltipRequest() -> {
                 surfaceView.tooltipText = output.tooltipRequest.text
             }
@@ -2259,20 +2329,62 @@ class VolvoxGridView @JvmOverloads constructor(
     // Edit Overlay
     // =========================================================================
 
-    private fun showEditOverlay(request: EditRequest) {
+    private fun androidInputTypeForEditor(editor: EditorSpec): Int {
+        if (!editor.hasText()) {
+            return InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+        }
+        val multilineFlag = if (editor.text.allowNewlines) {
+            InputType.TYPE_TEXT_FLAG_MULTI_LINE
+        } else {
+            0
+        }
+        return when (editor.text.inputType) {
+            io.github.ivere27.volvoxgrid.InputType.INPUT_TYPE_NUMBER ->
+                InputType.TYPE_CLASS_NUMBER or
+                    InputType.TYPE_NUMBER_FLAG_DECIMAL or
+                    InputType.TYPE_NUMBER_FLAG_SIGNED
+            io.github.ivere27.volvoxgrid.InputType.INPUT_TYPE_EMAIL ->
+                InputType.TYPE_CLASS_TEXT or
+                    InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS or
+                    InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS or
+                    multilineFlag
+            io.github.ivere27.volvoxgrid.InputType.INPUT_TYPE_URL ->
+                InputType.TYPE_CLASS_TEXT or
+                    InputType.TYPE_TEXT_VARIATION_URI or
+                    InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS or
+                    multilineFlag
+            io.github.ivere27.volvoxgrid.InputType.INPUT_TYPE_PHONE ->
+                InputType.TYPE_CLASS_PHONE
+            io.github.ivere27.volvoxgrid.InputType.INPUT_TYPE_PASSWORD ->
+                InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            else ->
+                InputType.TYPE_CLASS_TEXT or
+                    InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS or
+                    multilineFlag
+        }
+    }
+
+    private fun showEditOverlay(request: EditorSessionStarted) {
         post {
+            // Engine-drawn editor: host MUST NOT mount an overlay.
+            if (request.session.editor.presentation == EditorPresentation.EDITOR_CANVAS) {
+                return@post
+            }
             if (deferOverlayWhileImeActive) {
-                pendingEditRequest = request
+                pendingEditorStarted = request
                 return@post
             }
 
+            val session = request.session
             val existingOverlay = editOverlay
             val refreshingSameCell = existingOverlay != null &&
-                editingRow == request.row &&
-                editingCol == request.col
+                editingRow == session.row &&
+                editingCol == session.col
 
-            editingRow = request.row
-            editingCol = request.col
+            editingRow = session.row
+            editingCol = session.col
+            activeEditorSessionId = session.sessionId
+            activeEditorStateVersion = session.stateVersion
 
             // Remove imeProxy so only the edit overlay captures IME input.
             // It will be re-added on the next touch via requestIdleInputFocus().
@@ -2281,9 +2393,6 @@ class VolvoxGridView @JvmOverloads constructor(
             }
             clearImeProxy()
             dismissActiveDropdownPopup()
-
-            val uiMode = request.uiMode
-            currentEditUiMode = uiMode
 
             if (refreshingSameCell) {
                 // A geometry refresh can happen when the IME shows or hides.
@@ -2303,11 +2412,13 @@ class VolvoxGridView @JvmOverloads constructor(
             suppressEditorSync = false
 
             // Resolve the effective style for the edited cell.
-            val cellStyle = resolveEditCellStyle(request.row, request.col)
+            val cellStyle = resolveEditCellStyle(session.row, session.col)
 
             val editText = EditText(context).apply {
-                inputType = InputType.TYPE_CLASS_TEXT
-                setSingleLine(true)
+                inputType = androidInputTypeForEditor(session.editor)
+                val allowNewlines = session.editor.hasText() && session.editor.text.allowNewlines
+                setSingleLine(!allowNewlines)
+                maxLines = if (allowNewlines) Int.MAX_VALUE else 1
                 imeOptions = EditorInfo.IME_ACTION_DONE
                 setBackgroundColor(0xFFFFFFFF.toInt())
                 setPadding(cellStyle.padLeft, cellStyle.padTop, cellStyle.padRight, cellStyle.padBottom)
@@ -2325,11 +2436,13 @@ class VolvoxGridView @JvmOverloads constructor(
                 if (tf != null) typeface = tf
 
                 suppressEditorSync = true
-                setText(request.currentValue)
+                val initialText = editorValueToText(session.value)
+                setText(initialText)
                 // Map code-point offsets to code-unit offsets for selection
-                val text = request.currentValue
-                val selStartCu = codeUnitOffset(text, request.selStart)
-                val selEndCu = codeUnitOffset(text, request.selStart + request.selLength)
+                val text = initialText
+                val selection = session.selection
+                val selStartCu = codeUnitOffset(text, selection.start)
+                val selEndCu = codeUnitOffset(text, selection.start + selection.length)
                     .coerceAtMost(text.length)
                 if (selStartCu in 0..text.length && selEndCu in selStartCu..text.length) {
                     setSelection(selStartCu, selEndCu)
@@ -2339,26 +2452,37 @@ class VolvoxGridView @JvmOverloads constructor(
                 suppressEditorSync = false
 
                 setOnEditorActionListener { _, _, _ ->
-                    commitEdit(request.row, request.col, getText().toString())
+                    commitEdit(session.row, session.col, getText().toString())
                     true
                 }
 
                 setOnKeyListener { _, keyCode, event ->
-                    if (event.action != AndroidKeyEvent.ACTION_UP) return@setOnKeyListener false
+                    if (event.action != AndroidKeyEvent.ACTION_DOWN) return@setOnKeyListener false
                     when (keyCode) {
                         AndroidKeyEvent.KEYCODE_ENTER,
                         AndroidKeyEvent.KEYCODE_NUMPAD_ENTER -> {
-                            commitEdit(request.row, request.col, getText().toString())
-                            true
+                            if (event.isAltPressed) {
+                                val start = selectionStart.coerceAtLeast(0)
+                                val end = selectionEnd.coerceAtLeast(0)
+                                val from = start.coerceAtMost(end)
+                                val to = start.coerceAtLeast(end)
+                                getText().replace(from, to, "\n")
+                                true
+                            } else {
+                                commitEdit(session.row, session.col, getText().toString())
+                                true
+                            }
                         }
                         AndroidKeyEvent.KEYCODE_ESCAPE -> {
-                            cancelEdit(request.row, request.col)
+                            cancelEdit(session.row, session.col)
                             true
                         }
                         AndroidKeyEvent.KEYCODE_DPAD_UP,
                         AndroidKeyEvent.KEYCODE_DPAD_DOWN -> {
-                            if (uiMode == EditUiMode.EDIT_UI_MODE_ENTER) {
-                                commitEdit(request.row, request.col, getText().toString())
+                            if (getText().contains('\n')) {
+                                false // let EditText handle multiline caret movement
+                            } else {
+                                commitEdit(session.row, session.col, getText().toString())
                                 // Forward arrow to engine for cell navigation
                                 val stream = renderStream
                                 if (stream != null) {
@@ -2366,8 +2490,6 @@ class VolvoxGridView @JvmOverloads constructor(
                                     this@VolvoxGridView.onKeyUp(keyCode, event)
                                 }
                                 true
-                            } else {
-                                false // let EditText handle caret movement
                             }
                         }
                         else -> false
@@ -2397,16 +2519,21 @@ class VolvoxGridView @JvmOverloads constructor(
                         } else {
                             // Plain text change — sync to engine
                             try {
-                                ffiClient?.Edit(
+                                val state = ffiClient?.Edit(
                                     EditCommand.newBuilder()
                                         .setGridId(gridId)
-                                        .setSetText(
-                                            EditSetText.newBuilder()
-                                                .setText(s.toString())
+                                        .setSession(
+                                            editorSessionCommandBuilder()
+                                                .setValueChanged(
+                                                    EditorValueChanged.newBuilder()
+                                                        .setValue(editorValueFromText(s.toString()))
+                                                        .build()
+                                                )
                                                 .build()
                                         )
                                         .build()
                                 )
+                                updateEditorSessionFromState(state)
                             } catch (_: FfiError) {}
                             requestRenderFrame()
                         }
@@ -2423,22 +2550,24 @@ class VolvoxGridView @JvmOverloads constructor(
         }
     }
 
-    private fun editOverlayLayoutParams(request: EditRequest): LayoutParams {
+    private fun editOverlayLayoutParams(request: EditorSessionStarted): LayoutParams {
+        val rect = request.session.viewportRect
         return LayoutParams(
-            request.width.toInt().coerceAtLeast(60),
-            request.height.toInt().coerceAtLeast(30)
+            rect.width.toInt().coerceAtLeast(60),
+            rect.height.toInt().coerceAtLeast(30)
         ).apply {
-            leftMargin = request.x.toInt()
-            topMargin = request.y.toInt()
+            leftMargin = rect.x.toInt()
+            topMargin = rect.y.toInt()
         }
     }
 
-    private fun positionEditOverlay(editText: EditText, request: EditRequest) {
+    private fun positionEditOverlay(editText: EditText, request: EditorSessionStarted) {
         val lp = (editText.layoutParams as? LayoutParams) ?: editOverlayLayoutParams(request)
-        lp.width = request.width.toInt().coerceAtLeast(60)
-        lp.height = request.height.toInt().coerceAtLeast(30)
-        lp.leftMargin = request.x.toInt()
-        lp.topMargin = request.y.toInt()
+        val rect = request.session.viewportRect
+        lp.width = rect.width.toInt().coerceAtLeast(60)
+        lp.height = rect.height.toInt().coerceAtLeast(30)
+        lp.leftMargin = rect.x.toInt()
+        lp.topMargin = rect.y.toInt()
         editText.layoutParams = lp
         val overlayZ = dp(8f)
         editText.elevation = overlayZ
@@ -2503,12 +2632,19 @@ class VolvoxGridView @JvmOverloads constructor(
 
     private fun commitEdit(row: Int, col: Int, text: String) {
         try {
-            ffiClient?.Edit(
+            val state = ffiClient?.Edit(
                 EditCommand.newBuilder()
                     .setGridId(gridId)
-                    .setCommit(EditCommit.newBuilder().setText(text).build())
+                    .setSession(
+                        editorSessionCommandBuilder()
+                            .setCommit(EditCommit.newBuilder()
+                                .setValue(editorValueFromText(text))
+                                .build())
+                            .build()
+                    )
                     .build()
             )
+            updateEditorSessionFromState(state)
         } catch (_: FfiError) {}
         editListener?.onEditCommit(row, col, text)
         dismissEditOverlay()
@@ -2516,12 +2652,17 @@ class VolvoxGridView @JvmOverloads constructor(
 
     private fun cancelEdit(row: Int, col: Int) {
         try {
-            ffiClient?.Edit(
+            val state = ffiClient?.Edit(
                 EditCommand.newBuilder()
                     .setGridId(gridId)
-                    .setCancel(EditCancel.newBuilder().build())
+                    .setSession(
+                        editorSessionCommandBuilder()
+                            .setCancel(EditCancel.newBuilder().build())
+                            .build()
+                    )
                     .build()
             )
+            updateEditorSessionFromState(state)
         } catch (_: FfiError) {}
         editListener?.onEditCancel(row, col)
         dismissEditOverlay()
@@ -2531,6 +2672,7 @@ class VolvoxGridView @JvmOverloads constructor(
         post {
             editingRow = -1
             editingCol = -1
+            clearEditorSessionTracking()
             dismissActiveDropdownPopup()
             editOverlay?.let {
                 val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
@@ -2551,74 +2693,36 @@ class VolvoxGridView @JvmOverloads constructor(
     private fun dismissActiveDropdownPopup() {
     }
 
-    private fun showEditableDropdownOverlay(request: DropdownRequest) {
-        val editText = EditText(context).apply {
-            if (request.selected in 0 until request.itemsCount) {
-                setText(request.getItems(request.selected))
-            }
-            setSingleLine(true)
-            imeOptions = EditorInfo.IME_ACTION_DONE
-            setBackgroundColor(0xFFFFFFFF.toInt())
-            setPadding(4, 2, 4, 2)
-
-            setOnEditorActionListener { _, actionId, _ ->
-                if (actionId == EditorInfo.IME_ACTION_DONE) {
-                    commitEdit(request.row, request.col, text.toString())
-                    true
-                } else {
-                    false
-                }
-            }
-        }
-
-        val lp = LayoutParams(
-            request.width.toInt().coerceAtLeast(60),
-            request.height.toInt().coerceAtLeast(30)
-        )
-        lp.leftMargin = request.x.toInt()
-        lp.topMargin = request.y.toInt()
-
-        addView(editText, lp)
-        editOverlay = editText
-        editText.requestFocus()
-        val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
-        imm?.showSoftInput(editText, InputMethodManager.SHOW_IMPLICIT)
-    }
-
-    private fun showReadonlyDropdownPopup(request: DropdownRequest) {
-        if (request.itemsCount <= 0) {
-            cancelEdit(request.row, request.col)
-            return
-        }
-
-        imeProxy?.clearFocus()
-        val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
-        imm?.hideSoftInputFromWindow(windowToken, 0)
-        requestRenderFrame()
-    }
-
-    private fun handleDropdownRequest(request: DropdownRequest) {
+    private fun handleEditorUpdated(update: EditorSessionUpdated) {
         post {
-            editingRow = request.row
-            editingCol = request.col
-            imeProxy?.let { proxy ->
-                if (proxy.parent != null) removeView(proxy)
+            if (activeEditorSessionId == 0L || update.sessionId == activeEditorSessionId) {
+                activeEditorSessionId = update.sessionId
+                activeEditorStateVersion = update.stateVersion
             }
-            clearImeProxy()
-            dismissActiveDropdownPopup()
-            editOverlay?.let {
-                val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
-                imm?.hideSoftInputFromWindow(it.windowToken, 0)
-                removeView(it)
+            if (update.hasVisible() && !update.visible) {
+                dismissEditOverlay()
+                return@post
             }
-            editOverlay = null
-            editOverlayComposing = false
-            suppressEditorSync = false
-
-            if (request.editable) {
-                showEditableDropdownOverlay(request)
-            } else {
-                showReadonlyDropdownPopup(request)
+            val overlay = editOverlay ?: return@post
+            if (update.hasViewportRect()) {
+                val rect = update.viewportRect
+                val lp = (overlay.layoutParams as? LayoutParams) ?: LayoutParams(
+                    rect.width.toInt().coerceAtLeast(60),
+                    rect.height.toInt().coerceAtLeast(30)
+                )
+                lp.width = rect.width.toInt().coerceAtLeast(60)
+                lp.height = rect.height.toInt().coerceAtLeast(30)
+                lp.leftMargin = rect.x.toInt()
+                lp.topMargin = rect.y.toInt()
+                overlay.layoutParams = lp
+            }
+            if (update.hasValue() && !suppressEditorSync) {
+                val nextText = editorValueToText(update.value)
+                if (overlay.text.toString() != nextText) {
+                    suppressEditorSync = true
+                    overlay.setText(nextText)
+                    suppressEditorSync = false
+                }
             }
         }
     }
@@ -2725,7 +2829,6 @@ class VolvoxGridView @JvmOverloads constructor(
 
     private fun isCancelableGridEvent(event: GridEvent): Boolean =
         event.hasBeforeEdit() ||
-            event.hasBeforeDropdownOpen() ||
             event.hasCellEditValidate() ||
             event.hasBeforeSort() ||
             event.hasBeforeNodeToggle() ||

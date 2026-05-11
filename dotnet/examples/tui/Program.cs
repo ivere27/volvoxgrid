@@ -352,9 +352,10 @@ namespace VolvoxGrid.DotNet.TuiSample
                     },
                     Editing = new EditConfig
                     {
-                        Trigger = EditTrigger.EDIT_TRIGGER_KEY_CLICK,
-                        DropdownTrigger = DropdownTrigger.DROPDOWN_ALWAYS,
-                        DropdownSearch = false,
+                        Activation = new EditActivation
+                        {
+                            Trigger = EditTrigger.EDIT_TRIGGER_KEY_CLICK,
+                        },
                     },
                     Scrolling = new ScrollConfig
                     {
@@ -540,8 +541,10 @@ namespace VolvoxGrid.DotNet.TuiSample
                     },
                     Editing = new EditConfig
                     {
-                        Trigger = EditTrigger.EDIT_TRIGGER_KEY_CLICK,
-                        DropdownTrigger = DropdownTrigger.DROPDOWN_NEVER,
+                        Activation = new EditActivation
+                        {
+                            Trigger = EditTrigger.EDIT_TRIGGER_KEY_CLICK,
+                        },
                     },
                     Scrolling = new ScrollConfig
                     {
@@ -636,7 +639,10 @@ namespace VolvoxGrid.DotNet.TuiSample
                     },
                     Editing = new EditConfig
                     {
-                        Trigger = EditTrigger.EDIT_TRIGGER_KEY_CLICK,
+                        Activation = new EditActivation
+                        {
+                            Trigger = EditTrigger.EDIT_TRIGGER_KEY_CLICK,
+                        },
                     },
                     Scrolling = new ScrollConfig
                     {
@@ -775,20 +781,26 @@ namespace VolvoxGrid.DotNet.TuiSample
                 new ColumnDef { Index = 5, Width = 12, Caption = "Cost", Key = "Cost", Align = Align.ALIGN_RIGHT_CENTER, DataType = ColumnDataType.COLUMN_DATA_CURRENCY, Format = "$#,##0" },
                 new ColumnDef { Index = 6, Width = 10, Caption = "Margin%", Key = "Margin", Align = Align.ALIGN_CENTER_CENTER, DataType = ColumnDataType.COLUMN_DATA_NUMBER, ProgressColor = 0xFF818CF8u },
                 new ColumnDef { Index = 7, Width = 5, Caption = "Flag", Key = "Flag", Align = Align.ALIGN_CENTER_CENTER, DataType = ColumnDataType.COLUMN_DATA_BOOLEAN },
-                new ColumnDef { Index = 8, Width = 10, Caption = "Status", Key = "Status", Dropdown = DropdownFromLabels(SalesStatusItems) },
+                new ColumnDef { Index = 8, Width = 10, Caption = "Status", Key = "Status", Editor = ListEditorFromLabels(SalesStatusItems) },
                 new ColumnDef { Index = 9, Width = 18, Caption = "Notes", Key = "Notes" },
             };
         }
 
-        private static Dropdown DropdownFromLabels(string items)
+        private static EditorSpec ListEditorFromLabels(string items)
         {
-            var dropdown = new Dropdown();
+            var list = new ListEditorParams();
             foreach (var label in items.Split('|'))
             {
                 if (!string.IsNullOrEmpty(label))
-                    dropdown.Items.Add(new DropdownItem { Label = label });
+                    list.StaticItems.Add(new ListItem { Label = label });
             }
-            return dropdown;
+            return new EditorSpec
+            {
+                Kind = EditorKind.EDITOR_SELECT,
+                Owner = EditorOwner.EDITOR_OWNER_ENGINE,
+                Presentation = EditorPresentation.EDITOR_INLINE,
+                List = list,
+            };
         }
 
         private static List<ColumnDef> BuildHierarchyColumns()

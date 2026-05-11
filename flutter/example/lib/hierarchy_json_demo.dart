@@ -58,6 +58,11 @@ bool get _hierTouchHeader {
 int get _hierHeaderHeight =>
     _hierTouchHeader ? _hierMobileHeaderHeight : _hierDesktopHeaderHeight;
 
+EditorSpec _defaultHostTextEditorSpec() => EditorSpec()
+  ..kind = EditorKind.EDITOR_TEXT
+  ..owner = EditorOwner.EDITOR_OWNER_HOST_NATIVE
+  ..presentation = EditorPresentation.EDITOR_INLINE;
+
 Future<void> loadHierarchyJsonDemo(VolvoxGridController controller) async {
   final rawJson = utf8.decode(await controller.getDemoData('hierarchy'));
   final rows = (jsonDecode(rawJson) as List<dynamic>)
@@ -282,8 +287,9 @@ GridConfig _hierarchyThemeConfig(int maxOutlineDepth, int maxOutlineLevel) {
               ..style = BorderStyle.BORDER_THIN
               ..color = _hierAccent)))))
     ..editing = (EditConfig()
-      ..trigger = EditTrigger.EDIT_TRIGGER_NONE
-      ..dropdownTrigger = DropdownTrigger.DROPDOWN_NEVER)
+      ..defaultEditor = _defaultHostTextEditorSpec()
+      ..activation =
+          (EditActivation()..trigger = EditTrigger.EDIT_TRIGGER_NONE))
     ..scrolling = (ScrollConfig()
       ..scrollbars = ScrollBarsMode.SCROLLBAR_BOTH
       ..flingEnabled = true

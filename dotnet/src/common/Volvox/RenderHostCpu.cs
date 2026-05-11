@@ -187,11 +187,13 @@ namespace VolvoxGrid.DotNet.Internal
             _editOverlay = new TextBox
             {
                 Visible = true,
-                Multiline = false,
+                Multiline = true,
                 AutoSize = false,
                 BorderStyle = System.Windows.Forms.BorderStyle.None,
                 AcceptsReturn = false,
                 AcceptsTab = false,
+                WordWrap = false,
+                ScrollBars = ScrollBars.None,
                 ShortcutsEnabled = true,
                 ImeMode = ImeMode.On,
                 Margin = System.Windows.Forms.Padding.Empty,
@@ -686,7 +688,7 @@ namespace VolvoxGrid.DotNet.Internal
 
                 // IME composition should start a clean edit session for the
                 // active cell without injecting a synthetic printable key.
-                _client.EditStart(_gridId, selection.ActiveRow, selection.ActiveCol, null, null, string.Empty);
+                _client.EditStart(_gridId, selection.ActiveRow, selection.ActiveCol, EditStartReason.EDIT_START_IME_COMPOSITION, string.Empty);
                 _engineEditing = true;
                 RequestFrame();
             }
@@ -711,6 +713,12 @@ namespace VolvoxGrid.DotNet.Internal
             if (_editOverlayHost.Visible)
             {
                 base.OnKeyDown(e);
+                return;
+            }
+            if (TryHandleClipboardShortcut(e))
+            {
+                e.SuppressKeyPress = true;
+                e.Handled = true;
                 return;
             }
             base.OnKeyDown(e);
@@ -946,16 +954,21 @@ namespace VolvoxGrid.DotNet.Internal
                 return;
             }
 
-            if (output.EditRequest != null)
+            if (output.EditorStarted != null)
             {
-                BeginInvokeShowEditOverlay(output.EditRequest);
+                BeginInvokeShowEditOverlay(output.EditorStarted);
+            }
+            else if (output.EditorUpdated != null)
+            {
+                BeginInvokeUpdateEditOverlay(output.EditorUpdated);
             }
             else if (output.Cursor != null)
             {
                 BeginInvokeApplyEngineCursor(output.Cursor.Cursor);
             }
-            else if (output.DropdownRequest != null)
+            else if (output.EditorEnded != null)
             {
+                _engineEditing = false;
                 BeginInvokeHideEditOverlay(false);
             }
 
@@ -1850,7 +1863,7 @@ namespace VolvoxGrid.DotNet.Internal
             }
         }
 
-        private void BeginInvokeShowEditOverlay(EditRequest request)
+        private void BeginInvokeShowEditOverlay(EditorSessionStarted request)
         {
             if (request == null || !IsHandleCreated)
             {
@@ -1881,6 +1894,23 @@ namespace VolvoxGrid.DotNet.Internal
             else
             {
                 HideEditOverlay(focusHost);
+            }
+        }
+
+        private void BeginInvokeUpdateEditOverlay(EditorSessionUpdated update)
+        {
+            if (update == null || !IsHandleCreated)
+            {
+                return;
+            }
+
+            if (InvokeRequired)
+            {
+                BeginInvoke(new MethodInvoker(() => UpdateEditOverlay(update)));
+            }
+            else
+            {
+                UpdateEditOverlay(update);
             }
         }
 
@@ -1942,20 +1972,69 @@ namespace VolvoxGrid.DotNet.Internal
             }
         }
 
-        private void ShowEditOverlay(EditRequest request)
+        private static string EditorValueToText(EditorValue value)
         {
-            if (request == null || _client == null || _gridId == 0)
+            if (value == null)
+            {
+                return string.Empty;
+            }
+            if (value.HasEditText)
+            {
+                return value.EditText ?? string.Empty;
+            }
+            if (value.Value == null)
+            {
+                return string.Empty;
+            }
+            switch (value.Value.ValueCase)
+            {
+                case CellValue.ValueOneofCase.Text:
+                    return value.Value.Text ?? string.Empty;
+                case CellValue.ValueOneofCase.Number:
+                    return value.Value.Number.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                case CellValue.ValueOneofCase.Flag:
+                    return value.Value.Flag ? "true" : "false";
+                case CellValue.ValueOneofCase.Timestamp:
+                    return value.Value.Timestamp.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                default:
+                    return string.Empty;
+            }
+        }
+
+        private void ShowEditOverlay(EditorSessionStarted request)
+        {
+            var session = request?.Session;
+            if (session == null || _client == null || _gridId == 0)
+            {
+                return;
+            }
+            // Engine-drawn editor: host MUST NOT mount an overlay.
+            if (session.Editor != null && session.Editor.Presentation == EditorPresentation.EDITOR_CANVAS)
+            {
+                _engineEditing = true;
+                if (_editOverlayHost.Visible)
+                {
+                    HideEditOverlay(false);
+                }
+                if (IsHandleCreated && !Focused)
+                {
+                    Focus();
+                }
+                return;
+            }
+            if (session.ViewportRect == null)
             {
                 return;
             }
 
-            int x = Math.Max(0, (int)Math.Round(request.X));
-            int y = Math.Max(0, (int)Math.Round(request.Y));
-            int w = Math.Max(1, (int)Math.Round(request.Width));
-            int h = Math.Max(1, (int)Math.Round(request.Height));
-            bool sameCell = _editOverlayHost.Visible && _editOverlayRow == request.Row && _editOverlayCol == request.Col;
+            _engineEditing = true;
+            int x = Math.Max(0, (int)Math.Round(session.ViewportRect.X));
+            int y = Math.Max(0, (int)Math.Round(session.ViewportRect.Y));
+            int w = Math.Max(1, (int)Math.Round(session.ViewportRect.Width));
+            int h = Math.Max(1, (int)Math.Round(session.ViewportRect.Height));
+            bool sameCell = _editOverlayHost.Visible && _editOverlayRow == session.Row && _editOverlayCol == session.Col;
             System.Windows.Forms.Padding editPadding = ResolveEditPadding != null
-                ? ResolveEditPadding(request.Row, request.Col)
+                ? ResolveEditPadding(session.Row, session.Col)
                 : System.Windows.Forms.Padding.Empty;
             editPadding = new System.Windows.Forms.Padding(
                 Math.Max(0, editPadding.Left),
@@ -1967,22 +2046,27 @@ namespace VolvoxGrid.DotNet.Internal
             int innerW = Math.Max(1, w - editPadding.Left - editPadding.Right);
             int innerH = Math.Max(1, h - editPadding.Top - editPadding.Bottom);
 
-            _editOverlayRow = request.Row;
-            _editOverlayCol = request.Col;
-            _editOverlayUiMode = request.UiMode;
+            _editOverlayRow = session.Row;
+            _editOverlayCol = session.Col;
+            _editOverlayUiMode = session.UiMode;
             _editOverlay.Font = ResolveEditOverlayFont(Font);
             _editOverlayHost.Bounds = new Rectangle(x, y, w, h);
             _editOverlay.Bounds = new Rectangle(innerX, innerY, innerW, innerH);
-            _editOverlay.MaxLength = request.MaxLength > 0 ? request.MaxLength : 0;
+            int maxLength = session.Editor != null && session.Editor.Text != null
+                ? session.Editor.Text.MaxLength
+                : 0;
+            _editOverlay.MaxLength = maxLength > 0 ? maxLength : 0;
             _editOverlay.TextAlign = ResolveEditAlignment != null
-                ? ResolveEditAlignment(request.Row, request.Col)
+                ? ResolveEditAlignment(session.Row, session.Col)
                 : HorizontalAlignment.Left;
 
             if (!sameCell)
             {
-                string text = request.CurrentValue ?? string.Empty;
-                int start = ScalarIndexToCodeUnitIndex(text, request.SelStart);
-                int end = ScalarIndexToCodeUnitIndex(text, request.SelStart + request.SelLength);
+                string text = EditorValueToText(session.Value);
+                int selectionStart = session.Selection != null ? session.Selection.Start : 0;
+                int selectionLength = session.Selection != null ? session.Selection.Length : text.Length;
+                int start = ScalarIndexToCodeUnitIndex(text, selectionStart);
+                int end = ScalarIndexToCodeUnitIndex(text, selectionStart + selectionLength);
                 start = Math.Max(0, Math.Min(text.Length, start));
                 end = Math.Max(start, Math.Min(text.Length, end));
 
@@ -2009,6 +2093,64 @@ namespace VolvoxGrid.DotNet.Internal
                 _editOverlay.Focus();
             }
             SyncEditOverlaySelectionToEngine();
+        }
+
+        private void UpdateEditOverlay(EditorSessionUpdated update)
+        {
+            if (update == null)
+            {
+                return;
+            }
+            if (update.HasVisible && !update.Visible)
+            {
+                HideEditOverlay(false);
+                return;
+            }
+            if (!_editOverlayHost.Visible)
+            {
+                return;
+            }
+            if (update.ViewportRect != null)
+            {
+                int x = Math.Max(0, (int)Math.Round(update.ViewportRect.X));
+                int y = Math.Max(0, (int)Math.Round(update.ViewportRect.Y));
+                int w = Math.Max(1, (int)Math.Round(update.ViewportRect.Width));
+                int h = Math.Max(1, (int)Math.Round(update.ViewportRect.Height));
+                System.Windows.Forms.Padding editPadding = ResolveEditPadding != null
+                    ? ResolveEditPadding(_editOverlayRow, _editOverlayCol)
+                    : System.Windows.Forms.Padding.Empty;
+                editPadding = new System.Windows.Forms.Padding(
+                    Math.Max(0, editPadding.Left),
+                    Math.Max(0, editPadding.Top),
+                    Math.Max(0, editPadding.Right),
+                    Math.Max(0, editPadding.Bottom));
+                int innerW = Math.Max(1, w - editPadding.Left - editPadding.Right);
+                int innerH = Math.Max(1, h - editPadding.Top - editPadding.Bottom);
+                _editOverlayHost.Bounds = new Rectangle(x, y, w, h);
+                _editOverlay.Bounds = new Rectangle(editPadding.Left, editPadding.Top, innerW, innerH);
+            }
+            if (update.Value != null)
+            {
+                _suppressEditOverlayTextChanged = true;
+                try
+                {
+                    _editOverlay.Text = EditorValueToText(update.Value);
+                }
+                finally
+                {
+                    _suppressEditOverlayTextChanged = false;
+                }
+            }
+            if (update.Selection != null)
+            {
+                string text = _editOverlay.Text ?? string.Empty;
+                int start = ScalarIndexToCodeUnitIndex(text, update.Selection.Start);
+                int end = ScalarIndexToCodeUnitIndex(text, update.Selection.Start + update.Selection.Length);
+                start = Math.Max(0, Math.Min(text.Length, start));
+                end = Math.Max(start, Math.Min(text.Length, end));
+                _editOverlay.SelectionStart = start;
+                _editOverlay.SelectionLength = end - start;
+            }
         }
 
         private void EditOverlayHost_Paint(object sender, PaintEventArgs e)
@@ -2088,6 +2230,14 @@ namespace VolvoxGrid.DotNet.Internal
                     CommitEditOverlay((int)Keys.Tab, GetModifierBits(e));
                     return;
                 case Keys.Enter:
+                    if (e.Alt)
+                    {
+                        e.SuppressKeyPress = true;
+                        e.Handled = true;
+                        _editOverlay.SelectedText = "\n";
+                        SyncEditOverlaySelectionToEngine();
+                        return;
+                    }
                     e.SuppressKeyPress = true;
                     e.Handled = true;
                     CommitEditOverlay(e.Shift ? (int)Keys.Up : (int)Keys.Down, 0);
@@ -2096,6 +2246,10 @@ namespace VolvoxGrid.DotNet.Internal
                 case Keys.Right:
                 case Keys.Up:
                 case Keys.Down:
+                    if ((_editOverlay.Text ?? string.Empty).Contains("\n"))
+                    {
+                        break;
+                    }
                     if (_editOverlayUiMode != EditUiMode.EDIT_UI_MODE_EDIT)
                     {
                         e.SuppressKeyPress = true;
@@ -2124,6 +2278,67 @@ namespace VolvoxGrid.DotNet.Internal
                     }
                     break;
             }
+        }
+
+        private bool TryHandleClipboardShortcut(KeyEventArgs e)
+        {
+            if (e == null || _client == null || _gridId == 0 || !e.Control || e.Alt)
+            {
+                return false;
+            }
+
+            try
+            {
+                switch (e.KeyCode)
+                {
+                    case Keys.C:
+                    {
+                        ClipboardResponse response = _client.Clipboard(_gridId, "copy", null);
+                        SetSystemClipboardText(response != null ? response.Text : string.Empty);
+                        return true;
+                    }
+                    case Keys.X:
+                    {
+                        ClipboardResponse response = _client.Clipboard(_gridId, "cut", null);
+                        SetSystemClipboardText(response != null ? response.Text : string.Empty);
+                        RequestFrame();
+                        return true;
+                    }
+                    case Keys.V:
+                    {
+                        string text = GetSystemClipboardText();
+                        if (text != null)
+                        {
+                            _client.Clipboard(_gridId, "paste", text);
+                            RequestFrame();
+                        }
+                        return true;
+                    }
+                    default:
+                        return false;
+                }
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static void SetSystemClipboardText(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                System.Windows.Forms.Clipboard.Clear();
+                return;
+            }
+            System.Windows.Forms.Clipboard.SetText(text, TextDataFormat.UnicodeText);
+        }
+
+        private static string GetSystemClipboardText()
+        {
+            return System.Windows.Forms.Clipboard.ContainsText(TextDataFormat.UnicodeText)
+                ? System.Windows.Forms.Clipboard.GetText(TextDataFormat.UnicodeText)
+                : null;
         }
 
         private void EditOverlay_SelectionChanged(object sender, EventArgs e)

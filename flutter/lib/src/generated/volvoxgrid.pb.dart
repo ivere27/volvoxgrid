@@ -1304,6 +1304,95 @@ class CellRange extends $pb.GeneratedMessage {
   void clearCol2() => $_clearField(4);
 }
 
+class Rect extends $pb.GeneratedMessage {
+  factory Rect({
+    $core.double? x,
+    $core.double? y,
+    $core.double? width,
+    $core.double? height,
+  }) {
+    final result = create();
+    if (x != null) result.x = x;
+    if (y != null) result.y = y;
+    if (width != null) result.width = width;
+    if (height != null) result.height = height;
+    return result;
+  }
+
+  Rect._();
+
+  factory Rect.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory Rect.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'Rect',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aD(1, _omitFieldNames ? '' : 'x', fieldType: $pb.PbFieldType.OF)
+    ..aD(2, _omitFieldNames ? '' : 'y', fieldType: $pb.PbFieldType.OF)
+    ..aD(3, _omitFieldNames ? '' : 'width', fieldType: $pb.PbFieldType.OF)
+    ..aD(4, _omitFieldNames ? '' : 'height', fieldType: $pb.PbFieldType.OF)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Rect clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Rect copyWith(void Function(Rect) updates) =>
+      super.copyWith((message) => updates(message as Rect)) as Rect;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static Rect create() => Rect._();
+  @$core.override
+  Rect createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static Rect getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<Rect>(create);
+  static Rect? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.double get x => $_getN(0);
+  @$pb.TagNumber(1)
+  set x($core.double value) => $_setFloat(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasX() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearX() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.double get y => $_getN(1);
+  @$pb.TagNumber(2)
+  set y($core.double value) => $_setFloat(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasY() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearY() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.double get width => $_getN(2);
+  @$pb.TagNumber(3)
+  set width($core.double value) => $_setFloat(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasWidth() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearWidth() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.double get height => $_getN(3);
+  @$pb.TagNumber(4)
+  set height($core.double value) => $_setFloat(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasHeight() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearHeight() => $_clearField(4);
+}
+
 enum CellValue_Value { text, number, flag, raw, timestamp, notSet }
 
 /// Typed cell value. Maps to CellValueData in engine/src/cell.rs:
@@ -1433,6 +1522,243 @@ class CellValue extends $pb.GeneratedMessage {
   $core.bool hasTimestamp() => $_has(4);
   @$pb.TagNumber(5)
   void clearTimestamp() => $_clearField(5);
+}
+
+class StructValue extends $pb.GeneratedMessage {
+  factory StructValue({
+    $core.Iterable<StructField>? fields,
+  }) {
+    final result = create();
+    if (fields != null) result.fields.addAll(fields);
+    return result;
+  }
+
+  StructValue._();
+
+  factory StructValue.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory StructValue.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'StructValue',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..pPM<StructField>(1, _omitFieldNames ? '' : 'fields',
+        subBuilder: StructField.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  StructValue clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  StructValue copyWith(void Function(StructValue) updates) =>
+      super.copyWith((message) => updates(message as StructValue))
+          as StructValue;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static StructValue create() => StructValue._();
+  @$core.override
+  StructValue createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static StructValue getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<StructValue>(create);
+  static StructValue? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<StructField> get fields => $_getList(0);
+}
+
+class StructField extends $pb.GeneratedMessage {
+  factory StructField({
+    $core.String? key,
+    ScalarValue? value,
+  }) {
+    final result = create();
+    if (key != null) result.key = key;
+    if (value != null) result.value = value;
+    return result;
+  }
+
+  StructField._();
+
+  factory StructField.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory StructField.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'StructField',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'key')
+    ..aOM<ScalarValue>(2, _omitFieldNames ? '' : 'value',
+        subBuilder: ScalarValue.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  StructField clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  StructField copyWith(void Function(StructField) updates) =>
+      super.copyWith((message) => updates(message as StructField))
+          as StructField;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static StructField create() => StructField._();
+  @$core.override
+  StructField createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static StructField getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<StructField>(create);
+  static StructField? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get key => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set key($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasKey() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearKey() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  ScalarValue get value => $_getN(1);
+  @$pb.TagNumber(2)
+  set value(ScalarValue value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasValue() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearValue() => $_clearField(2);
+  @$pb.TagNumber(2)
+  ScalarValue ensureValue() => $_ensure(1);
+}
+
+enum ScalarValue_Value {
+  stringValue,
+  numberValue,
+  boolValue,
+  bytesValue,
+  notSet
+}
+
+class ScalarValue extends $pb.GeneratedMessage {
+  factory ScalarValue({
+    $core.String? stringValue,
+    $core.double? numberValue,
+    $core.bool? boolValue,
+    $core.List<$core.int>? bytesValue,
+  }) {
+    final result = create();
+    if (stringValue != null) result.stringValue = stringValue;
+    if (numberValue != null) result.numberValue = numberValue;
+    if (boolValue != null) result.boolValue = boolValue;
+    if (bytesValue != null) result.bytesValue = bytesValue;
+    return result;
+  }
+
+  ScalarValue._();
+
+  factory ScalarValue.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ScalarValue.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static const $core.Map<$core.int, ScalarValue_Value> _ScalarValue_ValueByTag =
+      {
+    1: ScalarValue_Value.stringValue,
+    2: ScalarValue_Value.numberValue,
+    3: ScalarValue_Value.boolValue,
+    4: ScalarValue_Value.bytesValue,
+    0: ScalarValue_Value.notSet
+  };
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ScalarValue',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..oo(0, [1, 2, 3, 4])
+    ..aOS(1, _omitFieldNames ? '' : 'stringValue')
+    ..aD(2, _omitFieldNames ? '' : 'numberValue')
+    ..aOB(3, _omitFieldNames ? '' : 'boolValue')
+    ..a<$core.List<$core.int>>(
+        4, _omitFieldNames ? '' : 'bytesValue', $pb.PbFieldType.OY)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ScalarValue clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ScalarValue copyWith(void Function(ScalarValue) updates) =>
+      super.copyWith((message) => updates(message as ScalarValue))
+          as ScalarValue;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ScalarValue create() => ScalarValue._();
+  @$core.override
+  ScalarValue createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ScalarValue getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ScalarValue>(create);
+  static ScalarValue? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  @$pb.TagNumber(2)
+  @$pb.TagNumber(3)
+  @$pb.TagNumber(4)
+  ScalarValue_Value whichValue() => _ScalarValue_ValueByTag[$_whichOneof(0)]!;
+  @$pb.TagNumber(1)
+  @$pb.TagNumber(2)
+  @$pb.TagNumber(3)
+  @$pb.TagNumber(4)
+  void clearValue() => $_clearField($_whichOneof(0));
+
+  @$pb.TagNumber(1)
+  $core.String get stringValue => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set stringValue($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasStringValue() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearStringValue() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.double get numberValue => $_getN(1);
+  @$pb.TagNumber(2)
+  set numberValue($core.double value) => $_setDouble(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasNumberValue() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearNumberValue() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.bool get boolValue => $_getBF(2);
+  @$pb.TagNumber(3)
+  set boolValue($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasBoolValue() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearBoolValue() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.List<$core.int> get bytesValue => $_getN(3);
+  @$pb.TagNumber(4)
+  set bytesValue($core.List<$core.int> value) => $_setBytes(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasBytesValue() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearBytesValue() => $_clearField(4);
 }
 
 class RichText extends $pb.GeneratedMessage {
@@ -1647,83 +1973,763 @@ class TextRunStyle extends $pb.GeneratedMessage {
   void clearLinkUrl() => $_clearField(4);
 }
 
-class Dropdown extends $pb.GeneratedMessage {
-  factory Dropdown({
-    $core.Iterable<DropdownItem>? items,
-    $core.bool? allowCustomValue,
-    DropdownItemLayout? itemLayout,
-    $core.bool? searchable,
+class EditorSpec extends $pb.GeneratedMessage {
+  factory EditorSpec({
+    EditorKind? kind,
+    EditorOwner? owner,
+    EditorPresentation? presentation,
+    ValidationMode? validationMode,
+    ValidationTrigger? validationTrigger,
+    $core.int? validationDebounceMs,
+    $core.String? customEditorId,
+    TextEditorParams? text,
+    NumberEditorParams? number,
+    CheckboxEditorParams? checkbox,
+    ListEditorParams? list,
+    DateTimeEditorParams? dateTime,
+    $core.Iterable<EditorAction>? actions,
+    StructValue? customProps,
   }) {
     final result = create();
-    if (items != null) result.items.addAll(items);
-    if (allowCustomValue != null) result.allowCustomValue = allowCustomValue;
-    if (itemLayout != null) result.itemLayout = itemLayout;
-    if (searchable != null) result.searchable = searchable;
+    if (kind != null) result.kind = kind;
+    if (owner != null) result.owner = owner;
+    if (presentation != null) result.presentation = presentation;
+    if (validationMode != null) result.validationMode = validationMode;
+    if (validationTrigger != null) result.validationTrigger = validationTrigger;
+    if (validationDebounceMs != null)
+      result.validationDebounceMs = validationDebounceMs;
+    if (customEditorId != null) result.customEditorId = customEditorId;
+    if (text != null) result.text = text;
+    if (number != null) result.number = number;
+    if (checkbox != null) result.checkbox = checkbox;
+    if (list != null) result.list = list;
+    if (dateTime != null) result.dateTime = dateTime;
+    if (actions != null) result.actions.addAll(actions);
+    if (customProps != null) result.customProps = customProps;
     return result;
   }
 
-  Dropdown._();
+  EditorSpec._();
 
-  factory Dropdown.fromBuffer($core.List<$core.int> data,
+  factory EditorSpec.fromBuffer($core.List<$core.int> data,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromBuffer(data, registry);
-  factory Dropdown.fromJson($core.String json,
+  factory EditorSpec.fromJson($core.String json,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromJson(json, registry);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'Dropdown',
+      _omitMessageNames ? '' : 'EditorSpec',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
-    ..pPM<DropdownItem>(1, _omitFieldNames ? '' : 'items',
-        subBuilder: DropdownItem.create)
-    ..aOB(2, _omitFieldNames ? '' : 'allowCustomValue')
-    ..aE<DropdownItemLayout>(3, _omitFieldNames ? '' : 'itemLayout',
-        enumValues: DropdownItemLayout.values)
-    ..aOB(4, _omitFieldNames ? '' : 'searchable')
+    ..aE<EditorKind>(1, _omitFieldNames ? '' : 'kind',
+        enumValues: EditorKind.values)
+    ..aE<EditorOwner>(2, _omitFieldNames ? '' : 'owner',
+        enumValues: EditorOwner.values)
+    ..aE<EditorPresentation>(3, _omitFieldNames ? '' : 'presentation',
+        enumValues: EditorPresentation.values)
+    ..aE<ValidationMode>(4, _omitFieldNames ? '' : 'validationMode',
+        enumValues: ValidationMode.values)
+    ..aE<ValidationTrigger>(5, _omitFieldNames ? '' : 'validationTrigger',
+        enumValues: ValidationTrigger.values)
+    ..aI(6, _omitFieldNames ? '' : 'validationDebounceMs')
+    ..aOS(10, _omitFieldNames ? '' : 'customEditorId')
+    ..aOM<TextEditorParams>(11, _omitFieldNames ? '' : 'text',
+        subBuilder: TextEditorParams.create)
+    ..aOM<NumberEditorParams>(12, _omitFieldNames ? '' : 'number',
+        subBuilder: NumberEditorParams.create)
+    ..aOM<CheckboxEditorParams>(13, _omitFieldNames ? '' : 'checkbox',
+        subBuilder: CheckboxEditorParams.create)
+    ..aOM<ListEditorParams>(14, _omitFieldNames ? '' : 'list',
+        subBuilder: ListEditorParams.create)
+    ..aOM<DateTimeEditorParams>(15, _omitFieldNames ? '' : 'dateTime',
+        subBuilder: DateTimeEditorParams.create)
+    ..pPM<EditorAction>(16, _omitFieldNames ? '' : 'actions',
+        subBuilder: EditorAction.create)
+    ..aOM<StructValue>(17, _omitFieldNames ? '' : 'customProps',
+        subBuilder: StructValue.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  Dropdown clone() => deepCopy();
+  EditorSpec clone() => deepCopy();
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  Dropdown copyWith(void Function(Dropdown) updates) =>
-      super.copyWith((message) => updates(message as Dropdown)) as Dropdown;
+  EditorSpec copyWith(void Function(EditorSpec) updates) =>
+      super.copyWith((message) => updates(message as EditorSpec)) as EditorSpec;
 
   @$core.override
   $pb.BuilderInfo get info_ => _i;
 
   @$core.pragma('dart2js:noInline')
-  static Dropdown create() => Dropdown._();
+  static EditorSpec create() => EditorSpec._();
   @$core.override
-  Dropdown createEmptyInstance() => create();
+  EditorSpec createEmptyInstance() => create();
   @$core.pragma('dart2js:noInline')
-  static Dropdown getDefault() =>
-      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<Dropdown>(create);
-  static Dropdown? _defaultInstance;
+  static EditorSpec getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<EditorSpec>(create);
+  static EditorSpec? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $pb.PbList<DropdownItem> get items => $_getList(0);
+  EditorKind get kind => $_getN(0);
+  @$pb.TagNumber(1)
+  set kind(EditorKind value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasKind() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearKind() => $_clearField(1);
 
-  /// When true, the user may type/commit a value not present in `items`.
   @$pb.TagNumber(2)
-  $core.bool get allowCustomValue => $_getBF(1);
+  EditorOwner get owner => $_getN(1);
   @$pb.TagNumber(2)
-  set allowCustomValue($core.bool value) => $_setBool(1, value);
+  set owner(EditorOwner value) => $_setField(2, value);
   @$pb.TagNumber(2)
-  $core.bool hasAllowCustomValue() => $_has(1);
+  $core.bool hasOwner() => $_has(1);
   @$pb.TagNumber(2)
-  void clearAllowCustomValue() => $_clearField(2);
+  void clearOwner() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  DropdownItemLayout get itemLayout => $_getN(2);
+  EditorPresentation get presentation => $_getN(2);
   @$pb.TagNumber(3)
-  set itemLayout(DropdownItemLayout value) => $_setField(3, value);
+  set presentation(EditorPresentation value) => $_setField(3, value);
   @$pb.TagNumber(3)
-  $core.bool hasItemLayout() => $_has(2);
+  $core.bool hasPresentation() => $_has(2);
   @$pb.TagNumber(3)
-  void clearItemLayout() => $_clearField(3);
+  void clearPresentation() => $_clearField(3);
 
-  /// Unset = use grid/global default; false/true override for this dropdown.
+  @$pb.TagNumber(4)
+  ValidationMode get validationMode => $_getN(3);
+  @$pb.TagNumber(4)
+  set validationMode(ValidationMode value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasValidationMode() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearValidationMode() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  ValidationTrigger get validationTrigger => $_getN(4);
+  @$pb.TagNumber(5)
+  set validationTrigger(ValidationTrigger value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasValidationTrigger() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearValidationTrigger() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.int get validationDebounceMs => $_getIZ(5);
+  @$pb.TagNumber(6)
+  set validationDebounceMs($core.int value) => $_setSignedInt32(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasValidationDebounceMs() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearValidationDebounceMs() => $_clearField(6);
+
+  @$pb.TagNumber(10)
+  $core.String get customEditorId => $_getSZ(6);
+  @$pb.TagNumber(10)
+  set customEditorId($core.String value) => $_setString(6, value);
+  @$pb.TagNumber(10)
+  $core.bool hasCustomEditorId() => $_has(6);
+  @$pb.TagNumber(10)
+  void clearCustomEditorId() => $_clearField(10);
+
+  @$pb.TagNumber(11)
+  TextEditorParams get text => $_getN(7);
+  @$pb.TagNumber(11)
+  set text(TextEditorParams value) => $_setField(11, value);
+  @$pb.TagNumber(11)
+  $core.bool hasText() => $_has(7);
+  @$pb.TagNumber(11)
+  void clearText() => $_clearField(11);
+  @$pb.TagNumber(11)
+  TextEditorParams ensureText() => $_ensure(7);
+
+  @$pb.TagNumber(12)
+  NumberEditorParams get number => $_getN(8);
+  @$pb.TagNumber(12)
+  set number(NumberEditorParams value) => $_setField(12, value);
+  @$pb.TagNumber(12)
+  $core.bool hasNumber() => $_has(8);
+  @$pb.TagNumber(12)
+  void clearNumber() => $_clearField(12);
+  @$pb.TagNumber(12)
+  NumberEditorParams ensureNumber() => $_ensure(8);
+
+  @$pb.TagNumber(13)
+  CheckboxEditorParams get checkbox => $_getN(9);
+  @$pb.TagNumber(13)
+  set checkbox(CheckboxEditorParams value) => $_setField(13, value);
+  @$pb.TagNumber(13)
+  $core.bool hasCheckbox() => $_has(9);
+  @$pb.TagNumber(13)
+  void clearCheckbox() => $_clearField(13);
+  @$pb.TagNumber(13)
+  CheckboxEditorParams ensureCheckbox() => $_ensure(9);
+
+  @$pb.TagNumber(14)
+  ListEditorParams get list => $_getN(10);
+  @$pb.TagNumber(14)
+  set list(ListEditorParams value) => $_setField(14, value);
+  @$pb.TagNumber(14)
+  $core.bool hasList() => $_has(10);
+  @$pb.TagNumber(14)
+  void clearList() => $_clearField(14);
+  @$pb.TagNumber(14)
+  ListEditorParams ensureList() => $_ensure(10);
+
+  @$pb.TagNumber(15)
+  DateTimeEditorParams get dateTime => $_getN(11);
+  @$pb.TagNumber(15)
+  set dateTime(DateTimeEditorParams value) => $_setField(15, value);
+  @$pb.TagNumber(15)
+  $core.bool hasDateTime() => $_has(11);
+  @$pb.TagNumber(15)
+  void clearDateTime() => $_clearField(15);
+  @$pb.TagNumber(15)
+  DateTimeEditorParams ensureDateTime() => $_ensure(11);
+
+  @$pb.TagNumber(16)
+  $pb.PbList<EditorAction> get actions => $_getList(12);
+
+  @$pb.TagNumber(17)
+  StructValue get customProps => $_getN(13);
+  @$pb.TagNumber(17)
+  set customProps(StructValue value) => $_setField(17, value);
+  @$pb.TagNumber(17)
+  $core.bool hasCustomProps() => $_has(13);
+  @$pb.TagNumber(17)
+  void clearCustomProps() => $_clearField(17);
+  @$pb.TagNumber(17)
+  StructValue ensureCustomProps() => $_ensure(13);
+}
+
+class TextEditorParams extends $pb.GeneratedMessage {
+  factory TextEditorParams({
+    $core.int? maxLength,
+    $core.String? mask,
+    $core.bool? allowNewlines,
+    InputType? inputType,
+  }) {
+    final result = create();
+    if (maxLength != null) result.maxLength = maxLength;
+    if (mask != null) result.mask = mask;
+    if (allowNewlines != null) result.allowNewlines = allowNewlines;
+    if (inputType != null) result.inputType = inputType;
+    return result;
+  }
+
+  TextEditorParams._();
+
+  factory TextEditorParams.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory TextEditorParams.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TextEditorParams',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'maxLength')
+    ..aOS(2, _omitFieldNames ? '' : 'mask')
+    ..aOB(3, _omitFieldNames ? '' : 'allowNewlines')
+    ..aE<InputType>(4, _omitFieldNames ? '' : 'inputType',
+        enumValues: InputType.values)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TextEditorParams clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TextEditorParams copyWith(void Function(TextEditorParams) updates) =>
+      super.copyWith((message) => updates(message as TextEditorParams))
+          as TextEditorParams;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static TextEditorParams create() => TextEditorParams._();
+  @$core.override
+  TextEditorParams createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static TextEditorParams getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TextEditorParams>(create);
+  static TextEditorParams? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get maxLength => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set maxLength($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasMaxLength() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearMaxLength() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get mask => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set mask($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasMask() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearMask() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.bool get allowNewlines => $_getBF(2);
+  @$pb.TagNumber(3)
+  set allowNewlines($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasAllowNewlines() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearAllowNewlines() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  InputType get inputType => $_getN(3);
+  @$pb.TagNumber(4)
+  set inputType(InputType value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasInputType() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearInputType() => $_clearField(4);
+}
+
+class NumberEditorParams extends $pb.GeneratedMessage {
+  factory NumberEditorParams({
+    $core.double? min,
+    $core.double? max,
+    $core.double? step,
+    $core.String? format,
+    $core.bool? nullable,
+  }) {
+    final result = create();
+    if (min != null) result.min = min;
+    if (max != null) result.max = max;
+    if (step != null) result.step = step;
+    if (format != null) result.format = format;
+    if (nullable != null) result.nullable = nullable;
+    return result;
+  }
+
+  NumberEditorParams._();
+
+  factory NumberEditorParams.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory NumberEditorParams.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'NumberEditorParams',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aD(1, _omitFieldNames ? '' : 'min')
+    ..aD(2, _omitFieldNames ? '' : 'max')
+    ..aD(3, _omitFieldNames ? '' : 'step')
+    ..aOS(4, _omitFieldNames ? '' : 'format')
+    ..aOB(5, _omitFieldNames ? '' : 'nullable')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  NumberEditorParams clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  NumberEditorParams copyWith(void Function(NumberEditorParams) updates) =>
+      super.copyWith((message) => updates(message as NumberEditorParams))
+          as NumberEditorParams;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static NumberEditorParams create() => NumberEditorParams._();
+  @$core.override
+  NumberEditorParams createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static NumberEditorParams getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<NumberEditorParams>(create);
+  static NumberEditorParams? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.double get min => $_getN(0);
+  @$pb.TagNumber(1)
+  set min($core.double value) => $_setDouble(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasMin() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearMin() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.double get max => $_getN(1);
+  @$pb.TagNumber(2)
+  set max($core.double value) => $_setDouble(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasMax() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearMax() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.double get step => $_getN(2);
+  @$pb.TagNumber(3)
+  set step($core.double value) => $_setDouble(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasStep() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearStep() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get format => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set format($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasFormat() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearFormat() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.bool get nullable => $_getBF(4);
+  @$pb.TagNumber(5)
+  set nullable($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasNullable() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearNullable() => $_clearField(5);
+}
+
+class CheckboxEditorParams extends $pb.GeneratedMessage {
+  factory CheckboxEditorParams({
+    $core.bool? threeState,
+  }) {
+    final result = create();
+    if (threeState != null) result.threeState = threeState;
+    return result;
+  }
+
+  CheckboxEditorParams._();
+
+  factory CheckboxEditorParams.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory CheckboxEditorParams.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CheckboxEditorParams',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'threeState')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CheckboxEditorParams clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CheckboxEditorParams copyWith(void Function(CheckboxEditorParams) updates) =>
+      super.copyWith((message) => updates(message as CheckboxEditorParams))
+          as CheckboxEditorParams;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static CheckboxEditorParams create() => CheckboxEditorParams._();
+  @$core.override
+  CheckboxEditorParams createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static CheckboxEditorParams getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CheckboxEditorParams>(create);
+  static CheckboxEditorParams? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get threeState => $_getBF(0);
+  @$pb.TagNumber(1)
+  set threeState($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasThreeState() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearThreeState() => $_clearField(1);
+}
+
+class DateTimeEditorParams extends $pb.GeneratedMessage {
+  factory DateTimeEditorParams({
+    $core.String? format,
+    $fixnum.Int64? minTimestamp,
+    $fixnum.Int64? maxTimestamp,
+    $core.bool? dateOnly,
+    $core.bool? timeOnly,
+  }) {
+    final result = create();
+    if (format != null) result.format = format;
+    if (minTimestamp != null) result.minTimestamp = minTimestamp;
+    if (maxTimestamp != null) result.maxTimestamp = maxTimestamp;
+    if (dateOnly != null) result.dateOnly = dateOnly;
+    if (timeOnly != null) result.timeOnly = timeOnly;
+    return result;
+  }
+
+  DateTimeEditorParams._();
+
+  factory DateTimeEditorParams.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory DateTimeEditorParams.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DateTimeEditorParams',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'format')
+    ..aInt64(2, _omitFieldNames ? '' : 'minTimestamp')
+    ..aInt64(3, _omitFieldNames ? '' : 'maxTimestamp')
+    ..aOB(4, _omitFieldNames ? '' : 'dateOnly')
+    ..aOB(5, _omitFieldNames ? '' : 'timeOnly')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DateTimeEditorParams clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DateTimeEditorParams copyWith(void Function(DateTimeEditorParams) updates) =>
+      super.copyWith((message) => updates(message as DateTimeEditorParams))
+          as DateTimeEditorParams;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static DateTimeEditorParams create() => DateTimeEditorParams._();
+  @$core.override
+  DateTimeEditorParams createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static DateTimeEditorParams getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DateTimeEditorParams>(create);
+  static DateTimeEditorParams? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get format => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set format($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasFormat() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearFormat() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $fixnum.Int64 get minTimestamp => $_getI64(1);
+  @$pb.TagNumber(2)
+  set minTimestamp($fixnum.Int64 value) => $_setInt64(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasMinTimestamp() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearMinTimestamp() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $fixnum.Int64 get maxTimestamp => $_getI64(2);
+  @$pb.TagNumber(3)
+  set maxTimestamp($fixnum.Int64 value) => $_setInt64(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasMaxTimestamp() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearMaxTimestamp() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.bool get dateOnly => $_getBF(3);
+  @$pb.TagNumber(4)
+  set dateOnly($core.bool value) => $_setBool(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasDateOnly() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearDateOnly() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.bool get timeOnly => $_getBF(4);
+  @$pb.TagNumber(5)
+  set timeOnly($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasTimeOnly() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearTimeOnly() => $_clearField(5);
+}
+
+class EditorAction extends $pb.GeneratedMessage {
+  factory EditorAction({
+    $core.String? actionId,
+    $core.String? label,
+    ButtonRole? role,
+    ImageData? icon,
+  }) {
+    final result = create();
+    if (actionId != null) result.actionId = actionId;
+    if (label != null) result.label = label;
+    if (role != null) result.role = role;
+    if (icon != null) result.icon = icon;
+    return result;
+  }
+
+  EditorAction._();
+
+  factory EditorAction.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory EditorAction.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'EditorAction',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'actionId')
+    ..aOS(2, _omitFieldNames ? '' : 'label')
+    ..aE<ButtonRole>(3, _omitFieldNames ? '' : 'role',
+        enumValues: ButtonRole.values)
+    ..aOM<ImageData>(4, _omitFieldNames ? '' : 'icon',
+        subBuilder: ImageData.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EditorAction clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EditorAction copyWith(void Function(EditorAction) updates) =>
+      super.copyWith((message) => updates(message as EditorAction))
+          as EditorAction;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static EditorAction create() => EditorAction._();
+  @$core.override
+  EditorAction createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static EditorAction getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<EditorAction>(create);
+  static EditorAction? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get actionId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set actionId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasActionId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearActionId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get label => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set label($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasLabel() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearLabel() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  ButtonRole get role => $_getN(2);
+  @$pb.TagNumber(3)
+  set role(ButtonRole value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasRole() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearRole() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  ImageData get icon => $_getN(3);
+  @$pb.TagNumber(4)
+  set icon(ImageData value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasIcon() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearIcon() => $_clearField(4);
+  @$pb.TagNumber(4)
+  ImageData ensureIcon() => $_ensure(3);
+}
+
+class ListEditorParams extends $pb.GeneratedMessage {
+  factory ListEditorParams({
+    $core.Iterable<ListItem>? staticItems,
+    ListDataSource? dataSource,
+    $core.bool? allowCustomValue,
+    $core.bool? searchable,
+    $core.bool? multiSelect,
+    DropdownItemLayout? itemLayout,
+  }) {
+    final result = create();
+    if (staticItems != null) result.staticItems.addAll(staticItems);
+    if (dataSource != null) result.dataSource = dataSource;
+    if (allowCustomValue != null) result.allowCustomValue = allowCustomValue;
+    if (searchable != null) result.searchable = searchable;
+    if (multiSelect != null) result.multiSelect = multiSelect;
+    if (itemLayout != null) result.itemLayout = itemLayout;
+    return result;
+  }
+
+  ListEditorParams._();
+
+  factory ListEditorParams.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ListEditorParams.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListEditorParams',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..pPM<ListItem>(1, _omitFieldNames ? '' : 'staticItems',
+        subBuilder: ListItem.create)
+    ..aOM<ListDataSource>(2, _omitFieldNames ? '' : 'dataSource',
+        subBuilder: ListDataSource.create)
+    ..aOB(3, _omitFieldNames ? '' : 'allowCustomValue')
+    ..aOB(4, _omitFieldNames ? '' : 'searchable')
+    ..aOB(5, _omitFieldNames ? '' : 'multiSelect')
+    ..aE<DropdownItemLayout>(6, _omitFieldNames ? '' : 'itemLayout',
+        enumValues: DropdownItemLayout.values)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListEditorParams clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListEditorParams copyWith(void Function(ListEditorParams) updates) =>
+      super.copyWith((message) => updates(message as ListEditorParams))
+          as ListEditorParams;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ListEditorParams create() => ListEditorParams._();
+  @$core.override
+  ListEditorParams createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ListEditorParams getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ListEditorParams>(create);
+  static ListEditorParams? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<ListItem> get staticItems => $_getList(0);
+
+  @$pb.TagNumber(2)
+  ListDataSource get dataSource => $_getN(1);
+  @$pb.TagNumber(2)
+  set dataSource(ListDataSource value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasDataSource() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearDataSource() => $_clearField(2);
+  @$pb.TagNumber(2)
+  ListDataSource ensureDataSource() => $_ensure(1);
+
+  /// false => EDITOR_SELECT/read-only list; true => EDITOR_COMBO/editable dropdown.
+  @$pb.TagNumber(3)
+  $core.bool get allowCustomValue => $_getBF(2);
+  @$pb.TagNumber(3)
+  set allowCustomValue($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasAllowCustomValue() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearAllowCustomValue() => $_clearField(3);
+
   @$pb.TagNumber(4)
   $core.bool get searchable => $_getBF(3);
   @$pb.TagNumber(4)
@@ -1732,11 +2738,29 @@ class Dropdown extends $pb.GeneratedMessage {
   $core.bool hasSearchable() => $_has(3);
   @$pb.TagNumber(4)
   void clearSearchable() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.bool get multiSelect => $_getBF(4);
+  @$pb.TagNumber(5)
+  set multiSelect($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasMultiSelect() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearMultiSelect() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  DropdownItemLayout get itemLayout => $_getN(5);
+  @$pb.TagNumber(6)
+  set itemLayout(DropdownItemLayout value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasItemLayout() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearItemLayout() => $_clearField(6);
 }
 
-class DropdownItem extends $pb.GeneratedMessage {
-  factory DropdownItem({
-    $core.String? value,
+class ListItem extends $pb.GeneratedMessage {
+  factory ListItem({
+    CellValue? value,
     $core.String? label,
     $core.Iterable<$core.String>? details,
     $core.bool? disabled,
@@ -1749,55 +2773,55 @@ class DropdownItem extends $pb.GeneratedMessage {
     return result;
   }
 
-  DropdownItem._();
+  ListItem._();
 
-  factory DropdownItem.fromBuffer($core.List<$core.int> data,
+  factory ListItem.fromBuffer($core.List<$core.int> data,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromBuffer(data, registry);
-  factory DropdownItem.fromJson($core.String json,
+  factory ListItem.fromJson($core.String json,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromJson(json, registry);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'DropdownItem',
+      _omitMessageNames ? '' : 'ListItem',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'value')
+    ..aOM<CellValue>(1, _omitFieldNames ? '' : 'value',
+        subBuilder: CellValue.create)
     ..aOS(2, _omitFieldNames ? '' : 'label')
     ..pPS(3, _omitFieldNames ? '' : 'details')
     ..aOB(4, _omitFieldNames ? '' : 'disabled')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  DropdownItem clone() => deepCopy();
+  ListItem clone() => deepCopy();
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  DropdownItem copyWith(void Function(DropdownItem) updates) =>
-      super.copyWith((message) => updates(message as DropdownItem))
-          as DropdownItem;
+  ListItem copyWith(void Function(ListItem) updates) =>
+      super.copyWith((message) => updates(message as ListItem)) as ListItem;
 
   @$core.override
   $pb.BuilderInfo get info_ => _i;
 
   @$core.pragma('dart2js:noInline')
-  static DropdownItem create() => DropdownItem._();
+  static ListItem create() => ListItem._();
   @$core.override
-  DropdownItem createEmptyInstance() => create();
+  ListItem createEmptyInstance() => create();
   @$core.pragma('dart2js:noInline')
-  static DropdownItem getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<DropdownItem>(create);
-  static DropdownItem? _defaultInstance;
+  static ListItem getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ListItem>(create);
+  static ListItem? _defaultInstance;
 
-  /// Value committed into the cell. If unset, commit `label`.
   @$pb.TagNumber(1)
-  $core.String get value => $_getSZ(0);
+  CellValue get value => $_getN(0);
   @$pb.TagNumber(1)
-  set value($core.String value) => $_setString(0, value);
+  set value(CellValue value) => $_setField(1, value);
   @$pb.TagNumber(1)
   $core.bool hasValue() => $_has(0);
   @$pb.TagNumber(1)
   void clearValue() => $_clearField(1);
+  @$pb.TagNumber(1)
+  CellValue ensureValue() => $_ensure(0);
 
-  /// Text shown to the user.
   @$pb.TagNumber(2)
   $core.String get label => $_getSZ(1);
   @$pb.TagNumber(2)
@@ -1807,7 +2831,6 @@ class DropdownItem extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearLabel() => $_clearField(2);
 
-  /// Optional secondary/detail strings for richer host layouts.
   @$pb.TagNumber(3)
   $pb.PbList<$core.String> get details => $_getList(2);
 
@@ -1819,6 +2842,438 @@ class DropdownItem extends $pb.GeneratedMessage {
   $core.bool hasDisabled() => $_has(3);
   @$pb.TagNumber(4)
   void clearDisabled() => $_clearField(4);
+}
+
+class ListDataSource extends $pb.GeneratedMessage {
+  factory ListDataSource({
+    $core.String? dataSourceId,
+    $core.bool? filterable,
+    $core.bool? pageable,
+    $core.int? pageSize,
+  }) {
+    final result = create();
+    if (dataSourceId != null) result.dataSourceId = dataSourceId;
+    if (filterable != null) result.filterable = filterable;
+    if (pageable != null) result.pageable = pageable;
+    if (pageSize != null) result.pageSize = pageSize;
+    return result;
+  }
+
+  ListDataSource._();
+
+  factory ListDataSource.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ListDataSource.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListDataSource',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'dataSourceId')
+    ..aOB(2, _omitFieldNames ? '' : 'filterable')
+    ..aOB(3, _omitFieldNames ? '' : 'pageable')
+    ..aI(4, _omitFieldNames ? '' : 'pageSize')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListDataSource clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListDataSource copyWith(void Function(ListDataSource) updates) =>
+      super.copyWith((message) => updates(message as ListDataSource))
+          as ListDataSource;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ListDataSource create() => ListDataSource._();
+  @$core.override
+  ListDataSource createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ListDataSource getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ListDataSource>(create);
+  static ListDataSource? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get dataSourceId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set dataSourceId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasDataSourceId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearDataSourceId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.bool get filterable => $_getBF(1);
+  @$pb.TagNumber(2)
+  set filterable($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasFilterable() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearFilterable() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.bool get pageable => $_getBF(2);
+  @$pb.TagNumber(3)
+  set pageable($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasPageable() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearPageable() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get pageSize => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set pageSize($core.int value) => $_setSignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasPageSize() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearPageSize() => $_clearField(4);
+}
+
+class EditorValue extends $pb.GeneratedMessage {
+  factory EditorValue({
+    CellValue? value,
+    $core.String? editText,
+    $core.String? displayText,
+  }) {
+    final result = create();
+    if (value != null) result.value = value;
+    if (editText != null) result.editText = editText;
+    if (displayText != null) result.displayText = displayText;
+    return result;
+  }
+
+  EditorValue._();
+
+  factory EditorValue.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory EditorValue.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'EditorValue',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOM<CellValue>(1, _omitFieldNames ? '' : 'value',
+        subBuilder: CellValue.create)
+    ..aOS(2, _omitFieldNames ? '' : 'editText')
+    ..aOS(3, _omitFieldNames ? '' : 'displayText')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EditorValue clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EditorValue copyWith(void Function(EditorValue) updates) =>
+      super.copyWith((message) => updates(message as EditorValue))
+          as EditorValue;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static EditorValue create() => EditorValue._();
+  @$core.override
+  EditorValue createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static EditorValue getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<EditorValue>(create);
+  static EditorValue? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  CellValue get value => $_getN(0);
+  @$pb.TagNumber(1)
+  set value(CellValue value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasValue() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearValue() => $_clearField(1);
+  @$pb.TagNumber(1)
+  CellValue ensureValue() => $_ensure(0);
+
+  @$pb.TagNumber(2)
+  $core.String get editText => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set editText($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasEditText() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearEditText() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get displayText => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set displayText($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasDisplayText() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearDisplayText() => $_clearField(3);
+}
+
+class TextSelection extends $pb.GeneratedMessage {
+  factory TextSelection({
+    $core.int? start,
+    $core.int? length,
+  }) {
+    final result = create();
+    if (start != null) result.start = start;
+    if (length != null) result.length = length;
+    return result;
+  }
+
+  TextSelection._();
+
+  factory TextSelection.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory TextSelection.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TextSelection',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'start')
+    ..aI(2, _omitFieldNames ? '' : 'length')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TextSelection clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TextSelection copyWith(void Function(TextSelection) updates) =>
+      super.copyWith((message) => updates(message as TextSelection))
+          as TextSelection;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static TextSelection create() => TextSelection._();
+  @$core.override
+  TextSelection createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static TextSelection getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TextSelection>(create);
+  static TextSelection? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get start => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set start($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasStart() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearStart() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get length => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set length($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasLength() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearLength() => $_clearField(2);
+}
+
+class ValidationError extends $pb.GeneratedMessage {
+  factory ValidationError({
+    $core.String? code,
+    $core.String? message,
+    $core.bool? blocking,
+  }) {
+    final result = create();
+    if (code != null) result.code = code;
+    if (message != null) result.message = message;
+    if (blocking != null) result.blocking = blocking;
+    return result;
+  }
+
+  ValidationError._();
+
+  factory ValidationError.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ValidationError.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ValidationError',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'code')
+    ..aOS(2, _omitFieldNames ? '' : 'message')
+    ..aOB(3, _omitFieldNames ? '' : 'blocking')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ValidationError clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ValidationError copyWith(void Function(ValidationError) updates) =>
+      super.copyWith((message) => updates(message as ValidationError))
+          as ValidationError;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ValidationError create() => ValidationError._();
+  @$core.override
+  ValidationError createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ValidationError getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ValidationError>(create);
+  static ValidationError? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get code => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set code($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasCode() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearCode() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get message => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set message($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasMessage() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearMessage() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.bool get blocking => $_getBF(2);
+  @$pb.TagNumber(3)
+  set blocking($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasBlocking() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearBlocking() => $_clearField(3);
+}
+
+class EditActivation extends $pb.GeneratedMessage {
+  factory EditActivation({
+    EditTrigger? trigger,
+    TabBehavior? tabBehavior,
+    $core.bool? singleClickEdit,
+    $core.bool? suppressClickEdit,
+    $core.bool? commitOnFocusLost,
+    $core.bool? preserveEditOnNavigation,
+  }) {
+    final result = create();
+    if (trigger != null) result.trigger = trigger;
+    if (tabBehavior != null) result.tabBehavior = tabBehavior;
+    if (singleClickEdit != null) result.singleClickEdit = singleClickEdit;
+    if (suppressClickEdit != null) result.suppressClickEdit = suppressClickEdit;
+    if (commitOnFocusLost != null) result.commitOnFocusLost = commitOnFocusLost;
+    if (preserveEditOnNavigation != null)
+      result.preserveEditOnNavigation = preserveEditOnNavigation;
+    return result;
+  }
+
+  EditActivation._();
+
+  factory EditActivation.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory EditActivation.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'EditActivation',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aE<EditTrigger>(1, _omitFieldNames ? '' : 'trigger',
+        enumValues: EditTrigger.values)
+    ..aE<TabBehavior>(2, _omitFieldNames ? '' : 'tabBehavior',
+        enumValues: TabBehavior.values)
+    ..aOB(3, _omitFieldNames ? '' : 'singleClickEdit')
+    ..aOB(4, _omitFieldNames ? '' : 'suppressClickEdit')
+    ..aOB(5, _omitFieldNames ? '' : 'commitOnFocusLost')
+    ..aOB(6, _omitFieldNames ? '' : 'preserveEditOnNavigation')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EditActivation clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EditActivation copyWith(void Function(EditActivation) updates) =>
+      super.copyWith((message) => updates(message as EditActivation))
+          as EditActivation;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static EditActivation create() => EditActivation._();
+  @$core.override
+  EditActivation createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static EditActivation getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<EditActivation>(create);
+  static EditActivation? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  EditTrigger get trigger => $_getN(0);
+  @$pb.TagNumber(1)
+  set trigger(EditTrigger value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasTrigger() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearTrigger() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  TabBehavior get tabBehavior => $_getN(1);
+  @$pb.TagNumber(2)
+  set tabBehavior(TabBehavior value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasTabBehavior() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearTabBehavior() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.bool get singleClickEdit => $_getBF(2);
+  @$pb.TagNumber(3)
+  set singleClickEdit($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasSingleClickEdit() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearSingleClickEdit() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.bool get suppressClickEdit => $_getBF(3);
+  @$pb.TagNumber(4)
+  set suppressClickEdit($core.bool value) => $_setBool(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasSuppressClickEdit() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearSuppressClickEdit() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.bool get commitOnFocusLost => $_getBF(4);
+  @$pb.TagNumber(5)
+  set commitOnFocusLost($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasCommitOnFocusLost() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearCommitOnFocusLost() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.bool get preserveEditOnNavigation => $_getBF(5);
+  @$pb.TagNumber(6)
+  set preserveEditOnNavigation($core.bool value) => $_setBool(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasPreserveEditOnNavigation() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearPreserveEditOnNavigation() => $_clearField(6);
 }
 
 class ScrollBarColors extends $pb.GeneratedMessage {
@@ -5012,36 +6467,18 @@ class SelectionConfig extends $pb.GeneratedMessage {
 }
 
 /// ── Editing ──
-/// The engine maintains a full edit state machine (engine/src/edit.rs).
-/// Two UI modes exist:
-///   EnterMode (default): Enter commits and moves cursor down.
-///     Character keys auto-replace cell content and start editing.
-///   EditMode (F2):       Caret placed at end. Escape cancels.
-///     Enter commits. Arrow keys move caret within text.
+/// Edit defaults used when a column/cell does not provide a more specific
+/// EditorSpec. Wrappers normally expose simpler high-level editor builders and
+/// keep owner/presentation policy internal.
 class EditConfig extends $pb.GeneratedMessage {
   factory EditConfig({
-    EditTrigger? trigger,
-    TabBehavior? tabBehavior,
-    DropdownTrigger? dropdownTrigger,
-    $core.bool? dropdownSearch,
-    $core.int? maxLength,
-    $core.String? mask,
-    $core.bool? hostKeyDispatch,
-    $core.bool? hostPointerDispatch,
-    $core.bool? engineCompose,
+    EditActivation? activation,
+    EditorSpec? defaultEditor,
     ComposeMethod? composeMethod,
   }) {
     final result = create();
-    if (trigger != null) result.trigger = trigger;
-    if (tabBehavior != null) result.tabBehavior = tabBehavior;
-    if (dropdownTrigger != null) result.dropdownTrigger = dropdownTrigger;
-    if (dropdownSearch != null) result.dropdownSearch = dropdownSearch;
-    if (maxLength != null) result.maxLength = maxLength;
-    if (mask != null) result.mask = mask;
-    if (hostKeyDispatch != null) result.hostKeyDispatch = hostKeyDispatch;
-    if (hostPointerDispatch != null)
-      result.hostPointerDispatch = hostPointerDispatch;
-    if (engineCompose != null) result.engineCompose = engineCompose;
+    if (activation != null) result.activation = activation;
+    if (defaultEditor != null) result.defaultEditor = defaultEditor;
     if (composeMethod != null) result.composeMethod = composeMethod;
     return result;
   }
@@ -5059,19 +6496,11 @@ class EditConfig extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'EditConfig',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
-    ..aE<EditTrigger>(1, _omitFieldNames ? '' : 'trigger',
-        enumValues: EditTrigger.values)
-    ..aE<TabBehavior>(2, _omitFieldNames ? '' : 'tabBehavior',
-        enumValues: TabBehavior.values)
-    ..aE<DropdownTrigger>(3, _omitFieldNames ? '' : 'dropdownTrigger',
-        enumValues: DropdownTrigger.values)
-    ..aOB(4, _omitFieldNames ? '' : 'dropdownSearch')
-    ..aI(5, _omitFieldNames ? '' : 'maxLength')
-    ..aOS(6, _omitFieldNames ? '' : 'mask')
-    ..aOB(7, _omitFieldNames ? '' : 'hostKeyDispatch')
-    ..aOB(8, _omitFieldNames ? '' : 'hostPointerDispatch')
-    ..aOB(9, _omitFieldNames ? '' : 'engineCompose')
-    ..aE<ComposeMethod>(10, _omitFieldNames ? '' : 'composeMethod',
+    ..aOM<EditActivation>(1, _omitFieldNames ? '' : 'activation',
+        subBuilder: EditActivation.create)
+    ..aOM<EditorSpec>(2, _omitFieldNames ? '' : 'defaultEditor',
+        subBuilder: EditorSpec.create)
+    ..aE<ComposeMethod>(3, _omitFieldNames ? '' : 'composeMethod',
         enumValues: ComposeMethod.values)
     ..hasRequiredFields = false;
 
@@ -5094,101 +6523,35 @@ class EditConfig extends $pb.GeneratedMessage {
   static EditConfig? _defaultInstance;
 
   @$pb.TagNumber(1)
-  EditTrigger get trigger => $_getN(0);
+  EditActivation get activation => $_getN(0);
   @$pb.TagNumber(1)
-  set trigger(EditTrigger value) => $_setField(1, value);
+  set activation(EditActivation value) => $_setField(1, value);
   @$pb.TagNumber(1)
-  $core.bool hasTrigger() => $_has(0);
+  $core.bool hasActivation() => $_has(0);
   @$pb.TagNumber(1)
-  void clearTrigger() => $_clearField(1);
+  void clearActivation() => $_clearField(1);
+  @$pb.TagNumber(1)
+  EditActivation ensureActivation() => $_ensure(0);
 
   @$pb.TagNumber(2)
-  TabBehavior get tabBehavior => $_getN(1);
+  EditorSpec get defaultEditor => $_getN(1);
   @$pb.TagNumber(2)
-  set tabBehavior(TabBehavior value) => $_setField(2, value);
+  set defaultEditor(EditorSpec value) => $_setField(2, value);
   @$pb.TagNumber(2)
-  $core.bool hasTabBehavior() => $_has(1);
+  $core.bool hasDefaultEditor() => $_has(1);
   @$pb.TagNumber(2)
-  void clearTabBehavior() => $_clearField(2);
+  void clearDefaultEditor() => $_clearField(2);
+  @$pb.TagNumber(2)
+  EditorSpec ensureDefaultEditor() => $_ensure(1);
 
   @$pb.TagNumber(3)
-  DropdownTrigger get dropdownTrigger => $_getN(2);
+  ComposeMethod get composeMethod => $_getN(2);
   @$pb.TagNumber(3)
-  set dropdownTrigger(DropdownTrigger value) => $_setField(3, value);
+  set composeMethod(ComposeMethod value) => $_setField(3, value);
   @$pb.TagNumber(3)
-  $core.bool hasDropdownTrigger() => $_has(2);
+  $core.bool hasComposeMethod() => $_has(2);
   @$pb.TagNumber(3)
-  void clearDropdownTrigger() => $_clearField(3);
-
-  /// When true, typing in a dropdown cell searches the list items.
-  @$pb.TagNumber(4)
-  $core.bool get dropdownSearch => $_getBF(3);
-  @$pb.TagNumber(4)
-  set dropdownSearch($core.bool value) => $_setBool(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasDropdownSearch() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearDropdownSearch() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $core.int get maxLength => $_getIZ(4);
-  @$pb.TagNumber(5)
-  set maxLength($core.int value) => $_setSignedInt32(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasMaxLength() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearMaxLength() => $_clearField(5);
-
-  @$pb.TagNumber(6)
-  $core.String get mask => $_getSZ(5);
-  @$pb.TagNumber(6)
-  set mask($core.String value) => $_setString(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasMask() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearMask() => $_clearField(6);
-
-  /// When true, the engine stops handling edit-action keys; the host
-  /// adapter drives editing via RPC (EditCommand) instead.
-  @$pb.TagNumber(7)
-  $core.bool get hostKeyDispatch => $_getBF(6);
-  @$pb.TagNumber(7)
-  set hostKeyDispatch($core.bool value) => $_setBool(6, value);
-  @$pb.TagNumber(7)
-  $core.bool hasHostKeyDispatch() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearHostKeyDispatch() => $_clearField(7);
-
-  /// When true, the engine stops handling pointer-driven selection/edit;
-  /// the host adapter drives via RPC.
-  @$pb.TagNumber(8)
-  $core.bool get hostPointerDispatch => $_getBF(7);
-  @$pb.TagNumber(8)
-  set hostPointerDispatch($core.bool value) => $_setBool(7, value);
-  @$pb.TagNumber(8)
-  $core.bool hasHostPointerDispatch() => $_has(7);
-  @$pb.TagNumber(8)
-  void clearHostPointerDispatch() => $_clearField(8);
-
-  /// Enables engine-side compose for platforms without a host IME.
-  @$pb.TagNumber(9)
-  $core.bool get engineCompose => $_getBF(8);
-  @$pb.TagNumber(9)
-  set engineCompose($core.bool value) => $_setBool(8, value);
-  @$pb.TagNumber(9)
-  $core.bool hasEngineCompose() => $_has(8);
-  @$pb.TagNumber(9)
-  void clearEngineCompose() => $_clearField(9);
-
-  /// Selects the active engine-side compose algorithm.
-  @$pb.TagNumber(10)
-  ComposeMethod get composeMethod => $_getN(9);
-  @$pb.TagNumber(10)
-  set composeMethod(ComposeMethod value) => $_setField(10, value);
-  @$pb.TagNumber(10)
-  $core.bool hasComposeMethod() => $_has(9);
-  @$pb.TagNumber(10)
-  void clearComposeMethod() => $_clearField(10);
+  void clearComposeMethod() => $_clearField(3);
 }
 
 class PullToRefreshConfig extends $pb.GeneratedMessage {
@@ -5504,15 +6867,15 @@ class OutlineConfig extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aE<TreeIndicatorStyle>(1, _omitFieldNames ? '' : 'treeIndicator',
         enumValues: TreeIndicatorStyle.values)
-    ..aI(3, _omitFieldNames ? '' : 'treeColor', fieldType: $pb.PbFieldType.OU3)
-    ..aE<GroupTotalPosition>(4, _omitFieldNames ? '' : 'groupTotalPosition',
+    ..aI(2, _omitFieldNames ? '' : 'treeColor', fieldType: $pb.PbFieldType.OU3)
+    ..aE<GroupTotalPosition>(3, _omitFieldNames ? '' : 'groupTotalPosition',
         enumValues: GroupTotalPosition.values)
-    ..aOB(5, _omitFieldNames ? '' : 'multiTotals')
-    ..aI(6, _omitFieldNames ? '' : 'indicatorIndent')
-    ..aI(7, _omitFieldNames ? '' : 'maxLevels')
-    ..aOB(8, _omitFieldNames ? '' : 'showLevelButtons')
-    ..aI(9, _omitFieldNames ? '' : 'labelColumn')
-    ..aI(10, _omitFieldNames ? '' : 'iconColumn')
+    ..aOB(4, _omitFieldNames ? '' : 'multiTotals')
+    ..aI(5, _omitFieldNames ? '' : 'indicatorIndent')
+    ..aI(6, _omitFieldNames ? '' : 'maxLevels')
+    ..aOB(7, _omitFieldNames ? '' : 'showLevelButtons')
+    ..aI(8, _omitFieldNames ? '' : 'labelColumn')
+    ..aI(9, _omitFieldNames ? '' : 'iconColumn')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -5543,80 +6906,80 @@ class OutlineConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearTreeIndicator() => $_clearField(1);
 
-  @$pb.TagNumber(3)
+  @$pb.TagNumber(2)
   $core.int get treeColor => $_getIZ(1);
-  @$pb.TagNumber(3)
+  @$pb.TagNumber(2)
   set treeColor($core.int value) => $_setUnsignedInt32(1, value);
-  @$pb.TagNumber(3)
+  @$pb.TagNumber(2)
   $core.bool hasTreeColor() => $_has(1);
-  @$pb.TagNumber(3)
-  void clearTreeColor() => $_clearField(3);
+  @$pb.TagNumber(2)
+  void clearTreeColor() => $_clearField(2);
 
-  @$pb.TagNumber(4)
+  @$pb.TagNumber(3)
   GroupTotalPosition get groupTotalPosition => $_getN(2);
-  @$pb.TagNumber(4)
-  set groupTotalPosition(GroupTotalPosition value) => $_setField(4, value);
-  @$pb.TagNumber(4)
+  @$pb.TagNumber(3)
+  set groupTotalPosition(GroupTotalPosition value) => $_setField(3, value);
+  @$pb.TagNumber(3)
   $core.bool hasGroupTotalPosition() => $_has(2);
-  @$pb.TagNumber(4)
-  void clearGroupTotalPosition() => $_clearField(4);
+  @$pb.TagNumber(3)
+  void clearGroupTotalPosition() => $_clearField(3);
 
   /// When true, repeated Subtotal() calls with the same group_on_col
   /// reuse existing subtotal rows instead of inserting new ones, allowing
   /// multiple aggregate columns (e.g. Sales + Cost) in a single row.
-  @$pb.TagNumber(5)
+  @$pb.TagNumber(4)
   $core.bool get multiTotals => $_getBF(3);
-  @$pb.TagNumber(5)
+  @$pb.TagNumber(4)
   set multiTotals($core.bool value) => $_setBool(3, value);
-  @$pb.TagNumber(5)
+  @$pb.TagNumber(4)
   $core.bool hasMultiTotals() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearMultiTotals() => $_clearField(4);
+
   @$pb.TagNumber(5)
-  void clearMultiTotals() => $_clearField(5);
-
-  @$pb.TagNumber(6)
   $core.int get indicatorIndent => $_getIZ(4);
-  @$pb.TagNumber(6)
+  @$pb.TagNumber(5)
   set indicatorIndent($core.int value) => $_setSignedInt32(4, value);
-  @$pb.TagNumber(6)
+  @$pb.TagNumber(5)
   $core.bool hasIndicatorIndent() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearIndicatorIndent() => $_clearField(5);
+
   @$pb.TagNumber(6)
-  void clearIndicatorIndent() => $_clearField(6);
-
-  @$pb.TagNumber(7)
   $core.int get maxLevels => $_getIZ(5);
-  @$pb.TagNumber(7)
+  @$pb.TagNumber(6)
   set maxLevels($core.int value) => $_setSignedInt32(5, value);
-  @$pb.TagNumber(7)
+  @$pb.TagNumber(6)
   $core.bool hasMaxLevels() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearMaxLevels() => $_clearField(6);
+
   @$pb.TagNumber(7)
-  void clearMaxLevels() => $_clearField(7);
-
-  @$pb.TagNumber(8)
   $core.bool get showLevelButtons => $_getBF(6);
-  @$pb.TagNumber(8)
+  @$pb.TagNumber(7)
   set showLevelButtons($core.bool value) => $_setBool(6, value);
-  @$pb.TagNumber(8)
+  @$pb.TagNumber(7)
   $core.bool hasShowLevelButtons() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearShowLevelButtons() => $_clearField(7);
+
   @$pb.TagNumber(8)
-  void clearShowLevelButtons() => $_clearField(8);
-
-  @$pb.TagNumber(9)
   $core.int get labelColumn => $_getIZ(7);
-  @$pb.TagNumber(9)
+  @$pb.TagNumber(8)
   set labelColumn($core.int value) => $_setSignedInt32(7, value);
-  @$pb.TagNumber(9)
+  @$pb.TagNumber(8)
   $core.bool hasLabelColumn() => $_has(7);
-  @$pb.TagNumber(9)
-  void clearLabelColumn() => $_clearField(9);
+  @$pb.TagNumber(8)
+  void clearLabelColumn() => $_clearField(8);
 
-  @$pb.TagNumber(10)
+  @$pb.TagNumber(9)
   $core.int get iconColumn => $_getIZ(8);
-  @$pb.TagNumber(10)
+  @$pb.TagNumber(9)
   set iconColumn($core.int value) => $_setSignedInt32(8, value);
-  @$pb.TagNumber(10)
+  @$pb.TagNumber(9)
   $core.bool hasIconColumn() => $_has(8);
-  @$pb.TagNumber(10)
-  void clearIconColumn() => $_clearField(10);
+  @$pb.TagNumber(9)
+  void clearIconColumn() => $_clearField(9);
 }
 
 /// ── Cell Span ──
@@ -6317,16 +7680,16 @@ class RowIndicatorConfig extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aOB(1, _omitFieldNames ? '' : 'visible')
     ..aI(2, _omitFieldNames ? '' : 'width')
-    ..aI(4, _omitFieldNames ? '' : 'background', fieldType: $pb.PbFieldType.OU3)
-    ..aI(5, _omitFieldNames ? '' : 'foreground', fieldType: $pb.PbFieldType.OU3)
-    ..aE<GridLineStyle>(6, _omitFieldNames ? '' : 'gridLines',
+    ..aI(3, _omitFieldNames ? '' : 'background', fieldType: $pb.PbFieldType.OU3)
+    ..aI(4, _omitFieldNames ? '' : 'foreground', fieldType: $pb.PbFieldType.OU3)
+    ..aE<GridLineStyle>(5, _omitFieldNames ? '' : 'gridLines',
         enumValues: GridLineStyle.values)
-    ..aI(7, _omitFieldNames ? '' : 'gridColor', fieldType: $pb.PbFieldType.OU3)
-    ..aOB(8, _omitFieldNames ? '' : 'autoSize')
-    ..aOB(9, _omitFieldNames ? '' : 'allowResize')
-    ..aOB(10, _omitFieldNames ? '' : 'allowSelect')
-    ..aOB(11, _omitFieldNames ? '' : 'allowReorder')
-    ..pPM<RowIndicatorSlot>(12, _omitFieldNames ? '' : 'slots',
+    ..aI(6, _omitFieldNames ? '' : 'gridColor', fieldType: $pb.PbFieldType.OU3)
+    ..aOB(7, _omitFieldNames ? '' : 'autoSize')
+    ..aOB(8, _omitFieldNames ? '' : 'allowResize')
+    ..aOB(9, _omitFieldNames ? '' : 'allowSelect')
+    ..aOB(10, _omitFieldNames ? '' : 'allowReorder')
+    ..pPM<RowIndicatorSlot>(11, _omitFieldNames ? '' : 'slots',
         subBuilder: RowIndicatorSlot.create)
     ..hasRequiredFields = false;
 
@@ -6367,79 +7730,79 @@ class RowIndicatorConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearWidth() => $_clearField(2);
 
-  @$pb.TagNumber(4)
+  @$pb.TagNumber(3)
   $core.int get background => $_getIZ(2);
-  @$pb.TagNumber(4)
+  @$pb.TagNumber(3)
   set background($core.int value) => $_setUnsignedInt32(2, value);
-  @$pb.TagNumber(4)
+  @$pb.TagNumber(3)
   $core.bool hasBackground() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearBackground() => $_clearField(3);
+
   @$pb.TagNumber(4)
-  void clearBackground() => $_clearField(4);
-
-  @$pb.TagNumber(5)
   $core.int get foreground => $_getIZ(3);
-  @$pb.TagNumber(5)
+  @$pb.TagNumber(4)
   set foreground($core.int value) => $_setUnsignedInt32(3, value);
-  @$pb.TagNumber(5)
+  @$pb.TagNumber(4)
   $core.bool hasForeground() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearForeground() => $_clearField(4);
+
   @$pb.TagNumber(5)
-  void clearForeground() => $_clearField(5);
-
-  @$pb.TagNumber(6)
   GridLineStyle get gridLines => $_getN(4);
-  @$pb.TagNumber(6)
-  set gridLines(GridLineStyle value) => $_setField(6, value);
-  @$pb.TagNumber(6)
+  @$pb.TagNumber(5)
+  set gridLines(GridLineStyle value) => $_setField(5, value);
+  @$pb.TagNumber(5)
   $core.bool hasGridLines() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearGridLines() => $_clearField(5);
+
   @$pb.TagNumber(6)
-  void clearGridLines() => $_clearField(6);
-
-  @$pb.TagNumber(7)
   $core.int get gridColor => $_getIZ(5);
-  @$pb.TagNumber(7)
+  @$pb.TagNumber(6)
   set gridColor($core.int value) => $_setUnsignedInt32(5, value);
-  @$pb.TagNumber(7)
+  @$pb.TagNumber(6)
   $core.bool hasGridColor() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearGridColor() => $_clearField(6);
+
   @$pb.TagNumber(7)
-  void clearGridColor() => $_clearField(7);
-
-  @$pb.TagNumber(8)
   $core.bool get autoSize => $_getBF(6);
-  @$pb.TagNumber(8)
+  @$pb.TagNumber(7)
   set autoSize($core.bool value) => $_setBool(6, value);
-  @$pb.TagNumber(8)
+  @$pb.TagNumber(7)
   $core.bool hasAutoSize() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearAutoSize() => $_clearField(7);
+
   @$pb.TagNumber(8)
-  void clearAutoSize() => $_clearField(8);
-
-  @$pb.TagNumber(9)
   $core.bool get allowResize => $_getBF(7);
-  @$pb.TagNumber(9)
+  @$pb.TagNumber(8)
   set allowResize($core.bool value) => $_setBool(7, value);
-  @$pb.TagNumber(9)
+  @$pb.TagNumber(8)
   $core.bool hasAllowResize() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearAllowResize() => $_clearField(8);
+
   @$pb.TagNumber(9)
-  void clearAllowResize() => $_clearField(9);
-
-  @$pb.TagNumber(10)
   $core.bool get allowSelect => $_getBF(8);
-  @$pb.TagNumber(10)
+  @$pb.TagNumber(9)
   set allowSelect($core.bool value) => $_setBool(8, value);
-  @$pb.TagNumber(10)
+  @$pb.TagNumber(9)
   $core.bool hasAllowSelect() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearAllowSelect() => $_clearField(9);
+
   @$pb.TagNumber(10)
-  void clearAllowSelect() => $_clearField(10);
-
-  @$pb.TagNumber(11)
   $core.bool get allowReorder => $_getBF(9);
-  @$pb.TagNumber(11)
+  @$pb.TagNumber(10)
   set allowReorder($core.bool value) => $_setBool(9, value);
-  @$pb.TagNumber(11)
+  @$pb.TagNumber(10)
   $core.bool hasAllowReorder() => $_has(9);
-  @$pb.TagNumber(11)
-  void clearAllowReorder() => $_clearField(11);
+  @$pb.TagNumber(10)
+  void clearAllowReorder() => $_clearField(10);
 
-  @$pb.TagNumber(12)
+  @$pb.TagNumber(11)
   $pb.PbList<RowIndicatorSlot> get slots => $_getList(10);
 }
 
@@ -6550,10 +7913,10 @@ class ColIndicatorCell extends $pb.GeneratedMessage {
     ..aI(3, _omitFieldNames ? '' : 'col1')
     ..aI(4, _omitFieldNames ? '' : 'col2')
     ..aOS(5, _omitFieldNames ? '' : 'text')
-    ..aOS(7, _omitFieldNames ? '' : 'customKey')
+    ..aOS(6, _omitFieldNames ? '' : 'customKey')
     ..a<$core.List<$core.int>>(
-        8, _omitFieldNames ? '' : 'data', $pb.PbFieldType.OY)
-    ..aOM<ColIndicatorCellModes>(9, _omitFieldNames ? '' : 'modes',
+        7, _omitFieldNames ? '' : 'data', $pb.PbFieldType.OY)
+    ..aOM<ColIndicatorCellModes>(8, _omitFieldNames ? '' : 'modes',
         subBuilder: ColIndicatorCellModes.create)
     ..hasRequiredFields = false;
 
@@ -6621,33 +7984,33 @@ class ColIndicatorCell extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearText() => $_clearField(5);
 
-  @$pb.TagNumber(7)
+  @$pb.TagNumber(6)
   $core.String get customKey => $_getSZ(5);
-  @$pb.TagNumber(7)
+  @$pb.TagNumber(6)
   set customKey($core.String value) => $_setString(5, value);
-  @$pb.TagNumber(7)
+  @$pb.TagNumber(6)
   $core.bool hasCustomKey() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearCustomKey() => $_clearField(6);
+
   @$pb.TagNumber(7)
-  void clearCustomKey() => $_clearField(7);
-
-  @$pb.TagNumber(8)
   $core.List<$core.int> get data => $_getN(6);
-  @$pb.TagNumber(8)
+  @$pb.TagNumber(7)
   set data($core.List<$core.int> value) => $_setBytes(6, value);
-  @$pb.TagNumber(8)
+  @$pb.TagNumber(7)
   $core.bool hasData() => $_has(6);
-  @$pb.TagNumber(8)
-  void clearData() => $_clearField(8);
+  @$pb.TagNumber(7)
+  void clearData() => $_clearField(7);
 
-  @$pb.TagNumber(9)
+  @$pb.TagNumber(8)
   ColIndicatorCellModes get modes => $_getN(7);
-  @$pb.TagNumber(9)
-  set modes(ColIndicatorCellModes value) => $_setField(9, value);
-  @$pb.TagNumber(9)
+  @$pb.TagNumber(8)
+  set modes(ColIndicatorCellModes value) => $_setField(8, value);
+  @$pb.TagNumber(8)
   $core.bool hasModes() => $_has(7);
-  @$pb.TagNumber(9)
-  void clearModes() => $_clearField(9);
-  @$pb.TagNumber(9)
+  @$pb.TagNumber(8)
+  void clearModes() => $_clearField(8);
+  @$pb.TagNumber(8)
   ColIndicatorCellModes ensureModes() => $_ensure(7);
 }
 
@@ -6702,20 +8065,20 @@ class ColIndicatorConfig extends $pb.GeneratedMessage {
     ..aOB(1, _omitFieldNames ? '' : 'visible')
     ..aI(2, _omitFieldNames ? '' : 'defaultRowHeight')
     ..aI(3, _omitFieldNames ? '' : 'bandRows')
-    ..aI(5, _omitFieldNames ? '' : 'background', fieldType: $pb.PbFieldType.OU3)
-    ..aI(6, _omitFieldNames ? '' : 'foreground', fieldType: $pb.PbFieldType.OU3)
-    ..aE<GridLineStyle>(7, _omitFieldNames ? '' : 'gridLines',
+    ..aI(4, _omitFieldNames ? '' : 'background', fieldType: $pb.PbFieldType.OU3)
+    ..aI(5, _omitFieldNames ? '' : 'foreground', fieldType: $pb.PbFieldType.OU3)
+    ..aE<GridLineStyle>(6, _omitFieldNames ? '' : 'gridLines',
         enumValues: GridLineStyle.values)
-    ..aI(8, _omitFieldNames ? '' : 'gridColor', fieldType: $pb.PbFieldType.OU3)
-    ..aOB(9, _omitFieldNames ? '' : 'autoSize')
-    ..aOB(10, _omitFieldNames ? '' : 'allowResize')
-    ..aOB(11, _omitFieldNames ? '' : 'allowReorder')
-    ..aOB(12, _omitFieldNames ? '' : 'allowMenu')
-    ..pPM<ColIndicatorRowDef>(13, _omitFieldNames ? '' : 'rowDefs',
+    ..aI(7, _omitFieldNames ? '' : 'gridColor', fieldType: $pb.PbFieldType.OU3)
+    ..aOB(8, _omitFieldNames ? '' : 'autoSize')
+    ..aOB(9, _omitFieldNames ? '' : 'allowResize')
+    ..aOB(10, _omitFieldNames ? '' : 'allowReorder')
+    ..aOB(11, _omitFieldNames ? '' : 'allowMenu')
+    ..pPM<ColIndicatorRowDef>(12, _omitFieldNames ? '' : 'rowDefs',
         subBuilder: ColIndicatorRowDef.create)
-    ..pPM<ColIndicatorCell>(14, _omitFieldNames ? '' : 'cells',
+    ..pPM<ColIndicatorCell>(13, _omitFieldNames ? '' : 'cells',
         subBuilder: ColIndicatorCell.create)
-    ..aOM<ColIndicatorCellModes>(15, _omitFieldNames ? '' : 'cellModes',
+    ..aOM<ColIndicatorCellModes>(14, _omitFieldNames ? '' : 'cellModes',
         subBuilder: ColIndicatorCellModes.create)
     ..hasRequiredFields = false;
 
@@ -6765,93 +8128,93 @@ class ColIndicatorConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearBandRows() => $_clearField(3);
 
-  @$pb.TagNumber(5)
+  @$pb.TagNumber(4)
   $core.int get background => $_getIZ(3);
-  @$pb.TagNumber(5)
+  @$pb.TagNumber(4)
   set background($core.int value) => $_setUnsignedInt32(3, value);
-  @$pb.TagNumber(5)
+  @$pb.TagNumber(4)
   $core.bool hasBackground() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearBackground() => $_clearField(4);
+
   @$pb.TagNumber(5)
-  void clearBackground() => $_clearField(5);
-
-  @$pb.TagNumber(6)
   $core.int get foreground => $_getIZ(4);
-  @$pb.TagNumber(6)
+  @$pb.TagNumber(5)
   set foreground($core.int value) => $_setUnsignedInt32(4, value);
-  @$pb.TagNumber(6)
+  @$pb.TagNumber(5)
   $core.bool hasForeground() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearForeground() => $_clearField(5);
+
   @$pb.TagNumber(6)
-  void clearForeground() => $_clearField(6);
-
-  @$pb.TagNumber(7)
   GridLineStyle get gridLines => $_getN(5);
-  @$pb.TagNumber(7)
-  set gridLines(GridLineStyle value) => $_setField(7, value);
-  @$pb.TagNumber(7)
+  @$pb.TagNumber(6)
+  set gridLines(GridLineStyle value) => $_setField(6, value);
+  @$pb.TagNumber(6)
   $core.bool hasGridLines() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearGridLines() => $_clearField(6);
+
   @$pb.TagNumber(7)
-  void clearGridLines() => $_clearField(7);
-
-  @$pb.TagNumber(8)
   $core.int get gridColor => $_getIZ(6);
-  @$pb.TagNumber(8)
+  @$pb.TagNumber(7)
   set gridColor($core.int value) => $_setUnsignedInt32(6, value);
-  @$pb.TagNumber(8)
+  @$pb.TagNumber(7)
   $core.bool hasGridColor() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearGridColor() => $_clearField(7);
+
   @$pb.TagNumber(8)
-  void clearGridColor() => $_clearField(8);
-
-  @$pb.TagNumber(9)
   $core.bool get autoSize => $_getBF(7);
-  @$pb.TagNumber(9)
+  @$pb.TagNumber(8)
   set autoSize($core.bool value) => $_setBool(7, value);
-  @$pb.TagNumber(9)
+  @$pb.TagNumber(8)
   $core.bool hasAutoSize() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearAutoSize() => $_clearField(8);
+
   @$pb.TagNumber(9)
-  void clearAutoSize() => $_clearField(9);
-
-  @$pb.TagNumber(10)
   $core.bool get allowResize => $_getBF(8);
-  @$pb.TagNumber(10)
+  @$pb.TagNumber(9)
   set allowResize($core.bool value) => $_setBool(8, value);
-  @$pb.TagNumber(10)
+  @$pb.TagNumber(9)
   $core.bool hasAllowResize() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearAllowResize() => $_clearField(9);
+
   @$pb.TagNumber(10)
-  void clearAllowResize() => $_clearField(10);
-
-  @$pb.TagNumber(11)
   $core.bool get allowReorder => $_getBF(9);
-  @$pb.TagNumber(11)
+  @$pb.TagNumber(10)
   set allowReorder($core.bool value) => $_setBool(9, value);
-  @$pb.TagNumber(11)
+  @$pb.TagNumber(10)
   $core.bool hasAllowReorder() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearAllowReorder() => $_clearField(10);
+
   @$pb.TagNumber(11)
-  void clearAllowReorder() => $_clearField(11);
-
-  @$pb.TagNumber(12)
   $core.bool get allowMenu => $_getBF(10);
-  @$pb.TagNumber(12)
+  @$pb.TagNumber(11)
   set allowMenu($core.bool value) => $_setBool(10, value);
-  @$pb.TagNumber(12)
+  @$pb.TagNumber(11)
   $core.bool hasAllowMenu() => $_has(10);
-  @$pb.TagNumber(12)
-  void clearAllowMenu() => $_clearField(12);
+  @$pb.TagNumber(11)
+  void clearAllowMenu() => $_clearField(11);
 
-  @$pb.TagNumber(13)
+  @$pb.TagNumber(12)
   $pb.PbList<ColIndicatorRowDef> get rowDefs => $_getList(11);
 
-  @$pb.TagNumber(14)
+  @$pb.TagNumber(13)
   $pb.PbList<ColIndicatorCell> get cells => $_getList(12);
 
-  @$pb.TagNumber(15)
+  @$pb.TagNumber(14)
   ColIndicatorCellModes get cellModes => $_getN(13);
-  @$pb.TagNumber(15)
-  set cellModes(ColIndicatorCellModes value) => $_setField(15, value);
-  @$pb.TagNumber(15)
+  @$pb.TagNumber(14)
+  set cellModes(ColIndicatorCellModes value) => $_setField(14, value);
+  @$pb.TagNumber(14)
   $core.bool hasCellModes() => $_has(13);
-  @$pb.TagNumber(15)
-  void clearCellModes() => $_clearField(15);
-  @$pb.TagNumber(15)
+  @$pb.TagNumber(14)
+  void clearCellModes() => $_clearField(14);
+  @$pb.TagNumber(14)
   ColIndicatorCellModes ensureCellModes() => $_ensure(13);
 }
 
@@ -7004,12 +8367,12 @@ class CornerIndicatorConfig extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
     ..aOB(1, _omitFieldNames ? '' : 'visible')
-    ..aI(3, _omitFieldNames ? '' : 'background', fieldType: $pb.PbFieldType.OU3)
-    ..aI(4, _omitFieldNames ? '' : 'foreground', fieldType: $pb.PbFieldType.OU3)
-    ..aOS(5, _omitFieldNames ? '' : 'customKey')
+    ..aI(2, _omitFieldNames ? '' : 'background', fieldType: $pb.PbFieldType.OU3)
+    ..aI(3, _omitFieldNames ? '' : 'foreground', fieldType: $pb.PbFieldType.OU3)
+    ..aOS(4, _omitFieldNames ? '' : 'customKey')
     ..a<$core.List<$core.int>>(
-        6, _omitFieldNames ? '' : 'data', $pb.PbFieldType.OY)
-    ..pPM<CornerIndicatorSlot>(7, _omitFieldNames ? '' : 'slots',
+        5, _omitFieldNames ? '' : 'data', $pb.PbFieldType.OY)
+    ..pPM<CornerIndicatorSlot>(6, _omitFieldNames ? '' : 'slots',
         subBuilder: CornerIndicatorSlot.create)
     ..hasRequiredFields = false;
 
@@ -7042,43 +8405,43 @@ class CornerIndicatorConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearVisible() => $_clearField(1);
 
-  @$pb.TagNumber(3)
+  @$pb.TagNumber(2)
   $core.int get background => $_getIZ(1);
-  @$pb.TagNumber(3)
+  @$pb.TagNumber(2)
   set background($core.int value) => $_setUnsignedInt32(1, value);
-  @$pb.TagNumber(3)
+  @$pb.TagNumber(2)
   $core.bool hasBackground() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearBackground() => $_clearField(2);
+
   @$pb.TagNumber(3)
-  void clearBackground() => $_clearField(3);
-
-  @$pb.TagNumber(4)
   $core.int get foreground => $_getIZ(2);
-  @$pb.TagNumber(4)
+  @$pb.TagNumber(3)
   set foreground($core.int value) => $_setUnsignedInt32(2, value);
-  @$pb.TagNumber(4)
+  @$pb.TagNumber(3)
   $core.bool hasForeground() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearForeground() => $_clearField(3);
+
   @$pb.TagNumber(4)
-  void clearForeground() => $_clearField(4);
-
-  @$pb.TagNumber(5)
   $core.String get customKey => $_getSZ(3);
-  @$pb.TagNumber(5)
+  @$pb.TagNumber(4)
   set customKey($core.String value) => $_setString(3, value);
-  @$pb.TagNumber(5)
+  @$pb.TagNumber(4)
   $core.bool hasCustomKey() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearCustomKey() => $_clearField(4);
+
   @$pb.TagNumber(5)
-  void clearCustomKey() => $_clearField(5);
-
-  @$pb.TagNumber(6)
   $core.List<$core.int> get data => $_getN(4);
-  @$pb.TagNumber(6)
+  @$pb.TagNumber(5)
   set data($core.List<$core.int> value) => $_setBytes(4, value);
-  @$pb.TagNumber(6)
+  @$pb.TagNumber(5)
   $core.bool hasData() => $_has(4);
-  @$pb.TagNumber(6)
-  void clearData() => $_clearField(6);
+  @$pb.TagNumber(5)
+  void clearData() => $_clearField(5);
 
-  @$pb.TagNumber(7)
+  @$pb.TagNumber(6)
   $pb.PbList<CornerIndicatorSlot> get slots => $_getList(5);
 }
 
@@ -7357,14 +8720,14 @@ class GridEventTarget extends $pb.GeneratedMessage {
         enumValues: IndicatorBand.values)
     ..aI(3, _omitFieldNames ? '' : 'slotIndex')
     ..aI(4, _omitFieldNames ? '' : 'slotKind')
-    ..aOS(6, _omitFieldNames ? '' : 'customKey')
-    ..aOS(7, _omitFieldNames ? '' : 'text')
-    ..aInt64(8, _omitFieldNames ? '' : 'intValue')
-    ..aI(9, _omitFieldNames ? '' : 'statusFlags',
+    ..aOS(5, _omitFieldNames ? '' : 'customKey')
+    ..aOS(6, _omitFieldNames ? '' : 'text')
+    ..aInt64(7, _omitFieldNames ? '' : 'intValue')
+    ..aI(8, _omitFieldNames ? '' : 'statusFlags',
         fieldType: $pb.PbFieldType.OU3)
     ..a<$core.List<$core.int>>(
-        10, _omitFieldNames ? '' : 'data', $pb.PbFieldType.OY)
-    ..aI(11, _omitFieldNames ? '' : 'subMode')
+        9, _omitFieldNames ? '' : 'data', $pb.PbFieldType.OY)
+    ..aI(10, _omitFieldNames ? '' : 'subMode')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -7422,59 +8785,59 @@ class GridEventTarget extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearSlotKind() => $_clearField(4);
 
-  @$pb.TagNumber(6)
+  @$pb.TagNumber(5)
   $core.String get customKey => $_getSZ(4);
-  @$pb.TagNumber(6)
+  @$pb.TagNumber(5)
   set customKey($core.String value) => $_setString(4, value);
-  @$pb.TagNumber(6)
+  @$pb.TagNumber(5)
   $core.bool hasCustomKey() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearCustomKey() => $_clearField(5);
+
   @$pb.TagNumber(6)
-  void clearCustomKey() => $_clearField(6);
-
-  @$pb.TagNumber(7)
   $core.String get text => $_getSZ(5);
-  @$pb.TagNumber(7)
+  @$pb.TagNumber(6)
   set text($core.String value) => $_setString(5, value);
-  @$pb.TagNumber(7)
+  @$pb.TagNumber(6)
   $core.bool hasText() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearText() => $_clearField(6);
+
   @$pb.TagNumber(7)
-  void clearText() => $_clearField(7);
-
-  @$pb.TagNumber(8)
   $fixnum.Int64 get intValue => $_getI64(6);
-  @$pb.TagNumber(8)
+  @$pb.TagNumber(7)
   set intValue($fixnum.Int64 value) => $_setInt64(6, value);
-  @$pb.TagNumber(8)
+  @$pb.TagNumber(7)
   $core.bool hasIntValue() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearIntValue() => $_clearField(7);
+
   @$pb.TagNumber(8)
-  void clearIntValue() => $_clearField(8);
-
-  @$pb.TagNumber(9)
   $core.int get statusFlags => $_getIZ(7);
-  @$pb.TagNumber(9)
+  @$pb.TagNumber(8)
   set statusFlags($core.int value) => $_setUnsignedInt32(7, value);
-  @$pb.TagNumber(9)
+  @$pb.TagNumber(8)
   $core.bool hasStatusFlags() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearStatusFlags() => $_clearField(8);
+
   @$pb.TagNumber(9)
-  void clearStatusFlags() => $_clearField(9);
-
-  @$pb.TagNumber(10)
   $core.List<$core.int> get data => $_getN(8);
-  @$pb.TagNumber(10)
+  @$pb.TagNumber(9)
   set data($core.List<$core.int> value) => $_setBytes(8, value);
-  @$pb.TagNumber(10)
+  @$pb.TagNumber(9)
   $core.bool hasData() => $_has(8);
-  @$pb.TagNumber(10)
-  void clearData() => $_clearField(10);
+  @$pb.TagNumber(9)
+  void clearData() => $_clearField(9);
 
-  @$pb.TagNumber(11)
+  @$pb.TagNumber(10)
   $core.int get subMode => $_getIZ(9);
-  @$pb.TagNumber(11)
+  @$pb.TagNumber(10)
   set subMode($core.int value) => $_setSignedInt32(9, value);
-  @$pb.TagNumber(11)
+  @$pb.TagNumber(10)
   $core.bool hasSubMode() => $_has(9);
-  @$pb.TagNumber(11)
-  void clearSubMode() => $_clearField(11);
+  @$pb.TagNumber(10)
+  void clearSubMode() => $_clearField(10);
 }
 
 class IndicatorFocusConfig extends $pb.GeneratedMessage {
@@ -7775,8 +9138,7 @@ class ColumnDef extends $pb.GeneratedMessage {
     $core.String? key,
     SortOrder? sortOrder,
     SortType? sortType,
-    Dropdown? dropdown,
-    $core.String? editMask,
+    EditorSpec? editor,
     $core.int? indent,
     $core.bool? hidden,
     $core.bool? span,
@@ -7804,8 +9166,7 @@ class ColumnDef extends $pb.GeneratedMessage {
     if (key != null) result.key = key;
     if (sortOrder != null) result.sortOrder = sortOrder;
     if (sortType != null) result.sortType = sortType;
-    if (dropdown != null) result.dropdown = dropdown;
-    if (editMask != null) result.editMask = editMask;
+    if (editor != null) result.editor = editor;
     if (indent != null) result.indent = indent;
     if (hidden != null) result.hidden = hidden;
     if (span != null) result.span = span;
@@ -7851,30 +9212,29 @@ class ColumnDef extends $pb.GeneratedMessage {
         enumValues: SortOrder.values)
     ..aE<SortType>(12, _omitFieldNames ? '' : 'sortType',
         enumValues: SortType.values)
-    ..aOM<Dropdown>(13, _omitFieldNames ? '' : 'dropdown',
-        subBuilder: Dropdown.create)
-    ..aOS(14, _omitFieldNames ? '' : 'editMask')
-    ..aI(15, _omitFieldNames ? '' : 'indent')
-    ..aOB(16, _omitFieldNames ? '' : 'hidden')
-    ..aOB(17, _omitFieldNames ? '' : 'span')
-    ..pPM<ImageData>(18, _omitFieldNames ? '' : 'imageList',
+    ..aOM<EditorSpec>(13, _omitFieldNames ? '' : 'editor',
+        subBuilder: EditorSpec.create)
+    ..aI(14, _omitFieldNames ? '' : 'indent')
+    ..aOB(15, _omitFieldNames ? '' : 'hidden')
+    ..aOB(16, _omitFieldNames ? '' : 'span')
+    ..pPM<ImageData>(17, _omitFieldNames ? '' : 'imageList',
         subBuilder: ImageData.create)
     ..a<$core.List<$core.int>>(
-        19, _omitFieldNames ? '' : 'data', $pb.PbFieldType.OY)
-    ..aE<StickyEdge>(20, _omitFieldNames ? '' : 'sticky',
+        18, _omitFieldNames ? '' : 'data', $pb.PbFieldType.OY)
+    ..aE<StickyEdge>(19, _omitFieldNames ? '' : 'sticky',
         enumValues: StickyEdge.values)
-    ..aOM<Padding>(21, _omitFieldNames ? '' : 'padding',
+    ..aOM<Padding>(20, _omitFieldNames ? '' : 'padding',
         subBuilder: Padding.create)
-    ..aOM<Padding>(22, _omitFieldNames ? '' : 'fixedPadding',
+    ..aOM<Padding>(21, _omitFieldNames ? '' : 'fixedPadding',
         subBuilder: Padding.create)
-    ..aOB(23, _omitFieldNames ? '' : 'nullable')
-    ..aE<CoercionMode>(24, _omitFieldNames ? '' : 'coercionMode',
+    ..aOB(22, _omitFieldNames ? '' : 'nullable')
+    ..aE<CoercionMode>(23, _omitFieldNames ? '' : 'coercionMode',
         enumValues: CoercionMode.values)
-    ..aE<WriteErrorMode>(25, _omitFieldNames ? '' : 'errorMode',
+    ..aE<WriteErrorMode>(24, _omitFieldNames ? '' : 'errorMode',
         enumValues: WriteErrorMode.values)
-    ..aE<CellInteraction>(26, _omitFieldNames ? '' : 'interaction',
+    ..aE<CellInteraction>(25, _omitFieldNames ? '' : 'interaction',
         enumValues: CellInteraction.values)
-    ..aI(27, _omitFieldNames ? '' : 'progressColor',
+    ..aI(26, _omitFieldNames ? '' : 'progressColor',
         fieldType: $pb.PbFieldType.OU3)
     ..hasRequiredFields = false;
 
@@ -8005,139 +9365,130 @@ class ColumnDef extends $pb.GeneratedMessage {
   void clearSortType() => $_clearField(12);
 
   @$pb.TagNumber(13)
-  Dropdown get dropdown => $_getN(12);
+  EditorSpec get editor => $_getN(12);
   @$pb.TagNumber(13)
-  set dropdown(Dropdown value) => $_setField(13, value);
+  set editor(EditorSpec value) => $_setField(13, value);
   @$pb.TagNumber(13)
-  $core.bool hasDropdown() => $_has(12);
+  $core.bool hasEditor() => $_has(12);
   @$pb.TagNumber(13)
-  void clearDropdown() => $_clearField(13);
+  void clearEditor() => $_clearField(13);
   @$pb.TagNumber(13)
-  Dropdown ensureDropdown() => $_ensure(12);
+  EditorSpec ensureEditor() => $_ensure(12);
 
   @$pb.TagNumber(14)
-  $core.String get editMask => $_getSZ(13);
+  $core.int get indent => $_getIZ(13);
   @$pb.TagNumber(14)
-  set editMask($core.String value) => $_setString(13, value);
+  set indent($core.int value) => $_setSignedInt32(13, value);
   @$pb.TagNumber(14)
-  $core.bool hasEditMask() => $_has(13);
+  $core.bool hasIndent() => $_has(13);
   @$pb.TagNumber(14)
-  void clearEditMask() => $_clearField(14);
+  void clearIndent() => $_clearField(14);
 
   @$pb.TagNumber(15)
-  $core.int get indent => $_getIZ(14);
+  $core.bool get hidden => $_getBF(14);
   @$pb.TagNumber(15)
-  set indent($core.int value) => $_setSignedInt32(14, value);
+  set hidden($core.bool value) => $_setBool(14, value);
   @$pb.TagNumber(15)
-  $core.bool hasIndent() => $_has(14);
+  $core.bool hasHidden() => $_has(14);
   @$pb.TagNumber(15)
-  void clearIndent() => $_clearField(15);
+  void clearHidden() => $_clearField(15);
 
   @$pb.TagNumber(16)
-  $core.bool get hidden => $_getBF(15);
+  $core.bool get span => $_getBF(15);
   @$pb.TagNumber(16)
-  set hidden($core.bool value) => $_setBool(15, value);
+  set span($core.bool value) => $_setBool(15, value);
   @$pb.TagNumber(16)
-  $core.bool hasHidden() => $_has(15);
+  $core.bool hasSpan() => $_has(15);
   @$pb.TagNumber(16)
-  void clearHidden() => $_clearField(16);
+  void clearSpan() => $_clearField(16);
 
   @$pb.TagNumber(17)
-  $core.bool get span => $_getBF(16);
-  @$pb.TagNumber(17)
-  set span($core.bool value) => $_setBool(16, value);
-  @$pb.TagNumber(17)
-  $core.bool hasSpan() => $_has(16);
-  @$pb.TagNumber(17)
-  void clearSpan() => $_clearField(17);
+  $pb.PbList<ImageData> get imageList => $_getList(16);
 
   @$pb.TagNumber(18)
-  $pb.PbList<ImageData> get imageList => $_getList(17);
+  $core.List<$core.int> get data => $_getN(17);
+  @$pb.TagNumber(18)
+  set data($core.List<$core.int> value) => $_setBytes(17, value);
+  @$pb.TagNumber(18)
+  $core.bool hasData() => $_has(17);
+  @$pb.TagNumber(18)
+  void clearData() => $_clearField(18);
 
   @$pb.TagNumber(19)
-  $core.List<$core.int> get data => $_getN(18);
+  StickyEdge get sticky => $_getN(18);
   @$pb.TagNumber(19)
-  set data($core.List<$core.int> value) => $_setBytes(18, value);
+  set sticky(StickyEdge value) => $_setField(19, value);
   @$pb.TagNumber(19)
-  $core.bool hasData() => $_has(18);
+  $core.bool hasSticky() => $_has(18);
   @$pb.TagNumber(19)
-  void clearData() => $_clearField(19);
+  void clearSticky() => $_clearField(19);
 
   @$pb.TagNumber(20)
-  StickyEdge get sticky => $_getN(19);
+  Padding get padding => $_getN(19);
   @$pb.TagNumber(20)
-  set sticky(StickyEdge value) => $_setField(20, value);
+  set padding(Padding value) => $_setField(20, value);
   @$pb.TagNumber(20)
-  $core.bool hasSticky() => $_has(19);
+  $core.bool hasPadding() => $_has(19);
   @$pb.TagNumber(20)
-  void clearSticky() => $_clearField(20);
+  void clearPadding() => $_clearField(20);
+  @$pb.TagNumber(20)
+  Padding ensurePadding() => $_ensure(19);
 
   @$pb.TagNumber(21)
-  Padding get padding => $_getN(20);
+  Padding get fixedPadding => $_getN(20);
   @$pb.TagNumber(21)
-  set padding(Padding value) => $_setField(21, value);
+  set fixedPadding(Padding value) => $_setField(21, value);
   @$pb.TagNumber(21)
-  $core.bool hasPadding() => $_has(20);
+  $core.bool hasFixedPadding() => $_has(20);
   @$pb.TagNumber(21)
-  void clearPadding() => $_clearField(21);
+  void clearFixedPadding() => $_clearField(21);
   @$pb.TagNumber(21)
-  Padding ensurePadding() => $_ensure(20);
+  Padding ensureFixedPadding() => $_ensure(20);
 
   @$pb.TagNumber(22)
-  Padding get fixedPadding => $_getN(21);
+  $core.bool get nullable => $_getBF(21);
   @$pb.TagNumber(22)
-  set fixedPadding(Padding value) => $_setField(22, value);
+  set nullable($core.bool value) => $_setBool(21, value);
   @$pb.TagNumber(22)
-  $core.bool hasFixedPadding() => $_has(21);
+  $core.bool hasNullable() => $_has(21);
   @$pb.TagNumber(22)
-  void clearFixedPadding() => $_clearField(22);
-  @$pb.TagNumber(22)
-  Padding ensureFixedPadding() => $_ensure(21);
+  void clearNullable() => $_clearField(22);
 
   @$pb.TagNumber(23)
-  $core.bool get nullable => $_getBF(22);
+  CoercionMode get coercionMode => $_getN(22);
   @$pb.TagNumber(23)
-  set nullable($core.bool value) => $_setBool(22, value);
+  set coercionMode(CoercionMode value) => $_setField(23, value);
   @$pb.TagNumber(23)
-  $core.bool hasNullable() => $_has(22);
+  $core.bool hasCoercionMode() => $_has(22);
   @$pb.TagNumber(23)
-  void clearNullable() => $_clearField(23);
+  void clearCoercionMode() => $_clearField(23);
 
   @$pb.TagNumber(24)
-  CoercionMode get coercionMode => $_getN(23);
+  WriteErrorMode get errorMode => $_getN(23);
   @$pb.TagNumber(24)
-  set coercionMode(CoercionMode value) => $_setField(24, value);
+  set errorMode(WriteErrorMode value) => $_setField(24, value);
   @$pb.TagNumber(24)
-  $core.bool hasCoercionMode() => $_has(23);
+  $core.bool hasErrorMode() => $_has(23);
   @$pb.TagNumber(24)
-  void clearCoercionMode() => $_clearField(24);
+  void clearErrorMode() => $_clearField(24);
 
   @$pb.TagNumber(25)
-  WriteErrorMode get errorMode => $_getN(24);
+  CellInteraction get interaction => $_getN(24);
   @$pb.TagNumber(25)
-  set errorMode(WriteErrorMode value) => $_setField(25, value);
+  set interaction(CellInteraction value) => $_setField(25, value);
   @$pb.TagNumber(25)
-  $core.bool hasErrorMode() => $_has(24);
+  $core.bool hasInteraction() => $_has(24);
   @$pb.TagNumber(25)
-  void clearErrorMode() => $_clearField(25);
+  void clearInteraction() => $_clearField(25);
 
   @$pb.TagNumber(26)
-  CellInteraction get interaction => $_getN(25);
+  $core.int get progressColor => $_getIZ(25);
   @$pb.TagNumber(26)
-  set interaction(CellInteraction value) => $_setField(26, value);
+  set progressColor($core.int value) => $_setUnsignedInt32(25, value);
   @$pb.TagNumber(26)
-  $core.bool hasInteraction() => $_has(25);
+  $core.bool hasProgressColor() => $_has(25);
   @$pb.TagNumber(26)
-  void clearInteraction() => $_clearField(26);
-
-  @$pb.TagNumber(27)
-  $core.int get progressColor => $_getIZ(26);
-  @$pb.TagNumber(27)
-  set progressColor($core.int value) => $_setUnsignedInt32(26, value);
-  @$pb.TagNumber(27)
-  $core.bool hasProgressColor() => $_has(26);
-  @$pb.TagNumber(27)
-  void clearProgressColor() => $_clearField(27);
+  void clearProgressColor() => $_clearField(26);
 }
 
 class DefineColumnsRequest extends $pb.GeneratedMessage {
@@ -8567,7 +9918,7 @@ class CellUpdate extends $pb.GeneratedMessage {
     ImageData? picture,
     ImageAlignment? pictureAlign,
     ImageData? buttonPicture,
-    Dropdown? dropdown,
+    EditorSpec? editor,
     StickyEdge? stickyRow,
     StickyEdge? stickyCol,
     CellInteraction? interaction,
@@ -8583,7 +9934,7 @@ class CellUpdate extends $pb.GeneratedMessage {
     if (picture != null) result.picture = picture;
     if (pictureAlign != null) result.pictureAlign = pictureAlign;
     if (buttonPicture != null) result.buttonPicture = buttonPicture;
-    if (dropdown != null) result.dropdown = dropdown;
+    if (editor != null) result.editor = editor;
     if (stickyRow != null) result.stickyRow = stickyRow;
     if (stickyCol != null) result.stickyCol = stickyCol;
     if (interaction != null) result.interaction = interaction;
@@ -8619,8 +9970,8 @@ class CellUpdate extends $pb.GeneratedMessage {
         enumValues: ImageAlignment.values)
     ..aOM<ImageData>(8, _omitFieldNames ? '' : 'buttonPicture',
         subBuilder: ImageData.create)
-    ..aOM<Dropdown>(9, _omitFieldNames ? '' : 'dropdown',
-        subBuilder: Dropdown.create)
+    ..aOM<EditorSpec>(9, _omitFieldNames ? '' : 'editor',
+        subBuilder: EditorSpec.create)
     ..aE<StickyEdge>(10, _omitFieldNames ? '' : 'stickyRow',
         enumValues: StickyEdge.values)
     ..aE<StickyEdge>(11, _omitFieldNames ? '' : 'stickyCol',
@@ -8732,15 +10083,15 @@ class CellUpdate extends $pb.GeneratedMessage {
   ImageData ensureButtonPicture() => $_ensure(7);
 
   @$pb.TagNumber(9)
-  Dropdown get dropdown => $_getN(8);
+  EditorSpec get editor => $_getN(8);
   @$pb.TagNumber(9)
-  set dropdown(Dropdown value) => $_setField(9, value);
+  set editor(EditorSpec value) => $_setField(9, value);
   @$pb.TagNumber(9)
-  $core.bool hasDropdown() => $_has(8);
+  $core.bool hasEditor() => $_has(8);
   @$pb.TagNumber(9)
-  void clearDropdown() => $_clearField(9);
+  void clearEditor() => $_clearField(9);
   @$pb.TagNumber(9)
-  Dropdown ensureDropdown() => $_ensure(8);
+  EditorSpec ensureEditor() => $_ensure(8);
 
   @$pb.TagNumber(10)
   StickyEdge get stickyRow => $_getN(9);
@@ -11056,40 +12407,20 @@ class EditSetHighlights extends $pb.GeneratedMessage {
   $pb.PbList<HighlightRegion> get regions => $_getList(0);
 }
 
-enum EditCommand_Command {
-  start,
-  commit,
-  cancel,
-  setText,
-  setSelection,
-  finish,
-  setHighlights,
-  setPreedit,
-  notSet
-}
+enum EditCommand_Command { start, session, getState, notSet }
 
 class EditCommand extends $pb.GeneratedMessage {
   factory EditCommand({
     $fixnum.Int64? gridId,
     EditStart? start,
-    EditCommit? commit,
-    EditCancel? cancel,
-    EditSetText? setText,
-    EditSetSelection? setSelection,
-    EditFinish? finish,
-    EditSetHighlights? setHighlights,
-    EditSetPreedit? setPreedit,
+    EditorSessionCommand? session,
+    EditGetState? getState,
   }) {
     final result = create();
     if (gridId != null) result.gridId = gridId;
     if (start != null) result.start = start;
-    if (commit != null) result.commit = commit;
-    if (cancel != null) result.cancel = cancel;
-    if (setText != null) result.setText = setText;
-    if (setSelection != null) result.setSelection = setSelection;
-    if (finish != null) result.finish = finish;
-    if (setHighlights != null) result.setHighlights = setHighlights;
-    if (setPreedit != null) result.setPreedit = setPreedit;
+    if (session != null) result.session = session;
+    if (getState != null) result.getState = getState;
     return result;
   }
 
@@ -11105,37 +12436,22 @@ class EditCommand extends $pb.GeneratedMessage {
   static const $core.Map<$core.int, EditCommand_Command>
       _EditCommand_CommandByTag = {
     2: EditCommand_Command.start,
-    3: EditCommand_Command.commit,
-    4: EditCommand_Command.cancel,
-    5: EditCommand_Command.setText,
-    6: EditCommand_Command.setSelection,
-    7: EditCommand_Command.finish,
-    8: EditCommand_Command.setHighlights,
-    9: EditCommand_Command.setPreedit,
+    3: EditCommand_Command.session,
+    4: EditCommand_Command.getState,
     0: EditCommand_Command.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'EditCommand',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
-    ..oo(0, [2, 3, 4, 5, 6, 7, 8, 9])
+    ..oo(0, [2, 3, 4])
     ..aInt64(1, _omitFieldNames ? '' : 'gridId')
     ..aOM<EditStart>(2, _omitFieldNames ? '' : 'start',
         subBuilder: EditStart.create)
-    ..aOM<EditCommit>(3, _omitFieldNames ? '' : 'commit',
-        subBuilder: EditCommit.create)
-    ..aOM<EditCancel>(4, _omitFieldNames ? '' : 'cancel',
-        subBuilder: EditCancel.create)
-    ..aOM<EditSetText>(5, _omitFieldNames ? '' : 'setText',
-        subBuilder: EditSetText.create)
-    ..aOM<EditSetSelection>(6, _omitFieldNames ? '' : 'setSelection',
-        subBuilder: EditSetSelection.create)
-    ..aOM<EditFinish>(7, _omitFieldNames ? '' : 'finish',
-        subBuilder: EditFinish.create)
-    ..aOM<EditSetHighlights>(8, _omitFieldNames ? '' : 'setHighlights',
-        subBuilder: EditSetHighlights.create)
-    ..aOM<EditSetPreedit>(9, _omitFieldNames ? '' : 'setPreedit',
-        subBuilder: EditSetPreedit.create)
+    ..aOM<EditorSessionCommand>(3, _omitFieldNames ? '' : 'session',
+        subBuilder: EditorSessionCommand.create)
+    ..aOM<EditGetState>(4, _omitFieldNames ? '' : 'getState',
+        subBuilder: EditGetState.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -11160,21 +12476,11 @@ class EditCommand extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   @$pb.TagNumber(3)
   @$pb.TagNumber(4)
-  @$pb.TagNumber(5)
-  @$pb.TagNumber(6)
-  @$pb.TagNumber(7)
-  @$pb.TagNumber(8)
-  @$pb.TagNumber(9)
   EditCommand_Command whichCommand() =>
       _EditCommand_CommandByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(2)
   @$pb.TagNumber(3)
   @$pb.TagNumber(4)
-  @$pb.TagNumber(5)
-  @$pb.TagNumber(6)
-  @$pb.TagNumber(7)
-  @$pb.TagNumber(8)
-  @$pb.TagNumber(9)
   void clearCommand() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -11198,99 +12504,56 @@ class EditCommand extends $pb.GeneratedMessage {
   EditStart ensureStart() => $_ensure(1);
 
   @$pb.TagNumber(3)
-  EditCommit get commit => $_getN(2);
+  EditorSessionCommand get session => $_getN(2);
   @$pb.TagNumber(3)
-  set commit(EditCommit value) => $_setField(3, value);
+  set session(EditorSessionCommand value) => $_setField(3, value);
   @$pb.TagNumber(3)
-  $core.bool hasCommit() => $_has(2);
+  $core.bool hasSession() => $_has(2);
   @$pb.TagNumber(3)
-  void clearCommit() => $_clearField(3);
+  void clearSession() => $_clearField(3);
   @$pb.TagNumber(3)
-  EditCommit ensureCommit() => $_ensure(2);
+  EditorSessionCommand ensureSession() => $_ensure(2);
 
   @$pb.TagNumber(4)
-  EditCancel get cancel => $_getN(3);
+  EditGetState get getState => $_getN(3);
   @$pb.TagNumber(4)
-  set cancel(EditCancel value) => $_setField(4, value);
+  set getState(EditGetState value) => $_setField(4, value);
   @$pb.TagNumber(4)
-  $core.bool hasCancel() => $_has(3);
+  $core.bool hasGetState() => $_has(3);
   @$pb.TagNumber(4)
-  void clearCancel() => $_clearField(4);
+  void clearGetState() => $_clearField(4);
   @$pb.TagNumber(4)
-  EditCancel ensureCancel() => $_ensure(3);
-
-  @$pb.TagNumber(5)
-  EditSetText get setText => $_getN(4);
-  @$pb.TagNumber(5)
-  set setText(EditSetText value) => $_setField(5, value);
-  @$pb.TagNumber(5)
-  $core.bool hasSetText() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearSetText() => $_clearField(5);
-  @$pb.TagNumber(5)
-  EditSetText ensureSetText() => $_ensure(4);
-
-  @$pb.TagNumber(6)
-  EditSetSelection get setSelection => $_getN(5);
-  @$pb.TagNumber(6)
-  set setSelection(EditSetSelection value) => $_setField(6, value);
-  @$pb.TagNumber(6)
-  $core.bool hasSetSelection() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearSetSelection() => $_clearField(6);
-  @$pb.TagNumber(6)
-  EditSetSelection ensureSetSelection() => $_ensure(5);
-
-  @$pb.TagNumber(7)
-  EditFinish get finish => $_getN(6);
-  @$pb.TagNumber(7)
-  set finish(EditFinish value) => $_setField(7, value);
-  @$pb.TagNumber(7)
-  $core.bool hasFinish() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearFinish() => $_clearField(7);
-  @$pb.TagNumber(7)
-  EditFinish ensureFinish() => $_ensure(6);
-
-  @$pb.TagNumber(8)
-  EditSetHighlights get setHighlights => $_getN(7);
-  @$pb.TagNumber(8)
-  set setHighlights(EditSetHighlights value) => $_setField(8, value);
-  @$pb.TagNumber(8)
-  $core.bool hasSetHighlights() => $_has(7);
-  @$pb.TagNumber(8)
-  void clearSetHighlights() => $_clearField(8);
-  @$pb.TagNumber(8)
-  EditSetHighlights ensureSetHighlights() => $_ensure(7);
-
-  @$pb.TagNumber(9)
-  EditSetPreedit get setPreedit => $_getN(8);
-  @$pb.TagNumber(9)
-  set setPreedit(EditSetPreedit value) => $_setField(9, value);
-  @$pb.TagNumber(9)
-  $core.bool hasSetPreedit() => $_has(8);
-  @$pb.TagNumber(9)
-  void clearSetPreedit() => $_clearField(9);
-  @$pb.TagNumber(9)
-  EditSetPreedit ensureSetPreedit() => $_ensure(8);
+  EditGetState ensureGetState() => $_ensure(3);
 }
 
+/// Begin an edit session. The host MUST set `reason` to the gesture / source
+/// that initiated the edit; the engine derives EditUiMode and the initial
+/// selection from the reason:
+///   F2 / DOUBLE_CLICK / CLICK_CARET → EDIT  (caret-positioned, no select-all)
+///   everything else                 → ENTER (select-all, replace on first key)
+/// Leaving `reason` as EDIT_START_UNSPECIFIED is treated as PROGRAMMATIC by the
+/// engine but is a contract violation — hosts that drive edits from a user
+/// gesture should always pass the matching enum value so audit logs and
+/// telemetry can attribute sessions correctly.
+///
+/// `caret_position` is consulted only when reason == EDIT_START_CLICK_CARET and
+/// names the desired caret offset (UTF-16 code units) into the cell's text.
+/// `seed_value` is used by IME / printable-key paths to push the keystroke
+/// that triggered the session into the new editor's buffer.
 class EditStart extends $pb.GeneratedMessage {
   factory EditStart({
     $core.int? row,
     $core.int? col,
-    $core.bool? selectAll,
-    $core.bool? caretEnd,
-    $core.String? seedText,
-    $core.bool? formulaMode,
+    EditStartReason? reason,
+    EditorValue? seedValue,
+    $core.int? caretPosition,
   }) {
     final result = create();
     if (row != null) result.row = row;
     if (col != null) result.col = col;
-    if (selectAll != null) result.selectAll = selectAll;
-    if (caretEnd != null) result.caretEnd = caretEnd;
-    if (seedText != null) result.seedText = seedText;
-    if (formulaMode != null) result.formulaMode = formulaMode;
+    if (reason != null) result.reason = reason;
+    if (seedValue != null) result.seedValue = seedValue;
+    if (caretPosition != null) result.caretPosition = caretPosition;
     return result;
   }
 
@@ -11309,10 +12572,11 @@ class EditStart extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aI(1, _omitFieldNames ? '' : 'row')
     ..aI(2, _omitFieldNames ? '' : 'col')
-    ..aOB(3, _omitFieldNames ? '' : 'selectAll')
-    ..aOB(4, _omitFieldNames ? '' : 'caretEnd')
-    ..aOS(5, _omitFieldNames ? '' : 'seedText')
-    ..aOB(6, _omitFieldNames ? '' : 'formulaMode')
+    ..aE<EditStartReason>(3, _omitFieldNames ? '' : 'reason',
+        enumValues: EditStartReason.values)
+    ..aOM<EditorValue>(4, _omitFieldNames ? '' : 'seedValue',
+        subBuilder: EditorValue.create)
+    ..aI(5, _omitFieldNames ? '' : 'caretPosition')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -11352,48 +12616,470 @@ class EditStart extends $pb.GeneratedMessage {
   void clearCol() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $core.bool get selectAll => $_getBF(2);
+  EditStartReason get reason => $_getN(2);
   @$pb.TagNumber(3)
-  set selectAll($core.bool value) => $_setBool(2, value);
+  set reason(EditStartReason value) => $_setField(3, value);
   @$pb.TagNumber(3)
-  $core.bool hasSelectAll() => $_has(2);
+  $core.bool hasReason() => $_has(2);
   @$pb.TagNumber(3)
-  void clearSelectAll() => $_clearField(3);
+  void clearReason() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  $core.bool get caretEnd => $_getBF(3);
+  EditorValue get seedValue => $_getN(3);
   @$pb.TagNumber(4)
-  set caretEnd($core.bool value) => $_setBool(3, value);
+  set seedValue(EditorValue value) => $_setField(4, value);
   @$pb.TagNumber(4)
-  $core.bool hasCaretEnd() => $_has(3);
+  $core.bool hasSeedValue() => $_has(3);
   @$pb.TagNumber(4)
-  void clearCaretEnd() => $_clearField(4);
+  void clearSeedValue() => $_clearField(4);
+  @$pb.TagNumber(4)
+  EditorValue ensureSeedValue() => $_ensure(3);
 
   @$pb.TagNumber(5)
-  $core.String get seedText => $_getSZ(4);
+  $core.int get caretPosition => $_getIZ(4);
   @$pb.TagNumber(5)
-  set seedText($core.String value) => $_setString(4, value);
+  set caretPosition($core.int value) => $_setSignedInt32(4, value);
   @$pb.TagNumber(5)
-  $core.bool hasSeedText() => $_has(4);
+  $core.bool hasCaretPosition() => $_has(4);
   @$pb.TagNumber(5)
-  void clearSeedText() => $_clearField(5);
-
-  @$pb.TagNumber(6)
-  $core.bool get formulaMode => $_getBF(5);
-  @$pb.TagNumber(6)
-  set formulaMode($core.bool value) => $_setBool(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasFormulaMode() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearFormulaMode() => $_clearField(6);
+  void clearCaretPosition() => $_clearField(5);
 }
 
-class EditCommit extends $pb.GeneratedMessage {
-  factory EditCommit({
+class EditGetState extends $pb.GeneratedMessage {
+  factory EditGetState() => create();
+
+  EditGetState._();
+
+  factory EditGetState.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory EditGetState.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'EditGetState',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EditGetState clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EditGetState copyWith(void Function(EditGetState) updates) =>
+      super.copyWith((message) => updates(message as EditGetState))
+          as EditGetState;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static EditGetState create() => EditGetState._();
+  @$core.override
+  EditGetState createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static EditGetState getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<EditGetState>(create);
+  static EditGetState? _defaultInstance;
+}
+
+enum EditorSessionCommand_Command {
+  valueChanged,
+  selectionChanged,
+  preeditChanged,
+  commit,
+  cancel,
+  customAction,
+  notSet
+}
+
+class EditorSessionCommand extends $pb.GeneratedMessage {
+  factory EditorSessionCommand({
+    $fixnum.Int64? sessionId,
+    $fixnum.Int64? stateVersion,
+    EditorValueChanged? valueChanged,
+    TextSelectionChanged? selectionChanged,
+    EditorPreeditChanged? preeditChanged,
+    EditCommit? commit,
+    EditCancel? cancel,
+    CustomEditorAction? customAction,
+  }) {
+    final result = create();
+    if (sessionId != null) result.sessionId = sessionId;
+    if (stateVersion != null) result.stateVersion = stateVersion;
+    if (valueChanged != null) result.valueChanged = valueChanged;
+    if (selectionChanged != null) result.selectionChanged = selectionChanged;
+    if (preeditChanged != null) result.preeditChanged = preeditChanged;
+    if (commit != null) result.commit = commit;
+    if (cancel != null) result.cancel = cancel;
+    if (customAction != null) result.customAction = customAction;
+    return result;
+  }
+
+  EditorSessionCommand._();
+
+  factory EditorSessionCommand.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory EditorSessionCommand.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static const $core.Map<$core.int, EditorSessionCommand_Command>
+      _EditorSessionCommand_CommandByTag = {
+    3: EditorSessionCommand_Command.valueChanged,
+    4: EditorSessionCommand_Command.selectionChanged,
+    5: EditorSessionCommand_Command.preeditChanged,
+    6: EditorSessionCommand_Command.commit,
+    7: EditorSessionCommand_Command.cancel,
+    8: EditorSessionCommand_Command.customAction,
+    0: EditorSessionCommand_Command.notSet
+  };
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'EditorSessionCommand',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..oo(0, [3, 4, 5, 6, 7, 8])
+    ..aInt64(1, _omitFieldNames ? '' : 'sessionId')
+    ..a<$fixnum.Int64>(
+        2, _omitFieldNames ? '' : 'stateVersion', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aOM<EditorValueChanged>(3, _omitFieldNames ? '' : 'valueChanged',
+        subBuilder: EditorValueChanged.create)
+    ..aOM<TextSelectionChanged>(4, _omitFieldNames ? '' : 'selectionChanged',
+        subBuilder: TextSelectionChanged.create)
+    ..aOM<EditorPreeditChanged>(5, _omitFieldNames ? '' : 'preeditChanged',
+        subBuilder: EditorPreeditChanged.create)
+    ..aOM<EditCommit>(6, _omitFieldNames ? '' : 'commit',
+        subBuilder: EditCommit.create)
+    ..aOM<EditCancel>(7, _omitFieldNames ? '' : 'cancel',
+        subBuilder: EditCancel.create)
+    ..aOM<CustomEditorAction>(8, _omitFieldNames ? '' : 'customAction',
+        subBuilder: CustomEditorAction.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EditorSessionCommand clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EditorSessionCommand copyWith(void Function(EditorSessionCommand) updates) =>
+      super.copyWith((message) => updates(message as EditorSessionCommand))
+          as EditorSessionCommand;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static EditorSessionCommand create() => EditorSessionCommand._();
+  @$core.override
+  EditorSessionCommand createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static EditorSessionCommand getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<EditorSessionCommand>(create);
+  static EditorSessionCommand? _defaultInstance;
+
+  @$pb.TagNumber(3)
+  @$pb.TagNumber(4)
+  @$pb.TagNumber(5)
+  @$pb.TagNumber(6)
+  @$pb.TagNumber(7)
+  @$pb.TagNumber(8)
+  EditorSessionCommand_Command whichCommand() =>
+      _EditorSessionCommand_CommandByTag[$_whichOneof(0)]!;
+  @$pb.TagNumber(3)
+  @$pb.TagNumber(4)
+  @$pb.TagNumber(5)
+  @$pb.TagNumber(6)
+  @$pb.TagNumber(7)
+  @$pb.TagNumber(8)
+  void clearCommand() => $_clearField($_whichOneof(0));
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get sessionId => $_getI64(0);
+  @$pb.TagNumber(1)
+  set sessionId($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSessionId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSessionId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $fixnum.Int64 get stateVersion => $_getI64(1);
+  @$pb.TagNumber(2)
+  set stateVersion($fixnum.Int64 value) => $_setInt64(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasStateVersion() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearStateVersion() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  EditorValueChanged get valueChanged => $_getN(2);
+  @$pb.TagNumber(3)
+  set valueChanged(EditorValueChanged value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasValueChanged() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearValueChanged() => $_clearField(3);
+  @$pb.TagNumber(3)
+  EditorValueChanged ensureValueChanged() => $_ensure(2);
+
+  @$pb.TagNumber(4)
+  TextSelectionChanged get selectionChanged => $_getN(3);
+  @$pb.TagNumber(4)
+  set selectionChanged(TextSelectionChanged value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasSelectionChanged() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearSelectionChanged() => $_clearField(4);
+  @$pb.TagNumber(4)
+  TextSelectionChanged ensureSelectionChanged() => $_ensure(3);
+
+  @$pb.TagNumber(5)
+  EditorPreeditChanged get preeditChanged => $_getN(4);
+  @$pb.TagNumber(5)
+  set preeditChanged(EditorPreeditChanged value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasPreeditChanged() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearPreeditChanged() => $_clearField(5);
+  @$pb.TagNumber(5)
+  EditorPreeditChanged ensurePreeditChanged() => $_ensure(4);
+
+  @$pb.TagNumber(6)
+  EditCommit get commit => $_getN(5);
+  @$pb.TagNumber(6)
+  set commit(EditCommit value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasCommit() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearCommit() => $_clearField(6);
+  @$pb.TagNumber(6)
+  EditCommit ensureCommit() => $_ensure(5);
+
+  @$pb.TagNumber(7)
+  EditCancel get cancel => $_getN(6);
+  @$pb.TagNumber(7)
+  set cancel(EditCancel value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasCancel() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearCancel() => $_clearField(7);
+  @$pb.TagNumber(7)
+  EditCancel ensureCancel() => $_ensure(6);
+
+  @$pb.TagNumber(8)
+  CustomEditorAction get customAction => $_getN(7);
+  @$pb.TagNumber(8)
+  set customAction(CustomEditorAction value) => $_setField(8, value);
+  @$pb.TagNumber(8)
+  $core.bool hasCustomAction() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearCustomAction() => $_clearField(8);
+  @$pb.TagNumber(8)
+  CustomEditorAction ensureCustomAction() => $_ensure(7);
+}
+
+class EditorValueChanged extends $pb.GeneratedMessage {
+  factory EditorValueChanged({
+    EditorValue? value,
+  }) {
+    final result = create();
+    if (value != null) result.value = value;
+    return result;
+  }
+
+  EditorValueChanged._();
+
+  factory EditorValueChanged.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory EditorValueChanged.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'EditorValueChanged',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOM<EditorValue>(1, _omitFieldNames ? '' : 'value',
+        subBuilder: EditorValue.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EditorValueChanged clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EditorValueChanged copyWith(void Function(EditorValueChanged) updates) =>
+      super.copyWith((message) => updates(message as EditorValueChanged))
+          as EditorValueChanged;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static EditorValueChanged create() => EditorValueChanged._();
+  @$core.override
+  EditorValueChanged createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static EditorValueChanged getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<EditorValueChanged>(create);
+  static EditorValueChanged? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  EditorValue get value => $_getN(0);
+  @$pb.TagNumber(1)
+  set value(EditorValue value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasValue() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearValue() => $_clearField(1);
+  @$pb.TagNumber(1)
+  EditorValue ensureValue() => $_ensure(0);
+}
+
+class TextSelectionChanged extends $pb.GeneratedMessage {
+  factory TextSelectionChanged({
+    TextSelection? selection,
+  }) {
+    final result = create();
+    if (selection != null) result.selection = selection;
+    return result;
+  }
+
+  TextSelectionChanged._();
+
+  factory TextSelectionChanged.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory TextSelectionChanged.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TextSelectionChanged',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOM<TextSelection>(1, _omitFieldNames ? '' : 'selection',
+        subBuilder: TextSelection.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TextSelectionChanged clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TextSelectionChanged copyWith(void Function(TextSelectionChanged) updates) =>
+      super.copyWith((message) => updates(message as TextSelectionChanged))
+          as TextSelectionChanged;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static TextSelectionChanged create() => TextSelectionChanged._();
+  @$core.override
+  TextSelectionChanged createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static TextSelectionChanged getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TextSelectionChanged>(create);
+  static TextSelectionChanged? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  TextSelection get selection => $_getN(0);
+  @$pb.TagNumber(1)
+  set selection(TextSelection value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSelection() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSelection() => $_clearField(1);
+  @$pb.TagNumber(1)
+  TextSelection ensureSelection() => $_ensure(0);
+}
+
+class EditorPreeditChanged extends $pb.GeneratedMessage {
+  factory EditorPreeditChanged({
     $core.String? text,
+    $core.int? cursor,
+    $core.bool? commit,
   }) {
     final result = create();
     if (text != null) result.text = text;
+    if (cursor != null) result.cursor = cursor;
+    if (commit != null) result.commit = commit;
+    return result;
+  }
+
+  EditorPreeditChanged._();
+
+  factory EditorPreeditChanged.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory EditorPreeditChanged.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'EditorPreeditChanged',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'text')
+    ..aI(2, _omitFieldNames ? '' : 'cursor')
+    ..aOB(3, _omitFieldNames ? '' : 'commit')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EditorPreeditChanged clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EditorPreeditChanged copyWith(void Function(EditorPreeditChanged) updates) =>
+      super.copyWith((message) => updates(message as EditorPreeditChanged))
+          as EditorPreeditChanged;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static EditorPreeditChanged create() => EditorPreeditChanged._();
+  @$core.override
+  EditorPreeditChanged createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static EditorPreeditChanged getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<EditorPreeditChanged>(create);
+  static EditorPreeditChanged? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get text => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set text($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasText() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearText() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get cursor => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set cursor($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasCursor() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearCursor() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.bool get commit => $_getBF(2);
+  @$pb.TagNumber(3)
+  set commit($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasCommit() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearCommit() => $_clearField(3);
+}
+
+/// Commit the active editor. When `value` is unset, the engine commits the
+/// editor's current in-flight buffer (the last value_changed / preedit_changed
+/// it accepted). Setting `value` overrides that buffer, used by hosts that
+/// maintain their own text widget and want to push the final string at commit.
+class EditCommit extends $pb.GeneratedMessage {
+  factory EditCommit({
+    EditorValue? value,
+  }) {
+    final result = create();
+    if (value != null) result.value = value;
     return result;
   }
 
@@ -11410,7 +13096,8 @@ class EditCommit extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'EditCommit',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'text')
+    ..aOM<EditorValue>(1, _omitFieldNames ? '' : 'value',
+        subBuilder: EditorValue.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -11432,13 +13119,15 @@ class EditCommit extends $pb.GeneratedMessage {
   static EditCommit? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $core.String get text => $_getSZ(0);
+  EditorValue get value => $_getN(0);
   @$pb.TagNumber(1)
-  set text($core.String value) => $_setString(0, value);
+  set value(EditorValue value) => $_setField(1, value);
   @$pb.TagNumber(1)
-  $core.bool hasText() => $_has(0);
+  $core.bool hasValue() => $_has(0);
   @$pb.TagNumber(1)
-  void clearText() => $_clearField(1);
+  void clearValue() => $_clearField(1);
+  @$pb.TagNumber(1)
+  EditorValue ensureValue() => $_ensure(0);
 }
 
 class EditCancel extends $pb.GeneratedMessage {
@@ -11478,274 +13167,448 @@ class EditCancel extends $pb.GeneratedMessage {
   static EditCancel? _defaultInstance;
 }
 
-class EditSetText extends $pb.GeneratedMessage {
-  factory EditSetText({
-    $core.String? text,
+class CustomEditorAction extends $pb.GeneratedMessage {
+  factory CustomEditorAction({
+    $core.String? actionId,
+    StructValue? payload,
   }) {
     final result = create();
-    if (text != null) result.text = text;
+    if (actionId != null) result.actionId = actionId;
+    if (payload != null) result.payload = payload;
     return result;
   }
 
-  EditSetText._();
+  CustomEditorAction._();
 
-  factory EditSetText.fromBuffer($core.List<$core.int> data,
+  factory CustomEditorAction.fromBuffer($core.List<$core.int> data,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromBuffer(data, registry);
-  factory EditSetText.fromJson($core.String json,
+  factory CustomEditorAction.fromJson($core.String json,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromJson(json, registry);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'EditSetText',
+      _omitMessageNames ? '' : 'CustomEditorAction',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'text')
+    ..aOS(1, _omitFieldNames ? '' : 'actionId')
+    ..aOM<StructValue>(2, _omitFieldNames ? '' : 'payload',
+        subBuilder: StructValue.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  EditSetText clone() => deepCopy();
+  CustomEditorAction clone() => deepCopy();
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  EditSetText copyWith(void Function(EditSetText) updates) =>
-      super.copyWith((message) => updates(message as EditSetText))
-          as EditSetText;
+  CustomEditorAction copyWith(void Function(CustomEditorAction) updates) =>
+      super.copyWith((message) => updates(message as CustomEditorAction))
+          as CustomEditorAction;
 
   @$core.override
   $pb.BuilderInfo get info_ => _i;
 
   @$core.pragma('dart2js:noInline')
-  static EditSetText create() => EditSetText._();
+  static CustomEditorAction create() => CustomEditorAction._();
   @$core.override
-  EditSetText createEmptyInstance() => create();
+  CustomEditorAction createEmptyInstance() => create();
   @$core.pragma('dart2js:noInline')
-  static EditSetText getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<EditSetText>(create);
-  static EditSetText? _defaultInstance;
+  static CustomEditorAction getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CustomEditorAction>(create);
+  static CustomEditorAction? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $core.String get text => $_getSZ(0);
+  $core.String get actionId => $_getSZ(0);
   @$pb.TagNumber(1)
-  set text($core.String value) => $_setString(0, value);
+  set actionId($core.String value) => $_setString(0, value);
   @$pb.TagNumber(1)
-  $core.bool hasText() => $_has(0);
+  $core.bool hasActionId() => $_has(0);
   @$pb.TagNumber(1)
-  void clearText() => $_clearField(1);
+  void clearActionId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  StructValue get payload => $_getN(1);
+  @$pb.TagNumber(2)
+  set payload(StructValue value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPayload() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPayload() => $_clearField(2);
+  @$pb.TagNumber(2)
+  StructValue ensurePayload() => $_ensure(1);
 }
 
-class EditSetSelection extends $pb.GeneratedMessage {
-  factory EditSetSelection({
-    $core.int? start,
-    $core.int? length,
+/// Canonical edit session shape. Carried by EditorSessionStarted (lifecycle)
+/// and EditState (current state snapshot). All fields the engine has agreed
+/// with the host on at session start, plus mutable runtime state.
+///
+/// Wire-type note: `session_id` and `state_version` are 64-bit on the wire.
+/// Use the binding's native 64-bit integer type and do NOT re-wrap:
+///   Rust prost  → i64 / u64
+///   Java/Kotlin → long
+///   .NET        → long / ulong
+///   Dart        → $fixnum.Int64 (already wrapped by protobuf-dart)
+///   JS / TS     → bigint
+///
+/// Immutability:
+///   - session_id, row, col, editor, ui_mode, capabilities, reason are fixed
+///     for the lifetime of the session and never change between Started and
+///     subsequent Updated deltas.
+///   - viewport_rect, value, selection, composing, preedit_text, state_version,
+///     validation_errors are mutable and can change via EditorSessionUpdated.
+///
+/// Presentation contract: when `editor.presentation == EDITOR_CANVAS`,
+/// `viewport_rect` is meaningless (engine draws the editor on the canvas
+/// itself). Hosts MUST NOT mount an overlay widget in that case; they MUST
+/// still track the session for clipboard / keyboard routing.
+class EditorSession extends $pb.GeneratedMessage {
+  factory EditorSession({
+    $fixnum.Int64? sessionId,
+    $core.int? row,
+    $core.int? col,
+    Rect? viewportRect,
+    EditorSpec? editor,
+    EditorValue? value,
+    TextSelection? selection,
+    EditUiMode? uiMode,
+    EditorCapabilities? capabilities,
+    EditStartReason? reason,
+    $fixnum.Int64? stateVersion,
+    $core.bool? composing,
+    $core.String? preeditText,
+    $core.Iterable<ValidationError>? validationErrors,
   }) {
     final result = create();
-    if (start != null) result.start = start;
-    if (length != null) result.length = length;
+    if (sessionId != null) result.sessionId = sessionId;
+    if (row != null) result.row = row;
+    if (col != null) result.col = col;
+    if (viewportRect != null) result.viewportRect = viewportRect;
+    if (editor != null) result.editor = editor;
+    if (value != null) result.value = value;
+    if (selection != null) result.selection = selection;
+    if (uiMode != null) result.uiMode = uiMode;
+    if (capabilities != null) result.capabilities = capabilities;
+    if (reason != null) result.reason = reason;
+    if (stateVersion != null) result.stateVersion = stateVersion;
+    if (composing != null) result.composing = composing;
+    if (preeditText != null) result.preeditText = preeditText;
+    if (validationErrors != null)
+      result.validationErrors.addAll(validationErrors);
     return result;
   }
 
-  EditSetSelection._();
+  EditorSession._();
 
-  factory EditSetSelection.fromBuffer($core.List<$core.int> data,
+  factory EditorSession.fromBuffer($core.List<$core.int> data,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromBuffer(data, registry);
-  factory EditSetSelection.fromJson($core.String json,
+  factory EditorSession.fromJson($core.String json,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromJson(json, registry);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'EditSetSelection',
+      _omitMessageNames ? '' : 'EditorSession',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
-    ..aI(1, _omitFieldNames ? '' : 'start')
-    ..aI(2, _omitFieldNames ? '' : 'length')
+    ..aInt64(1, _omitFieldNames ? '' : 'sessionId')
+    ..aI(2, _omitFieldNames ? '' : 'row')
+    ..aI(3, _omitFieldNames ? '' : 'col')
+    ..aOM<Rect>(4, _omitFieldNames ? '' : 'viewportRect',
+        subBuilder: Rect.create)
+    ..aOM<EditorSpec>(5, _omitFieldNames ? '' : 'editor',
+        subBuilder: EditorSpec.create)
+    ..aOM<EditorValue>(6, _omitFieldNames ? '' : 'value',
+        subBuilder: EditorValue.create)
+    ..aOM<TextSelection>(7, _omitFieldNames ? '' : 'selection',
+        subBuilder: TextSelection.create)
+    ..aE<EditUiMode>(8, _omitFieldNames ? '' : 'uiMode',
+        enumValues: EditUiMode.values)
+    ..aOM<EditorCapabilities>(9, _omitFieldNames ? '' : 'capabilities',
+        subBuilder: EditorCapabilities.create)
+    ..aE<EditStartReason>(10, _omitFieldNames ? '' : 'reason',
+        enumValues: EditStartReason.values)
+    ..a<$fixnum.Int64>(
+        11, _omitFieldNames ? '' : 'stateVersion', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aOB(12, _omitFieldNames ? '' : 'composing')
+    ..aOS(13, _omitFieldNames ? '' : 'preeditText')
+    ..pPM<ValidationError>(14, _omitFieldNames ? '' : 'validationErrors',
+        subBuilder: ValidationError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  EditSetSelection clone() => deepCopy();
+  EditorSession clone() => deepCopy();
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  EditSetSelection copyWith(void Function(EditSetSelection) updates) =>
-      super.copyWith((message) => updates(message as EditSetSelection))
-          as EditSetSelection;
+  EditorSession copyWith(void Function(EditorSession) updates) =>
+      super.copyWith((message) => updates(message as EditorSession))
+          as EditorSession;
 
   @$core.override
   $pb.BuilderInfo get info_ => _i;
 
   @$core.pragma('dart2js:noInline')
-  static EditSetSelection create() => EditSetSelection._();
+  static EditorSession create() => EditorSession._();
   @$core.override
-  EditSetSelection createEmptyInstance() => create();
+  EditorSession createEmptyInstance() => create();
   @$core.pragma('dart2js:noInline')
-  static EditSetSelection getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<EditSetSelection>(create);
-  static EditSetSelection? _defaultInstance;
+  static EditorSession getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<EditorSession>(create);
+  static EditorSession? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $core.int get start => $_getIZ(0);
+  $fixnum.Int64 get sessionId => $_getI64(0);
   @$pb.TagNumber(1)
-  set start($core.int value) => $_setSignedInt32(0, value);
+  set sessionId($fixnum.Int64 value) => $_setInt64(0, value);
   @$pb.TagNumber(1)
-  $core.bool hasStart() => $_has(0);
+  $core.bool hasSessionId() => $_has(0);
   @$pb.TagNumber(1)
-  void clearStart() => $_clearField(1);
+  void clearSessionId() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $core.int get length => $_getIZ(1);
+  $core.int get row => $_getIZ(1);
   @$pb.TagNumber(2)
-  set length($core.int value) => $_setSignedInt32(1, value);
+  set row($core.int value) => $_setSignedInt32(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasLength() => $_has(1);
+  $core.bool hasRow() => $_has(1);
   @$pb.TagNumber(2)
-  void clearLength() => $_clearField(2);
+  void clearRow() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get col => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set col($core.int value) => $_setSignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasCol() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearCol() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  Rect get viewportRect => $_getN(3);
+  @$pb.TagNumber(4)
+  set viewportRect(Rect value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasViewportRect() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearViewportRect() => $_clearField(4);
+  @$pb.TagNumber(4)
+  Rect ensureViewportRect() => $_ensure(3);
+
+  @$pb.TagNumber(5)
+  EditorSpec get editor => $_getN(4);
+  @$pb.TagNumber(5)
+  set editor(EditorSpec value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasEditor() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearEditor() => $_clearField(5);
+  @$pb.TagNumber(5)
+  EditorSpec ensureEditor() => $_ensure(4);
+
+  @$pb.TagNumber(6)
+  EditorValue get value => $_getN(5);
+  @$pb.TagNumber(6)
+  set value(EditorValue value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasValue() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearValue() => $_clearField(6);
+  @$pb.TagNumber(6)
+  EditorValue ensureValue() => $_ensure(5);
+
+  @$pb.TagNumber(7)
+  TextSelection get selection => $_getN(6);
+  @$pb.TagNumber(7)
+  set selection(TextSelection value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasSelection() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearSelection() => $_clearField(7);
+  @$pb.TagNumber(7)
+  TextSelection ensureSelection() => $_ensure(6);
+
+  @$pb.TagNumber(8)
+  EditUiMode get uiMode => $_getN(7);
+  @$pb.TagNumber(8)
+  set uiMode(EditUiMode value) => $_setField(8, value);
+  @$pb.TagNumber(8)
+  $core.bool hasUiMode() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearUiMode() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  EditorCapabilities get capabilities => $_getN(8);
+  @$pb.TagNumber(9)
+  set capabilities(EditorCapabilities value) => $_setField(9, value);
+  @$pb.TagNumber(9)
+  $core.bool hasCapabilities() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearCapabilities() => $_clearField(9);
+  @$pb.TagNumber(9)
+  EditorCapabilities ensureCapabilities() => $_ensure(8);
+
+  @$pb.TagNumber(10)
+  EditStartReason get reason => $_getN(9);
+  @$pb.TagNumber(10)
+  set reason(EditStartReason value) => $_setField(10, value);
+  @$pb.TagNumber(10)
+  $core.bool hasReason() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearReason() => $_clearField(10);
+
+  @$pb.TagNumber(11)
+  $fixnum.Int64 get stateVersion => $_getI64(10);
+  @$pb.TagNumber(11)
+  set stateVersion($fixnum.Int64 value) => $_setInt64(10, value);
+  @$pb.TagNumber(11)
+  $core.bool hasStateVersion() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearStateVersion() => $_clearField(11);
+
+  @$pb.TagNumber(12)
+  $core.bool get composing => $_getBF(11);
+  @$pb.TagNumber(12)
+  set composing($core.bool value) => $_setBool(11, value);
+  @$pb.TagNumber(12)
+  $core.bool hasComposing() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearComposing() => $_clearField(12);
+
+  @$pb.TagNumber(13)
+  $core.String get preeditText => $_getSZ(12);
+  @$pb.TagNumber(13)
+  set preeditText($core.String value) => $_setString(12, value);
+  @$pb.TagNumber(13)
+  $core.bool hasPreeditText() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearPreeditText() => $_clearField(13);
+
+  @$pb.TagNumber(14)
+  $pb.PbList<ValidationError> get validationErrors => $_getList(13);
 }
 
-class EditSetPreedit extends $pb.GeneratedMessage {
-  factory EditSetPreedit({
-    $core.String? text,
-    $core.int? cursor,
-    $core.bool? commit,
+/// Engine-declared editor capabilities. Derived once from
+/// (EditorSpec.kind, EditorSpec.owner, ListEditorParams.allow_custom_value, …)
+/// so every host gates UI affordances against the same truth.
+class EditorCapabilities extends $pb.GeneratedMessage {
+  factory EditorCapabilities({
+    $core.bool? acceptsTextInput,
+    $core.bool? supportsSelection,
+    $core.bool? supportsCut,
+    $core.bool? supportsPaste,
+    $core.bool? supportsUndo,
   }) {
     final result = create();
-    if (text != null) result.text = text;
-    if (cursor != null) result.cursor = cursor;
-    if (commit != null) result.commit = commit;
+    if (acceptsTextInput != null) result.acceptsTextInput = acceptsTextInput;
+    if (supportsSelection != null) result.supportsSelection = supportsSelection;
+    if (supportsCut != null) result.supportsCut = supportsCut;
+    if (supportsPaste != null) result.supportsPaste = supportsPaste;
+    if (supportsUndo != null) result.supportsUndo = supportsUndo;
     return result;
   }
 
-  EditSetPreedit._();
+  EditorCapabilities._();
 
-  factory EditSetPreedit.fromBuffer($core.List<$core.int> data,
+  factory EditorCapabilities.fromBuffer($core.List<$core.int> data,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromBuffer(data, registry);
-  factory EditSetPreedit.fromJson($core.String json,
+  factory EditorCapabilities.fromJson($core.String json,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromJson(json, registry);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'EditSetPreedit',
+      _omitMessageNames ? '' : 'EditorCapabilities',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'text')
-    ..aI(2, _omitFieldNames ? '' : 'cursor')
-    ..aOB(3, _omitFieldNames ? '' : 'commit')
+    ..aOB(1, _omitFieldNames ? '' : 'acceptsTextInput')
+    ..aOB(2, _omitFieldNames ? '' : 'supportsSelection')
+    ..aOB(3, _omitFieldNames ? '' : 'supportsCut')
+    ..aOB(4, _omitFieldNames ? '' : 'supportsPaste')
+    ..aOB(5, _omitFieldNames ? '' : 'supportsUndo')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  EditSetPreedit clone() => deepCopy();
+  EditorCapabilities clone() => deepCopy();
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  EditSetPreedit copyWith(void Function(EditSetPreedit) updates) =>
-      super.copyWith((message) => updates(message as EditSetPreedit))
-          as EditSetPreedit;
+  EditorCapabilities copyWith(void Function(EditorCapabilities) updates) =>
+      super.copyWith((message) => updates(message as EditorCapabilities))
+          as EditorCapabilities;
 
   @$core.override
   $pb.BuilderInfo get info_ => _i;
 
   @$core.pragma('dart2js:noInline')
-  static EditSetPreedit create() => EditSetPreedit._();
+  static EditorCapabilities create() => EditorCapabilities._();
   @$core.override
-  EditSetPreedit createEmptyInstance() => create();
+  EditorCapabilities createEmptyInstance() => create();
   @$core.pragma('dart2js:noInline')
-  static EditSetPreedit getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<EditSetPreedit>(create);
-  static EditSetPreedit? _defaultInstance;
+  static EditorCapabilities getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<EditorCapabilities>(create);
+  static EditorCapabilities? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $core.String get text => $_getSZ(0);
+  $core.bool get acceptsTextInput => $_getBF(0);
   @$pb.TagNumber(1)
-  set text($core.String value) => $_setString(0, value);
+  set acceptsTextInput($core.bool value) => $_setBool(0, value);
   @$pb.TagNumber(1)
-  $core.bool hasText() => $_has(0);
+  $core.bool hasAcceptsTextInput() => $_has(0);
   @$pb.TagNumber(1)
-  void clearText() => $_clearField(1);
+  void clearAcceptsTextInput() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $core.int get cursor => $_getIZ(1);
+  $core.bool get supportsSelection => $_getBF(1);
   @$pb.TagNumber(2)
-  set cursor($core.int value) => $_setSignedInt32(1, value);
+  set supportsSelection($core.bool value) => $_setBool(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasCursor() => $_has(1);
+  $core.bool hasSupportsSelection() => $_has(1);
   @$pb.TagNumber(2)
-  void clearCursor() => $_clearField(2);
+  void clearSupportsSelection() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $core.bool get commit => $_getBF(2);
+  $core.bool get supportsCut => $_getBF(2);
   @$pb.TagNumber(3)
-  set commit($core.bool value) => $_setBool(2, value);
+  set supportsCut($core.bool value) => $_setBool(2, value);
   @$pb.TagNumber(3)
-  $core.bool hasCommit() => $_has(2);
+  $core.bool hasSupportsCut() => $_has(2);
   @$pb.TagNumber(3)
-  void clearCommit() => $_clearField(3);
+  void clearSupportsCut() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.bool get supportsPaste => $_getBF(3);
+  @$pb.TagNumber(4)
+  set supportsPaste($core.bool value) => $_setBool(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasSupportsPaste() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearSupportsPaste() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.bool get supportsUndo => $_getBF(4);
+  @$pb.TagNumber(5)
+  set supportsUndo($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasSupportsUndo() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearSupportsUndo() => $_clearField(5);
 }
 
-class EditFinish extends $pb.GeneratedMessage {
-  factory EditFinish() => create();
-
-  EditFinish._();
-
-  factory EditFinish.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory EditFinish.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'EditFinish',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
-      createEmptyInstance: create)
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  EditFinish clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  EditFinish copyWith(void Function(EditFinish) updates) =>
-      super.copyWith((message) => updates(message as EditFinish)) as EditFinish;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static EditFinish create() => EditFinish._();
-  @$core.override
-  EditFinish createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static EditFinish getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<EditFinish>(create);
-  static EditFinish? _defaultInstance;
-}
-
-/// Returned by Edit() RPC. Reflects the engine's current edit state.
+/// Returned by Edit() RPC as a synchronous snapshot of the current edit
+/// session, or its absence.
+///
+/// `active == false` → no session is open; `session` is left at its proto
+///                     default (do not read its fields).
+/// `active == true`  → `session` carries the full current state (same shape
+///                     as EditorSessionStarted.session). Field-level
+///                     invariants documented on EditorSession apply.
+///
+/// Hosts that need to compose follow-up commands should read the session's
+/// `session_id` + `state_version` and pass them to EditorSessionCommand for
+/// optimistic concurrency.
 class EditState extends $pb.GeneratedMessage {
   factory EditState({
     $core.bool? active,
-    $core.int? row,
-    $core.int? col,
-    $core.String? text,
-    $core.int? selStart,
-    $core.int? selLength,
-    $core.bool? composing,
-    $core.String? preeditText,
-    EditUiMode? uiMode,
-    $core.double? x,
-    $core.double? y,
-    $core.double? width,
-    $core.double? height,
-    $core.int? maxLength,
+    EditorSession? session,
   }) {
     final result = create();
     if (active != null) result.active = active;
-    if (row != null) result.row = row;
-    if (col != null) result.col = col;
-    if (text != null) result.text = text;
-    if (selStart != null) result.selStart = selStart;
-    if (selLength != null) result.selLength = selLength;
-    if (composing != null) result.composing = composing;
-    if (preeditText != null) result.preeditText = preeditText;
-    if (uiMode != null) result.uiMode = uiMode;
-    if (x != null) result.x = x;
-    if (y != null) result.y = y;
-    if (width != null) result.width = width;
-    if (height != null) result.height = height;
-    if (maxLength != null) result.maxLength = maxLength;
+    if (session != null) result.session = session;
     return result;
   }
 
@@ -11763,20 +13626,8 @@ class EditState extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
     ..aOB(1, _omitFieldNames ? '' : 'active')
-    ..aI(2, _omitFieldNames ? '' : 'row')
-    ..aI(3, _omitFieldNames ? '' : 'col')
-    ..aOS(4, _omitFieldNames ? '' : 'text')
-    ..aI(5, _omitFieldNames ? '' : 'selStart')
-    ..aI(6, _omitFieldNames ? '' : 'selLength')
-    ..aOB(7, _omitFieldNames ? '' : 'composing')
-    ..aOS(8, _omitFieldNames ? '' : 'preeditText')
-    ..aE<EditUiMode>(9, _omitFieldNames ? '' : 'uiMode',
-        enumValues: EditUiMode.values)
-    ..aD(10, _omitFieldNames ? '' : 'x', fieldType: $pb.PbFieldType.OF)
-    ..aD(11, _omitFieldNames ? '' : 'y', fieldType: $pb.PbFieldType.OF)
-    ..aD(12, _omitFieldNames ? '' : 'width', fieldType: $pb.PbFieldType.OF)
-    ..aD(13, _omitFieldNames ? '' : 'height', fieldType: $pb.PbFieldType.OF)
-    ..aI(14, _omitFieldNames ? '' : 'maxLength')
+    ..aOM<EditorSession>(2, _omitFieldNames ? '' : 'session',
+        subBuilder: EditorSession.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -11807,121 +13658,15 @@ class EditState extends $pb.GeneratedMessage {
   void clearActive() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $core.int get row => $_getIZ(1);
+  EditorSession get session => $_getN(1);
   @$pb.TagNumber(2)
-  set row($core.int value) => $_setSignedInt32(1, value);
+  set session(EditorSession value) => $_setField(2, value);
   @$pb.TagNumber(2)
-  $core.bool hasRow() => $_has(1);
+  $core.bool hasSession() => $_has(1);
   @$pb.TagNumber(2)
-  void clearRow() => $_clearField(2);
-
-  @$pb.TagNumber(3)
-  $core.int get col => $_getIZ(2);
-  @$pb.TagNumber(3)
-  set col($core.int value) => $_setSignedInt32(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasCol() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearCol() => $_clearField(3);
-
-  @$pb.TagNumber(4)
-  $core.String get text => $_getSZ(3);
-  @$pb.TagNumber(4)
-  set text($core.String value) => $_setString(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasText() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearText() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $core.int get selStart => $_getIZ(4);
-  @$pb.TagNumber(5)
-  set selStart($core.int value) => $_setSignedInt32(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasSelStart() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearSelStart() => $_clearField(5);
-
-  @$pb.TagNumber(6)
-  $core.int get selLength => $_getIZ(5);
-  @$pb.TagNumber(6)
-  set selLength($core.int value) => $_setSignedInt32(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasSelLength() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearSelLength() => $_clearField(6);
-
-  @$pb.TagNumber(7)
-  $core.bool get composing => $_getBF(6);
-  @$pb.TagNumber(7)
-  set composing($core.bool value) => $_setBool(6, value);
-  @$pb.TagNumber(7)
-  $core.bool hasComposing() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearComposing() => $_clearField(7);
-
-  @$pb.TagNumber(8)
-  $core.String get preeditText => $_getSZ(7);
-  @$pb.TagNumber(8)
-  set preeditText($core.String value) => $_setString(7, value);
-  @$pb.TagNumber(8)
-  $core.bool hasPreeditText() => $_has(7);
-  @$pb.TagNumber(8)
-  void clearPreeditText() => $_clearField(8);
-
-  @$pb.TagNumber(9)
-  EditUiMode get uiMode => $_getN(8);
-  @$pb.TagNumber(9)
-  set uiMode(EditUiMode value) => $_setField(9, value);
-  @$pb.TagNumber(9)
-  $core.bool hasUiMode() => $_has(8);
-  @$pb.TagNumber(9)
-  void clearUiMode() => $_clearField(9);
-
-  @$pb.TagNumber(10)
-  $core.double get x => $_getN(9);
-  @$pb.TagNumber(10)
-  set x($core.double value) => $_setFloat(9, value);
-  @$pb.TagNumber(10)
-  $core.bool hasX() => $_has(9);
-  @$pb.TagNumber(10)
-  void clearX() => $_clearField(10);
-
-  @$pb.TagNumber(11)
-  $core.double get y => $_getN(10);
-  @$pb.TagNumber(11)
-  set y($core.double value) => $_setFloat(10, value);
-  @$pb.TagNumber(11)
-  $core.bool hasY() => $_has(10);
-  @$pb.TagNumber(11)
-  void clearY() => $_clearField(11);
-
-  @$pb.TagNumber(12)
-  $core.double get width => $_getN(11);
-  @$pb.TagNumber(12)
-  set width($core.double value) => $_setFloat(11, value);
-  @$pb.TagNumber(12)
-  $core.bool hasWidth() => $_has(11);
-  @$pb.TagNumber(12)
-  void clearWidth() => $_clearField(12);
-
-  @$pb.TagNumber(13)
-  $core.double get height => $_getN(12);
-  @$pb.TagNumber(13)
-  set height($core.double value) => $_setFloat(12, value);
-  @$pb.TagNumber(13)
-  $core.bool hasHeight() => $_has(12);
-  @$pb.TagNumber(13)
-  void clearHeight() => $_clearField(13);
-
-  @$pb.TagNumber(14)
-  $core.int get maxLength => $_getIZ(13);
-  @$pb.TagNumber(14)
-  set maxLength($core.int value) => $_setSignedInt32(13, value);
-  @$pb.TagNumber(14)
-  $core.bool hasMaxLength() => $_has(13);
-  @$pb.TagNumber(14)
-  void clearMaxLength() => $_clearField(14);
+  void clearSession() => $_clearField(2);
+  @$pb.TagNumber(2)
+  EditorSession ensureSession() => $_ensure(1);
 }
 
 class SortColumn extends $pb.GeneratedMessage {
@@ -16994,6 +18739,8 @@ enum RenderInput_Input {
   terminalViewport,
   terminalCommand,
   compareResponse,
+  editValidationResponse,
+  editorListItemsResponse,
   notSet
 }
 
@@ -17013,6 +18760,8 @@ class RenderInput extends $pb.GeneratedMessage {
     TerminalViewport? terminalViewport,
     TerminalCommand? terminalCommand,
     CompareResponse? compareResponse,
+    EditValidationResponse? editValidationResponse,
+    EditorListItemsResponse? editorListItemsResponse,
   }) {
     final result = create();
     if (gridId != null) result.gridId = gridId;
@@ -17030,6 +18779,10 @@ class RenderInput extends $pb.GeneratedMessage {
     if (terminalViewport != null) result.terminalViewport = terminalViewport;
     if (terminalCommand != null) result.terminalCommand = terminalCommand;
     if (compareResponse != null) result.compareResponse = compareResponse;
+    if (editValidationResponse != null)
+      result.editValidationResponse = editValidationResponse;
+    if (editorListItemsResponse != null)
+      result.editorListItemsResponse = editorListItemsResponse;
     return result;
   }
 
@@ -17057,13 +18810,15 @@ class RenderInput extends $pb.GeneratedMessage {
     12: RenderInput_Input.terminalViewport,
     13: RenderInput_Input.terminalCommand,
     14: RenderInput_Input.compareResponse,
+    15: RenderInput_Input.editValidationResponse,
+    16: RenderInput_Input.editorListItemsResponse,
     0: RenderInput_Input.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'RenderInput',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
-    ..oo(0, [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14])
+    ..oo(0, [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16])
     ..aInt64(1, _omitFieldNames ? '' : 'gridId')
     ..aOM<ViewportState>(2, _omitFieldNames ? '' : 'viewport',
         subBuilder: ViewportState.create)
@@ -17092,6 +18847,12 @@ class RenderInput extends $pb.GeneratedMessage {
         subBuilder: TerminalCommand.create)
     ..aOM<CompareResponse>(14, _omitFieldNames ? '' : 'compareResponse',
         subBuilder: CompareResponse.create)
+    ..aOM<EditValidationResponse>(
+        15, _omitFieldNames ? '' : 'editValidationResponse',
+        subBuilder: EditValidationResponse.create)
+    ..aOM<EditorListItemsResponse>(
+        16, _omitFieldNames ? '' : 'editorListItemsResponse',
+        subBuilder: EditorListItemsResponse.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -17126,6 +18887,8 @@ class RenderInput extends $pb.GeneratedMessage {
   @$pb.TagNumber(12)
   @$pb.TagNumber(13)
   @$pb.TagNumber(14)
+  @$pb.TagNumber(15)
+  @$pb.TagNumber(16)
   RenderInput_Input whichInput() => _RenderInput_InputByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(2)
   @$pb.TagNumber(3)
@@ -17140,6 +18903,8 @@ class RenderInput extends $pb.GeneratedMessage {
   @$pb.TagNumber(12)
   @$pb.TagNumber(13)
   @$pb.TagNumber(14)
+  @$pb.TagNumber(15)
+  @$pb.TagNumber(16)
   void clearInput() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -17293,6 +19058,30 @@ class RenderInput extends $pb.GeneratedMessage {
   void clearCompareResponse() => $_clearField(14);
   @$pb.TagNumber(14)
   CompareResponse ensureCompareResponse() => $_ensure(13);
+
+  @$pb.TagNumber(15)
+  EditValidationResponse get editValidationResponse => $_getN(14);
+  @$pb.TagNumber(15)
+  set editValidationResponse(EditValidationResponse value) =>
+      $_setField(15, value);
+  @$pb.TagNumber(15)
+  $core.bool hasEditValidationResponse() => $_has(14);
+  @$pb.TagNumber(15)
+  void clearEditValidationResponse() => $_clearField(15);
+  @$pb.TagNumber(15)
+  EditValidationResponse ensureEditValidationResponse() => $_ensure(14);
+
+  @$pb.TagNumber(16)
+  EditorListItemsResponse get editorListItemsResponse => $_getN(15);
+  @$pb.TagNumber(16)
+  set editorListItemsResponse(EditorListItemsResponse value) =>
+      $_setField(16, value);
+  @$pb.TagNumber(16)
+  $core.bool hasEditorListItemsResponse() => $_has(15);
+  @$pb.TagNumber(16)
+  void clearEditorListItemsResponse() => $_clearField(16);
+  @$pb.TagNumber(16)
+  EditorListItemsResponse ensureEditorListItemsResponse() => $_ensure(15);
 }
 
 /// Host response to a CompareEvent emitted on EventStream during
@@ -17362,6 +19151,181 @@ class CompareResponse extends $pb.GeneratedMessage {
   $core.bool hasResult() => $_has(1);
   @$pb.TagNumber(2)
   void clearResult() => $_clearField(2);
+}
+
+class EditValidationResponse extends $pb.GeneratedMessage {
+  factory EditValidationResponse({
+    $fixnum.Int64? requestId,
+    $fixnum.Int64? sessionId,
+    $core.Iterable<ValidationError>? errors,
+    EditorValue? normalizedValue,
+  }) {
+    final result = create();
+    if (requestId != null) result.requestId = requestId;
+    if (sessionId != null) result.sessionId = sessionId;
+    if (errors != null) result.errors.addAll(errors);
+    if (normalizedValue != null) result.normalizedValue = normalizedValue;
+    return result;
+  }
+
+  EditValidationResponse._();
+
+  factory EditValidationResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory EditValidationResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'EditValidationResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aInt64(1, _omitFieldNames ? '' : 'requestId')
+    ..aInt64(2, _omitFieldNames ? '' : 'sessionId')
+    ..pPM<ValidationError>(3, _omitFieldNames ? '' : 'errors',
+        subBuilder: ValidationError.create)
+    ..aOM<EditorValue>(4, _omitFieldNames ? '' : 'normalizedValue',
+        subBuilder: EditorValue.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EditValidationResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EditValidationResponse copyWith(
+          void Function(EditValidationResponse) updates) =>
+      super.copyWith((message) => updates(message as EditValidationResponse))
+          as EditValidationResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static EditValidationResponse create() => EditValidationResponse._();
+  @$core.override
+  EditValidationResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static EditValidationResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<EditValidationResponse>(create);
+  static EditValidationResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get requestId => $_getI64(0);
+  @$pb.TagNumber(1)
+  set requestId($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasRequestId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRequestId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $fixnum.Int64 get sessionId => $_getI64(1);
+  @$pb.TagNumber(2)
+  set sessionId($fixnum.Int64 value) => $_setInt64(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasSessionId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearSessionId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $pb.PbList<ValidationError> get errors => $_getList(2);
+
+  @$pb.TagNumber(4)
+  EditorValue get normalizedValue => $_getN(3);
+  @$pb.TagNumber(4)
+  set normalizedValue(EditorValue value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasNormalizedValue() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearNormalizedValue() => $_clearField(4);
+  @$pb.TagNumber(4)
+  EditorValue ensureNormalizedValue() => $_ensure(3);
+}
+
+class EditorListItemsResponse extends $pb.GeneratedMessage {
+  factory EditorListItemsResponse({
+    $fixnum.Int64? requestId,
+    $fixnum.Int64? sessionId,
+    $core.Iterable<ListItem>? items,
+    $core.bool? hasMore,
+  }) {
+    final result = create();
+    if (requestId != null) result.requestId = requestId;
+    if (sessionId != null) result.sessionId = sessionId;
+    if (items != null) result.items.addAll(items);
+    if (hasMore != null) result.hasMore = hasMore;
+    return result;
+  }
+
+  EditorListItemsResponse._();
+
+  factory EditorListItemsResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory EditorListItemsResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'EditorListItemsResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aInt64(1, _omitFieldNames ? '' : 'requestId')
+    ..aInt64(2, _omitFieldNames ? '' : 'sessionId')
+    ..pPM<ListItem>(3, _omitFieldNames ? '' : 'items',
+        subBuilder: ListItem.create)
+    ..aOB(4, _omitFieldNames ? '' : 'hasMore')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EditorListItemsResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EditorListItemsResponse copyWith(
+          void Function(EditorListItemsResponse) updates) =>
+      super.copyWith((message) => updates(message as EditorListItemsResponse))
+          as EditorListItemsResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static EditorListItemsResponse create() => EditorListItemsResponse._();
+  @$core.override
+  EditorListItemsResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static EditorListItemsResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<EditorListItemsResponse>(create);
+  static EditorListItemsResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get requestId => $_getI64(0);
+  @$pb.TagNumber(1)
+  set requestId($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasRequestId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRequestId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $fixnum.Int64 get sessionId => $_getI64(1);
+  @$pb.TagNumber(2)
+  set sessionId($fixnum.Int64 value) => $_setInt64(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasSessionId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearSessionId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $pb.PbList<ListItem> get items => $_getList(2);
+
+  @$pb.TagNumber(4)
+  $core.bool get hasMore => $_getBF(3);
+  @$pb.TagNumber(4)
+  set hasMore($core.bool value) => $_setBool(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasHasMore() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearHasMore() => $_clearField(4);
 }
 
 class ViewportState extends $pb.GeneratedMessage {
@@ -18320,7 +20284,7 @@ class GpuSurfaceReady extends $pb.GeneratedMessage {
 /// InteractionConfig.decision_timeout_ms with a finite value to enable a
 /// watchdog; on timeout the engine emits ErrorEvent and auto-allows.
 ///
-/// Cancelable events: BeforeEdit, BeforeDropdownOpen, CellEditValidate, BeforeSort,
+/// Cancelable events: BeforeEdit, CellEditValidate, BeforeSort,
 /// BeforeNodeToggle, BeforeScroll, BeforeUserResize, BeforeMoveColumn,
 /// BeforeMoveRow, BeforeMouseDown. Print-only BeforePageBreak is emitted
 /// during synchronous rendering and is informational in this API.
@@ -18406,8 +20370,9 @@ enum RenderOutput_Event {
   frameDone,
   selection,
   cursor,
-  editRequest,
-  dropdownRequest,
+  editorStarted,
+  editorUpdated,
+  editorEnded,
   tooltipRequest,
   gpuFrameDone,
   notSet
@@ -18423,8 +20388,9 @@ class RenderOutput extends $pb.GeneratedMessage {
     FrameDone? frameDone,
     SelectionUpdate? selection,
     CursorChange? cursor,
-    EditRequest? editRequest,
-    DropdownRequest? dropdownRequest,
+    EditorSessionStarted? editorStarted,
+    EditorSessionUpdated? editorUpdated,
+    EditorSessionEnded? editorEnded,
     TooltipRequest? tooltipRequest,
     GpuFrameDone? gpuFrameDone,
   }) {
@@ -18433,8 +20399,9 @@ class RenderOutput extends $pb.GeneratedMessage {
     if (frameDone != null) result.frameDone = frameDone;
     if (selection != null) result.selection = selection;
     if (cursor != null) result.cursor = cursor;
-    if (editRequest != null) result.editRequest = editRequest;
-    if (dropdownRequest != null) result.dropdownRequest = dropdownRequest;
+    if (editorStarted != null) result.editorStarted = editorStarted;
+    if (editorUpdated != null) result.editorUpdated = editorUpdated;
+    if (editorEnded != null) result.editorEnded = editorEnded;
     if (tooltipRequest != null) result.tooltipRequest = tooltipRequest;
     if (gpuFrameDone != null) result.gpuFrameDone = gpuFrameDone;
     return result;
@@ -18454,17 +20421,18 @@ class RenderOutput extends $pb.GeneratedMessage {
     2: RenderOutput_Event.frameDone,
     3: RenderOutput_Event.selection,
     4: RenderOutput_Event.cursor,
-    5: RenderOutput_Event.editRequest,
-    6: RenderOutput_Event.dropdownRequest,
-    7: RenderOutput_Event.tooltipRequest,
-    8: RenderOutput_Event.gpuFrameDone,
+    5: RenderOutput_Event.editorStarted,
+    6: RenderOutput_Event.editorUpdated,
+    7: RenderOutput_Event.editorEnded,
+    8: RenderOutput_Event.tooltipRequest,
+    9: RenderOutput_Event.gpuFrameDone,
     0: RenderOutput_Event.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'RenderOutput',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
-    ..oo(0, [2, 3, 4, 5, 6, 7, 8])
+    ..oo(0, [2, 3, 4, 5, 6, 7, 8, 9])
     ..aOB(1, _omitFieldNames ? '' : 'rendered')
     ..aOM<FrameDone>(2, _omitFieldNames ? '' : 'frameDone',
         subBuilder: FrameDone.create)
@@ -18472,13 +20440,15 @@ class RenderOutput extends $pb.GeneratedMessage {
         subBuilder: SelectionUpdate.create)
     ..aOM<CursorChange>(4, _omitFieldNames ? '' : 'cursor',
         subBuilder: CursorChange.create)
-    ..aOM<EditRequest>(5, _omitFieldNames ? '' : 'editRequest',
-        subBuilder: EditRequest.create)
-    ..aOM<DropdownRequest>(6, _omitFieldNames ? '' : 'dropdownRequest',
-        subBuilder: DropdownRequest.create)
-    ..aOM<TooltipRequest>(7, _omitFieldNames ? '' : 'tooltipRequest',
+    ..aOM<EditorSessionStarted>(5, _omitFieldNames ? '' : 'editorStarted',
+        subBuilder: EditorSessionStarted.create)
+    ..aOM<EditorSessionUpdated>(6, _omitFieldNames ? '' : 'editorUpdated',
+        subBuilder: EditorSessionUpdated.create)
+    ..aOM<EditorSessionEnded>(7, _omitFieldNames ? '' : 'editorEnded',
+        subBuilder: EditorSessionEnded.create)
+    ..aOM<TooltipRequest>(8, _omitFieldNames ? '' : 'tooltipRequest',
         subBuilder: TooltipRequest.create)
-    ..aOM<GpuFrameDone>(8, _omitFieldNames ? '' : 'gpuFrameDone',
+    ..aOM<GpuFrameDone>(9, _omitFieldNames ? '' : 'gpuFrameDone',
         subBuilder: GpuFrameDone.create)
     ..hasRequiredFields = false;
 
@@ -18508,6 +20478,7 @@ class RenderOutput extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   @$pb.TagNumber(7)
   @$pb.TagNumber(8)
+  @$pb.TagNumber(9)
   RenderOutput_Event whichEvent() => _RenderOutput_EventByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(2)
   @$pb.TagNumber(3)
@@ -18516,6 +20487,7 @@ class RenderOutput extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   @$pb.TagNumber(7)
   @$pb.TagNumber(8)
+  @$pb.TagNumber(9)
   void clearEvent() => $_clearField($_whichOneof(0));
 
   /// true if pixels were actually painted this frame.
@@ -18564,48 +20536,59 @@ class RenderOutput extends $pb.GeneratedMessage {
   CursorChange ensureCursor() => $_ensure(3);
 
   @$pb.TagNumber(5)
-  EditRequest get editRequest => $_getN(4);
+  EditorSessionStarted get editorStarted => $_getN(4);
   @$pb.TagNumber(5)
-  set editRequest(EditRequest value) => $_setField(5, value);
+  set editorStarted(EditorSessionStarted value) => $_setField(5, value);
   @$pb.TagNumber(5)
-  $core.bool hasEditRequest() => $_has(4);
+  $core.bool hasEditorStarted() => $_has(4);
   @$pb.TagNumber(5)
-  void clearEditRequest() => $_clearField(5);
+  void clearEditorStarted() => $_clearField(5);
   @$pb.TagNumber(5)
-  EditRequest ensureEditRequest() => $_ensure(4);
+  EditorSessionStarted ensureEditorStarted() => $_ensure(4);
 
   @$pb.TagNumber(6)
-  DropdownRequest get dropdownRequest => $_getN(5);
+  EditorSessionUpdated get editorUpdated => $_getN(5);
   @$pb.TagNumber(6)
-  set dropdownRequest(DropdownRequest value) => $_setField(6, value);
+  set editorUpdated(EditorSessionUpdated value) => $_setField(6, value);
   @$pb.TagNumber(6)
-  $core.bool hasDropdownRequest() => $_has(5);
+  $core.bool hasEditorUpdated() => $_has(5);
   @$pb.TagNumber(6)
-  void clearDropdownRequest() => $_clearField(6);
+  void clearEditorUpdated() => $_clearField(6);
   @$pb.TagNumber(6)
-  DropdownRequest ensureDropdownRequest() => $_ensure(5);
+  EditorSessionUpdated ensureEditorUpdated() => $_ensure(5);
 
   @$pb.TagNumber(7)
-  TooltipRequest get tooltipRequest => $_getN(6);
+  EditorSessionEnded get editorEnded => $_getN(6);
   @$pb.TagNumber(7)
-  set tooltipRequest(TooltipRequest value) => $_setField(7, value);
+  set editorEnded(EditorSessionEnded value) => $_setField(7, value);
   @$pb.TagNumber(7)
-  $core.bool hasTooltipRequest() => $_has(6);
+  $core.bool hasEditorEnded() => $_has(6);
   @$pb.TagNumber(7)
-  void clearTooltipRequest() => $_clearField(7);
+  void clearEditorEnded() => $_clearField(7);
   @$pb.TagNumber(7)
-  TooltipRequest ensureTooltipRequest() => $_ensure(6);
+  EditorSessionEnded ensureEditorEnded() => $_ensure(6);
 
   @$pb.TagNumber(8)
-  GpuFrameDone get gpuFrameDone => $_getN(7);
+  TooltipRequest get tooltipRequest => $_getN(7);
   @$pb.TagNumber(8)
-  set gpuFrameDone(GpuFrameDone value) => $_setField(8, value);
+  set tooltipRequest(TooltipRequest value) => $_setField(8, value);
   @$pb.TagNumber(8)
-  $core.bool hasGpuFrameDone() => $_has(7);
+  $core.bool hasTooltipRequest() => $_has(7);
   @$pb.TagNumber(8)
-  void clearGpuFrameDone() => $_clearField(8);
+  void clearTooltipRequest() => $_clearField(8);
   @$pb.TagNumber(8)
-  GpuFrameDone ensureGpuFrameDone() => $_ensure(7);
+  TooltipRequest ensureTooltipRequest() => $_ensure(7);
+
+  @$pb.TagNumber(9)
+  GpuFrameDone get gpuFrameDone => $_getN(8);
+  @$pb.TagNumber(9)
+  set gpuFrameDone(GpuFrameDone value) => $_setField(9, value);
+  @$pb.TagNumber(9)
+  $core.bool hasGpuFrameDone() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearGpuFrameDone() => $_clearField(9);
+  @$pb.TagNumber(9)
+  GpuFrameDone ensureGpuFrameDone() => $_ensure(8);
 }
 
 /// CPU frame completion. The dirty rect tells the host which region
@@ -19090,342 +21073,347 @@ class CursorChange extends $pb.GeneratedMessage {
   void clearCursor() => $_clearField(1);
 }
 
-/// Emitted on RenderOutput when the engine wants the host to show an
-/// edit overlay. The host should position a native text input at (x,y)
-/// with the given dimensions and pre-fill it with current_value.
-/// See runtime/src/lib.rs build_edit_request().
-class EditRequest extends $pb.GeneratedMessage {
-  factory EditRequest({
-    $core.int? row,
-    $core.int? col,
-    $core.double? x,
-    $core.double? y,
-    $core.double? width,
-    $core.double? height,
-    $core.String? currentValue,
-    $core.String? editMask,
-    $core.int? maxLength,
-    $core.int? selStart,
-    $core.int? selLength,
-    EditUiMode? uiMode,
+/// Engine → host. Begins an editor session on the host side. Carries the full
+/// EditorSession snapshot. For engine-drawn editors the EditorSpec inside
+/// `session.editor` will have presentation = EDITOR_CANVAS; the host MUST
+/// track the session for clipboard / keyboard routing but MUST NOT show an
+/// overlay.
+class EditorSessionStarted extends $pb.GeneratedMessage {
+  factory EditorSessionStarted({
+    EditorSession? session,
   }) {
     final result = create();
-    if (row != null) result.row = row;
-    if (col != null) result.col = col;
-    if (x != null) result.x = x;
-    if (y != null) result.y = y;
-    if (width != null) result.width = width;
-    if (height != null) result.height = height;
-    if (currentValue != null) result.currentValue = currentValue;
-    if (editMask != null) result.editMask = editMask;
-    if (maxLength != null) result.maxLength = maxLength;
-    if (selStart != null) result.selStart = selStart;
-    if (selLength != null) result.selLength = selLength;
-    if (uiMode != null) result.uiMode = uiMode;
+    if (session != null) result.session = session;
     return result;
   }
 
-  EditRequest._();
+  EditorSessionStarted._();
 
-  factory EditRequest.fromBuffer($core.List<$core.int> data,
+  factory EditorSessionStarted.fromBuffer($core.List<$core.int> data,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromBuffer(data, registry);
-  factory EditRequest.fromJson($core.String json,
+  factory EditorSessionStarted.fromJson($core.String json,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromJson(json, registry);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'EditRequest',
+      _omitMessageNames ? '' : 'EditorSessionStarted',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
-    ..aI(1, _omitFieldNames ? '' : 'row')
-    ..aI(2, _omitFieldNames ? '' : 'col')
-    ..aD(3, _omitFieldNames ? '' : 'x', fieldType: $pb.PbFieldType.OF)
-    ..aD(4, _omitFieldNames ? '' : 'y', fieldType: $pb.PbFieldType.OF)
-    ..aD(5, _omitFieldNames ? '' : 'width', fieldType: $pb.PbFieldType.OF)
-    ..aD(6, _omitFieldNames ? '' : 'height', fieldType: $pb.PbFieldType.OF)
-    ..aOS(7, _omitFieldNames ? '' : 'currentValue')
-    ..aOS(8, _omitFieldNames ? '' : 'editMask')
-    ..aI(9, _omitFieldNames ? '' : 'maxLength')
-    ..aI(10, _omitFieldNames ? '' : 'selStart')
-    ..aI(11, _omitFieldNames ? '' : 'selLength')
-    ..aE<EditUiMode>(12, _omitFieldNames ? '' : 'uiMode',
-        enumValues: EditUiMode.values)
+    ..aOM<EditorSession>(1, _omitFieldNames ? '' : 'session',
+        subBuilder: EditorSession.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  EditRequest clone() => deepCopy();
+  EditorSessionStarted clone() => deepCopy();
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  EditRequest copyWith(void Function(EditRequest) updates) =>
-      super.copyWith((message) => updates(message as EditRequest))
-          as EditRequest;
+  EditorSessionStarted copyWith(void Function(EditorSessionStarted) updates) =>
+      super.copyWith((message) => updates(message as EditorSessionStarted))
+          as EditorSessionStarted;
 
   @$core.override
   $pb.BuilderInfo get info_ => _i;
 
   @$core.pragma('dart2js:noInline')
-  static EditRequest create() => EditRequest._();
+  static EditorSessionStarted create() => EditorSessionStarted._();
   @$core.override
-  EditRequest createEmptyInstance() => create();
+  EditorSessionStarted createEmptyInstance() => create();
   @$core.pragma('dart2js:noInline')
-  static EditRequest getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<EditRequest>(create);
-  static EditRequest? _defaultInstance;
+  static EditorSessionStarted getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<EditorSessionStarted>(create);
+  static EditorSessionStarted? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $core.int get row => $_getIZ(0);
+  EditorSession get session => $_getN(0);
   @$pb.TagNumber(1)
-  set row($core.int value) => $_setSignedInt32(0, value);
+  set session(EditorSession value) => $_setField(1, value);
   @$pb.TagNumber(1)
-  $core.bool hasRow() => $_has(0);
+  $core.bool hasSession() => $_has(0);
   @$pb.TagNumber(1)
-  void clearRow() => $_clearField(1);
-
-  @$pb.TagNumber(2)
-  $core.int get col => $_getIZ(1);
-  @$pb.TagNumber(2)
-  set col($core.int value) => $_setSignedInt32(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasCol() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearCol() => $_clearField(2);
-
-  @$pb.TagNumber(3)
-  $core.double get x => $_getN(2);
-  @$pb.TagNumber(3)
-  set x($core.double value) => $_setFloat(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasX() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearX() => $_clearField(3);
-
-  @$pb.TagNumber(4)
-  $core.double get y => $_getN(3);
-  @$pb.TagNumber(4)
-  set y($core.double value) => $_setFloat(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasY() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearY() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $core.double get width => $_getN(4);
-  @$pb.TagNumber(5)
-  set width($core.double value) => $_setFloat(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasWidth() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearWidth() => $_clearField(5);
-
-  @$pb.TagNumber(6)
-  $core.double get height => $_getN(5);
-  @$pb.TagNumber(6)
-  set height($core.double value) => $_setFloat(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasHeight() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearHeight() => $_clearField(6);
-
-  @$pb.TagNumber(7)
-  $core.String get currentValue => $_getSZ(6);
-  @$pb.TagNumber(7)
-  set currentValue($core.String value) => $_setString(6, value);
-  @$pb.TagNumber(7)
-  $core.bool hasCurrentValue() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearCurrentValue() => $_clearField(7);
-
-  @$pb.TagNumber(8)
-  $core.String get editMask => $_getSZ(7);
-  @$pb.TagNumber(8)
-  set editMask($core.String value) => $_setString(7, value);
-  @$pb.TagNumber(8)
-  $core.bool hasEditMask() => $_has(7);
-  @$pb.TagNumber(8)
-  void clearEditMask() => $_clearField(8);
-
-  @$pb.TagNumber(9)
-  $core.int get maxLength => $_getIZ(8);
-  @$pb.TagNumber(9)
-  set maxLength($core.int value) => $_setSignedInt32(8, value);
-  @$pb.TagNumber(9)
-  $core.bool hasMaxLength() => $_has(8);
-  @$pb.TagNumber(9)
-  void clearMaxLength() => $_clearField(9);
-
-  @$pb.TagNumber(10)
-  $core.int get selStart => $_getIZ(9);
-  @$pb.TagNumber(10)
-  set selStart($core.int value) => $_setSignedInt32(9, value);
-  @$pb.TagNumber(10)
-  $core.bool hasSelStart() => $_has(9);
-  @$pb.TagNumber(10)
-  void clearSelStart() => $_clearField(10);
-
-  @$pb.TagNumber(11)
-  $core.int get selLength => $_getIZ(10);
-  @$pb.TagNumber(11)
-  set selLength($core.int value) => $_setSignedInt32(10, value);
-  @$pb.TagNumber(11)
-  $core.bool hasSelLength() => $_has(10);
-  @$pb.TagNumber(11)
-  void clearSelLength() => $_clearField(11);
-
-  /// ENTER (0): Enter commits and moves cursor. Character keys replace content.
-  /// EDIT (1):  F2 mode. Caret at end. Escape cancels.
-  @$pb.TagNumber(12)
-  EditUiMode get uiMode => $_getN(11);
-  @$pb.TagNumber(12)
-  set uiMode(EditUiMode value) => $_setField(12, value);
-  @$pb.TagNumber(12)
-  $core.bool hasUiMode() => $_has(11);
-  @$pb.TagNumber(12)
-  void clearUiMode() => $_clearField(12);
+  void clearSession() => $_clearField(1);
+  @$pb.TagNumber(1)
+  EditorSession ensureSession() => $_ensure(0);
 }
 
-class DropdownRequest extends $pb.GeneratedMessage {
-  factory DropdownRequest({
-    $core.int? row,
-    $core.int? col,
-    $core.double? x,
-    $core.double? y,
-    $core.double? width,
-    $core.double? height,
-    $core.Iterable<$core.String>? items,
-    $core.int? selected,
-    $core.bool? editable,
+/// Engine → host. Sparse delta against the last known session. Any field left
+/// unset is unchanged; `validation_errors` is always authoritative when present.
+///
+/// Why this is flat (not nested in `session` like EditorSessionStarted): this
+/// is a partial update against a previously-Started snapshot, not a fresh
+/// snapshot. Nesting it inside an EditorSession submessage would force every
+/// reader to handle the "field present but inner field unset" case for each
+/// mutable field, with no benefit since the immutable fields (row, col,
+/// editor, ui_mode, …) are guaranteed unchanged.
+class EditorSessionUpdated extends $pb.GeneratedMessage {
+  factory EditorSessionUpdated({
+    $fixnum.Int64? sessionId,
+    $fixnum.Int64? stateVersion,
+    EditorUpdateReason? reason,
+    Rect? viewportRect,
+    EditorValue? value,
+    TextSelection? selection,
+    $core.bool? visible,
+    $core.bool? forceRefocus,
+    $core.Iterable<ValidationError>? validationErrors,
+    StructValue? customPayload,
   }) {
     final result = create();
-    if (row != null) result.row = row;
-    if (col != null) result.col = col;
-    if (x != null) result.x = x;
-    if (y != null) result.y = y;
-    if (width != null) result.width = width;
-    if (height != null) result.height = height;
-    if (items != null) result.items.addAll(items);
-    if (selected != null) result.selected = selected;
-    if (editable != null) result.editable = editable;
+    if (sessionId != null) result.sessionId = sessionId;
+    if (stateVersion != null) result.stateVersion = stateVersion;
+    if (reason != null) result.reason = reason;
+    if (viewportRect != null) result.viewportRect = viewportRect;
+    if (value != null) result.value = value;
+    if (selection != null) result.selection = selection;
+    if (visible != null) result.visible = visible;
+    if (forceRefocus != null) result.forceRefocus = forceRefocus;
+    if (validationErrors != null)
+      result.validationErrors.addAll(validationErrors);
+    if (customPayload != null) result.customPayload = customPayload;
     return result;
   }
 
-  DropdownRequest._();
+  EditorSessionUpdated._();
 
-  factory DropdownRequest.fromBuffer($core.List<$core.int> data,
+  factory EditorSessionUpdated.fromBuffer($core.List<$core.int> data,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromBuffer(data, registry);
-  factory DropdownRequest.fromJson($core.String json,
+  factory EditorSessionUpdated.fromJson($core.String json,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromJson(json, registry);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'DropdownRequest',
+      _omitMessageNames ? '' : 'EditorSessionUpdated',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
-    ..aI(1, _omitFieldNames ? '' : 'row')
-    ..aI(2, _omitFieldNames ? '' : 'col')
-    ..aD(3, _omitFieldNames ? '' : 'x', fieldType: $pb.PbFieldType.OF)
-    ..aD(4, _omitFieldNames ? '' : 'y', fieldType: $pb.PbFieldType.OF)
-    ..aD(5, _omitFieldNames ? '' : 'width', fieldType: $pb.PbFieldType.OF)
-    ..aD(6, _omitFieldNames ? '' : 'height', fieldType: $pb.PbFieldType.OF)
-    ..pPS(7, _omitFieldNames ? '' : 'items')
-    ..aI(8, _omitFieldNames ? '' : 'selected')
-    ..aOB(9, _omitFieldNames ? '' : 'editable')
+    ..aInt64(1, _omitFieldNames ? '' : 'sessionId')
+    ..a<$fixnum.Int64>(
+        2, _omitFieldNames ? '' : 'stateVersion', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aE<EditorUpdateReason>(3, _omitFieldNames ? '' : 'reason',
+        enumValues: EditorUpdateReason.values)
+    ..aOM<Rect>(4, _omitFieldNames ? '' : 'viewportRect',
+        subBuilder: Rect.create)
+    ..aOM<EditorValue>(5, _omitFieldNames ? '' : 'value',
+        subBuilder: EditorValue.create)
+    ..aOM<TextSelection>(6, _omitFieldNames ? '' : 'selection',
+        subBuilder: TextSelection.create)
+    ..aOB(7, _omitFieldNames ? '' : 'visible')
+    ..aOB(8, _omitFieldNames ? '' : 'forceRefocus')
+    ..pPM<ValidationError>(9, _omitFieldNames ? '' : 'validationErrors',
+        subBuilder: ValidationError.create)
+    ..aOM<StructValue>(10, _omitFieldNames ? '' : 'customPayload',
+        subBuilder: StructValue.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  DropdownRequest clone() => deepCopy();
+  EditorSessionUpdated clone() => deepCopy();
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  DropdownRequest copyWith(void Function(DropdownRequest) updates) =>
-      super.copyWith((message) => updates(message as DropdownRequest))
-          as DropdownRequest;
+  EditorSessionUpdated copyWith(void Function(EditorSessionUpdated) updates) =>
+      super.copyWith((message) => updates(message as EditorSessionUpdated))
+          as EditorSessionUpdated;
 
   @$core.override
   $pb.BuilderInfo get info_ => _i;
 
   @$core.pragma('dart2js:noInline')
-  static DropdownRequest create() => DropdownRequest._();
+  static EditorSessionUpdated create() => EditorSessionUpdated._();
   @$core.override
-  DropdownRequest createEmptyInstance() => create();
+  EditorSessionUpdated createEmptyInstance() => create();
   @$core.pragma('dart2js:noInline')
-  static DropdownRequest getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<DropdownRequest>(create);
-  static DropdownRequest? _defaultInstance;
+  static EditorSessionUpdated getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<EditorSessionUpdated>(create);
+  static EditorSessionUpdated? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $core.int get row => $_getIZ(0);
+  $fixnum.Int64 get sessionId => $_getI64(0);
   @$pb.TagNumber(1)
-  set row($core.int value) => $_setSignedInt32(0, value);
+  set sessionId($fixnum.Int64 value) => $_setInt64(0, value);
   @$pb.TagNumber(1)
-  $core.bool hasRow() => $_has(0);
+  $core.bool hasSessionId() => $_has(0);
   @$pb.TagNumber(1)
-  void clearRow() => $_clearField(1);
+  void clearSessionId() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $core.int get col => $_getIZ(1);
+  $fixnum.Int64 get stateVersion => $_getI64(1);
   @$pb.TagNumber(2)
-  set col($core.int value) => $_setSignedInt32(1, value);
+  set stateVersion($fixnum.Int64 value) => $_setInt64(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasCol() => $_has(1);
+  $core.bool hasStateVersion() => $_has(1);
   @$pb.TagNumber(2)
-  void clearCol() => $_clearField(2);
+  void clearStateVersion() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $core.double get x => $_getN(2);
+  EditorUpdateReason get reason => $_getN(2);
   @$pb.TagNumber(3)
-  set x($core.double value) => $_setFloat(2, value);
+  set reason(EditorUpdateReason value) => $_setField(3, value);
   @$pb.TagNumber(3)
-  $core.bool hasX() => $_has(2);
+  $core.bool hasReason() => $_has(2);
   @$pb.TagNumber(3)
-  void clearX() => $_clearField(3);
+  void clearReason() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  $core.double get y => $_getN(3);
+  Rect get viewportRect => $_getN(3);
   @$pb.TagNumber(4)
-  set y($core.double value) => $_setFloat(3, value);
+  set viewportRect(Rect value) => $_setField(4, value);
   @$pb.TagNumber(4)
-  $core.bool hasY() => $_has(3);
+  $core.bool hasViewportRect() => $_has(3);
   @$pb.TagNumber(4)
-  void clearY() => $_clearField(4);
+  void clearViewportRect() => $_clearField(4);
+  @$pb.TagNumber(4)
+  Rect ensureViewportRect() => $_ensure(3);
 
   @$pb.TagNumber(5)
-  $core.double get width => $_getN(4);
+  EditorValue get value => $_getN(4);
   @$pb.TagNumber(5)
-  set width($core.double value) => $_setFloat(4, value);
+  set value(EditorValue value) => $_setField(5, value);
   @$pb.TagNumber(5)
-  $core.bool hasWidth() => $_has(4);
+  $core.bool hasValue() => $_has(4);
   @$pb.TagNumber(5)
-  void clearWidth() => $_clearField(5);
+  void clearValue() => $_clearField(5);
+  @$pb.TagNumber(5)
+  EditorValue ensureValue() => $_ensure(4);
 
   @$pb.TagNumber(6)
-  $core.double get height => $_getN(5);
+  TextSelection get selection => $_getN(5);
   @$pb.TagNumber(6)
-  set height($core.double value) => $_setFloat(5, value);
+  set selection(TextSelection value) => $_setField(6, value);
   @$pb.TagNumber(6)
-  $core.bool hasHeight() => $_has(5);
+  $core.bool hasSelection() => $_has(5);
   @$pb.TagNumber(6)
-  void clearHeight() => $_clearField(6);
+  void clearSelection() => $_clearField(6);
+  @$pb.TagNumber(6)
+  TextSelection ensureSelection() => $_ensure(5);
 
   @$pb.TagNumber(7)
-  $pb.PbList<$core.String> get items => $_getList(6);
+  $core.bool get visible => $_getBF(6);
+  @$pb.TagNumber(7)
+  set visible($core.bool value) => $_setBool(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasVisible() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearVisible() => $_clearField(7);
 
+  /// Edge-triggered: when true, the host should re-focus its overlay widget on
+  /// the next tick. Stale Updateds replayed across reconnect are gated by
+  /// `state_version`.
   @$pb.TagNumber(8)
-  $core.int get selected => $_getIZ(7);
+  $core.bool get forceRefocus => $_getBF(7);
   @$pb.TagNumber(8)
-  set selected($core.int value) => $_setSignedInt32(7, value);
+  set forceRefocus($core.bool value) => $_setBool(7, value);
   @$pb.TagNumber(8)
-  $core.bool hasSelected() => $_has(7);
+  $core.bool hasForceRefocus() => $_has(7);
   @$pb.TagNumber(8)
-  void clearSelected() => $_clearField(8);
+  void clearForceRefocus() => $_clearField(8);
 
-  /// True if free-form text entry is allowed.
   @$pb.TagNumber(9)
-  $core.bool get editable => $_getBF(8);
-  @$pb.TagNumber(9)
-  set editable($core.bool value) => $_setBool(8, value);
-  @$pb.TagNumber(9)
-  $core.bool hasEditable() => $_has(8);
-  @$pb.TagNumber(9)
-  void clearEditable() => $_clearField(9);
+  $pb.PbList<ValidationError> get validationErrors => $_getList(8);
+
+  @$pb.TagNumber(10)
+  StructValue get customPayload => $_getN(9);
+  @$pb.TagNumber(10)
+  set customPayload(StructValue value) => $_setField(10, value);
+  @$pb.TagNumber(10)
+  $core.bool hasCustomPayload() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearCustomPayload() => $_clearField(10);
+  @$pb.TagNumber(10)
+  StructValue ensureCustomPayload() => $_ensure(9);
+}
+
+class EditorSessionEnded extends $pb.GeneratedMessage {
+  factory EditorSessionEnded({
+    $fixnum.Int64? sessionId,
+    EditEndReason? reason,
+    EditorValue? committedValue,
+    $fixnum.Int64? stateVersion,
+  }) {
+    final result = create();
+    if (sessionId != null) result.sessionId = sessionId;
+    if (reason != null) result.reason = reason;
+    if (committedValue != null) result.committedValue = committedValue;
+    if (stateVersion != null) result.stateVersion = stateVersion;
+    return result;
+  }
+
+  EditorSessionEnded._();
+
+  factory EditorSessionEnded.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory EditorSessionEnded.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'EditorSessionEnded',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aInt64(1, _omitFieldNames ? '' : 'sessionId')
+    ..aE<EditEndReason>(2, _omitFieldNames ? '' : 'reason',
+        enumValues: EditEndReason.values)
+    ..aOM<EditorValue>(3, _omitFieldNames ? '' : 'committedValue',
+        subBuilder: EditorValue.create)
+    ..a<$fixnum.Int64>(
+        4, _omitFieldNames ? '' : 'stateVersion', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EditorSessionEnded clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EditorSessionEnded copyWith(void Function(EditorSessionEnded) updates) =>
+      super.copyWith((message) => updates(message as EditorSessionEnded))
+          as EditorSessionEnded;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static EditorSessionEnded create() => EditorSessionEnded._();
+  @$core.override
+  EditorSessionEnded createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static EditorSessionEnded getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<EditorSessionEnded>(create);
+  static EditorSessionEnded? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get sessionId => $_getI64(0);
+  @$pb.TagNumber(1)
+  set sessionId($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSessionId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSessionId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  EditEndReason get reason => $_getN(1);
+  @$pb.TagNumber(2)
+  set reason(EditEndReason value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasReason() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearReason() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  EditorValue get committedValue => $_getN(2);
+  @$pb.TagNumber(3)
+  set committedValue(EditorValue value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasCommittedValue() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearCommittedValue() => $_clearField(3);
+  @$pb.TagNumber(3)
+  EditorValue ensureCommittedValue() => $_ensure(2);
+
+  @$pb.TagNumber(4)
+  $fixnum.Int64 get stateVersion => $_getI64(3);
+  @$pb.TagNumber(4)
+  set stateVersion($fixnum.Int64 value) => $_setInt64(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasStateVersion() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearStateVersion() => $_clearField(4);
 }
 
 class TooltipRequest extends $pb.GeneratedMessage {
@@ -19521,10 +21509,9 @@ enum GridEvent_Event {
   keyDownEdit,
   keyPressEdit,
   keyUpEdit,
-  cellEditConfigureStyle,
-  cellEditConfigureWindow,
-  dropdownClosed,
-  dropdownOpened,
+  editValidationRequest,
+  editorListItemsRequest,
+  customEditorAction,
   cellChanged,
   rowStatusChange,
   beforeSort,
@@ -19567,7 +21554,6 @@ enum GridEvent_Event {
   getHeaderRow,
   pullToRefreshTriggered,
   pullToRefreshCanceled,
-  beforeDropdownOpen,
   treeChildrenRequested,
   beforeTreeNodeToggle,
   afterTreeNodeToggle,
@@ -19593,10 +21579,9 @@ class GridEvent extends $pb.GeneratedMessage {
     KeyDownEditEvent? keyDownEdit,
     KeyPressEditEvent? keyPressEdit,
     KeyUpEditEvent? keyUpEdit,
-    CellEditConfigureStyleEvent? cellEditConfigureStyle,
-    CellEditConfigureWindowEvent? cellEditConfigureWindow,
-    DropdownClosedEvent? dropdownClosed,
-    DropdownOpenedEvent? dropdownOpened,
+    EditValidationRequest? editValidationRequest,
+    EditorListItemsRequest? editorListItemsRequest,
+    CustomEditorActionEvent? customEditorAction,
     CellChangedEvent? cellChanged,
     RowStatusChangeEvent? rowStatusChange,
     BeforeSortEvent? beforeSort,
@@ -19639,7 +21624,6 @@ class GridEvent extends $pb.GeneratedMessage {
     GetHeaderRowEvent? getHeaderRow,
     PullToRefreshTriggeredEvent? pullToRefreshTriggered,
     PullToRefreshCanceledEvent? pullToRefreshCanceled,
-    BeforeDropdownOpenEvent? beforeDropdownOpen,
     TreeChildrenRequestedEvent? treeChildrenRequested,
     BeforeTreeNodeToggleEvent? beforeTreeNodeToggle,
     AfterTreeNodeToggleEvent? afterTreeNodeToggle,
@@ -19663,12 +21647,12 @@ class GridEvent extends $pb.GeneratedMessage {
     if (keyDownEdit != null) result.keyDownEdit = keyDownEdit;
     if (keyPressEdit != null) result.keyPressEdit = keyPressEdit;
     if (keyUpEdit != null) result.keyUpEdit = keyUpEdit;
-    if (cellEditConfigureStyle != null)
-      result.cellEditConfigureStyle = cellEditConfigureStyle;
-    if (cellEditConfigureWindow != null)
-      result.cellEditConfigureWindow = cellEditConfigureWindow;
-    if (dropdownClosed != null) result.dropdownClosed = dropdownClosed;
-    if (dropdownOpened != null) result.dropdownOpened = dropdownOpened;
+    if (editValidationRequest != null)
+      result.editValidationRequest = editValidationRequest;
+    if (editorListItemsRequest != null)
+      result.editorListItemsRequest = editorListItemsRequest;
+    if (customEditorAction != null)
+      result.customEditorAction = customEditorAction;
     if (cellChanged != null) result.cellChanged = cellChanged;
     if (rowStatusChange != null) result.rowStatusChange = rowStatusChange;
     if (beforeSort != null) result.beforeSort = beforeSort;
@@ -19713,8 +21697,6 @@ class GridEvent extends $pb.GeneratedMessage {
       result.pullToRefreshTriggered = pullToRefreshTriggered;
     if (pullToRefreshCanceled != null)
       result.pullToRefreshCanceled = pullToRefreshCanceled;
-    if (beforeDropdownOpen != null)
-      result.beforeDropdownOpen = beforeDropdownOpen;
     if (treeChildrenRequested != null)
       result.treeChildrenRequested = treeChildrenRequested;
     if (beforeTreeNodeToggle != null)
@@ -19749,61 +21731,59 @@ class GridEvent extends $pb.GeneratedMessage {
     10: GridEvent_Event.afterEdit,
     11: GridEvent_Event.cellEditValidate,
     12: GridEvent_Event.cellEditChange,
-    14: GridEvent_Event.keyDownEdit,
-    15: GridEvent_Event.keyPressEdit,
-    16: GridEvent_Event.keyUpEdit,
-    17: GridEvent_Event.cellEditConfigureStyle,
-    18: GridEvent_Event.cellEditConfigureWindow,
-    19: GridEvent_Event.dropdownClosed,
-    20: GridEvent_Event.dropdownOpened,
-    21: GridEvent_Event.cellChanged,
-    22: GridEvent_Event.rowStatusChange,
-    23: GridEvent_Event.beforeSort,
-    24: GridEvent_Event.afterSort,
-    25: GridEvent_Event.compare,
-    26: GridEvent_Event.beforeNodeToggle,
-    27: GridEvent_Event.afterNodeToggle,
-    28: GridEvent_Event.beforeScroll,
-    29: GridEvent_Event.afterScroll,
-    30: GridEvent_Event.scrollTooltip,
-    31: GridEvent_Event.beforeUserResize,
-    32: GridEvent_Event.afterUserResize,
-    33: GridEvent_Event.afterUserFreeze,
-    34: GridEvent_Event.beforeMoveColumn,
-    35: GridEvent_Event.afterMoveColumn,
-    36: GridEvent_Event.beforeMoveRow,
-    37: GridEvent_Event.afterMoveRow,
-    38: GridEvent_Event.beforeMouseDown,
-    39: GridEvent_Event.mouseDown,
-    40: GridEvent_Event.mouseUp,
-    41: GridEvent_Event.mouseMove,
-    42: GridEvent_Event.click,
-    43: GridEvent_Event.dblClick,
-    44: GridEvent_Event.keyDown,
-    45: GridEvent_Event.keyPress,
-    46: GridEvent_Event.keyUp,
-    47: GridEvent_Event.customRenderCell,
-    48: GridEvent_Event.dragStart,
-    49: GridEvent_Event.dragOver,
-    50: GridEvent_Event.dragDrop,
-    51: GridEvent_Event.dragComplete,
-    52: GridEvent_Event.typeAheadStarted,
-    53: GridEvent_Event.typeAheadEnded,
-    54: GridEvent_Event.dataRefreshing,
-    55: GridEvent_Event.dataRefreshed,
-    56: GridEvent_Event.filterData,
-    57: GridEvent_Event.error,
-    58: GridEvent_Event.beforePageBreak,
-    59: GridEvent_Event.startPage,
-    60: GridEvent_Event.getHeaderRow,
-    61: GridEvent_Event.pullToRefreshTriggered,
-    62: GridEvent_Event.pullToRefreshCanceled,
-    63: GridEvent_Event.beforeDropdownOpen,
-    64: GridEvent_Event.treeChildrenRequested,
-    65: GridEvent_Event.beforeTreeNodeToggle,
-    66: GridEvent_Event.afterTreeNodeToggle,
-    67: GridEvent_Event.treeNodeActivate,
-    68: GridEvent_Event.treeNodeContextMenu,
+    13: GridEvent_Event.keyDownEdit,
+    14: GridEvent_Event.keyPressEdit,
+    15: GridEvent_Event.keyUpEdit,
+    16: GridEvent_Event.editValidationRequest,
+    17: GridEvent_Event.editorListItemsRequest,
+    18: GridEvent_Event.customEditorAction,
+    19: GridEvent_Event.cellChanged,
+    20: GridEvent_Event.rowStatusChange,
+    21: GridEvent_Event.beforeSort,
+    22: GridEvent_Event.afterSort,
+    23: GridEvent_Event.compare,
+    24: GridEvent_Event.beforeNodeToggle,
+    25: GridEvent_Event.afterNodeToggle,
+    26: GridEvent_Event.beforeScroll,
+    27: GridEvent_Event.afterScroll,
+    28: GridEvent_Event.scrollTooltip,
+    29: GridEvent_Event.beforeUserResize,
+    30: GridEvent_Event.afterUserResize,
+    31: GridEvent_Event.afterUserFreeze,
+    32: GridEvent_Event.beforeMoveColumn,
+    33: GridEvent_Event.afterMoveColumn,
+    34: GridEvent_Event.beforeMoveRow,
+    35: GridEvent_Event.afterMoveRow,
+    36: GridEvent_Event.beforeMouseDown,
+    37: GridEvent_Event.mouseDown,
+    38: GridEvent_Event.mouseUp,
+    39: GridEvent_Event.mouseMove,
+    40: GridEvent_Event.click,
+    41: GridEvent_Event.dblClick,
+    42: GridEvent_Event.keyDown,
+    43: GridEvent_Event.keyPress,
+    44: GridEvent_Event.keyUp,
+    45: GridEvent_Event.customRenderCell,
+    46: GridEvent_Event.dragStart,
+    47: GridEvent_Event.dragOver,
+    48: GridEvent_Event.dragDrop,
+    49: GridEvent_Event.dragComplete,
+    50: GridEvent_Event.typeAheadStarted,
+    51: GridEvent_Event.typeAheadEnded,
+    52: GridEvent_Event.dataRefreshing,
+    53: GridEvent_Event.dataRefreshed,
+    54: GridEvent_Event.filterData,
+    55: GridEvent_Event.error,
+    56: GridEvent_Event.beforePageBreak,
+    57: GridEvent_Event.startPage,
+    58: GridEvent_Event.getHeaderRow,
+    59: GridEvent_Event.pullToRefreshTriggered,
+    60: GridEvent_Event.pullToRefreshCanceled,
+    61: GridEvent_Event.treeChildrenRequested,
+    62: GridEvent_Event.beforeTreeNodeToggle,
+    63: GridEvent_Event.afterTreeNodeToggle,
+    64: GridEvent_Event.treeNodeActivate,
+    65: GridEvent_Event.treeNodeContextMenu,
     0: GridEvent_Event.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
@@ -19822,6 +21802,7 @@ class GridEvent extends $pb.GeneratedMessage {
       10,
       11,
       12,
+      13,
       14,
       15,
       16,
@@ -19873,10 +21854,7 @@ class GridEvent extends $pb.GeneratedMessage {
       62,
       63,
       64,
-      65,
-      66,
-      67,
-      68
+      65
     ])
     ..aInt64(1, _omitFieldNames ? '' : 'gridId')
     ..aOM<CellFocusChangingEvent>(2, _omitFieldNames ? '' : 'cellFocusChanging',
@@ -19901,124 +21879,120 @@ class GridEvent extends $pb.GeneratedMessage {
         subBuilder: CellEditValidateEvent.create)
     ..aOM<CellEditChangeEvent>(12, _omitFieldNames ? '' : 'cellEditChange',
         subBuilder: CellEditChangeEvent.create)
-    ..aOM<KeyDownEditEvent>(14, _omitFieldNames ? '' : 'keyDownEdit',
+    ..aOM<KeyDownEditEvent>(13, _omitFieldNames ? '' : 'keyDownEdit',
         subBuilder: KeyDownEditEvent.create)
-    ..aOM<KeyPressEditEvent>(15, _omitFieldNames ? '' : 'keyPressEdit',
+    ..aOM<KeyPressEditEvent>(14, _omitFieldNames ? '' : 'keyPressEdit',
         subBuilder: KeyPressEditEvent.create)
-    ..aOM<KeyUpEditEvent>(16, _omitFieldNames ? '' : 'keyUpEdit',
+    ..aOM<KeyUpEditEvent>(15, _omitFieldNames ? '' : 'keyUpEdit',
         subBuilder: KeyUpEditEvent.create)
-    ..aOM<CellEditConfigureStyleEvent>(
-        17, _omitFieldNames ? '' : 'cellEditConfigureStyle',
-        subBuilder: CellEditConfigureStyleEvent.create)
-    ..aOM<CellEditConfigureWindowEvent>(
-        18, _omitFieldNames ? '' : 'cellEditConfigureWindow',
-        subBuilder: CellEditConfigureWindowEvent.create)
-    ..aOM<DropdownClosedEvent>(19, _omitFieldNames ? '' : 'dropdownClosed',
-        subBuilder: DropdownClosedEvent.create)
-    ..aOM<DropdownOpenedEvent>(20, _omitFieldNames ? '' : 'dropdownOpened',
-        subBuilder: DropdownOpenedEvent.create)
-    ..aOM<CellChangedEvent>(21, _omitFieldNames ? '' : 'cellChanged',
+    ..aOM<EditValidationRequest>(
+        16, _omitFieldNames ? '' : 'editValidationRequest',
+        subBuilder: EditValidationRequest.create)
+    ..aOM<EditorListItemsRequest>(
+        17, _omitFieldNames ? '' : 'editorListItemsRequest',
+        subBuilder: EditorListItemsRequest.create)
+    ..aOM<CustomEditorActionEvent>(
+        18, _omitFieldNames ? '' : 'customEditorAction',
+        subBuilder: CustomEditorActionEvent.create)
+    ..aOM<CellChangedEvent>(19, _omitFieldNames ? '' : 'cellChanged',
         subBuilder: CellChangedEvent.create)
-    ..aOM<RowStatusChangeEvent>(22, _omitFieldNames ? '' : 'rowStatusChange',
+    ..aOM<RowStatusChangeEvent>(20, _omitFieldNames ? '' : 'rowStatusChange',
         subBuilder: RowStatusChangeEvent.create)
-    ..aOM<BeforeSortEvent>(23, _omitFieldNames ? '' : 'beforeSort',
+    ..aOM<BeforeSortEvent>(21, _omitFieldNames ? '' : 'beforeSort',
         subBuilder: BeforeSortEvent.create)
-    ..aOM<AfterSortEvent>(24, _omitFieldNames ? '' : 'afterSort',
+    ..aOM<AfterSortEvent>(22, _omitFieldNames ? '' : 'afterSort',
         subBuilder: AfterSortEvent.create)
-    ..aOM<CompareEvent>(25, _omitFieldNames ? '' : 'compare',
+    ..aOM<CompareEvent>(23, _omitFieldNames ? '' : 'compare',
         subBuilder: CompareEvent.create)
-    ..aOM<BeforeNodeToggleEvent>(26, _omitFieldNames ? '' : 'beforeNodeToggle',
+    ..aOM<BeforeNodeToggleEvent>(24, _omitFieldNames ? '' : 'beforeNodeToggle',
         subBuilder: BeforeNodeToggleEvent.create)
-    ..aOM<AfterNodeToggleEvent>(27, _omitFieldNames ? '' : 'afterNodeToggle',
+    ..aOM<AfterNodeToggleEvent>(25, _omitFieldNames ? '' : 'afterNodeToggle',
         subBuilder: AfterNodeToggleEvent.create)
-    ..aOM<BeforeScrollEvent>(28, _omitFieldNames ? '' : 'beforeScroll',
+    ..aOM<BeforeScrollEvent>(26, _omitFieldNames ? '' : 'beforeScroll',
         subBuilder: BeforeScrollEvent.create)
-    ..aOM<AfterScrollEvent>(29, _omitFieldNames ? '' : 'afterScroll',
+    ..aOM<AfterScrollEvent>(27, _omitFieldNames ? '' : 'afterScroll',
         subBuilder: AfterScrollEvent.create)
-    ..aOM<ScrollTooltipEvent>(30, _omitFieldNames ? '' : 'scrollTooltip',
+    ..aOM<ScrollTooltipEvent>(28, _omitFieldNames ? '' : 'scrollTooltip',
         subBuilder: ScrollTooltipEvent.create)
-    ..aOM<BeforeUserResizeEvent>(31, _omitFieldNames ? '' : 'beforeUserResize',
+    ..aOM<BeforeUserResizeEvent>(29, _omitFieldNames ? '' : 'beforeUserResize',
         subBuilder: BeforeUserResizeEvent.create)
-    ..aOM<AfterUserResizeEvent>(32, _omitFieldNames ? '' : 'afterUserResize',
+    ..aOM<AfterUserResizeEvent>(30, _omitFieldNames ? '' : 'afterUserResize',
         subBuilder: AfterUserResizeEvent.create)
-    ..aOM<AfterUserFreezeEvent>(33, _omitFieldNames ? '' : 'afterUserFreeze',
+    ..aOM<AfterUserFreezeEvent>(31, _omitFieldNames ? '' : 'afterUserFreeze',
         subBuilder: AfterUserFreezeEvent.create)
-    ..aOM<BeforeMoveColumnEvent>(34, _omitFieldNames ? '' : 'beforeMoveColumn',
+    ..aOM<BeforeMoveColumnEvent>(32, _omitFieldNames ? '' : 'beforeMoveColumn',
         subBuilder: BeforeMoveColumnEvent.create)
-    ..aOM<AfterMoveColumnEvent>(35, _omitFieldNames ? '' : 'afterMoveColumn',
+    ..aOM<AfterMoveColumnEvent>(33, _omitFieldNames ? '' : 'afterMoveColumn',
         subBuilder: AfterMoveColumnEvent.create)
-    ..aOM<BeforeMoveRowEvent>(36, _omitFieldNames ? '' : 'beforeMoveRow',
+    ..aOM<BeforeMoveRowEvent>(34, _omitFieldNames ? '' : 'beforeMoveRow',
         subBuilder: BeforeMoveRowEvent.create)
-    ..aOM<AfterMoveRowEvent>(37, _omitFieldNames ? '' : 'afterMoveRow',
+    ..aOM<AfterMoveRowEvent>(35, _omitFieldNames ? '' : 'afterMoveRow',
         subBuilder: AfterMoveRowEvent.create)
-    ..aOM<BeforeMouseDownEvent>(38, _omitFieldNames ? '' : 'beforeMouseDown',
+    ..aOM<BeforeMouseDownEvent>(36, _omitFieldNames ? '' : 'beforeMouseDown',
         subBuilder: BeforeMouseDownEvent.create)
-    ..aOM<MouseDownEvent>(39, _omitFieldNames ? '' : 'mouseDown',
+    ..aOM<MouseDownEvent>(37, _omitFieldNames ? '' : 'mouseDown',
         subBuilder: MouseDownEvent.create)
-    ..aOM<MouseUpEvent>(40, _omitFieldNames ? '' : 'mouseUp',
+    ..aOM<MouseUpEvent>(38, _omitFieldNames ? '' : 'mouseUp',
         subBuilder: MouseUpEvent.create)
-    ..aOM<MouseMoveEvent>(41, _omitFieldNames ? '' : 'mouseMove',
+    ..aOM<MouseMoveEvent>(39, _omitFieldNames ? '' : 'mouseMove',
         subBuilder: MouseMoveEvent.create)
-    ..aOM<ClickEvent>(42, _omitFieldNames ? '' : 'click',
+    ..aOM<ClickEvent>(40, _omitFieldNames ? '' : 'click',
         subBuilder: ClickEvent.create)
-    ..aOM<DblClickEvent>(43, _omitFieldNames ? '' : 'dblClick',
+    ..aOM<DblClickEvent>(41, _omitFieldNames ? '' : 'dblClick',
         subBuilder: DblClickEvent.create)
-    ..aOM<KeyDownEvent>(44, _omitFieldNames ? '' : 'keyDown',
+    ..aOM<KeyDownEvent>(42, _omitFieldNames ? '' : 'keyDown',
         subBuilder: KeyDownEvent.create)
-    ..aOM<KeyPressEvent>(45, _omitFieldNames ? '' : 'keyPress',
+    ..aOM<KeyPressEvent>(43, _omitFieldNames ? '' : 'keyPress',
         subBuilder: KeyPressEvent.create)
-    ..aOM<KeyUpEvent>(46, _omitFieldNames ? '' : 'keyUp',
+    ..aOM<KeyUpEvent>(44, _omitFieldNames ? '' : 'keyUp',
         subBuilder: KeyUpEvent.create)
-    ..aOM<CustomRenderCellEvent>(47, _omitFieldNames ? '' : 'customRenderCell',
+    ..aOM<CustomRenderCellEvent>(45, _omitFieldNames ? '' : 'customRenderCell',
         subBuilder: CustomRenderCellEvent.create)
-    ..aOM<DragStartEvent>(48, _omitFieldNames ? '' : 'dragStart',
+    ..aOM<DragStartEvent>(46, _omitFieldNames ? '' : 'dragStart',
         subBuilder: DragStartEvent.create)
-    ..aOM<DragOverEvent>(49, _omitFieldNames ? '' : 'dragOver',
+    ..aOM<DragOverEvent>(47, _omitFieldNames ? '' : 'dragOver',
         subBuilder: DragOverEvent.create)
-    ..aOM<DragDropEvent>(50, _omitFieldNames ? '' : 'dragDrop',
+    ..aOM<DragDropEvent>(48, _omitFieldNames ? '' : 'dragDrop',
         subBuilder: DragDropEvent.create)
-    ..aOM<DragCompleteEvent>(51, _omitFieldNames ? '' : 'dragComplete',
+    ..aOM<DragCompleteEvent>(49, _omitFieldNames ? '' : 'dragComplete',
         subBuilder: DragCompleteEvent.create)
-    ..aOM<TypeAheadStartedEvent>(52, _omitFieldNames ? '' : 'typeAheadStarted',
+    ..aOM<TypeAheadStartedEvent>(50, _omitFieldNames ? '' : 'typeAheadStarted',
         subBuilder: TypeAheadStartedEvent.create)
-    ..aOM<TypeAheadEndedEvent>(53, _omitFieldNames ? '' : 'typeAheadEnded',
+    ..aOM<TypeAheadEndedEvent>(51, _omitFieldNames ? '' : 'typeAheadEnded',
         subBuilder: TypeAheadEndedEvent.create)
-    ..aOM<DataRefreshingEvent>(54, _omitFieldNames ? '' : 'dataRefreshing',
+    ..aOM<DataRefreshingEvent>(52, _omitFieldNames ? '' : 'dataRefreshing',
         subBuilder: DataRefreshingEvent.create)
-    ..aOM<DataRefreshedEvent>(55, _omitFieldNames ? '' : 'dataRefreshed',
+    ..aOM<DataRefreshedEvent>(53, _omitFieldNames ? '' : 'dataRefreshed',
         subBuilder: DataRefreshedEvent.create)
-    ..aOM<FilterDataEvent>(56, _omitFieldNames ? '' : 'filterData',
+    ..aOM<FilterDataEvent>(54, _omitFieldNames ? '' : 'filterData',
         subBuilder: FilterDataEvent.create)
-    ..aOM<ErrorEvent>(57, _omitFieldNames ? '' : 'error',
+    ..aOM<ErrorEvent>(55, _omitFieldNames ? '' : 'error',
         subBuilder: ErrorEvent.create)
-    ..aOM<BeforePageBreakEvent>(58, _omitFieldNames ? '' : 'beforePageBreak',
+    ..aOM<BeforePageBreakEvent>(56, _omitFieldNames ? '' : 'beforePageBreak',
         subBuilder: BeforePageBreakEvent.create)
-    ..aOM<StartPageEvent>(59, _omitFieldNames ? '' : 'startPage',
+    ..aOM<StartPageEvent>(57, _omitFieldNames ? '' : 'startPage',
         subBuilder: StartPageEvent.create)
-    ..aOM<GetHeaderRowEvent>(60, _omitFieldNames ? '' : 'getHeaderRow',
+    ..aOM<GetHeaderRowEvent>(58, _omitFieldNames ? '' : 'getHeaderRow',
         subBuilder: GetHeaderRowEvent.create)
     ..aOM<PullToRefreshTriggeredEvent>(
-        61, _omitFieldNames ? '' : 'pullToRefreshTriggered',
+        59, _omitFieldNames ? '' : 'pullToRefreshTriggered',
         subBuilder: PullToRefreshTriggeredEvent.create)
     ..aOM<PullToRefreshCanceledEvent>(
-        62, _omitFieldNames ? '' : 'pullToRefreshCanceled',
+        60, _omitFieldNames ? '' : 'pullToRefreshCanceled',
         subBuilder: PullToRefreshCanceledEvent.create)
-    ..aOM<BeforeDropdownOpenEvent>(
-        63, _omitFieldNames ? '' : 'beforeDropdownOpen',
-        subBuilder: BeforeDropdownOpenEvent.create)
     ..aOM<TreeChildrenRequestedEvent>(
-        64, _omitFieldNames ? '' : 'treeChildrenRequested',
+        61, _omitFieldNames ? '' : 'treeChildrenRequested',
         subBuilder: TreeChildrenRequestedEvent.create)
     ..aOM<BeforeTreeNodeToggleEvent>(
-        65, _omitFieldNames ? '' : 'beforeTreeNodeToggle',
+        62, _omitFieldNames ? '' : 'beforeTreeNodeToggle',
         subBuilder: BeforeTreeNodeToggleEvent.create)
     ..aOM<AfterTreeNodeToggleEvent>(
-        66, _omitFieldNames ? '' : 'afterTreeNodeToggle',
+        63, _omitFieldNames ? '' : 'afterTreeNodeToggle',
         subBuilder: AfterTreeNodeToggleEvent.create)
-    ..aOM<TreeNodeActivateEvent>(67, _omitFieldNames ? '' : 'treeNodeActivate',
+    ..aOM<TreeNodeActivateEvent>(64, _omitFieldNames ? '' : 'treeNodeActivate',
         subBuilder: TreeNodeActivateEvent.create)
     ..aOM<TreeNodeContextMenuEvent>(
-        68, _omitFieldNames ? '' : 'treeNodeContextMenu',
+        65, _omitFieldNames ? '' : 'treeNodeContextMenu',
         subBuilder: TreeNodeContextMenuEvent.create)
     ..aInt64(100, _omitFieldNames ? '' : 'eventId')
     ..hasRequiredFields = false;
@@ -20052,6 +22026,7 @@ class GridEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(10)
   @$pb.TagNumber(11)
   @$pb.TagNumber(12)
+  @$pb.TagNumber(13)
   @$pb.TagNumber(14)
   @$pb.TagNumber(15)
   @$pb.TagNumber(16)
@@ -20104,9 +22079,6 @@ class GridEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(63)
   @$pb.TagNumber(64)
   @$pb.TagNumber(65)
-  @$pb.TagNumber(66)
-  @$pb.TagNumber(67)
-  @$pb.TagNumber(68)
   GridEvent_Event whichEvent() => _GridEvent_EventByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(2)
   @$pb.TagNumber(3)
@@ -20119,6 +22091,7 @@ class GridEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(10)
   @$pb.TagNumber(11)
   @$pb.TagNumber(12)
+  @$pb.TagNumber(13)
   @$pb.TagNumber(14)
   @$pb.TagNumber(15)
   @$pb.TagNumber(16)
@@ -20171,9 +22144,6 @@ class GridEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(63)
   @$pb.TagNumber(64)
   @$pb.TagNumber(65)
-  @$pb.TagNumber(66)
-  @$pb.TagNumber(67)
-  @$pb.TagNumber(68)
   void clearEvent() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -20308,644 +22278,622 @@ class GridEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(12)
   CellEditChangeEvent ensureCellEditChange() => $_ensure(11);
 
-  @$pb.TagNumber(14)
+  @$pb.TagNumber(13)
   KeyDownEditEvent get keyDownEdit => $_getN(12);
-  @$pb.TagNumber(14)
-  set keyDownEdit(KeyDownEditEvent value) => $_setField(14, value);
-  @$pb.TagNumber(14)
+  @$pb.TagNumber(13)
+  set keyDownEdit(KeyDownEditEvent value) => $_setField(13, value);
+  @$pb.TagNumber(13)
   $core.bool hasKeyDownEdit() => $_has(12);
-  @$pb.TagNumber(14)
-  void clearKeyDownEdit() => $_clearField(14);
-  @$pb.TagNumber(14)
+  @$pb.TagNumber(13)
+  void clearKeyDownEdit() => $_clearField(13);
+  @$pb.TagNumber(13)
   KeyDownEditEvent ensureKeyDownEdit() => $_ensure(12);
 
-  @$pb.TagNumber(15)
+  @$pb.TagNumber(14)
   KeyPressEditEvent get keyPressEdit => $_getN(13);
-  @$pb.TagNumber(15)
-  set keyPressEdit(KeyPressEditEvent value) => $_setField(15, value);
-  @$pb.TagNumber(15)
+  @$pb.TagNumber(14)
+  set keyPressEdit(KeyPressEditEvent value) => $_setField(14, value);
+  @$pb.TagNumber(14)
   $core.bool hasKeyPressEdit() => $_has(13);
-  @$pb.TagNumber(15)
-  void clearKeyPressEdit() => $_clearField(15);
-  @$pb.TagNumber(15)
+  @$pb.TagNumber(14)
+  void clearKeyPressEdit() => $_clearField(14);
+  @$pb.TagNumber(14)
   KeyPressEditEvent ensureKeyPressEdit() => $_ensure(13);
 
-  @$pb.TagNumber(16)
+  @$pb.TagNumber(15)
   KeyUpEditEvent get keyUpEdit => $_getN(14);
-  @$pb.TagNumber(16)
-  set keyUpEdit(KeyUpEditEvent value) => $_setField(16, value);
-  @$pb.TagNumber(16)
+  @$pb.TagNumber(15)
+  set keyUpEdit(KeyUpEditEvent value) => $_setField(15, value);
+  @$pb.TagNumber(15)
   $core.bool hasKeyUpEdit() => $_has(14);
-  @$pb.TagNumber(16)
-  void clearKeyUpEdit() => $_clearField(16);
-  @$pb.TagNumber(16)
+  @$pb.TagNumber(15)
+  void clearKeyUpEdit() => $_clearField(15);
+  @$pb.TagNumber(15)
   KeyUpEditEvent ensureKeyUpEdit() => $_ensure(14);
 
+  @$pb.TagNumber(16)
+  EditValidationRequest get editValidationRequest => $_getN(15);
+  @$pb.TagNumber(16)
+  set editValidationRequest(EditValidationRequest value) =>
+      $_setField(16, value);
+  @$pb.TagNumber(16)
+  $core.bool hasEditValidationRequest() => $_has(15);
+  @$pb.TagNumber(16)
+  void clearEditValidationRequest() => $_clearField(16);
+  @$pb.TagNumber(16)
+  EditValidationRequest ensureEditValidationRequest() => $_ensure(15);
+
   @$pb.TagNumber(17)
-  CellEditConfigureStyleEvent get cellEditConfigureStyle => $_getN(15);
+  EditorListItemsRequest get editorListItemsRequest => $_getN(16);
   @$pb.TagNumber(17)
-  set cellEditConfigureStyle(CellEditConfigureStyleEvent value) =>
+  set editorListItemsRequest(EditorListItemsRequest value) =>
       $_setField(17, value);
   @$pb.TagNumber(17)
-  $core.bool hasCellEditConfigureStyle() => $_has(15);
+  $core.bool hasEditorListItemsRequest() => $_has(16);
   @$pb.TagNumber(17)
-  void clearCellEditConfigureStyle() => $_clearField(17);
+  void clearEditorListItemsRequest() => $_clearField(17);
   @$pb.TagNumber(17)
-  CellEditConfigureStyleEvent ensureCellEditConfigureStyle() => $_ensure(15);
+  EditorListItemsRequest ensureEditorListItemsRequest() => $_ensure(16);
 
   @$pb.TagNumber(18)
-  CellEditConfigureWindowEvent get cellEditConfigureWindow => $_getN(16);
+  CustomEditorActionEvent get customEditorAction => $_getN(17);
   @$pb.TagNumber(18)
-  set cellEditConfigureWindow(CellEditConfigureWindowEvent value) =>
+  set customEditorAction(CustomEditorActionEvent value) =>
       $_setField(18, value);
   @$pb.TagNumber(18)
-  $core.bool hasCellEditConfigureWindow() => $_has(16);
+  $core.bool hasCustomEditorAction() => $_has(17);
   @$pb.TagNumber(18)
-  void clearCellEditConfigureWindow() => $_clearField(18);
+  void clearCustomEditorAction() => $_clearField(18);
   @$pb.TagNumber(18)
-  CellEditConfigureWindowEvent ensureCellEditConfigureWindow() => $_ensure(16);
-
-  @$pb.TagNumber(19)
-  DropdownClosedEvent get dropdownClosed => $_getN(17);
-  @$pb.TagNumber(19)
-  set dropdownClosed(DropdownClosedEvent value) => $_setField(19, value);
-  @$pb.TagNumber(19)
-  $core.bool hasDropdownClosed() => $_has(17);
-  @$pb.TagNumber(19)
-  void clearDropdownClosed() => $_clearField(19);
-  @$pb.TagNumber(19)
-  DropdownClosedEvent ensureDropdownClosed() => $_ensure(17);
-
-  @$pb.TagNumber(20)
-  DropdownOpenedEvent get dropdownOpened => $_getN(18);
-  @$pb.TagNumber(20)
-  set dropdownOpened(DropdownOpenedEvent value) => $_setField(20, value);
-  @$pb.TagNumber(20)
-  $core.bool hasDropdownOpened() => $_has(18);
-  @$pb.TagNumber(20)
-  void clearDropdownOpened() => $_clearField(20);
-  @$pb.TagNumber(20)
-  DropdownOpenedEvent ensureDropdownOpened() => $_ensure(18);
+  CustomEditorActionEvent ensureCustomEditorAction() => $_ensure(17);
 
   /// Data
-  @$pb.TagNumber(21)
-  CellChangedEvent get cellChanged => $_getN(19);
-  @$pb.TagNumber(21)
-  set cellChanged(CellChangedEvent value) => $_setField(21, value);
-  @$pb.TagNumber(21)
-  $core.bool hasCellChanged() => $_has(19);
-  @$pb.TagNumber(21)
-  void clearCellChanged() => $_clearField(21);
-  @$pb.TagNumber(21)
-  CellChangedEvent ensureCellChanged() => $_ensure(19);
+  @$pb.TagNumber(19)
+  CellChangedEvent get cellChanged => $_getN(18);
+  @$pb.TagNumber(19)
+  set cellChanged(CellChangedEvent value) => $_setField(19, value);
+  @$pb.TagNumber(19)
+  $core.bool hasCellChanged() => $_has(18);
+  @$pb.TagNumber(19)
+  void clearCellChanged() => $_clearField(19);
+  @$pb.TagNumber(19)
+  CellChangedEvent ensureCellChanged() => $_ensure(18);
 
-  @$pb.TagNumber(22)
-  RowStatusChangeEvent get rowStatusChange => $_getN(20);
-  @$pb.TagNumber(22)
-  set rowStatusChange(RowStatusChangeEvent value) => $_setField(22, value);
-  @$pb.TagNumber(22)
-  $core.bool hasRowStatusChange() => $_has(20);
-  @$pb.TagNumber(22)
-  void clearRowStatusChange() => $_clearField(22);
-  @$pb.TagNumber(22)
-  RowStatusChangeEvent ensureRowStatusChange() => $_ensure(20);
+  @$pb.TagNumber(20)
+  RowStatusChangeEvent get rowStatusChange => $_getN(19);
+  @$pb.TagNumber(20)
+  set rowStatusChange(RowStatusChangeEvent value) => $_setField(20, value);
+  @$pb.TagNumber(20)
+  $core.bool hasRowStatusChange() => $_has(19);
+  @$pb.TagNumber(20)
+  void clearRowStatusChange() => $_clearField(20);
+  @$pb.TagNumber(20)
+  RowStatusChangeEvent ensureRowStatusChange() => $_ensure(19);
 
   /// Sort
-  @$pb.TagNumber(23)
-  BeforeSortEvent get beforeSort => $_getN(21);
-  @$pb.TagNumber(23)
-  set beforeSort(BeforeSortEvent value) => $_setField(23, value);
-  @$pb.TagNumber(23)
-  $core.bool hasBeforeSort() => $_has(21);
-  @$pb.TagNumber(23)
-  void clearBeforeSort() => $_clearField(23);
-  @$pb.TagNumber(23)
-  BeforeSortEvent ensureBeforeSort() => $_ensure(21);
+  @$pb.TagNumber(21)
+  BeforeSortEvent get beforeSort => $_getN(20);
+  @$pb.TagNumber(21)
+  set beforeSort(BeforeSortEvent value) => $_setField(21, value);
+  @$pb.TagNumber(21)
+  $core.bool hasBeforeSort() => $_has(20);
+  @$pb.TagNumber(21)
+  void clearBeforeSort() => $_clearField(21);
+  @$pb.TagNumber(21)
+  BeforeSortEvent ensureBeforeSort() => $_ensure(20);
 
-  @$pb.TagNumber(24)
-  AfterSortEvent get afterSort => $_getN(22);
-  @$pb.TagNumber(24)
-  set afterSort(AfterSortEvent value) => $_setField(24, value);
-  @$pb.TagNumber(24)
-  $core.bool hasAfterSort() => $_has(22);
-  @$pb.TagNumber(24)
-  void clearAfterSort() => $_clearField(24);
-  @$pb.TagNumber(24)
-  AfterSortEvent ensureAfterSort() => $_ensure(22);
+  @$pb.TagNumber(22)
+  AfterSortEvent get afterSort => $_getN(21);
+  @$pb.TagNumber(22)
+  set afterSort(AfterSortEvent value) => $_setField(22, value);
+  @$pb.TagNumber(22)
+  $core.bool hasAfterSort() => $_has(21);
+  @$pb.TagNumber(22)
+  void clearAfterSort() => $_clearField(22);
+  @$pb.TagNumber(22)
+  AfterSortEvent ensureAfterSort() => $_ensure(21);
 
-  @$pb.TagNumber(25)
-  CompareEvent get compare => $_getN(23);
-  @$pb.TagNumber(25)
-  set compare(CompareEvent value) => $_setField(25, value);
-  @$pb.TagNumber(25)
-  $core.bool hasCompare() => $_has(23);
-  @$pb.TagNumber(25)
-  void clearCompare() => $_clearField(25);
-  @$pb.TagNumber(25)
-  CompareEvent ensureCompare() => $_ensure(23);
+  @$pb.TagNumber(23)
+  CompareEvent get compare => $_getN(22);
+  @$pb.TagNumber(23)
+  set compare(CompareEvent value) => $_setField(23, value);
+  @$pb.TagNumber(23)
+  $core.bool hasCompare() => $_has(22);
+  @$pb.TagNumber(23)
+  void clearCompare() => $_clearField(23);
+  @$pb.TagNumber(23)
+  CompareEvent ensureCompare() => $_ensure(22);
 
   /// Outline
-  @$pb.TagNumber(26)
-  BeforeNodeToggleEvent get beforeNodeToggle => $_getN(24);
-  @$pb.TagNumber(26)
-  set beforeNodeToggle(BeforeNodeToggleEvent value) => $_setField(26, value);
-  @$pb.TagNumber(26)
-  $core.bool hasBeforeNodeToggle() => $_has(24);
-  @$pb.TagNumber(26)
-  void clearBeforeNodeToggle() => $_clearField(26);
-  @$pb.TagNumber(26)
-  BeforeNodeToggleEvent ensureBeforeNodeToggle() => $_ensure(24);
+  @$pb.TagNumber(24)
+  BeforeNodeToggleEvent get beforeNodeToggle => $_getN(23);
+  @$pb.TagNumber(24)
+  set beforeNodeToggle(BeforeNodeToggleEvent value) => $_setField(24, value);
+  @$pb.TagNumber(24)
+  $core.bool hasBeforeNodeToggle() => $_has(23);
+  @$pb.TagNumber(24)
+  void clearBeforeNodeToggle() => $_clearField(24);
+  @$pb.TagNumber(24)
+  BeforeNodeToggleEvent ensureBeforeNodeToggle() => $_ensure(23);
 
-  @$pb.TagNumber(27)
-  AfterNodeToggleEvent get afterNodeToggle => $_getN(25);
-  @$pb.TagNumber(27)
-  set afterNodeToggle(AfterNodeToggleEvent value) => $_setField(27, value);
-  @$pb.TagNumber(27)
-  $core.bool hasAfterNodeToggle() => $_has(25);
-  @$pb.TagNumber(27)
-  void clearAfterNodeToggle() => $_clearField(27);
-  @$pb.TagNumber(27)
-  AfterNodeToggleEvent ensureAfterNodeToggle() => $_ensure(25);
+  @$pb.TagNumber(25)
+  AfterNodeToggleEvent get afterNodeToggle => $_getN(24);
+  @$pb.TagNumber(25)
+  set afterNodeToggle(AfterNodeToggleEvent value) => $_setField(25, value);
+  @$pb.TagNumber(25)
+  $core.bool hasAfterNodeToggle() => $_has(24);
+  @$pb.TagNumber(25)
+  void clearAfterNodeToggle() => $_clearField(25);
+  @$pb.TagNumber(25)
+  AfterNodeToggleEvent ensureAfterNodeToggle() => $_ensure(24);
 
   /// Scroll
-  @$pb.TagNumber(28)
-  BeforeScrollEvent get beforeScroll => $_getN(26);
-  @$pb.TagNumber(28)
-  set beforeScroll(BeforeScrollEvent value) => $_setField(28, value);
-  @$pb.TagNumber(28)
-  $core.bool hasBeforeScroll() => $_has(26);
-  @$pb.TagNumber(28)
-  void clearBeforeScroll() => $_clearField(28);
-  @$pb.TagNumber(28)
-  BeforeScrollEvent ensureBeforeScroll() => $_ensure(26);
+  @$pb.TagNumber(26)
+  BeforeScrollEvent get beforeScroll => $_getN(25);
+  @$pb.TagNumber(26)
+  set beforeScroll(BeforeScrollEvent value) => $_setField(26, value);
+  @$pb.TagNumber(26)
+  $core.bool hasBeforeScroll() => $_has(25);
+  @$pb.TagNumber(26)
+  void clearBeforeScroll() => $_clearField(26);
+  @$pb.TagNumber(26)
+  BeforeScrollEvent ensureBeforeScroll() => $_ensure(25);
 
-  @$pb.TagNumber(29)
-  AfterScrollEvent get afterScroll => $_getN(27);
-  @$pb.TagNumber(29)
-  set afterScroll(AfterScrollEvent value) => $_setField(29, value);
-  @$pb.TagNumber(29)
-  $core.bool hasAfterScroll() => $_has(27);
-  @$pb.TagNumber(29)
-  void clearAfterScroll() => $_clearField(29);
-  @$pb.TagNumber(29)
-  AfterScrollEvent ensureAfterScroll() => $_ensure(27);
+  @$pb.TagNumber(27)
+  AfterScrollEvent get afterScroll => $_getN(26);
+  @$pb.TagNumber(27)
+  set afterScroll(AfterScrollEvent value) => $_setField(27, value);
+  @$pb.TagNumber(27)
+  $core.bool hasAfterScroll() => $_has(26);
+  @$pb.TagNumber(27)
+  void clearAfterScroll() => $_clearField(27);
+  @$pb.TagNumber(27)
+  AfterScrollEvent ensureAfterScroll() => $_ensure(26);
 
-  @$pb.TagNumber(30)
-  ScrollTooltipEvent get scrollTooltip => $_getN(28);
-  @$pb.TagNumber(30)
-  set scrollTooltip(ScrollTooltipEvent value) => $_setField(30, value);
-  @$pb.TagNumber(30)
-  $core.bool hasScrollTooltip() => $_has(28);
-  @$pb.TagNumber(30)
-  void clearScrollTooltip() => $_clearField(30);
-  @$pb.TagNumber(30)
-  ScrollTooltipEvent ensureScrollTooltip() => $_ensure(28);
+  @$pb.TagNumber(28)
+  ScrollTooltipEvent get scrollTooltip => $_getN(27);
+  @$pb.TagNumber(28)
+  set scrollTooltip(ScrollTooltipEvent value) => $_setField(28, value);
+  @$pb.TagNumber(28)
+  $core.bool hasScrollTooltip() => $_has(27);
+  @$pb.TagNumber(28)
+  void clearScrollTooltip() => $_clearField(28);
+  @$pb.TagNumber(28)
+  ScrollTooltipEvent ensureScrollTooltip() => $_ensure(27);
 
   /// Resize & Freeze
-  @$pb.TagNumber(31)
-  BeforeUserResizeEvent get beforeUserResize => $_getN(29);
-  @$pb.TagNumber(31)
-  set beforeUserResize(BeforeUserResizeEvent value) => $_setField(31, value);
-  @$pb.TagNumber(31)
-  $core.bool hasBeforeUserResize() => $_has(29);
-  @$pb.TagNumber(31)
-  void clearBeforeUserResize() => $_clearField(31);
-  @$pb.TagNumber(31)
-  BeforeUserResizeEvent ensureBeforeUserResize() => $_ensure(29);
+  @$pb.TagNumber(29)
+  BeforeUserResizeEvent get beforeUserResize => $_getN(28);
+  @$pb.TagNumber(29)
+  set beforeUserResize(BeforeUserResizeEvent value) => $_setField(29, value);
+  @$pb.TagNumber(29)
+  $core.bool hasBeforeUserResize() => $_has(28);
+  @$pb.TagNumber(29)
+  void clearBeforeUserResize() => $_clearField(29);
+  @$pb.TagNumber(29)
+  BeforeUserResizeEvent ensureBeforeUserResize() => $_ensure(28);
 
-  @$pb.TagNumber(32)
-  AfterUserResizeEvent get afterUserResize => $_getN(30);
-  @$pb.TagNumber(32)
-  set afterUserResize(AfterUserResizeEvent value) => $_setField(32, value);
-  @$pb.TagNumber(32)
-  $core.bool hasAfterUserResize() => $_has(30);
-  @$pb.TagNumber(32)
-  void clearAfterUserResize() => $_clearField(32);
-  @$pb.TagNumber(32)
-  AfterUserResizeEvent ensureAfterUserResize() => $_ensure(30);
+  @$pb.TagNumber(30)
+  AfterUserResizeEvent get afterUserResize => $_getN(29);
+  @$pb.TagNumber(30)
+  set afterUserResize(AfterUserResizeEvent value) => $_setField(30, value);
+  @$pb.TagNumber(30)
+  $core.bool hasAfterUserResize() => $_has(29);
+  @$pb.TagNumber(30)
+  void clearAfterUserResize() => $_clearField(30);
+  @$pb.TagNumber(30)
+  AfterUserResizeEvent ensureAfterUserResize() => $_ensure(29);
 
-  @$pb.TagNumber(33)
-  AfterUserFreezeEvent get afterUserFreeze => $_getN(31);
-  @$pb.TagNumber(33)
-  set afterUserFreeze(AfterUserFreezeEvent value) => $_setField(33, value);
-  @$pb.TagNumber(33)
-  $core.bool hasAfterUserFreeze() => $_has(31);
-  @$pb.TagNumber(33)
-  void clearAfterUserFreeze() => $_clearField(33);
-  @$pb.TagNumber(33)
-  AfterUserFreezeEvent ensureAfterUserFreeze() => $_ensure(31);
+  @$pb.TagNumber(31)
+  AfterUserFreezeEvent get afterUserFreeze => $_getN(30);
+  @$pb.TagNumber(31)
+  set afterUserFreeze(AfterUserFreezeEvent value) => $_setField(31, value);
+  @$pb.TagNumber(31)
+  $core.bool hasAfterUserFreeze() => $_has(30);
+  @$pb.TagNumber(31)
+  void clearAfterUserFreeze() => $_clearField(31);
+  @$pb.TagNumber(31)
+  AfterUserFreezeEvent ensureAfterUserFreeze() => $_ensure(30);
 
   /// Column/Row move
+  @$pb.TagNumber(32)
+  BeforeMoveColumnEvent get beforeMoveColumn => $_getN(31);
+  @$pb.TagNumber(32)
+  set beforeMoveColumn(BeforeMoveColumnEvent value) => $_setField(32, value);
+  @$pb.TagNumber(32)
+  $core.bool hasBeforeMoveColumn() => $_has(31);
+  @$pb.TagNumber(32)
+  void clearBeforeMoveColumn() => $_clearField(32);
+  @$pb.TagNumber(32)
+  BeforeMoveColumnEvent ensureBeforeMoveColumn() => $_ensure(31);
+
+  @$pb.TagNumber(33)
+  AfterMoveColumnEvent get afterMoveColumn => $_getN(32);
+  @$pb.TagNumber(33)
+  set afterMoveColumn(AfterMoveColumnEvent value) => $_setField(33, value);
+  @$pb.TagNumber(33)
+  $core.bool hasAfterMoveColumn() => $_has(32);
+  @$pb.TagNumber(33)
+  void clearAfterMoveColumn() => $_clearField(33);
+  @$pb.TagNumber(33)
+  AfterMoveColumnEvent ensureAfterMoveColumn() => $_ensure(32);
+
   @$pb.TagNumber(34)
-  BeforeMoveColumnEvent get beforeMoveColumn => $_getN(32);
+  BeforeMoveRowEvent get beforeMoveRow => $_getN(33);
   @$pb.TagNumber(34)
-  set beforeMoveColumn(BeforeMoveColumnEvent value) => $_setField(34, value);
+  set beforeMoveRow(BeforeMoveRowEvent value) => $_setField(34, value);
   @$pb.TagNumber(34)
-  $core.bool hasBeforeMoveColumn() => $_has(32);
+  $core.bool hasBeforeMoveRow() => $_has(33);
   @$pb.TagNumber(34)
-  void clearBeforeMoveColumn() => $_clearField(34);
+  void clearBeforeMoveRow() => $_clearField(34);
   @$pb.TagNumber(34)
-  BeforeMoveColumnEvent ensureBeforeMoveColumn() => $_ensure(32);
+  BeforeMoveRowEvent ensureBeforeMoveRow() => $_ensure(33);
 
   @$pb.TagNumber(35)
-  AfterMoveColumnEvent get afterMoveColumn => $_getN(33);
+  AfterMoveRowEvent get afterMoveRow => $_getN(34);
   @$pb.TagNumber(35)
-  set afterMoveColumn(AfterMoveColumnEvent value) => $_setField(35, value);
+  set afterMoveRow(AfterMoveRowEvent value) => $_setField(35, value);
   @$pb.TagNumber(35)
-  $core.bool hasAfterMoveColumn() => $_has(33);
+  $core.bool hasAfterMoveRow() => $_has(34);
   @$pb.TagNumber(35)
-  void clearAfterMoveColumn() => $_clearField(35);
+  void clearAfterMoveRow() => $_clearField(35);
   @$pb.TagNumber(35)
-  AfterMoveColumnEvent ensureAfterMoveColumn() => $_ensure(33);
-
-  @$pb.TagNumber(36)
-  BeforeMoveRowEvent get beforeMoveRow => $_getN(34);
-  @$pb.TagNumber(36)
-  set beforeMoveRow(BeforeMoveRowEvent value) => $_setField(36, value);
-  @$pb.TagNumber(36)
-  $core.bool hasBeforeMoveRow() => $_has(34);
-  @$pb.TagNumber(36)
-  void clearBeforeMoveRow() => $_clearField(36);
-  @$pb.TagNumber(36)
-  BeforeMoveRowEvent ensureBeforeMoveRow() => $_ensure(34);
-
-  @$pb.TagNumber(37)
-  AfterMoveRowEvent get afterMoveRow => $_getN(35);
-  @$pb.TagNumber(37)
-  set afterMoveRow(AfterMoveRowEvent value) => $_setField(37, value);
-  @$pb.TagNumber(37)
-  $core.bool hasAfterMoveRow() => $_has(35);
-  @$pb.TagNumber(37)
-  void clearAfterMoveRow() => $_clearField(37);
-  @$pb.TagNumber(37)
-  AfterMoveRowEvent ensureAfterMoveRow() => $_ensure(35);
+  AfterMoveRowEvent ensureAfterMoveRow() => $_ensure(34);
 
   /// Mouse
+  @$pb.TagNumber(36)
+  BeforeMouseDownEvent get beforeMouseDown => $_getN(35);
+  @$pb.TagNumber(36)
+  set beforeMouseDown(BeforeMouseDownEvent value) => $_setField(36, value);
+  @$pb.TagNumber(36)
+  $core.bool hasBeforeMouseDown() => $_has(35);
+  @$pb.TagNumber(36)
+  void clearBeforeMouseDown() => $_clearField(36);
+  @$pb.TagNumber(36)
+  BeforeMouseDownEvent ensureBeforeMouseDown() => $_ensure(35);
+
+  @$pb.TagNumber(37)
+  MouseDownEvent get mouseDown => $_getN(36);
+  @$pb.TagNumber(37)
+  set mouseDown(MouseDownEvent value) => $_setField(37, value);
+  @$pb.TagNumber(37)
+  $core.bool hasMouseDown() => $_has(36);
+  @$pb.TagNumber(37)
+  void clearMouseDown() => $_clearField(37);
+  @$pb.TagNumber(37)
+  MouseDownEvent ensureMouseDown() => $_ensure(36);
+
   @$pb.TagNumber(38)
-  BeforeMouseDownEvent get beforeMouseDown => $_getN(36);
+  MouseUpEvent get mouseUp => $_getN(37);
   @$pb.TagNumber(38)
-  set beforeMouseDown(BeforeMouseDownEvent value) => $_setField(38, value);
+  set mouseUp(MouseUpEvent value) => $_setField(38, value);
   @$pb.TagNumber(38)
-  $core.bool hasBeforeMouseDown() => $_has(36);
+  $core.bool hasMouseUp() => $_has(37);
   @$pb.TagNumber(38)
-  void clearBeforeMouseDown() => $_clearField(38);
+  void clearMouseUp() => $_clearField(38);
   @$pb.TagNumber(38)
-  BeforeMouseDownEvent ensureBeforeMouseDown() => $_ensure(36);
+  MouseUpEvent ensureMouseUp() => $_ensure(37);
 
   @$pb.TagNumber(39)
-  MouseDownEvent get mouseDown => $_getN(37);
+  MouseMoveEvent get mouseMove => $_getN(38);
   @$pb.TagNumber(39)
-  set mouseDown(MouseDownEvent value) => $_setField(39, value);
+  set mouseMove(MouseMoveEvent value) => $_setField(39, value);
   @$pb.TagNumber(39)
-  $core.bool hasMouseDown() => $_has(37);
+  $core.bool hasMouseMove() => $_has(38);
   @$pb.TagNumber(39)
-  void clearMouseDown() => $_clearField(39);
+  void clearMouseMove() => $_clearField(39);
   @$pb.TagNumber(39)
-  MouseDownEvent ensureMouseDown() => $_ensure(37);
+  MouseMoveEvent ensureMouseMove() => $_ensure(38);
 
   @$pb.TagNumber(40)
-  MouseUpEvent get mouseUp => $_getN(38);
+  ClickEvent get click => $_getN(39);
   @$pb.TagNumber(40)
-  set mouseUp(MouseUpEvent value) => $_setField(40, value);
+  set click(ClickEvent value) => $_setField(40, value);
   @$pb.TagNumber(40)
-  $core.bool hasMouseUp() => $_has(38);
+  $core.bool hasClick() => $_has(39);
   @$pb.TagNumber(40)
-  void clearMouseUp() => $_clearField(40);
+  void clearClick() => $_clearField(40);
   @$pb.TagNumber(40)
-  MouseUpEvent ensureMouseUp() => $_ensure(38);
+  ClickEvent ensureClick() => $_ensure(39);
 
   @$pb.TagNumber(41)
-  MouseMoveEvent get mouseMove => $_getN(39);
+  DblClickEvent get dblClick => $_getN(40);
   @$pb.TagNumber(41)
-  set mouseMove(MouseMoveEvent value) => $_setField(41, value);
+  set dblClick(DblClickEvent value) => $_setField(41, value);
   @$pb.TagNumber(41)
-  $core.bool hasMouseMove() => $_has(39);
+  $core.bool hasDblClick() => $_has(40);
   @$pb.TagNumber(41)
-  void clearMouseMove() => $_clearField(41);
+  void clearDblClick() => $_clearField(41);
   @$pb.TagNumber(41)
-  MouseMoveEvent ensureMouseMove() => $_ensure(39);
-
-  @$pb.TagNumber(42)
-  ClickEvent get click => $_getN(40);
-  @$pb.TagNumber(42)
-  set click(ClickEvent value) => $_setField(42, value);
-  @$pb.TagNumber(42)
-  $core.bool hasClick() => $_has(40);
-  @$pb.TagNumber(42)
-  void clearClick() => $_clearField(42);
-  @$pb.TagNumber(42)
-  ClickEvent ensureClick() => $_ensure(40);
-
-  @$pb.TagNumber(43)
-  DblClickEvent get dblClick => $_getN(41);
-  @$pb.TagNumber(43)
-  set dblClick(DblClickEvent value) => $_setField(43, value);
-  @$pb.TagNumber(43)
-  $core.bool hasDblClick() => $_has(41);
-  @$pb.TagNumber(43)
-  void clearDblClick() => $_clearField(43);
-  @$pb.TagNumber(43)
-  DblClickEvent ensureDblClick() => $_ensure(41);
+  DblClickEvent ensureDblClick() => $_ensure(40);
 
   /// Keyboard
-  @$pb.TagNumber(44)
-  KeyDownEvent get keyDown => $_getN(42);
-  @$pb.TagNumber(44)
-  set keyDown(KeyDownEvent value) => $_setField(44, value);
-  @$pb.TagNumber(44)
-  $core.bool hasKeyDown() => $_has(42);
-  @$pb.TagNumber(44)
-  void clearKeyDown() => $_clearField(44);
-  @$pb.TagNumber(44)
-  KeyDownEvent ensureKeyDown() => $_ensure(42);
+  @$pb.TagNumber(42)
+  KeyDownEvent get keyDown => $_getN(41);
+  @$pb.TagNumber(42)
+  set keyDown(KeyDownEvent value) => $_setField(42, value);
+  @$pb.TagNumber(42)
+  $core.bool hasKeyDown() => $_has(41);
+  @$pb.TagNumber(42)
+  void clearKeyDown() => $_clearField(42);
+  @$pb.TagNumber(42)
+  KeyDownEvent ensureKeyDown() => $_ensure(41);
 
-  @$pb.TagNumber(45)
-  KeyPressEvent get keyPress => $_getN(43);
-  @$pb.TagNumber(45)
-  set keyPress(KeyPressEvent value) => $_setField(45, value);
-  @$pb.TagNumber(45)
-  $core.bool hasKeyPress() => $_has(43);
-  @$pb.TagNumber(45)
-  void clearKeyPress() => $_clearField(45);
-  @$pb.TagNumber(45)
-  KeyPressEvent ensureKeyPress() => $_ensure(43);
+  @$pb.TagNumber(43)
+  KeyPressEvent get keyPress => $_getN(42);
+  @$pb.TagNumber(43)
+  set keyPress(KeyPressEvent value) => $_setField(43, value);
+  @$pb.TagNumber(43)
+  $core.bool hasKeyPress() => $_has(42);
+  @$pb.TagNumber(43)
+  void clearKeyPress() => $_clearField(43);
+  @$pb.TagNumber(43)
+  KeyPressEvent ensureKeyPress() => $_ensure(42);
 
-  @$pb.TagNumber(46)
-  KeyUpEvent get keyUp => $_getN(44);
-  @$pb.TagNumber(46)
-  set keyUp(KeyUpEvent value) => $_setField(46, value);
-  @$pb.TagNumber(46)
-  $core.bool hasKeyUp() => $_has(44);
-  @$pb.TagNumber(46)
-  void clearKeyUp() => $_clearField(46);
-  @$pb.TagNumber(46)
-  KeyUpEvent ensureKeyUp() => $_ensure(44);
+  @$pb.TagNumber(44)
+  KeyUpEvent get keyUp => $_getN(43);
+  @$pb.TagNumber(44)
+  set keyUp(KeyUpEvent value) => $_setField(44, value);
+  @$pb.TagNumber(44)
+  $core.bool hasKeyUp() => $_has(43);
+  @$pb.TagNumber(44)
+  void clearKeyUp() => $_clearField(44);
+  @$pb.TagNumber(44)
+  KeyUpEvent ensureKeyUp() => $_ensure(43);
 
   /// Drawing
-  @$pb.TagNumber(47)
-  CustomRenderCellEvent get customRenderCell => $_getN(45);
-  @$pb.TagNumber(47)
-  set customRenderCell(CustomRenderCellEvent value) => $_setField(47, value);
-  @$pb.TagNumber(47)
-  $core.bool hasCustomRenderCell() => $_has(45);
-  @$pb.TagNumber(47)
-  void clearCustomRenderCell() => $_clearField(47);
-  @$pb.TagNumber(47)
-  CustomRenderCellEvent ensureCustomRenderCell() => $_ensure(45);
+  @$pb.TagNumber(45)
+  CustomRenderCellEvent get customRenderCell => $_getN(44);
+  @$pb.TagNumber(45)
+  set customRenderCell(CustomRenderCellEvent value) => $_setField(45, value);
+  @$pb.TagNumber(45)
+  $core.bool hasCustomRenderCell() => $_has(44);
+  @$pb.TagNumber(45)
+  void clearCustomRenderCell() => $_clearField(45);
+  @$pb.TagNumber(45)
+  CustomRenderCellEvent ensureCustomRenderCell() => $_ensure(44);
 
   /// Drag & Drop
+  @$pb.TagNumber(46)
+  DragStartEvent get dragStart => $_getN(45);
+  @$pb.TagNumber(46)
+  set dragStart(DragStartEvent value) => $_setField(46, value);
+  @$pb.TagNumber(46)
+  $core.bool hasDragStart() => $_has(45);
+  @$pb.TagNumber(46)
+  void clearDragStart() => $_clearField(46);
+  @$pb.TagNumber(46)
+  DragStartEvent ensureDragStart() => $_ensure(45);
+
+  @$pb.TagNumber(47)
+  DragOverEvent get dragOver => $_getN(46);
+  @$pb.TagNumber(47)
+  set dragOver(DragOverEvent value) => $_setField(47, value);
+  @$pb.TagNumber(47)
+  $core.bool hasDragOver() => $_has(46);
+  @$pb.TagNumber(47)
+  void clearDragOver() => $_clearField(47);
+  @$pb.TagNumber(47)
+  DragOverEvent ensureDragOver() => $_ensure(46);
+
   @$pb.TagNumber(48)
-  DragStartEvent get dragStart => $_getN(46);
+  DragDropEvent get dragDrop => $_getN(47);
   @$pb.TagNumber(48)
-  set dragStart(DragStartEvent value) => $_setField(48, value);
+  set dragDrop(DragDropEvent value) => $_setField(48, value);
   @$pb.TagNumber(48)
-  $core.bool hasDragStart() => $_has(46);
+  $core.bool hasDragDrop() => $_has(47);
   @$pb.TagNumber(48)
-  void clearDragStart() => $_clearField(48);
+  void clearDragDrop() => $_clearField(48);
   @$pb.TagNumber(48)
-  DragStartEvent ensureDragStart() => $_ensure(46);
+  DragDropEvent ensureDragDrop() => $_ensure(47);
 
   @$pb.TagNumber(49)
-  DragOverEvent get dragOver => $_getN(47);
+  DragCompleteEvent get dragComplete => $_getN(48);
   @$pb.TagNumber(49)
-  set dragOver(DragOverEvent value) => $_setField(49, value);
+  set dragComplete(DragCompleteEvent value) => $_setField(49, value);
   @$pb.TagNumber(49)
-  $core.bool hasDragOver() => $_has(47);
+  $core.bool hasDragComplete() => $_has(48);
   @$pb.TagNumber(49)
-  void clearDragOver() => $_clearField(49);
+  void clearDragComplete() => $_clearField(49);
   @$pb.TagNumber(49)
-  DragOverEvent ensureDragOver() => $_ensure(47);
-
-  @$pb.TagNumber(50)
-  DragDropEvent get dragDrop => $_getN(48);
-  @$pb.TagNumber(50)
-  set dragDrop(DragDropEvent value) => $_setField(50, value);
-  @$pb.TagNumber(50)
-  $core.bool hasDragDrop() => $_has(48);
-  @$pb.TagNumber(50)
-  void clearDragDrop() => $_clearField(50);
-  @$pb.TagNumber(50)
-  DragDropEvent ensureDragDrop() => $_ensure(48);
-
-  @$pb.TagNumber(51)
-  DragCompleteEvent get dragComplete => $_getN(49);
-  @$pb.TagNumber(51)
-  set dragComplete(DragCompleteEvent value) => $_setField(51, value);
-  @$pb.TagNumber(51)
-  $core.bool hasDragComplete() => $_has(49);
-  @$pb.TagNumber(51)
-  void clearDragComplete() => $_clearField(51);
-  @$pb.TagNumber(51)
-  DragCompleteEvent ensureDragComplete() => $_ensure(49);
+  DragCompleteEvent ensureDragComplete() => $_ensure(48);
 
   /// Search
-  @$pb.TagNumber(52)
-  TypeAheadStartedEvent get typeAheadStarted => $_getN(50);
-  @$pb.TagNumber(52)
-  set typeAheadStarted(TypeAheadStartedEvent value) => $_setField(52, value);
-  @$pb.TagNumber(52)
-  $core.bool hasTypeAheadStarted() => $_has(50);
-  @$pb.TagNumber(52)
-  void clearTypeAheadStarted() => $_clearField(52);
-  @$pb.TagNumber(52)
-  TypeAheadStartedEvent ensureTypeAheadStarted() => $_ensure(50);
+  @$pb.TagNumber(50)
+  TypeAheadStartedEvent get typeAheadStarted => $_getN(49);
+  @$pb.TagNumber(50)
+  set typeAheadStarted(TypeAheadStartedEvent value) => $_setField(50, value);
+  @$pb.TagNumber(50)
+  $core.bool hasTypeAheadStarted() => $_has(49);
+  @$pb.TagNumber(50)
+  void clearTypeAheadStarted() => $_clearField(50);
+  @$pb.TagNumber(50)
+  TypeAheadStartedEvent ensureTypeAheadStarted() => $_ensure(49);
 
-  @$pb.TagNumber(53)
-  TypeAheadEndedEvent get typeAheadEnded => $_getN(51);
-  @$pb.TagNumber(53)
-  set typeAheadEnded(TypeAheadEndedEvent value) => $_setField(53, value);
-  @$pb.TagNumber(53)
-  $core.bool hasTypeAheadEnded() => $_has(51);
-  @$pb.TagNumber(53)
-  void clearTypeAheadEnded() => $_clearField(53);
-  @$pb.TagNumber(53)
-  TypeAheadEndedEvent ensureTypeAheadEnded() => $_ensure(51);
+  @$pb.TagNumber(51)
+  TypeAheadEndedEvent get typeAheadEnded => $_getN(50);
+  @$pb.TagNumber(51)
+  set typeAheadEnded(TypeAheadEndedEvent value) => $_setField(51, value);
+  @$pb.TagNumber(51)
+  $core.bool hasTypeAheadEnded() => $_has(50);
+  @$pb.TagNumber(51)
+  void clearTypeAheadEnded() => $_clearField(51);
+  @$pb.TagNumber(51)
+  TypeAheadEndedEvent ensureTypeAheadEnded() => $_ensure(50);
 
   /// Data refresh
-  @$pb.TagNumber(54)
-  DataRefreshingEvent get dataRefreshing => $_getN(52);
-  @$pb.TagNumber(54)
-  set dataRefreshing(DataRefreshingEvent value) => $_setField(54, value);
-  @$pb.TagNumber(54)
-  $core.bool hasDataRefreshing() => $_has(52);
-  @$pb.TagNumber(54)
-  void clearDataRefreshing() => $_clearField(54);
-  @$pb.TagNumber(54)
-  DataRefreshingEvent ensureDataRefreshing() => $_ensure(52);
+  @$pb.TagNumber(52)
+  DataRefreshingEvent get dataRefreshing => $_getN(51);
+  @$pb.TagNumber(52)
+  set dataRefreshing(DataRefreshingEvent value) => $_setField(52, value);
+  @$pb.TagNumber(52)
+  $core.bool hasDataRefreshing() => $_has(51);
+  @$pb.TagNumber(52)
+  void clearDataRefreshing() => $_clearField(52);
+  @$pb.TagNumber(52)
+  DataRefreshingEvent ensureDataRefreshing() => $_ensure(51);
 
-  @$pb.TagNumber(55)
-  DataRefreshedEvent get dataRefreshed => $_getN(53);
-  @$pb.TagNumber(55)
-  set dataRefreshed(DataRefreshedEvent value) => $_setField(55, value);
-  @$pb.TagNumber(55)
-  $core.bool hasDataRefreshed() => $_has(53);
-  @$pb.TagNumber(55)
-  void clearDataRefreshed() => $_clearField(55);
-  @$pb.TagNumber(55)
-  DataRefreshedEvent ensureDataRefreshed() => $_ensure(53);
+  @$pb.TagNumber(53)
+  DataRefreshedEvent get dataRefreshed => $_getN(52);
+  @$pb.TagNumber(53)
+  set dataRefreshed(DataRefreshedEvent value) => $_setField(53, value);
+  @$pb.TagNumber(53)
+  $core.bool hasDataRefreshed() => $_has(52);
+  @$pb.TagNumber(53)
+  void clearDataRefreshed() => $_clearField(53);
+  @$pb.TagNumber(53)
+  DataRefreshedEvent ensureDataRefreshed() => $_ensure(52);
 
-  @$pb.TagNumber(56)
-  FilterDataEvent get filterData => $_getN(54);
-  @$pb.TagNumber(56)
-  set filterData(FilterDataEvent value) => $_setField(56, value);
-  @$pb.TagNumber(56)
-  $core.bool hasFilterData() => $_has(54);
-  @$pb.TagNumber(56)
-  void clearFilterData() => $_clearField(56);
-  @$pb.TagNumber(56)
-  FilterDataEvent ensureFilterData() => $_ensure(54);
+  @$pb.TagNumber(54)
+  FilterDataEvent get filterData => $_getN(53);
+  @$pb.TagNumber(54)
+  set filterData(FilterDataEvent value) => $_setField(54, value);
+  @$pb.TagNumber(54)
+  $core.bool hasFilterData() => $_has(53);
+  @$pb.TagNumber(54)
+  void clearFilterData() => $_clearField(54);
+  @$pb.TagNumber(54)
+  FilterDataEvent ensureFilterData() => $_ensure(53);
 
   /// Error
-  @$pb.TagNumber(57)
-  ErrorEvent get error => $_getN(55);
-  @$pb.TagNumber(57)
-  set error(ErrorEvent value) => $_setField(57, value);
-  @$pb.TagNumber(57)
-  $core.bool hasError() => $_has(55);
-  @$pb.TagNumber(57)
-  void clearError() => $_clearField(57);
-  @$pb.TagNumber(57)
-  ErrorEvent ensureError() => $_ensure(55);
+  @$pb.TagNumber(55)
+  ErrorEvent get error => $_getN(54);
+  @$pb.TagNumber(55)
+  set error(ErrorEvent value) => $_setField(55, value);
+  @$pb.TagNumber(55)
+  $core.bool hasError() => $_has(54);
+  @$pb.TagNumber(55)
+  void clearError() => $_clearField(55);
+  @$pb.TagNumber(55)
+  ErrorEvent ensureError() => $_ensure(54);
 
   /// Print
-  @$pb.TagNumber(58)
-  BeforePageBreakEvent get beforePageBreak => $_getN(56);
-  @$pb.TagNumber(58)
-  set beforePageBreak(BeforePageBreakEvent value) => $_setField(58, value);
-  @$pb.TagNumber(58)
-  $core.bool hasBeforePageBreak() => $_has(56);
-  @$pb.TagNumber(58)
-  void clearBeforePageBreak() => $_clearField(58);
-  @$pb.TagNumber(58)
-  BeforePageBreakEvent ensureBeforePageBreak() => $_ensure(56);
+  @$pb.TagNumber(56)
+  BeforePageBreakEvent get beforePageBreak => $_getN(55);
+  @$pb.TagNumber(56)
+  set beforePageBreak(BeforePageBreakEvent value) => $_setField(56, value);
+  @$pb.TagNumber(56)
+  $core.bool hasBeforePageBreak() => $_has(55);
+  @$pb.TagNumber(56)
+  void clearBeforePageBreak() => $_clearField(56);
+  @$pb.TagNumber(56)
+  BeforePageBreakEvent ensureBeforePageBreak() => $_ensure(55);
 
-  @$pb.TagNumber(59)
-  StartPageEvent get startPage => $_getN(57);
-  @$pb.TagNumber(59)
-  set startPage(StartPageEvent value) => $_setField(59, value);
-  @$pb.TagNumber(59)
-  $core.bool hasStartPage() => $_has(57);
-  @$pb.TagNumber(59)
-  void clearStartPage() => $_clearField(59);
-  @$pb.TagNumber(59)
-  StartPageEvent ensureStartPage() => $_ensure(57);
+  @$pb.TagNumber(57)
+  StartPageEvent get startPage => $_getN(56);
+  @$pb.TagNumber(57)
+  set startPage(StartPageEvent value) => $_setField(57, value);
+  @$pb.TagNumber(57)
+  $core.bool hasStartPage() => $_has(56);
+  @$pb.TagNumber(57)
+  void clearStartPage() => $_clearField(57);
+  @$pb.TagNumber(57)
+  StartPageEvent ensureStartPage() => $_ensure(56);
 
-  @$pb.TagNumber(60)
-  GetHeaderRowEvent get getHeaderRow => $_getN(58);
-  @$pb.TagNumber(60)
-  set getHeaderRow(GetHeaderRowEvent value) => $_setField(60, value);
-  @$pb.TagNumber(60)
-  $core.bool hasGetHeaderRow() => $_has(58);
-  @$pb.TagNumber(60)
-  void clearGetHeaderRow() => $_clearField(60);
-  @$pb.TagNumber(60)
-  GetHeaderRowEvent ensureGetHeaderRow() => $_ensure(58);
+  @$pb.TagNumber(58)
+  GetHeaderRowEvent get getHeaderRow => $_getN(57);
+  @$pb.TagNumber(58)
+  set getHeaderRow(GetHeaderRowEvent value) => $_setField(58, value);
+  @$pb.TagNumber(58)
+  $core.bool hasGetHeaderRow() => $_has(57);
+  @$pb.TagNumber(58)
+  void clearGetHeaderRow() => $_clearField(58);
+  @$pb.TagNumber(58)
+  GetHeaderRowEvent ensureGetHeaderRow() => $_ensure(57);
 
   /// Pull to refresh
-  @$pb.TagNumber(61)
-  PullToRefreshTriggeredEvent get pullToRefreshTriggered => $_getN(59);
-  @$pb.TagNumber(61)
+  @$pb.TagNumber(59)
+  PullToRefreshTriggeredEvent get pullToRefreshTriggered => $_getN(58);
+  @$pb.TagNumber(59)
   set pullToRefreshTriggered(PullToRefreshTriggeredEvent value) =>
-      $_setField(61, value);
-  @$pb.TagNumber(61)
-  $core.bool hasPullToRefreshTriggered() => $_has(59);
-  @$pb.TagNumber(61)
-  void clearPullToRefreshTriggered() => $_clearField(61);
-  @$pb.TagNumber(61)
-  PullToRefreshTriggeredEvent ensurePullToRefreshTriggered() => $_ensure(59);
+      $_setField(59, value);
+  @$pb.TagNumber(59)
+  $core.bool hasPullToRefreshTriggered() => $_has(58);
+  @$pb.TagNumber(59)
+  void clearPullToRefreshTriggered() => $_clearField(59);
+  @$pb.TagNumber(59)
+  PullToRefreshTriggeredEvent ensurePullToRefreshTriggered() => $_ensure(58);
 
-  @$pb.TagNumber(62)
-  PullToRefreshCanceledEvent get pullToRefreshCanceled => $_getN(60);
-  @$pb.TagNumber(62)
+  @$pb.TagNumber(60)
+  PullToRefreshCanceledEvent get pullToRefreshCanceled => $_getN(59);
+  @$pb.TagNumber(60)
   set pullToRefreshCanceled(PullToRefreshCanceledEvent value) =>
-      $_setField(62, value);
-  @$pb.TagNumber(62)
-  $core.bool hasPullToRefreshCanceled() => $_has(60);
-  @$pb.TagNumber(62)
-  void clearPullToRefreshCanceled() => $_clearField(62);
-  @$pb.TagNumber(62)
-  PullToRefreshCanceledEvent ensurePullToRefreshCanceled() => $_ensure(60);
-
-  @$pb.TagNumber(63)
-  BeforeDropdownOpenEvent get beforeDropdownOpen => $_getN(61);
-  @$pb.TagNumber(63)
-  set beforeDropdownOpen(BeforeDropdownOpenEvent value) =>
-      $_setField(63, value);
-  @$pb.TagNumber(63)
-  $core.bool hasBeforeDropdownOpen() => $_has(61);
-  @$pb.TagNumber(63)
-  void clearBeforeDropdownOpen() => $_clearField(63);
-  @$pb.TagNumber(63)
-  BeforeDropdownOpenEvent ensureBeforeDropdownOpen() => $_ensure(61);
+      $_setField(60, value);
+  @$pb.TagNumber(60)
+  $core.bool hasPullToRefreshCanceled() => $_has(59);
+  @$pb.TagNumber(60)
+  void clearPullToRefreshCanceled() => $_clearField(60);
+  @$pb.TagNumber(60)
+  PullToRefreshCanceledEvent ensurePullToRefreshCanceled() => $_ensure(59);
 
   /// Native tree model
-  @$pb.TagNumber(64)
-  TreeChildrenRequestedEvent get treeChildrenRequested => $_getN(62);
-  @$pb.TagNumber(64)
+  @$pb.TagNumber(61)
+  TreeChildrenRequestedEvent get treeChildrenRequested => $_getN(60);
+  @$pb.TagNumber(61)
   set treeChildrenRequested(TreeChildrenRequestedEvent value) =>
-      $_setField(64, value);
+      $_setField(61, value);
+  @$pb.TagNumber(61)
+  $core.bool hasTreeChildrenRequested() => $_has(60);
+  @$pb.TagNumber(61)
+  void clearTreeChildrenRequested() => $_clearField(61);
+  @$pb.TagNumber(61)
+  TreeChildrenRequestedEvent ensureTreeChildrenRequested() => $_ensure(60);
+
+  @$pb.TagNumber(62)
+  BeforeTreeNodeToggleEvent get beforeTreeNodeToggle => $_getN(61);
+  @$pb.TagNumber(62)
+  set beforeTreeNodeToggle(BeforeTreeNodeToggleEvent value) =>
+      $_setField(62, value);
+  @$pb.TagNumber(62)
+  $core.bool hasBeforeTreeNodeToggle() => $_has(61);
+  @$pb.TagNumber(62)
+  void clearBeforeTreeNodeToggle() => $_clearField(62);
+  @$pb.TagNumber(62)
+  BeforeTreeNodeToggleEvent ensureBeforeTreeNodeToggle() => $_ensure(61);
+
+  @$pb.TagNumber(63)
+  AfterTreeNodeToggleEvent get afterTreeNodeToggle => $_getN(62);
+  @$pb.TagNumber(63)
+  set afterTreeNodeToggle(AfterTreeNodeToggleEvent value) =>
+      $_setField(63, value);
+  @$pb.TagNumber(63)
+  $core.bool hasAfterTreeNodeToggle() => $_has(62);
+  @$pb.TagNumber(63)
+  void clearAfterTreeNodeToggle() => $_clearField(63);
+  @$pb.TagNumber(63)
+  AfterTreeNodeToggleEvent ensureAfterTreeNodeToggle() => $_ensure(62);
+
   @$pb.TagNumber(64)
-  $core.bool hasTreeChildrenRequested() => $_has(62);
+  TreeNodeActivateEvent get treeNodeActivate => $_getN(63);
   @$pb.TagNumber(64)
-  void clearTreeChildrenRequested() => $_clearField(64);
+  set treeNodeActivate(TreeNodeActivateEvent value) => $_setField(64, value);
   @$pb.TagNumber(64)
-  TreeChildrenRequestedEvent ensureTreeChildrenRequested() => $_ensure(62);
+  $core.bool hasTreeNodeActivate() => $_has(63);
+  @$pb.TagNumber(64)
+  void clearTreeNodeActivate() => $_clearField(64);
+  @$pb.TagNumber(64)
+  TreeNodeActivateEvent ensureTreeNodeActivate() => $_ensure(63);
 
   @$pb.TagNumber(65)
-  BeforeTreeNodeToggleEvent get beforeTreeNodeToggle => $_getN(63);
+  TreeNodeContextMenuEvent get treeNodeContextMenu => $_getN(64);
   @$pb.TagNumber(65)
-  set beforeTreeNodeToggle(BeforeTreeNodeToggleEvent value) =>
+  set treeNodeContextMenu(TreeNodeContextMenuEvent value) =>
       $_setField(65, value);
   @$pb.TagNumber(65)
-  $core.bool hasBeforeTreeNodeToggle() => $_has(63);
+  $core.bool hasTreeNodeContextMenu() => $_has(64);
   @$pb.TagNumber(65)
-  void clearBeforeTreeNodeToggle() => $_clearField(65);
+  void clearTreeNodeContextMenu() => $_clearField(65);
   @$pb.TagNumber(65)
-  BeforeTreeNodeToggleEvent ensureBeforeTreeNodeToggle() => $_ensure(63);
-
-  @$pb.TagNumber(66)
-  AfterTreeNodeToggleEvent get afterTreeNodeToggle => $_getN(64);
-  @$pb.TagNumber(66)
-  set afterTreeNodeToggle(AfterTreeNodeToggleEvent value) =>
-      $_setField(66, value);
-  @$pb.TagNumber(66)
-  $core.bool hasAfterTreeNodeToggle() => $_has(64);
-  @$pb.TagNumber(66)
-  void clearAfterTreeNodeToggle() => $_clearField(66);
-  @$pb.TagNumber(66)
-  AfterTreeNodeToggleEvent ensureAfterTreeNodeToggle() => $_ensure(64);
-
-  @$pb.TagNumber(67)
-  TreeNodeActivateEvent get treeNodeActivate => $_getN(65);
-  @$pb.TagNumber(67)
-  set treeNodeActivate(TreeNodeActivateEvent value) => $_setField(67, value);
-  @$pb.TagNumber(67)
-  $core.bool hasTreeNodeActivate() => $_has(65);
-  @$pb.TagNumber(67)
-  void clearTreeNodeActivate() => $_clearField(67);
-  @$pb.TagNumber(67)
-  TreeNodeActivateEvent ensureTreeNodeActivate() => $_ensure(65);
-
-  @$pb.TagNumber(68)
-  TreeNodeContextMenuEvent get treeNodeContextMenu => $_getN(66);
-  @$pb.TagNumber(68)
-  set treeNodeContextMenu(TreeNodeContextMenuEvent value) =>
-      $_setField(68, value);
-  @$pb.TagNumber(68)
-  $core.bool hasTreeNodeContextMenu() => $_has(66);
-  @$pb.TagNumber(68)
-  void clearTreeNodeContextMenu() => $_clearField(68);
-  @$pb.TagNumber(68)
-  TreeNodeContextMenuEvent ensureTreeNodeContextMenu() => $_ensure(66);
+  TreeNodeContextMenuEvent ensureTreeNodeContextMenu() => $_ensure(64);
 
   /// 0 = non-cancelable (informational only).
   /// Non-zero = cancelable — send EventDecision with this ID to allow/veto.
   @$pb.TagNumber(100)
-  $fixnum.Int64 get eventId => $_getI64(67);
+  $fixnum.Int64 get eventId => $_getI64(65);
   @$pb.TagNumber(100)
-  set eventId($fixnum.Int64 value) => $_setInt64(67, value);
+  set eventId($fixnum.Int64 value) => $_setInt64(65, value);
   @$pb.TagNumber(100)
-  $core.bool hasEventId() => $_has(67);
+  $core.bool hasEventId() => $_has(65);
   @$pb.TagNumber(100)
   void clearEventId() => $_clearField(100);
 }
@@ -21815,10 +23763,12 @@ class CellEditChangeEvent extends $pb.GeneratedMessage {
 
 class KeyDownEditEvent extends $pb.GeneratedMessage {
   factory KeyDownEditEvent({
+    $fixnum.Int64? sessionId,
     $core.int? keyCode,
     $core.int? modifier,
   }) {
     final result = create();
+    if (sessionId != null) result.sessionId = sessionId;
     if (keyCode != null) result.keyCode = keyCode;
     if (modifier != null) result.modifier = modifier;
     return result;
@@ -21837,8 +23787,9 @@ class KeyDownEditEvent extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'KeyDownEditEvent',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
-    ..aI(1, _omitFieldNames ? '' : 'keyCode')
-    ..aI(2, _omitFieldNames ? '' : 'modifier')
+    ..aInt64(1, _omitFieldNames ? '' : 'sessionId')
+    ..aI(2, _omitFieldNames ? '' : 'keyCode')
+    ..aI(3, _omitFieldNames ? '' : 'modifier')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -21861,29 +23812,40 @@ class KeyDownEditEvent extends $pb.GeneratedMessage {
   static KeyDownEditEvent? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $core.int get keyCode => $_getIZ(0);
+  $fixnum.Int64 get sessionId => $_getI64(0);
   @$pb.TagNumber(1)
-  set keyCode($core.int value) => $_setSignedInt32(0, value);
+  set sessionId($fixnum.Int64 value) => $_setInt64(0, value);
   @$pb.TagNumber(1)
-  $core.bool hasKeyCode() => $_has(0);
+  $core.bool hasSessionId() => $_has(0);
   @$pb.TagNumber(1)
-  void clearKeyCode() => $_clearField(1);
+  void clearSessionId() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $core.int get modifier => $_getIZ(1);
+  $core.int get keyCode => $_getIZ(1);
   @$pb.TagNumber(2)
-  set modifier($core.int value) => $_setSignedInt32(1, value);
+  set keyCode($core.int value) => $_setSignedInt32(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasModifier() => $_has(1);
+  $core.bool hasKeyCode() => $_has(1);
   @$pb.TagNumber(2)
-  void clearModifier() => $_clearField(2);
+  void clearKeyCode() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get modifier => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set modifier($core.int value) => $_setSignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasModifier() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearModifier() => $_clearField(3);
 }
 
 class KeyPressEditEvent extends $pb.GeneratedMessage {
   factory KeyPressEditEvent({
+    $fixnum.Int64? sessionId,
     $core.int? keyAscii,
   }) {
     final result = create();
+    if (sessionId != null) result.sessionId = sessionId;
     if (keyAscii != null) result.keyAscii = keyAscii;
     return result;
   }
@@ -21901,7 +23863,8 @@ class KeyPressEditEvent extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'KeyPressEditEvent',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
-    ..aI(1, _omitFieldNames ? '' : 'keyAscii')
+    ..aInt64(1, _omitFieldNames ? '' : 'sessionId')
+    ..aI(2, _omitFieldNames ? '' : 'keyAscii')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -21924,21 +23887,32 @@ class KeyPressEditEvent extends $pb.GeneratedMessage {
   static KeyPressEditEvent? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $core.int get keyAscii => $_getIZ(0);
+  $fixnum.Int64 get sessionId => $_getI64(0);
   @$pb.TagNumber(1)
-  set keyAscii($core.int value) => $_setSignedInt32(0, value);
+  set sessionId($fixnum.Int64 value) => $_setInt64(0, value);
   @$pb.TagNumber(1)
-  $core.bool hasKeyAscii() => $_has(0);
+  $core.bool hasSessionId() => $_has(0);
   @$pb.TagNumber(1)
-  void clearKeyAscii() => $_clearField(1);
+  void clearSessionId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get keyAscii => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set keyAscii($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasKeyAscii() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearKeyAscii() => $_clearField(2);
 }
 
 class KeyUpEditEvent extends $pb.GeneratedMessage {
   factory KeyUpEditEvent({
+    $fixnum.Int64? sessionId,
     $core.int? keyCode,
     $core.int? modifier,
   }) {
     final result = create();
+    if (sessionId != null) result.sessionId = sessionId;
     if (keyCode != null) result.keyCode = keyCode;
     if (modifier != null) result.modifier = modifier;
     return result;
@@ -21957,8 +23931,9 @@ class KeyUpEditEvent extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'KeyUpEditEvent',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
-    ..aI(1, _omitFieldNames ? '' : 'keyCode')
-    ..aI(2, _omitFieldNames ? '' : 'modifier')
+    ..aInt64(1, _omitFieldNames ? '' : 'sessionId')
+    ..aI(2, _omitFieldNames ? '' : 'keyCode')
+    ..aI(3, _omitFieldNames ? '' : 'modifier')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -21981,392 +23956,358 @@ class KeyUpEditEvent extends $pb.GeneratedMessage {
   static KeyUpEditEvent? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $core.int get keyCode => $_getIZ(0);
+  $fixnum.Int64 get sessionId => $_getI64(0);
   @$pb.TagNumber(1)
-  set keyCode($core.int value) => $_setSignedInt32(0, value);
+  set sessionId($fixnum.Int64 value) => $_setInt64(0, value);
   @$pb.TagNumber(1)
-  $core.bool hasKeyCode() => $_has(0);
+  $core.bool hasSessionId() => $_has(0);
   @$pb.TagNumber(1)
-  void clearKeyCode() => $_clearField(1);
+  void clearSessionId() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $core.int get modifier => $_getIZ(1);
+  $core.int get keyCode => $_getIZ(1);
   @$pb.TagNumber(2)
-  set modifier($core.int value) => $_setSignedInt32(1, value);
+  set keyCode($core.int value) => $_setSignedInt32(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasModifier() => $_has(1);
+  $core.bool hasKeyCode() => $_has(1);
   @$pb.TagNumber(2)
-  void clearModifier() => $_clearField(2);
+  void clearKeyCode() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get modifier => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set modifier($core.int value) => $_setSignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasModifier() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearModifier() => $_clearField(3);
 }
 
-class CellEditConfigureStyleEvent extends $pb.GeneratedMessage {
-  factory CellEditConfigureStyleEvent({
+class EditValidationRequest extends $pb.GeneratedMessage {
+  factory EditValidationRequest({
+    $fixnum.Int64? requestId,
+    $fixnum.Int64? sessionId,
     $core.int? row,
     $core.int? col,
+    EditorValue? value,
   }) {
     final result = create();
+    if (requestId != null) result.requestId = requestId;
+    if (sessionId != null) result.sessionId = sessionId;
     if (row != null) result.row = row;
     if (col != null) result.col = col;
+    if (value != null) result.value = value;
     return result;
   }
 
-  CellEditConfigureStyleEvent._();
+  EditValidationRequest._();
 
-  factory CellEditConfigureStyleEvent.fromBuffer($core.List<$core.int> data,
+  factory EditValidationRequest.fromBuffer($core.List<$core.int> data,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromBuffer(data, registry);
-  factory CellEditConfigureStyleEvent.fromJson($core.String json,
+  factory EditValidationRequest.fromJson($core.String json,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromJson(json, registry);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'CellEditConfigureStyleEvent',
+      _omitMessageNames ? '' : 'EditValidationRequest',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
-    ..aI(1, _omitFieldNames ? '' : 'row')
-    ..aI(2, _omitFieldNames ? '' : 'col')
+    ..aInt64(1, _omitFieldNames ? '' : 'requestId')
+    ..aInt64(2, _omitFieldNames ? '' : 'sessionId')
+    ..aI(3, _omitFieldNames ? '' : 'row')
+    ..aI(4, _omitFieldNames ? '' : 'col')
+    ..aOM<EditorValue>(5, _omitFieldNames ? '' : 'value',
+        subBuilder: EditorValue.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  CellEditConfigureStyleEvent clone() => deepCopy();
+  EditValidationRequest clone() => deepCopy();
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  CellEditConfigureStyleEvent copyWith(
-          void Function(CellEditConfigureStyleEvent) updates) =>
-      super.copyWith(
-              (message) => updates(message as CellEditConfigureStyleEvent))
-          as CellEditConfigureStyleEvent;
+  EditValidationRequest copyWith(
+          void Function(EditValidationRequest) updates) =>
+      super.copyWith((message) => updates(message as EditValidationRequest))
+          as EditValidationRequest;
 
   @$core.override
   $pb.BuilderInfo get info_ => _i;
 
   @$core.pragma('dart2js:noInline')
-  static CellEditConfigureStyleEvent create() =>
-      CellEditConfigureStyleEvent._();
+  static EditValidationRequest create() => EditValidationRequest._();
   @$core.override
-  CellEditConfigureStyleEvent createEmptyInstance() => create();
+  EditValidationRequest createEmptyInstance() => create();
   @$core.pragma('dart2js:noInline')
-  static CellEditConfigureStyleEvent getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<CellEditConfigureStyleEvent>(create);
-  static CellEditConfigureStyleEvent? _defaultInstance;
+  static EditValidationRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<EditValidationRequest>(create);
+  static EditValidationRequest? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $core.int get row => $_getIZ(0);
+  $fixnum.Int64 get requestId => $_getI64(0);
   @$pb.TagNumber(1)
-  set row($core.int value) => $_setSignedInt32(0, value);
+  set requestId($fixnum.Int64 value) => $_setInt64(0, value);
   @$pb.TagNumber(1)
-  $core.bool hasRow() => $_has(0);
+  $core.bool hasRequestId() => $_has(0);
   @$pb.TagNumber(1)
-  void clearRow() => $_clearField(1);
+  void clearRequestId() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $core.int get col => $_getIZ(1);
+  $fixnum.Int64 get sessionId => $_getI64(1);
   @$pb.TagNumber(2)
-  set col($core.int value) => $_setSignedInt32(1, value);
+  set sessionId($fixnum.Int64 value) => $_setInt64(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasCol() => $_has(1);
+  $core.bool hasSessionId() => $_has(1);
   @$pb.TagNumber(2)
-  void clearCol() => $_clearField(2);
+  void clearSessionId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get row => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set row($core.int value) => $_setSignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasRow() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearRow() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get col => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set col($core.int value) => $_setSignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasCol() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearCol() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  EditorValue get value => $_getN(4);
+  @$pb.TagNumber(5)
+  set value(EditorValue value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasValue() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearValue() => $_clearField(5);
+  @$pb.TagNumber(5)
+  EditorValue ensureValue() => $_ensure(4);
 }
 
-class CellEditConfigureWindowEvent extends $pb.GeneratedMessage {
-  factory CellEditConfigureWindowEvent({
-    $core.int? row,
-    $core.int? col,
+class EditorListItemsRequest extends $pb.GeneratedMessage {
+  factory EditorListItemsRequest({
+    $fixnum.Int64? requestId,
+    $fixnum.Int64? sessionId,
+    $core.String? dataSourceId,
+    $core.String? filterText,
+    $core.int? offset,
+    $core.int? limit,
   }) {
     final result = create();
-    if (row != null) result.row = row;
-    if (col != null) result.col = col;
+    if (requestId != null) result.requestId = requestId;
+    if (sessionId != null) result.sessionId = sessionId;
+    if (dataSourceId != null) result.dataSourceId = dataSourceId;
+    if (filterText != null) result.filterText = filterText;
+    if (offset != null) result.offset = offset;
+    if (limit != null) result.limit = limit;
     return result;
   }
 
-  CellEditConfigureWindowEvent._();
+  EditorListItemsRequest._();
 
-  factory CellEditConfigureWindowEvent.fromBuffer($core.List<$core.int> data,
+  factory EditorListItemsRequest.fromBuffer($core.List<$core.int> data,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromBuffer(data, registry);
-  factory CellEditConfigureWindowEvent.fromJson($core.String json,
+  factory EditorListItemsRequest.fromJson($core.String json,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromJson(json, registry);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'CellEditConfigureWindowEvent',
+      _omitMessageNames ? '' : 'EditorListItemsRequest',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
-    ..aI(1, _omitFieldNames ? '' : 'row')
-    ..aI(2, _omitFieldNames ? '' : 'col')
+    ..aInt64(1, _omitFieldNames ? '' : 'requestId')
+    ..aInt64(2, _omitFieldNames ? '' : 'sessionId')
+    ..aOS(3, _omitFieldNames ? '' : 'dataSourceId')
+    ..aOS(4, _omitFieldNames ? '' : 'filterText')
+    ..aI(5, _omitFieldNames ? '' : 'offset')
+    ..aI(6, _omitFieldNames ? '' : 'limit')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  CellEditConfigureWindowEvent clone() => deepCopy();
+  EditorListItemsRequest clone() => deepCopy();
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  CellEditConfigureWindowEvent copyWith(
-          void Function(CellEditConfigureWindowEvent) updates) =>
-      super.copyWith(
-              (message) => updates(message as CellEditConfigureWindowEvent))
-          as CellEditConfigureWindowEvent;
+  EditorListItemsRequest copyWith(
+          void Function(EditorListItemsRequest) updates) =>
+      super.copyWith((message) => updates(message as EditorListItemsRequest))
+          as EditorListItemsRequest;
 
   @$core.override
   $pb.BuilderInfo get info_ => _i;
 
   @$core.pragma('dart2js:noInline')
-  static CellEditConfigureWindowEvent create() =>
-      CellEditConfigureWindowEvent._();
+  static EditorListItemsRequest create() => EditorListItemsRequest._();
   @$core.override
-  CellEditConfigureWindowEvent createEmptyInstance() => create();
+  EditorListItemsRequest createEmptyInstance() => create();
   @$core.pragma('dart2js:noInline')
-  static CellEditConfigureWindowEvent getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<CellEditConfigureWindowEvent>(create);
-  static CellEditConfigureWindowEvent? _defaultInstance;
+  static EditorListItemsRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<EditorListItemsRequest>(create);
+  static EditorListItemsRequest? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $core.int get row => $_getIZ(0);
+  $fixnum.Int64 get requestId => $_getI64(0);
   @$pb.TagNumber(1)
-  set row($core.int value) => $_setSignedInt32(0, value);
+  set requestId($fixnum.Int64 value) => $_setInt64(0, value);
   @$pb.TagNumber(1)
-  $core.bool hasRow() => $_has(0);
+  $core.bool hasRequestId() => $_has(0);
   @$pb.TagNumber(1)
-  void clearRow() => $_clearField(1);
+  void clearRequestId() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $core.int get col => $_getIZ(1);
+  $fixnum.Int64 get sessionId => $_getI64(1);
   @$pb.TagNumber(2)
-  set col($core.int value) => $_setSignedInt32(1, value);
+  set sessionId($fixnum.Int64 value) => $_setInt64(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasCol() => $_has(1);
+  $core.bool hasSessionId() => $_has(1);
   @$pb.TagNumber(2)
-  void clearCol() => $_clearField(2);
+  void clearSessionId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get dataSourceId => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set dataSourceId($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasDataSourceId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearDataSourceId() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get filterText => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set filterText($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasFilterText() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearFilterText() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.int get offset => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set offset($core.int value) => $_setSignedInt32(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasOffset() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearOffset() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.int get limit => $_getIZ(5);
+  @$pb.TagNumber(6)
+  set limit($core.int value) => $_setSignedInt32(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasLimit() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearLimit() => $_clearField(6);
 }
 
-class BeforeDropdownOpenEvent extends $pb.GeneratedMessage {
-  factory BeforeDropdownOpenEvent({
+class CustomEditorActionEvent extends $pb.GeneratedMessage {
+  factory CustomEditorActionEvent({
+    $fixnum.Int64? sessionId,
     $core.int? row,
     $core.int? col,
-    $core.double? x,
-    $core.double? y,
-    $core.double? width,
-    $core.double? height,
-    Dropdown? dropdown,
-    $core.String? currentValue,
-    $core.int? selectedIndex,
+    $core.String? actionId,
+    StructValue? payload,
   }) {
     final result = create();
+    if (sessionId != null) result.sessionId = sessionId;
     if (row != null) result.row = row;
     if (col != null) result.col = col;
-    if (x != null) result.x = x;
-    if (y != null) result.y = y;
-    if (width != null) result.width = width;
-    if (height != null) result.height = height;
-    if (dropdown != null) result.dropdown = dropdown;
-    if (currentValue != null) result.currentValue = currentValue;
-    if (selectedIndex != null) result.selectedIndex = selectedIndex;
+    if (actionId != null) result.actionId = actionId;
+    if (payload != null) result.payload = payload;
     return result;
   }
 
-  BeforeDropdownOpenEvent._();
+  CustomEditorActionEvent._();
 
-  factory BeforeDropdownOpenEvent.fromBuffer($core.List<$core.int> data,
+  factory CustomEditorActionEvent.fromBuffer($core.List<$core.int> data,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromBuffer(data, registry);
-  factory BeforeDropdownOpenEvent.fromJson($core.String json,
+  factory CustomEditorActionEvent.fromJson($core.String json,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromJson(json, registry);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'BeforeDropdownOpenEvent',
+      _omitMessageNames ? '' : 'CustomEditorActionEvent',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
-    ..aI(1, _omitFieldNames ? '' : 'row')
-    ..aI(2, _omitFieldNames ? '' : 'col')
-    ..aD(3, _omitFieldNames ? '' : 'x', fieldType: $pb.PbFieldType.OF)
-    ..aD(4, _omitFieldNames ? '' : 'y', fieldType: $pb.PbFieldType.OF)
-    ..aD(5, _omitFieldNames ? '' : 'width', fieldType: $pb.PbFieldType.OF)
-    ..aD(6, _omitFieldNames ? '' : 'height', fieldType: $pb.PbFieldType.OF)
-    ..aOM<Dropdown>(7, _omitFieldNames ? '' : 'dropdown',
-        subBuilder: Dropdown.create)
-    ..aOS(8, _omitFieldNames ? '' : 'currentValue')
-    ..aI(9, _omitFieldNames ? '' : 'selectedIndex')
+    ..aInt64(1, _omitFieldNames ? '' : 'sessionId')
+    ..aI(2, _omitFieldNames ? '' : 'row')
+    ..aI(3, _omitFieldNames ? '' : 'col')
+    ..aOS(4, _omitFieldNames ? '' : 'actionId')
+    ..aOM<StructValue>(5, _omitFieldNames ? '' : 'payload',
+        subBuilder: StructValue.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  BeforeDropdownOpenEvent clone() => deepCopy();
+  CustomEditorActionEvent clone() => deepCopy();
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  BeforeDropdownOpenEvent copyWith(
-          void Function(BeforeDropdownOpenEvent) updates) =>
-      super.copyWith((message) => updates(message as BeforeDropdownOpenEvent))
-          as BeforeDropdownOpenEvent;
+  CustomEditorActionEvent copyWith(
+          void Function(CustomEditorActionEvent) updates) =>
+      super.copyWith((message) => updates(message as CustomEditorActionEvent))
+          as CustomEditorActionEvent;
 
   @$core.override
   $pb.BuilderInfo get info_ => _i;
 
   @$core.pragma('dart2js:noInline')
-  static BeforeDropdownOpenEvent create() => BeforeDropdownOpenEvent._();
+  static CustomEditorActionEvent create() => CustomEditorActionEvent._();
   @$core.override
-  BeforeDropdownOpenEvent createEmptyInstance() => create();
+  CustomEditorActionEvent createEmptyInstance() => create();
   @$core.pragma('dart2js:noInline')
-  static BeforeDropdownOpenEvent getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<BeforeDropdownOpenEvent>(create);
-  static BeforeDropdownOpenEvent? _defaultInstance;
+  static CustomEditorActionEvent getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CustomEditorActionEvent>(create);
+  static CustomEditorActionEvent? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $core.int get row => $_getIZ(0);
+  $fixnum.Int64 get sessionId => $_getI64(0);
   @$pb.TagNumber(1)
-  set row($core.int value) => $_setSignedInt32(0, value);
+  set sessionId($fixnum.Int64 value) => $_setInt64(0, value);
   @$pb.TagNumber(1)
-  $core.bool hasRow() => $_has(0);
+  $core.bool hasSessionId() => $_has(0);
   @$pb.TagNumber(1)
-  void clearRow() => $_clearField(1);
+  void clearSessionId() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $core.int get col => $_getIZ(1);
+  $core.int get row => $_getIZ(1);
   @$pb.TagNumber(2)
-  set col($core.int value) => $_setSignedInt32(1, value);
+  set row($core.int value) => $_setSignedInt32(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasCol() => $_has(1);
+  $core.bool hasRow() => $_has(1);
   @$pb.TagNumber(2)
-  void clearCol() => $_clearField(2);
+  void clearRow() => $_clearField(2);
 
-  /// Viewport-local cell rect. Hosts can use this when canceling the
-  /// engine list and opening their own positioned popup.
   @$pb.TagNumber(3)
-  $core.double get x => $_getN(2);
+  $core.int get col => $_getIZ(2);
   @$pb.TagNumber(3)
-  set x($core.double value) => $_setFloat(2, value);
+  set col($core.int value) => $_setSignedInt32(2, value);
   @$pb.TagNumber(3)
-  $core.bool hasX() => $_has(2);
+  $core.bool hasCol() => $_has(2);
   @$pb.TagNumber(3)
-  void clearX() => $_clearField(3);
+  void clearCol() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  $core.double get y => $_getN(3);
+  $core.String get actionId => $_getSZ(3);
   @$pb.TagNumber(4)
-  set y($core.double value) => $_setFloat(3, value);
+  set actionId($core.String value) => $_setString(3, value);
   @$pb.TagNumber(4)
-  $core.bool hasY() => $_has(3);
+  $core.bool hasActionId() => $_has(3);
   @$pb.TagNumber(4)
-  void clearY() => $_clearField(4);
+  void clearActionId() => $_clearField(4);
 
   @$pb.TagNumber(5)
-  $core.double get width => $_getN(4);
+  StructValue get payload => $_getN(4);
   @$pb.TagNumber(5)
-  set width($core.double value) => $_setFloat(4, value);
+  set payload(StructValue value) => $_setField(5, value);
   @$pb.TagNumber(5)
-  $core.bool hasWidth() => $_has(4);
+  $core.bool hasPayload() => $_has(4);
   @$pb.TagNumber(5)
-  void clearWidth() => $_clearField(5);
-
-  @$pb.TagNumber(6)
-  $core.double get height => $_getN(5);
-  @$pb.TagNumber(6)
-  set height($core.double value) => $_setFloat(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasHeight() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearHeight() => $_clearField(6);
-
-  @$pb.TagNumber(7)
-  Dropdown get dropdown => $_getN(6);
-  @$pb.TagNumber(7)
-  set dropdown(Dropdown value) => $_setField(7, value);
-  @$pb.TagNumber(7)
-  $core.bool hasDropdown() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearDropdown() => $_clearField(7);
-  @$pb.TagNumber(7)
-  Dropdown ensureDropdown() => $_ensure(6);
-
-  @$pb.TagNumber(8)
-  $core.String get currentValue => $_getSZ(7);
-  @$pb.TagNumber(8)
-  set currentValue($core.String value) => $_setString(7, value);
-  @$pb.TagNumber(8)
-  $core.bool hasCurrentValue() => $_has(7);
-  @$pb.TagNumber(8)
-  void clearCurrentValue() => $_clearField(8);
-
-  @$pb.TagNumber(9)
-  $core.int get selectedIndex => $_getIZ(8);
-  @$pb.TagNumber(9)
-  set selectedIndex($core.int value) => $_setSignedInt32(8, value);
-  @$pb.TagNumber(9)
-  $core.bool hasSelectedIndex() => $_has(8);
-  @$pb.TagNumber(9)
-  void clearSelectedIndex() => $_clearField(9);
-}
-
-class DropdownClosedEvent extends $pb.GeneratedMessage {
-  factory DropdownClosedEvent() => create();
-
-  DropdownClosedEvent._();
-
-  factory DropdownClosedEvent.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory DropdownClosedEvent.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'DropdownClosedEvent',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
-      createEmptyInstance: create)
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  DropdownClosedEvent clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  DropdownClosedEvent copyWith(void Function(DropdownClosedEvent) updates) =>
-      super.copyWith((message) => updates(message as DropdownClosedEvent))
-          as DropdownClosedEvent;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static DropdownClosedEvent create() => DropdownClosedEvent._();
-  @$core.override
-  DropdownClosedEvent createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static DropdownClosedEvent getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<DropdownClosedEvent>(create);
-  static DropdownClosedEvent? _defaultInstance;
-}
-
-class DropdownOpenedEvent extends $pb.GeneratedMessage {
-  factory DropdownOpenedEvent() => create();
-
-  DropdownOpenedEvent._();
-
-  factory DropdownOpenedEvent.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory DropdownOpenedEvent.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'DropdownOpenedEvent',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
-      createEmptyInstance: create)
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  DropdownOpenedEvent clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  DropdownOpenedEvent copyWith(void Function(DropdownOpenedEvent) updates) =>
-      super.copyWith((message) => updates(message as DropdownOpenedEvent))
-          as DropdownOpenedEvent;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static DropdownOpenedEvent create() => DropdownOpenedEvent._();
-  @$core.override
-  DropdownOpenedEvent createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static DropdownOpenedEvent getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<DropdownOpenedEvent>(create);
-  static DropdownOpenedEvent? _defaultInstance;
+  void clearPayload() => $_clearField(5);
+  @$pb.TagNumber(5)
+  StructValue ensurePayload() => $_ensure(4);
 }
 
 /// ── Data Events ──

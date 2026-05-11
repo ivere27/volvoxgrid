@@ -20,7 +20,6 @@ import {
   SelectionConfigFields as ProtoSelectionConfigFields,
   SpanConfigFields as ProtoSpanConfigFields,
   StyleConfigFields as ProtoStyleConfigFields,
-  EditConfigFields as ProtoEditConfigFields,
 } from "volvoxgrid/generated/volvoxgrid_ffi.js";
 import {
   encodeTag,
@@ -34,6 +33,15 @@ import {
   type HighlightStyleArg,
   type FontArg,
 } from "./proto-utils.js";
+
+const ProtoEditConfigFields = {
+  activation: 1,
+} as const;
+
+const ProtoEditActivationFields = {
+  trigger: 1,
+  tab_behavior: 2,
+} as const;
 
 export interface GridLinesArg {
   style?: number;
@@ -153,7 +161,6 @@ export interface SheetGridConfig {
   indicatorColStyle?: HighlightStyleArg;
   editTrigger?: number;
   tabBehavior?: number;
-  hostKeyDispatch?: boolean;
   resize?: ResizePolicyArg;
   autoResize?: boolean;
   cellSpan?: number;
@@ -367,9 +374,10 @@ export function encodeGridConfig(config: SheetGridConfig): Uint8Array {
   if (selection.length > 0) gridConfig.push(...encodeMessageField(ProtoGridConfigFields.selection, selection));
 
   const editing: number[] = [];
-  if (config.editTrigger != null) editing.push(...encodeTag(ProtoEditConfigFields.trigger, 0), ...encodeInt32(config.editTrigger));
-  if (config.tabBehavior != null) editing.push(...encodeTag(ProtoEditConfigFields.tab_behavior, 0), ...encodeInt32(config.tabBehavior));
-  if (config.hostKeyDispatch != null) editing.push(...encodeTag(ProtoEditConfigFields.host_key_dispatch, 0), ...encodeBool(config.hostKeyDispatch));
+  const activation: number[] = [];
+  if (config.editTrigger != null) activation.push(...encodeTag(ProtoEditActivationFields.trigger, 0), ...encodeInt32(config.editTrigger));
+  if (config.tabBehavior != null) activation.push(...encodeTag(ProtoEditActivationFields.tab_behavior, 0), ...encodeInt32(config.tabBehavior));
+  if (activation.length > 0) editing.push(...encodeMessageField(ProtoEditConfigFields.activation, activation));
   if (editing.length > 0) gridConfig.push(...encodeMessageField(ProtoGridConfigFields.editing, editing));
 
   const span: number[] = [];

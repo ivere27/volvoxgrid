@@ -16,11 +16,13 @@ import io.github.ivere27.volvoxgrid.ColIndicatorConfig;
 import io.github.ivere27.volvoxgrid.ColumnDataType;
 import io.github.ivere27.volvoxgrid.ColumnDef;
 import io.github.ivere27.volvoxgrid.DefineColumnsRequest;
-import io.github.ivere27.volvoxgrid.Dropdown;
-import io.github.ivere27.volvoxgrid.DropdownItem;
-import io.github.ivere27.volvoxgrid.DropdownTrigger;
+import io.github.ivere27.volvoxgrid.EditActivation;
 import io.github.ivere27.volvoxgrid.EditConfig;
 import io.github.ivere27.volvoxgrid.EditTrigger;
+import io.github.ivere27.volvoxgrid.EditorKind;
+import io.github.ivere27.volvoxgrid.EditorOwner;
+import io.github.ivere27.volvoxgrid.EditorPresentation;
+import io.github.ivere27.volvoxgrid.EditorSpec;
 import io.github.ivere27.volvoxgrid.FillHandlePosition;
 import io.github.ivere27.volvoxgrid.FreezePolicy;
 import io.github.ivere27.volvoxgrid.GridConfig;
@@ -36,6 +38,8 @@ import io.github.ivere27.volvoxgrid.HoverConfig;
 import io.github.ivere27.volvoxgrid.IndicatorsConfig;
 import io.github.ivere27.volvoxgrid.InteractionConfig;
 import io.github.ivere27.volvoxgrid.LayoutConfig;
+import io.github.ivere27.volvoxgrid.ListEditorParams;
+import io.github.ivere27.volvoxgrid.ListItem;
 import io.github.ivere27.volvoxgrid.LoadDataResult;
 import io.github.ivere27.volvoxgrid.LoadDataStatus;
 import io.github.ivere27.volvoxgrid.LoadDataOptions;
@@ -110,7 +114,7 @@ final class SalesJsonDesktopDemo {
                     .setCaption("Status")
                     .setKey("Status")
                     .setWidth(COL_WIDTHS[8])
-                    .setDropdown(dropdownFromLabels(SALES_STATUS_ITEMS))
+                    .setEditor(dropdownEditorFromLabels(SALES_STATUS_ITEMS))
                     .build())
                 .addColumns(column(1, null).build())
                 .addColumns(column(2, null).build())
@@ -171,7 +175,7 @@ final class SalesJsonDesktopDemo {
                     CellUpdate.newBuilder()
                         .setRow(row)
                         .setCol(8)
-                        .setDropdown(dropdownFromLabels(SALES_STATUS_ITEMS))
+                        .setEditor(dropdownEditorFromLabels(SALES_STATUS_ITEMS))
                         .build()
                 );
                 continue;
@@ -217,14 +221,27 @@ final class SalesJsonDesktopDemo {
         }
     }
 
-    private static Dropdown dropdownFromLabels(String items) {
-        Dropdown.Builder dropdown = Dropdown.newBuilder();
+    private static EditorSpec dropdownEditorFromLabels(String items) {
+        ListEditorParams.Builder list = ListEditorParams.newBuilder();
         for (String label : items.split("\\|")) {
             if (!label.isEmpty()) {
-                dropdown.addItems(DropdownItem.newBuilder().setLabel(label));
+                list.addStaticItems(ListItem.newBuilder().setLabel(label));
             }
         }
-        return dropdown.build();
+        return EditorSpec.newBuilder()
+            .setKind(EditorKind.EDITOR_SELECT)
+            .setOwner(EditorOwner.EDITOR_OWNER_ENGINE)
+            .setPresentation(EditorPresentation.EDITOR_CANVAS)
+            .setList(list)
+            .build();
+    }
+
+    private static EditorSpec defaultHostTextEditor() {
+        return EditorSpec.newBuilder()
+            .setKind(EditorKind.EDITOR_TEXT)
+            .setOwner(EditorOwner.EDITOR_OWNER_HOST_NATIVE)
+            .setPresentation(EditorPresentation.EDITOR_INLINE)
+            .build();
     }
 
     private static boolean parseSalesFlag(String text) {
@@ -389,9 +406,9 @@ final class SalesJsonDesktopDemo {
             )
             .setEditing(
                 EditConfig.newBuilder()
-                    .setTrigger(EditTrigger.EDIT_TRIGGER_NONE)
-                    .setDropdownTrigger(DropdownTrigger.DROPDOWN_ALWAYS)
-                    .setDropdownSearch(false)
+                    .setActivation(EditActivation.newBuilder()
+                        .setTrigger(EditTrigger.EDIT_TRIGGER_NONE))
+                    .setDefaultEditor(defaultHostTextEditor())
                     .build()
             )
             .setScrolling(

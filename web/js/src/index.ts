@@ -4,6 +4,9 @@ export type {
   VolvoxGridOptions,
   VolvoxGridRowIndicatorConfig,
   VolvoxGridRowIndicatorSlot,
+  VolvoxGridEditorSessionEndedDetails,
+  VolvoxGridEditorSessionStartedDetails,
+  VolvoxGridEditorSessionUpdatedDetails,
 } from "./volvoxgrid.js";
 export { VolvoxGridElement } from "./volvoxgrid-element.js";
 export { setupDefaultInput, setupDefaultKeyboard, setupDefaultContextMenu } from "./default-input.js";

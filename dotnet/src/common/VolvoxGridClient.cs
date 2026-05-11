@@ -294,10 +294,10 @@ namespace VolvoxGrid.DotNet
             return _client.GetMergedRegions(_gridId);
         }
 
-        public void BeginEdit(int row, int col, bool? selectAll, bool? caretEnd, string seedText)
+        public void BeginEdit(int row, int col, EditStartReason reason, string seedText, int? caretPosition = null)
         {
             EnsureNotDisposed();
-            _client.EditStart(_gridId, row, col, selectAll, caretEnd, seedText);
+            _client.EditStart(_gridId, row, col, reason, seedText, caretPosition);
         }
 
         public void CommitEdit(string text)

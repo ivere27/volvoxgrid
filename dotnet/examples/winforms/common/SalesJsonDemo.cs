@@ -4,8 +4,8 @@ using VolvoxGrid.DotNet;
 using ColIndicatorCellMode = Volvoxgrid.V1.ColIndicatorCellMode;
 using ColIndicatorCellModes = Volvoxgrid.V1.ColIndicatorCellModes;
 using ColIndicatorConfig = Volvoxgrid.V1.ColIndicatorConfig;
-using Dropdown = Volvoxgrid.V1.Dropdown;
-using DropdownItem = Volvoxgrid.V1.DropdownItem;
+using ListEditorParams = Volvoxgrid.V1.ListEditorParams;
+using ListItem = Volvoxgrid.V1.ListItem;
 using RowIndicatorConfig = Volvoxgrid.V1.RowIndicatorConfig;
 using RowIndicatorSlot = Volvoxgrid.V1.RowIndicatorSlot;
 using RowIndicatorSlotKind = Volvoxgrid.V1.RowIndicatorSlotKind;
@@ -62,8 +62,6 @@ namespace VolvoxGrid.DotNet.Sample
             grid.SetColumns(columns);
             grid.SetColDropdown(8, DropdownFromLabels(StatusItems));
             grid.SelectionMode = VolvoxGridSelectionMode.Free;
-            grid.DropdownTrigger = VolvoxGridDropdownTrigger.Always;
-            grid.DropdownSearch = false;
             grid.HoverEnabled = true;
             grid.ResizePolicy = new VolvoxGridResizePolicy { Columns = true, Rows = true, Uniform = false };
             grid.HeaderFeatures = new VolvoxGridHeaderFeatures { Sort = true, Reorder = true, Chooser = false };
@@ -129,7 +127,6 @@ namespace VolvoxGrid.DotNet.Sample
             grid.SetSpanCol(0, true);
             grid.SetSpanCol(1, true);
             grid.TreeIndicator = VolvoxGridTreeIndicatorStyle.None;
-            grid.Editable = false;
 
             grid.Subtotal(VolvoxGridAggregateType.Clear, 0, 0, "", 0, 0, false);
             ApplySalesSubtotalDecorations(grid, grid.Subtotal(VolvoxGridAggregateType.Sum, -1, 4, "Grand Total", 0xFFEEF2FF, 0xFF111827, true));
@@ -161,13 +158,13 @@ namespace VolvoxGrid.DotNet.Sample
             }, true);
         }
 
-        private static Dropdown DropdownFromLabels(string items)
+        private static ListEditorParams DropdownFromLabels(string items)
         {
-            var dropdown = new Dropdown();
+            var dropdown = new ListEditorParams();
             foreach (var label in items.Split('|'))
             {
                 if (label.Length == 0) continue;
-                dropdown.Items.Add(new DropdownItem { Label = label });
+                dropdown.StaticItems.Add(new ListItem { Label = label });
             }
             return dropdown;
         }

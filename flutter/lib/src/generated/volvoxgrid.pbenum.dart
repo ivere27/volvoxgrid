@@ -855,28 +855,6 @@ class EditTrigger extends $pb.ProtobufEnum {
   const EditTrigger._(super.value, super.name);
 }
 
-class DropdownTrigger extends $pb.ProtobufEnum {
-  static const DropdownTrigger DROPDOWN_NEVER =
-      DropdownTrigger._(0, _omitEnumNames ? '' : 'DROPDOWN_NEVER');
-  static const DropdownTrigger DROPDOWN_ALWAYS =
-      DropdownTrigger._(1, _omitEnumNames ? '' : 'DROPDOWN_ALWAYS');
-  static const DropdownTrigger DROPDOWN_ON_EDIT =
-      DropdownTrigger._(2, _omitEnumNames ? '' : 'DROPDOWN_ON_EDIT');
-
-  static const $core.List<DropdownTrigger> values = <DropdownTrigger>[
-    DROPDOWN_NEVER,
-    DROPDOWN_ALWAYS,
-    DROPDOWN_ON_EDIT,
-  ];
-
-  static final $core.List<DropdownTrigger?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 2);
-  static DropdownTrigger? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
-
-  const DropdownTrigger._(super.value, super.name);
-}
-
 class DropdownItemLayout extends $pb.ProtobufEnum {
   static const DropdownItemLayout DROPDOWN_ITEM_AUTO =
       DropdownItemLayout._(0, _omitEnumNames ? '' : 'DROPDOWN_ITEM_AUTO');
@@ -921,6 +899,210 @@ class TabBehavior extends $pb.ProtobufEnum {
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
   const TabBehavior._(super.value, super.name);
+}
+
+class EditorKind extends $pb.ProtobufEnum {
+  static const EditorKind EDITOR_KIND_UNSPECIFIED =
+      EditorKind._(0, _omitEnumNames ? '' : 'EDITOR_KIND_UNSPECIFIED');
+  static const EditorKind EDITOR_TEXT =
+      EditorKind._(1, _omitEnumNames ? '' : 'EDITOR_TEXT');
+  static const EditorKind EDITOR_MULTILINE_TEXT =
+      EditorKind._(2, _omitEnumNames ? '' : 'EDITOR_MULTILINE_TEXT');
+  static const EditorKind EDITOR_NUMBER =
+      EditorKind._(3, _omitEnumNames ? '' : 'EDITOR_NUMBER');
+  static const EditorKind EDITOR_CHECKBOX =
+      EditorKind._(4, _omitEnumNames ? '' : 'EDITOR_CHECKBOX');
+  static const EditorKind EDITOR_SELECT =
+      EditorKind._(5, _omitEnumNames ? '' : 'EDITOR_SELECT');
+  static const EditorKind EDITOR_COMBO =
+      EditorKind._(6, _omitEnumNames ? '' : 'EDITOR_COMBO');
+  static const EditorKind EDITOR_DATE_TIME =
+      EditorKind._(7, _omitEnumNames ? '' : 'EDITOR_DATE_TIME');
+  static const EditorKind EDITOR_BUTTON =
+      EditorKind._(8, _omitEnumNames ? '' : 'EDITOR_BUTTON');
+  static const EditorKind EDITOR_CUSTOM =
+      EditorKind._(100, _omitEnumNames ? '' : 'EDITOR_CUSTOM');
+
+  static const $core.List<EditorKind> values = <EditorKind>[
+    EDITOR_KIND_UNSPECIFIED,
+    EDITOR_TEXT,
+    EDITOR_MULTILINE_TEXT,
+    EDITOR_NUMBER,
+    EDITOR_CHECKBOX,
+    EDITOR_SELECT,
+    EDITOR_COMBO,
+    EDITOR_DATE_TIME,
+    EDITOR_BUTTON,
+    EDITOR_CUSTOM,
+  ];
+
+  static final $core.Map<$core.int, EditorKind> _byValue =
+      $pb.ProtobufEnum.initByValue(values);
+  static EditorKind? valueOf($core.int value) => _byValue[value];
+
+  const EditorKind._(super.value, super.name);
+}
+
+class EditorOwner extends $pb.ProtobufEnum {
+  static const EditorOwner EDITOR_OWNER_ENGINE =
+      EditorOwner._(0, _omitEnumNames ? '' : 'EDITOR_OWNER_ENGINE');
+  static const EditorOwner EDITOR_OWNER_HOST_NATIVE =
+      EditorOwner._(1, _omitEnumNames ? '' : 'EDITOR_OWNER_HOST_NATIVE');
+  static const EditorOwner EDITOR_OWNER_CUSTOM =
+      EditorOwner._(2, _omitEnumNames ? '' : 'EDITOR_OWNER_CUSTOM');
+
+  static const $core.List<EditorOwner> values = <EditorOwner>[
+    EDITOR_OWNER_ENGINE,
+    EDITOR_OWNER_HOST_NATIVE,
+    EDITOR_OWNER_CUSTOM,
+  ];
+
+  static final $core.List<EditorOwner?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static EditorOwner? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const EditorOwner._(super.value, super.name);
+}
+
+/// Who renders the editor surface.
+///   CANVAS: engine draws on canvas; host tracks session only (no overlay).
+///   INLINE / POPUP_* / MODAL: host mounts an overlay widget at viewport_rect.
+/// CANVAS is value 0 so that an unset/forgotten `presentation` field is the
+/// safe default — no surprise host overlays.
+class EditorPresentation extends $pb.ProtobufEnum {
+  static const EditorPresentation EDITOR_CANVAS =
+      EditorPresentation._(0, _omitEnumNames ? '' : 'EDITOR_CANVAS');
+  static const EditorPresentation EDITOR_POPUP_OVER =
+      EditorPresentation._(1, _omitEnumNames ? '' : 'EDITOR_POPUP_OVER');
+  static const EditorPresentation EDITOR_POPUP_UNDER =
+      EditorPresentation._(2, _omitEnumNames ? '' : 'EDITOR_POPUP_UNDER');
+  static const EditorPresentation EDITOR_MODAL =
+      EditorPresentation._(3, _omitEnumNames ? '' : 'EDITOR_MODAL');
+  static const EditorPresentation EDITOR_INLINE =
+      EditorPresentation._(4, _omitEnumNames ? '' : 'EDITOR_INLINE');
+
+  static const $core.List<EditorPresentation> values = <EditorPresentation>[
+    EDITOR_CANVAS,
+    EDITOR_POPUP_OVER,
+    EDITOR_POPUP_UNDER,
+    EDITOR_MODAL,
+    EDITOR_INLINE,
+  ];
+
+  static final $core.List<EditorPresentation?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 4);
+  static EditorPresentation? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const EditorPresentation._(super.value, super.name);
+}
+
+class ValidationMode extends $pb.ProtobufEnum {
+  static const ValidationMode VALIDATION_BLOCK =
+      ValidationMode._(0, _omitEnumNames ? '' : 'VALIDATION_BLOCK');
+  static const ValidationMode VALIDATION_REVERT =
+      ValidationMode._(1, _omitEnumNames ? '' : 'VALIDATION_REVERT');
+  static const ValidationMode VALIDATION_ALLOW_INVALID =
+      ValidationMode._(2, _omitEnumNames ? '' : 'VALIDATION_ALLOW_INVALID');
+
+  static const $core.List<ValidationMode> values = <ValidationMode>[
+    VALIDATION_BLOCK,
+    VALIDATION_REVERT,
+    VALIDATION_ALLOW_INVALID,
+  ];
+
+  static final $core.List<ValidationMode?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static ValidationMode? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const ValidationMode._(super.value, super.name);
+}
+
+class ValidationTrigger extends $pb.ProtobufEnum {
+  static const ValidationTrigger VALIDATION_TRIGGER_ON_COMMIT =
+      ValidationTrigger._(
+          0, _omitEnumNames ? '' : 'VALIDATION_TRIGGER_ON_COMMIT');
+  static const ValidationTrigger VALIDATION_TRIGGER_ON_CHANGE =
+      ValidationTrigger._(
+          1, _omitEnumNames ? '' : 'VALIDATION_TRIGGER_ON_CHANGE');
+  static const ValidationTrigger VALIDATION_TRIGGER_ON_PAUSE =
+      ValidationTrigger._(
+          2, _omitEnumNames ? '' : 'VALIDATION_TRIGGER_ON_PAUSE');
+  static const ValidationTrigger VALIDATION_TRIGGER_ON_FOCUS_LOST =
+      ValidationTrigger._(
+          3, _omitEnumNames ? '' : 'VALIDATION_TRIGGER_ON_FOCUS_LOST');
+
+  static const $core.List<ValidationTrigger> values = <ValidationTrigger>[
+    VALIDATION_TRIGGER_ON_COMMIT,
+    VALIDATION_TRIGGER_ON_CHANGE,
+    VALIDATION_TRIGGER_ON_PAUSE,
+    VALIDATION_TRIGGER_ON_FOCUS_LOST,
+  ];
+
+  static final $core.List<ValidationTrigger?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static ValidationTrigger? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const ValidationTrigger._(super.value, super.name);
+}
+
+class InputType extends $pb.ProtobufEnum {
+  static const InputType INPUT_TYPE_TEXT =
+      InputType._(0, _omitEnumNames ? '' : 'INPUT_TYPE_TEXT');
+  static const InputType INPUT_TYPE_NUMBER =
+      InputType._(1, _omitEnumNames ? '' : 'INPUT_TYPE_NUMBER');
+  static const InputType INPUT_TYPE_EMAIL =
+      InputType._(2, _omitEnumNames ? '' : 'INPUT_TYPE_EMAIL');
+  static const InputType INPUT_TYPE_URL =
+      InputType._(3, _omitEnumNames ? '' : 'INPUT_TYPE_URL');
+  static const InputType INPUT_TYPE_PHONE =
+      InputType._(4, _omitEnumNames ? '' : 'INPUT_TYPE_PHONE');
+  static const InputType INPUT_TYPE_PASSWORD =
+      InputType._(5, _omitEnumNames ? '' : 'INPUT_TYPE_PASSWORD');
+
+  static const $core.List<InputType> values = <InputType>[
+    INPUT_TYPE_TEXT,
+    INPUT_TYPE_NUMBER,
+    INPUT_TYPE_EMAIL,
+    INPUT_TYPE_URL,
+    INPUT_TYPE_PHONE,
+    INPUT_TYPE_PASSWORD,
+  ];
+
+  static final $core.List<InputType?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 5);
+  static InputType? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const InputType._(super.value, super.name);
+}
+
+class ButtonRole extends $pb.ProtobufEnum {
+  static const ButtonRole BUTTON_ROLE_DEFAULT =
+      ButtonRole._(0, _omitEnumNames ? '' : 'BUTTON_ROLE_DEFAULT');
+  static const ButtonRole BUTTON_ROLE_ELLIPSIS =
+      ButtonRole._(1, _omitEnumNames ? '' : 'BUTTON_ROLE_ELLIPSIS');
+  static const ButtonRole BUTTON_ROLE_CLEAR =
+      ButtonRole._(2, _omitEnumNames ? '' : 'BUTTON_ROLE_CLEAR');
+  static const ButtonRole BUTTON_ROLE_CUSTOM =
+      ButtonRole._(3, _omitEnumNames ? '' : 'BUTTON_ROLE_CUSTOM');
+
+  static const $core.List<ButtonRole> values = <ButtonRole>[
+    BUTTON_ROLE_DEFAULT,
+    BUTTON_ROLE_ELLIPSIS,
+    BUTTON_ROLE_CLEAR,
+    BUTTON_ROLE_CUSTOM,
+  ];
+
+  static final $core.List<ButtonRole?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static ButtonRole? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const ButtonRole._(super.value, super.name);
 }
 
 class SortOrder extends $pb.ProtobufEnum {
@@ -2453,6 +2635,123 @@ class CursorType extends $pb.ProtobufEnum {
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
   const CursorType._(super.value, super.name);
+}
+
+/// Gesture / source that initiated an edit. The engine derives EditUiMode from
+/// this:
+///   F2, DOUBLE_CLICK, CLICK_CARET → EDIT  (caret-positioned, no select-all)
+///   everything else               → ENTER (select-all, replace on first key)
+class EditStartReason extends $pb.ProtobufEnum {
+  static const EditStartReason EDIT_START_UNSPECIFIED =
+      EditStartReason._(0, _omitEnumNames ? '' : 'EDIT_START_UNSPECIFIED');
+  static const EditStartReason EDIT_START_F2 =
+      EditStartReason._(1, _omitEnumNames ? '' : 'EDIT_START_F2');
+  static const EditStartReason EDIT_START_DOUBLE_CLICK =
+      EditStartReason._(2, _omitEnumNames ? '' : 'EDIT_START_DOUBLE_CLICK');
+  static const EditStartReason EDIT_START_CLICK_CARET =
+      EditStartReason._(3, _omitEnumNames ? '' : 'EDIT_START_CLICK_CARET');
+  static const EditStartReason EDIT_START_ENTER_KEY =
+      EditStartReason._(4, _omitEnumNames ? '' : 'EDIT_START_ENTER_KEY');
+  static const EditStartReason EDIT_START_PRINTABLE_KEY =
+      EditStartReason._(5, _omitEnumNames ? '' : 'EDIT_START_PRINTABLE_KEY');
+  static const EditStartReason EDIT_START_IME_COMPOSITION =
+      EditStartReason._(6, _omitEnumNames ? '' : 'EDIT_START_IME_COMPOSITION');
+  static const EditStartReason EDIT_START_DROPDOWN_BUTTON =
+      EditStartReason._(7, _omitEnumNames ? '' : 'EDIT_START_DROPDOWN_BUTTON');
+  static const EditStartReason EDIT_START_PROGRAMMATIC =
+      EditStartReason._(8, _omitEnumNames ? '' : 'EDIT_START_PROGRAMMATIC');
+
+  static const $core.List<EditStartReason> values = <EditStartReason>[
+    EDIT_START_UNSPECIFIED,
+    EDIT_START_F2,
+    EDIT_START_DOUBLE_CLICK,
+    EDIT_START_CLICK_CARET,
+    EDIT_START_ENTER_KEY,
+    EDIT_START_PRINTABLE_KEY,
+    EDIT_START_IME_COMPOSITION,
+    EDIT_START_DROPDOWN_BUTTON,
+    EDIT_START_PROGRAMMATIC,
+  ];
+
+  static final $core.List<EditStartReason?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 8);
+  static EditStartReason? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const EditStartReason._(super.value, super.name);
+}
+
+class EditEndReason extends $pb.ProtobufEnum {
+  static const EditEndReason EDIT_END_UNSPECIFIED =
+      EditEndReason._(0, _omitEnumNames ? '' : 'EDIT_END_UNSPECIFIED');
+  static const EditEndReason EDIT_END_COMMITTED =
+      EditEndReason._(1, _omitEnumNames ? '' : 'EDIT_END_COMMITTED');
+  static const EditEndReason EDIT_END_CANCELED =
+      EditEndReason._(2, _omitEnumNames ? '' : 'EDIT_END_CANCELED');
+  static const EditEndReason EDIT_END_REVERTED_INVALID =
+      EditEndReason._(3, _omitEnumNames ? '' : 'EDIT_END_REVERTED_INVALID');
+  static const EditEndReason EDIT_END_FOCUS_LOST =
+      EditEndReason._(4, _omitEnumNames ? '' : 'EDIT_END_FOCUS_LOST');
+  static const EditEndReason EDIT_END_CELL_REMOVED =
+      EditEndReason._(5, _omitEnumNames ? '' : 'EDIT_END_CELL_REMOVED');
+  static const EditEndReason EDIT_END_GRID_DESTROYED =
+      EditEndReason._(6, _omitEnumNames ? '' : 'EDIT_END_GRID_DESTROYED');
+
+  static const $core.List<EditEndReason> values = <EditEndReason>[
+    EDIT_END_UNSPECIFIED,
+    EDIT_END_COMMITTED,
+    EDIT_END_CANCELED,
+    EDIT_END_REVERTED_INVALID,
+    EDIT_END_FOCUS_LOST,
+    EDIT_END_CELL_REMOVED,
+    EDIT_END_GRID_DESTROYED,
+  ];
+
+  static final $core.List<EditEndReason?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 6);
+  static EditEndReason? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const EditEndReason._(super.value, super.name);
+}
+
+class EditorUpdateReason extends $pb.ProtobufEnum {
+  static const EditorUpdateReason EDITOR_UPDATE_UNSPECIFIED =
+      EditorUpdateReason._(
+          0, _omitEnumNames ? '' : 'EDITOR_UPDATE_UNSPECIFIED');
+  static const EditorUpdateReason EDITOR_UPDATE_GEOMETRY =
+      EditorUpdateReason._(1, _omitEnumNames ? '' : 'EDITOR_UPDATE_GEOMETRY');
+  static const EditorUpdateReason EDITOR_UPDATE_VALIDATION =
+      EditorUpdateReason._(2, _omitEnumNames ? '' : 'EDITOR_UPDATE_VALIDATION');
+  static const EditorUpdateReason EDITOR_UPDATE_NORMALIZED_VALUE =
+      EditorUpdateReason._(
+          3, _omitEnumNames ? '' : 'EDITOR_UPDATE_NORMALIZED_VALUE');
+  static const EditorUpdateReason EDITOR_UPDATE_PROGRAMMATIC_VALUE =
+      EditorUpdateReason._(
+          4, _omitEnumNames ? '' : 'EDITOR_UPDATE_PROGRAMMATIC_VALUE');
+  static const EditorUpdateReason EDITOR_UPDATE_REMOTE_VALUE =
+      EditorUpdateReason._(
+          5, _omitEnumNames ? '' : 'EDITOR_UPDATE_REMOTE_VALUE');
+  static const EditorUpdateReason EDITOR_UPDATE_CUSTOM_PAYLOAD =
+      EditorUpdateReason._(
+          6, _omitEnumNames ? '' : 'EDITOR_UPDATE_CUSTOM_PAYLOAD');
+
+  static const $core.List<EditorUpdateReason> values = <EditorUpdateReason>[
+    EDITOR_UPDATE_UNSPECIFIED,
+    EDITOR_UPDATE_GEOMETRY,
+    EDITOR_UPDATE_VALIDATION,
+    EDITOR_UPDATE_NORMALIZED_VALUE,
+    EDITOR_UPDATE_PROGRAMMATIC_VALUE,
+    EDITOR_UPDATE_REMOTE_VALUE,
+    EDITOR_UPDATE_CUSTOM_PAYLOAD,
+  ];
+
+  static final $core.List<EditorUpdateReason?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 6);
+  static EditorUpdateReason? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const EditorUpdateReason._(super.value, super.name);
 }
 
 class ArchiveRequest_Action extends $pb.ProtobufEnum {

@@ -17,7 +17,7 @@ import io.github.ivere27.volvoxgrid.CornerIndicatorSlot;
 import io.github.ivere27.volvoxgrid.CornerIndicatorSlotKind;
 import io.github.ivere27.volvoxgrid.DefineColumnsRequest;
 import io.github.ivere27.volvoxgrid.DefineRowsRequest;
-import io.github.ivere27.volvoxgrid.DropdownTrigger;
+import io.github.ivere27.volvoxgrid.EditActivation;
 import io.github.ivere27.volvoxgrid.EditConfig;
 import io.github.ivere27.volvoxgrid.EditTrigger;
 import io.github.ivere27.volvoxgrid.FillHandlePosition;
@@ -323,8 +323,8 @@ final class HierarchyJsonDesktopDemo {
             )
             .setEditing(
                 EditConfig.newBuilder()
-                    .setTrigger(EditTrigger.EDIT_TRIGGER_NONE)
-                    .setDropdownTrigger(DropdownTrigger.DROPDOWN_NEVER)
+                    .setActivation(EditActivation.newBuilder()
+                        .setTrigger(EditTrigger.EDIT_TRIGGER_NONE))
                     .build()
             )
             .setScrolling(

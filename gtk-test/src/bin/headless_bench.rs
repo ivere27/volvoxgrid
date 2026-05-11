@@ -71,16 +71,33 @@ const NATIVE_SURFACE_DESC_VERSION: u16 = 1;
 const NATIVE_SURFACE_KIND_WAYLAND: u16 = 1;
 const NATIVE_SURFACE_KIND_X11: u16 = 2;
 
-fn dropdown_from_labels(items: &str) -> pb::Dropdown {
-    pb::Dropdown {
-        items: items
-            .split('|')
-            .filter(|label| !label.is_empty())
-            .map(|label| pb::DropdownItem {
-                label: Some(label.to_string()),
-                ..Default::default()
-            })
-            .collect(),
+fn dropdown_from_labels(items: &str) -> pb::EditorSpec {
+    pb::EditorSpec {
+        kind: pb::EditorKind::EditorSelect as i32,
+        owner: pb::EditorOwner::Engine as i32,
+        presentation: pb::EditorPresentation::EditorInline as i32,
+        list: Some(pb::ListEditorParams {
+            static_items: items
+                .split('|')
+                .filter(|label| !label.is_empty())
+                .map(|label| pb::ListItem {
+                    label: label.to_string(),
+                    ..Default::default()
+                })
+                .collect(),
+            ..Default::default()
+        }),
+        ..Default::default()
+    }
+}
+
+fn edit_config(trigger: i32, tab_behavior: i32) -> pb::EditConfig {
+    pb::EditConfig {
+        activation: Some(pb::EditActivation {
+            trigger: Some(trigger),
+            tab_behavior: Some(tab_behavior),
+            ..Default::default()
+        }),
         ..Default::default()
     }
 }
@@ -1010,7 +1027,7 @@ fn load_sales_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Result<()
                 width: Some(80),
                 caption: Some("Status".to_string()),
                 key: Some("Status".to_string()),
-                dropdown: Some(dropdown_from_labels(SALES_STATUS_ITEMS)),
+                editor: Some(dropdown_from_labels(SALES_STATUS_ITEMS)),
                 ..Default::default()
             },
             pb::ColumnDef {
@@ -1042,13 +1059,10 @@ fn load_sales_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Result<()
                 extend_last_col: Some(true),
                 ..Default::default()
             }),
-            editing: Some(pb::EditConfig {
-                trigger: Some(pb::EditTrigger::None as i32),
-                tab_behavior: Some(pb::TabBehavior::TabCells as i32),
-                dropdown_trigger: Some(pb::DropdownTrigger::DropdownAlways as i32),
-                dropdown_search: Some(false),
-                ..Default::default()
-            }),
+            editing: Some(edit_config(
+                pb::EditTrigger::None as i32,
+                pb::TabBehavior::TabCells as i32,
+            )),
             scrolling: Some(pb::ScrollConfig {
                 scrollbars: Some(pb::ScrollBarsMode::ScrollbarBoth as i32),
                 fling_enabled: Some(true),
@@ -1333,12 +1347,10 @@ fn load_hierarchy_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Resul
                 mode: Some(pb::SelectionMode::SelectionFree as i32),
                 ..Default::default()
             }),
-            editing: Some(pb::EditConfig {
-                trigger: Some(pb::EditTrigger::None as i32),
-                tab_behavior: Some(pb::TabBehavior::TabCells as i32),
-                dropdown_trigger: Some(pb::DropdownTrigger::DropdownNever as i32),
-                ..Default::default()
-            }),
+            editing: Some(edit_config(
+                pb::EditTrigger::None as i32,
+                pb::TabBehavior::TabCells as i32,
+            )),
             scrolling: Some(pb::ScrollConfig {
                 scrollbars: Some(pb::ScrollBarsMode::ScrollbarBoth as i32),
                 fling_enabled: Some(true),
@@ -1836,11 +1848,7 @@ fn apply_initial_config_for_grid(
                 scroll_blit: Some(scroll_blit),
                 ..Default::default()
             }),
-            editing: Some(pb::EditConfig {
-                host_key_dispatch: Some(false),
-                host_pointer_dispatch: Some(false),
-                ..Default::default()
-            }),
+            editing: Some(pb::EditConfig::default()),
             interaction: Some(pb::InteractionConfig {
                 header_features: Some(pb::HeaderFeatures {
                     sort: Some(true),

@@ -20,13 +20,15 @@ import io.github.ivere27.volvoxgrid.CreateRequest;
 import io.github.ivere27.volvoxgrid.CreateResponse;
 import io.github.ivere27.volvoxgrid.DefineColumnsRequest;
 import io.github.ivere27.volvoxgrid.DefineRowsRequest;
-import io.github.ivere27.volvoxgrid.Dropdown;
-import io.github.ivere27.volvoxgrid.DropdownItem;
-import io.github.ivere27.volvoxgrid.DropdownTrigger;
+import io.github.ivere27.volvoxgrid.EditActivation;
 import io.github.ivere27.volvoxgrid.EditConfig;
 import io.github.ivere27.volvoxgrid.EditTrigger;
 import io.github.ivere27.volvoxgrid.EditState;
-import io.github.ivere27.volvoxgrid.EditUiMode;
+import io.github.ivere27.volvoxgrid.EditorKind;
+import io.github.ivere27.volvoxgrid.EditorOwner;
+import io.github.ivere27.volvoxgrid.EditorPresentation;
+import io.github.ivere27.volvoxgrid.EditorSpec;
+import io.github.ivere27.volvoxgrid.EditorValue;
 import io.github.ivere27.volvoxgrid.Font;
 import io.github.ivere27.volvoxgrid.FreezePolicy;
 import io.github.ivere27.volvoxgrid.GridConfig;
@@ -36,6 +38,8 @@ import io.github.ivere27.volvoxgrid.IndicatorsConfig;
 import io.github.ivere27.volvoxgrid.IndicatorAppearance;
 import io.github.ivere27.volvoxgrid.InteractionConfig;
 import io.github.ivere27.volvoxgrid.LayoutConfig;
+import io.github.ivere27.volvoxgrid.ListEditorParams;
+import io.github.ivere27.volvoxgrid.ListItem;
 import io.github.ivere27.volvoxgrid.LoadDataOptions;
 import io.github.ivere27.volvoxgrid.LoadDataResult;
 import io.github.ivere27.volvoxgrid.LoadDataStatus;
@@ -55,6 +59,7 @@ import io.github.ivere27.volvoxgrid.SelectionMode;
 import io.github.ivere27.volvoxgrid.SelectionState;
 import io.github.ivere27.volvoxgrid.SpanConfig;
 import io.github.ivere27.volvoxgrid.SpanCompareMode;
+import io.github.ivere27.volvoxgrid.TextSelection;
 import io.github.ivere27.volvoxgrid.TreeIndicatorStyle;
 import io.github.ivere27.volvoxgrid.UpdateCellsRequest;
 import java.io.ByteArrayOutputStream;
@@ -438,7 +443,7 @@ public final class VolvoxGridDesktopTuiExample {
                     .setWidth(10)
                     .setCaption("Status")
                     .setKey("Status")
-                    .setDropdown(dropdownFromLabels(SALES_STATUS_ITEMS))
+                    .setEditor(dropdownEditorFromLabels(SALES_STATUS_ITEMS))
                     .build()
             )
             .addColumns(
@@ -452,14 +457,19 @@ public final class VolvoxGridDesktopTuiExample {
             .build();
     }
 
-    private static Dropdown dropdownFromLabels(String items) {
-        Dropdown.Builder dropdown = Dropdown.newBuilder();
+    private static EditorSpec dropdownEditorFromLabels(String items) {
+        ListEditorParams.Builder list = ListEditorParams.newBuilder();
         for (String label : items.split("\\|")) {
             if (!label.isEmpty()) {
-                dropdown.addItems(DropdownItem.newBuilder().setLabel(label));
+                list.addStaticItems(ListItem.newBuilder().setLabel(label));
             }
         }
-        return dropdown.build();
+        return EditorSpec.newBuilder()
+            .setKind(EditorKind.EDITOR_SELECT)
+            .setOwner(EditorOwner.EDITOR_OWNER_ENGINE)
+            .setPresentation(EditorPresentation.EDITOR_CANVAS)
+            .setList(list)
+            .build();
     }
 
     private static GridConfig buildSalesTuiConfig(int rowIndicatorWidth) {
@@ -471,9 +481,8 @@ public final class VolvoxGridDesktopTuiExample {
             )
             .setEditing(
                 EditConfig.newBuilder()
-                    .setTrigger(EditTrigger.EDIT_TRIGGER_KEY_CLICK)
-                    .setDropdownTrigger(DropdownTrigger.DROPDOWN_ALWAYS)
-                    .setDropdownSearch(false)
+                    .setActivation(EditActivation.newBuilder()
+                        .setTrigger(EditTrigger.EDIT_TRIGGER_KEY_CLICK))
                     .build()
             )
             .setScrolling(
@@ -736,8 +745,8 @@ public final class VolvoxGridDesktopTuiExample {
             )
             .setEditing(
                 EditConfig.newBuilder()
-                    .setTrigger(EditTrigger.EDIT_TRIGGER_KEY_CLICK)
-                    .setDropdownTrigger(DropdownTrigger.DROPDOWN_NEVER)
+                    .setActivation(EditActivation.newBuilder()
+                        .setTrigger(EditTrigger.EDIT_TRIGGER_KEY_CLICK))
                     .build()
             )
             .setScrolling(
@@ -858,7 +867,8 @@ public final class VolvoxGridDesktopTuiExample {
             )
             .setEditing(
                 EditConfig.newBuilder()
-                    .setTrigger(EditTrigger.EDIT_TRIGGER_KEY_CLICK)
+                    .setActivation(EditActivation.newBuilder()
+                        .setTrigger(EditTrigger.EDIT_TRIGGER_KEY_CLICK))
                     .build()
             )
             .setScrolling(
@@ -1840,37 +1850,79 @@ public final class VolvoxGridDesktopTuiExample {
         return state != null && state.getActive();
     }
 
+    private static String editorValueText(EditorValue value) {
+        if (value == null) {
+            return "";
+        }
+        if (value.hasEditText()) {
+            return value.getEditText();
+        }
+        if (!value.hasValue()) {
+            return "";
+        }
+        CellValue cellValue = value.getValue();
+        switch (cellValue.getValueCase()) {
+            case TEXT:
+                return cellValue.getText();
+            case NUMBER:
+                return Double.toString(cellValue.getNumber());
+            case FLAG:
+                return Boolean.toString(cellValue.getFlag());
+            case TIMESTAMP:
+                return Long.toString(cellValue.getTimestamp());
+            default:
+                return "";
+        }
+    }
+
+    private static int editSelectionStart(EditState state) {
+        if (state == null || !state.hasSession()) return 0;
+        io.github.ivere27.volvoxgrid.EditorSession s = state.getSession();
+        return s.hasSelection() ? s.getSelection().getStart() : 0;
+    }
+
+    private static int editSelectionLength(EditState state) {
+        if (state == null || !state.hasSession()) return 0;
+        io.github.ivere27.volvoxgrid.EditorSession s = state.getSession();
+        return s.hasSelection() ? s.getSelection().getLength() : 0;
+    }
+
     private static String debugEditCellLabel(EditState state) {
-        if (!debugEditActive(state)) {
+        if (!debugEditActive(state) || !state.hasSession()) {
             return "--";
         }
-        return debugCellLabel(state.getRow(), state.getCol());
+        io.github.ivere27.volvoxgrid.EditorSession s = state.getSession();
+        return debugCellLabel(s.getRow(), s.getCol());
     }
 
     private static String debugEditSelectionLabel(EditState state) {
         if (!debugEditActive(state)) {
             return "--";
         }
-        return state.getSelStart() + "+" + state.getSelLength();
+        return editSelectionStart(state) + "+" + editSelectionLength(state);
     }
 
     private static boolean debugEditComposing(EditState state) {
-        return state != null && state.getComposing();
+        return state != null && state.hasSession() && state.getSession().getComposing();
     }
 
     private static String debugEditUiMode(EditState state) {
-        if (!debugEditActive(state)) {
+        if (!debugEditActive(state) || !state.hasSession()) {
             return "--";
         }
-        return state.getUiMode() == EditUiMode.EDIT_UI_MODE_EDIT ? "EDIT" : "ENTER";
+        return state.getSession().getUiMode() == io.github.ivere27.volvoxgrid.EditUiMode.EDIT_UI_MODE_EDIT
+            ? "EDIT" : "ENTER";
     }
 
     private static String debugEditTextLabel(EditState state) {
-        return !debugEditActive(state) ? "--" : debugCompactText(state.getText(), 20);
+        if (!debugEditActive(state) || !state.hasSession()) return "--";
+        io.github.ivere27.volvoxgrid.EditorSession s = state.getSession();
+        return debugCompactText(s.hasValue() ? editorValueText(s.getValue()) : "", 20);
     }
 
     private static String debugEditPreeditLabel(EditState state) {
-        return !debugEditActive(state) ? "--" : debugCompactText(state.getPreeditText(), 16);
+        if (!debugEditActive(state) || !state.hasSession()) return "--";
+        return debugCompactText(state.getSession().getPreeditText(), 16);
     }
 
     private static String debugFrameKind(VolvoxGridDesktopTerminalSession.Frame frame) {

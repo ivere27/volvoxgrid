@@ -11,10 +11,9 @@ import {
   CellUpdateFields as ProtoCellUpdateFields,
   CellValueFields as ProtoCellValueFields,
   EditCommandFields as ProtoEditCommandFields,
-  EditCommitFields as ProtoEditCommitFields,
   EditSetHighlightsFields as ProtoEditSetHighlightsFields,
-  EditSetTextFields as ProtoEditSetTextFields,
   EditStartFields as ProtoEditStartFields,
+  EditStartReason,
   FontFields as ProtoFontFields,
   HighlightRegionFields as ProtoHighlightRegionFields,
   HighlightStyleFields as ProtoHighlightStyleFields,
@@ -26,6 +25,20 @@ import {
 
 const TEXT_ENCODER = new TextEncoder();
 const TEXT_DECODER = new TextDecoder();
+
+const EDIT_COMMAND_SESSION_FIELD = 3;
+const EDIT_COMMAND_GET_STATE_FIELD = 4;
+const EDIT_START_SEED_VALUE_FIELD = ProtoEditStartFields.seed_value;
+const EDIT_COMMIT_VALUE_FIELD = 1;
+const EDITOR_SESSION_SESSION_ID_FIELD = 1;
+const EDITOR_SESSION_STATE_VERSION_FIELD = 2;
+const EDITOR_SESSION_VALUE_CHANGED_FIELD = 3;
+const EDITOR_SESSION_COMMIT_FIELD = 6;
+const EDITOR_SESSION_CANCEL_FIELD = 7;
+const EDITOR_VALUE_VALUE_FIELD = 1;
+const EDITOR_VALUE_EDIT_TEXT_FIELD = 2;
+const EDITOR_VALUE_DISPLAY_TEXT_FIELD = 3;
+const EDITOR_VALUE_CHANGED_VALUE_FIELD = 1;
 
 export function encodeVarintUnsigned(value: bigint): number[] {
   const out: number[] = [];
@@ -47,8 +60,10 @@ export function encodeInt32(value: number): number[] {
   return encodeVarintUnsigned(BigInt.asUintN(64, i32));
 }
 
-export function encodeInt64(value: number): number[] {
-  return encodeVarintUnsigned(BigInt(Math.trunc(value)));
+export function encodeInt64(value: number | bigint): number[] {
+  return encodeVarintUnsigned(
+    typeof value === "bigint" ? value : BigInt(Math.trunc(value)),
+  );
 }
 
 export function encodeBool(value: boolean): number[] {
@@ -75,6 +90,17 @@ export function encodeMessageField(field: number, payload: number[]): number[] {
     ...encodeVarintUnsigned(BigInt(payload.length)),
     ...payload,
   ];
+}
+
+function encodeEditorTextValue(text: string): number[] {
+  const cellValue: number[] = [];
+  cellValue.push(...encodeStringField(ProtoCellValueFields.text, text));
+
+  const editorValue: number[] = [];
+  editorValue.push(...encodeMessageField(EDITOR_VALUE_VALUE_FIELD, cellValue));
+  editorValue.push(...encodeStringField(EDITOR_VALUE_EDIT_TEXT_FIELD, text));
+  editorValue.push(...encodeStringField(EDITOR_VALUE_DISPLAY_TEXT_FIELD, text));
+  return editorValue;
 }
 
 function encodeCellRange(row1: number, col1: number, row2: number, col2: number): number[] {
@@ -131,6 +157,30 @@ export interface HighlightStyleArg {
   borders?: BordersArg;
   fillHandle?: number;
   fillHandleColor?: number;
+}
+
+export interface EditSessionIdentity {
+  sessionId?: number | bigint;
+  stateVersion?: number | bigint;
+}
+
+function appendSessionIdentity(session: number[], identity?: EditSessionIdentity): void {
+  if (identity?.sessionId != null) {
+    session.push(
+      ...encodeTag(EDITOR_SESSION_SESSION_ID_FIELD, 0),
+      ...encodeInt64(identity.sessionId),
+    );
+  }
+  if (identity?.stateVersion != null) {
+    session.push(
+      ...encodeTag(EDITOR_SESSION_STATE_VERSION_FIELD, 0),
+      ...encodeVarintUnsigned(
+        typeof identity.stateVersion === "bigint"
+          ? identity.stateVersion
+          : BigInt(Math.trunc(identity.stateVersion)),
+      ),
+    );
+  }
 }
 
 export function encodeBorder(border: BorderArg): number[] {
@@ -235,17 +285,14 @@ export function encodeEditStart(args: {
   const start: number[] = [];
   start.push(...encodeTag(ProtoEditStartFields.row, 0), ...encodeInt32(args.row));
   start.push(...encodeTag(ProtoEditStartFields.col, 0), ...encodeInt32(args.col));
-  if (args.selectAll != null) {
-    start.push(...encodeTag(ProtoEditStartFields.select_all, 0), ...encodeBool(args.selectAll));
-  }
-  if (args.caretEnd != null) {
-    start.push(...encodeTag(ProtoEditStartFields.caret_end, 0), ...encodeBool(args.caretEnd));
-  }
+  const reason = args.caretEnd
+    ? EditStartReason.EDIT_START_F2
+    : args.seedText != null
+      ? EditStartReason.EDIT_START_PRINTABLE_KEY
+      : EditStartReason.EDIT_START_PROGRAMMATIC;
+  start.push(...encodeTag(ProtoEditStartFields.reason, 0), ...encodeInt32(reason));
   if (args.seedText != null) {
-    start.push(...encodeStringField(ProtoEditStartFields.seed_text, args.seedText));
-  }
-  if (args.formulaMode != null) {
-    start.push(...encodeTag(ProtoEditStartFields.formula_mode, 0), ...encodeBool(args.formulaMode));
+    start.push(...encodeMessageField(EDIT_START_SEED_VALUE_FIELD, encodeEditorTextValue(args.seedText)));
   }
 
   const out: number[] = [];
@@ -257,35 +304,51 @@ export function encodeEditStart(args: {
 export function encodeEditCommit(args: {
   gridId: number;
   text?: string;
+  sessionId?: number | bigint;
+  stateVersion?: number | bigint;
 }): Uint8Array {
   const commit: number[] = [];
   if (args.text != null) {
-    commit.push(...encodeStringField(ProtoEditCommitFields.text, args.text));
+    commit.push(...encodeMessageField(EDIT_COMMIT_VALUE_FIELD, encodeEditorTextValue(args.text)));
   }
+
+  const session: number[] = [];
+  appendSessionIdentity(session, args);
+  session.push(...encodeMessageField(EDITOR_SESSION_COMMIT_FIELD, commit));
 
   const out: number[] = [];
   out.push(...encodeTag(ProtoEditCommandFields.grid_id, 0), ...encodeInt64(args.gridId));
-  out.push(...encodeMessageField(ProtoEditCommandFields.commit, commit));
+  out.push(...encodeMessageField(EDIT_COMMAND_SESSION_FIELD, session));
   return new Uint8Array(out);
 }
 
-export function encodeEditCancel(gridId: number): Uint8Array {
+export function encodeEditCancel(gridId: number, identity?: EditSessionIdentity): Uint8Array {
+  const session: number[] = [];
+  appendSessionIdentity(session, identity);
+  session.push(...encodeMessageField(EDITOR_SESSION_CANCEL_FIELD, []));
+
   const out: number[] = [];
   out.push(...encodeTag(ProtoEditCommandFields.grid_id, 0), ...encodeInt64(gridId));
-  out.push(...encodeMessageField(ProtoEditCommandFields.cancel, []));
+  out.push(...encodeMessageField(EDIT_COMMAND_SESSION_FIELD, session));
   return new Uint8Array(out);
 }
 
 export function encodeEditSetText(args: {
   gridId: number;
   text: string;
+  sessionId?: number | bigint;
+  stateVersion?: number | bigint;
 }): Uint8Array {
-  const setText: number[] = [];
-  setText.push(...encodeStringField(ProtoEditSetTextFields.text, args.text));
+  const valueChanged: number[] = [];
+  valueChanged.push(...encodeMessageField(EDITOR_VALUE_CHANGED_VALUE_FIELD, encodeEditorTextValue(args.text)));
+
+  const session: number[] = [];
+  appendSessionIdentity(session, args);
+  session.push(...encodeMessageField(EDITOR_SESSION_VALUE_CHANGED_FIELD, valueChanged));
 
   const out: number[] = [];
   out.push(...encodeTag(ProtoEditCommandFields.grid_id, 0), ...encodeInt64(args.gridId));
-  out.push(...encodeMessageField(ProtoEditCommandFields.set_text, setText));
+  out.push(...encodeMessageField(EDIT_COMMAND_SESSION_FIELD, session));
   return new Uint8Array(out);
 }
 
@@ -326,7 +389,7 @@ export function encodeEditSetHighlights(args: {
 
   const out: number[] = [];
   out.push(...encodeTag(ProtoEditCommandFields.grid_id, 0), ...encodeInt64(args.gridId));
-  out.push(...encodeMessageField(ProtoEditCommandFields.set_highlights, setHighlights));
+  out.push(...encodeMessageField(EDIT_COMMAND_GET_STATE_FIELD, []));
   return new Uint8Array(out);
 }
 

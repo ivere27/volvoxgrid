@@ -5,8 +5,8 @@ using System.IO;
 using System.Threading;
 using System.Windows.Forms;
 using VolvoxGrid.DotNet;
-using Dropdown = Volvoxgrid.V1.Dropdown;
-using DropdownItem = Volvoxgrid.V1.DropdownItem;
+using ListEditorParams = Volvoxgrid.V1.ListEditorParams;
+using ListItem = Volvoxgrid.V1.ListItem;
 
 namespace VolvoxGrid.DotNet.Sample
 {
@@ -511,6 +511,16 @@ namespace VolvoxGrid.DotNet.Sample
             _grid.SetCellValue(4, "c1", "Delta**");
             SmokeAssert(WaitForCellText(4, 1, "Delta**"), "SetCellValue/GetCellValue");
 
+            RunOptionalSmokeStep("BeginEdit/CommitEdit/CancelEdit", delegate
+            {
+                _grid.Editable = true;
+                _grid.BeginEdit(2, 1, Volvoxgrid.V1.EditStartReason.EDIT_START_PROGRAMMATIC, null);
+                _grid.CommitEdit("EditedViaSmoke");
+                SmokeAssert(WaitForCellText(2, 1, "EditedViaSmoke"), "CommitEdit result");
+                _grid.BeginEdit(2, 1);
+                _grid.CancelEdit();
+            });
+
             _grid.DefineColumns(2, dataType: VolvoxGridColumnDataType.Number, alignment: VolvoxGridAlign.RightCenter, format: "N0");
             _grid.SetColWidth(1, 170);
             _grid.SetRowHeight(1, 28);
@@ -576,15 +586,6 @@ namespace VolvoxGrid.DotNet.Sample
             var clipboard = _grid.Copy();
             SmokeAssert(clipboard != null, "Copy");
             _grid.Paste("101\tPasted\t99\ttrue");
-
-            RunOptionalSmokeStep("BeginEdit/CommitEdit/CancelEdit", delegate
-            {
-                _grid.BeginEdit(2, 1, true, true, null);
-                _grid.CommitEdit("EditedViaSmoke");
-                SmokeAssert(WaitForCellText(2, 1, "EditedViaSmoke"), "CommitEdit result");
-                _grid.BeginEdit(2, 1);
-                _grid.CancelEdit();
-            });
 
             var exportData = _grid.SaveGrid(VolvoxGridExportFormat.Binary, VolvoxGridExportScope.All);
             SmokeAssert(exportData != null && exportData.Data != null && exportData.Data.Length > 0, "SaveGrid");
@@ -1233,13 +1234,13 @@ namespace VolvoxGrid.DotNet.Sample
             _status.Text = _status.Text + " | " + message;
         }
 
-        private static Dropdown DropdownFromLabels(string items)
+        private static ListEditorParams DropdownFromLabels(string items)
         {
-            var dropdown = new Dropdown();
+            var dropdown = new ListEditorParams();
             foreach (var label in items.Split('|'))
             {
                 if (label.Length == 0) continue;
-                dropdown.Items.Add(new DropdownItem { Label = label });
+                dropdown.StaticItems.Add(new ListItem { Label = label });
             }
             return dropdown;
         }

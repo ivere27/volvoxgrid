@@ -614,12 +614,14 @@ WASM_PACK_OPT_FLAGS ?= --no-opt
 wasm:
 	@command -v wasm-pack >/dev/null 2>&1 || { echo "Error: wasm-pack not found. Install with: cargo install wasm-pack"; exit 1; }
 	@echo "Building WASM crate..."
+	@rm -f "$(WASM_OUTPUT_DIR)/package.json"
 	cd runtime && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" rustup run nightly wasm-pack build . $(WASM_PACK_OPT_FLAGS) --target web --out-dir ../web/example/wasm --out-name volvoxgrid_wasm --no-default-features --features wasm-default,gpu
 	@echo "WASM build complete: web/example/wasm/"
 
 wasm-lite:
 	@command -v wasm-pack >/dev/null 2>&1 || { echo "Error: wasm-pack not found. Install with: cargo install wasm-pack"; exit 1; }
 	@echo "Building WASM crate (lite, with demo fixtures)..."
+	@rm -f "$(WASM_OUTPUT_DIR)/package.json"
 	cd runtime && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" rustup run nightly wasm-pack build . $(WASM_PACK_OPT_FLAGS) --target web --out-dir ../web/example/wasm --out-name volvoxgrid_wasm --no-default-features --features demo
 	@echo "WASM lite build complete: web/example/wasm/"
 

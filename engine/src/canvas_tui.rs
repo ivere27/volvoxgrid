@@ -2897,7 +2897,8 @@ mod tests {
         grid.set_renderer_mode(pb::RendererMode::RendererTui as i32);
         grid.columns[0].caption = "Value".to_string();
         grid.cells.set_text(1, 0, "seed".to_string());
-        grid.edit.start_edit(1, 0, "seed");
+        grid.edit
+            .start_edit(1, 0, pb::EditStartReason::EditStartUnspecified, "seed");
         grid.edit.edit_text = "edit".to_string();
         grid.edit.sel_start = 2;
         grid.edit.sel_length = 0;
@@ -2923,7 +2924,8 @@ mod tests {
         grid.cells.set_text(1, 0, "edit".to_string());
         grid.selection.row = 1;
         grid.selection.col = 0;
-        grid.edit.start_edit(1, 0, "edit");
+        grid.edit
+            .start_edit(1, 0, pb::EditStartReason::EditStartUnspecified, "edit");
 
         let mut buffer = vec![TuiCell::default(); 12 * 3];
         render_grid_tui(&mut grid, &mut buffer, 12, 3, 12);
@@ -2955,7 +2957,8 @@ mod tests {
         grid.cells.set_text(1, 0, "one".to_string());
         grid.cells.set_text(1, 1, "two".to_string());
         grid.cells.set_text(1, 2, "tri".to_string());
-        grid.edit.start_edit(1, 1, "two");
+        grid.edit
+            .start_edit(1, 1, pb::EditStartReason::EditStartUnspecified, "two");
 
         let mut buffer = vec![TuiCell::default(); 20 * 3];
         render_grid_tui(&mut grid, &mut buffer, 20, 3, 20);
@@ -2973,7 +2976,8 @@ mod tests {
         grid.columns[0].alignment = pb::Align::RightCenter as i32;
         grid.set_col_width(0, 6);
         grid.cells.set_text(0, 0, "12".to_string());
-        grid.edit.start_edit(0, 0, "12");
+        grid.edit
+            .start_edit(0, 0, pb::EditStartReason::EditStartUnspecified, "12");
         grid.edit.sel_start = 0;
         grid.edit.sel_length = 0;
         grid.edit.sel_caret = 0;
@@ -2998,7 +3002,12 @@ mod tests {
         grid.columns[0].caption = "Value".to_string();
         grid.set_col_width(0, 4);
         grid.cells.set_text(0, 0, "abcdefghijkl".to_string());
-        grid.edit.start_edit(0, 0, "abcdefghijkl");
+        grid.edit.start_edit(
+            0,
+            0,
+            pb::EditStartReason::EditStartUnspecified,
+            "abcdefghijkl",
+        );
 
         grid.edit.sel_start = 0;
         grid.edit.sel_length = 0;
@@ -3026,7 +3035,8 @@ mod tests {
         grid.columns[0].dropdown_items = "Alpha|Beta|Gamma".to_string();
         grid.set_col_width(0, 8);
         grid.cells.set_text(0, 0, "Alpha".to_string());
-        grid.edit.start_edit(0, 0, "Alpha");
+        grid.edit
+            .start_edit(0, 0, pb::EditStartReason::EditStartUnspecified, "Alpha");
         grid.edit.parse_dropdown_items("Alpha|Beta|Gamma");
         grid.edit.set_dropdown_index(0);
 
@@ -3063,7 +3073,8 @@ mod tests {
         grid.set_col_width(1, 6);
         grid.set_col_width(2, 4);
         grid.cells.set_text(0, 1, "Alpha".to_string());
-        grid.edit.start_edit(0, 1, "Alpha");
+        grid.edit
+            .start_edit(0, 1, pb::EditStartReason::EditStartUnspecified, "Alpha");
         grid.edit.parse_dropdown_items("Alpha|Beta|Gamma");
         grid.edit.set_dropdown_index(0);
 
@@ -3086,7 +3097,8 @@ mod tests {
         grid.set_col_width(1, 2);
         grid.set_col_width(2, 3);
         grid.cells.set_text(1, 1, "가".to_string());
-        grid.edit.start_edit(1, 1, "가");
+        grid.edit
+            .start_edit(1, 1, pb::EditStartReason::EditStartUnspecified, "가");
 
         let mut buffer = vec![TuiCell::default(); 20 * 3];
         render_grid_tui(&mut grid, &mut buffer, 20, 3, 20);

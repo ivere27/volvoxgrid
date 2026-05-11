@@ -44,10 +44,20 @@ const int _salesTreeColor = 0xFF9CA3AF;
 const int _salesHoverBandBg = 0x106366F1;
 const int _salesHoverCellBg = 0x1E818CF8;
 
-Dropdown _salesStatusDropdown() => Dropdown()
-  ..items.addAll(_salesStatusItems
-      .split('|')
-      .map((label) => DropdownItem()..label = label));
+ListEditorParams _salesStatusDropdown() => ListEditorParams()
+  ..staticItems.addAll(
+      _salesStatusItems.split('|').map((label) => ListItem()..label = label));
+
+EditorSpec _salesStatusEditor() => EditorSpec()
+  ..kind = EditorKind.EDITOR_SELECT
+  ..owner = EditorOwner.EDITOR_OWNER_ENGINE
+  ..presentation = EditorPresentation.EDITOR_CANVAS
+  ..list = _salesStatusDropdown();
+
+EditorSpec _defaultHostTextEditorSpec() => EditorSpec()
+  ..kind = EditorKind.EDITOR_TEXT
+  ..owner = EditorOwner.EDITOR_OWNER_HOST_NATIVE
+  ..presentation = EditorPresentation.EDITOR_INLINE;
 
 Future<void> loadSalesJsonDemo(VolvoxGridController controller) async {
   await controller.setColCount(_salesKeys.length);
@@ -162,7 +172,7 @@ DefineColumnsRequest _salesDefineColumnsRequest() {
       def.align = Align.ALIGN_CENTER_CENTER;
       def.dataType = ColumnDataType.COLUMN_DATA_BOOLEAN;
     } else if (col == 8) {
-      def.dropdown = _salesStatusDropdown();
+      def.editor = _salesStatusEditor();
     }
     if (col == 0 || col == 1) {
       def.span = true;
@@ -251,9 +261,9 @@ GridConfig _salesThemeConfig() {
               ..style = BorderStyle.BORDER_THIN
               ..color = _salesAccent)))))
     ..editing = (EditConfig()
-      ..trigger = EditTrigger.EDIT_TRIGGER_NONE
-      ..dropdownTrigger = DropdownTrigger.DROPDOWN_ALWAYS
-      ..dropdownSearch = false)
+      ..defaultEditor = _defaultHostTextEditorSpec()
+      ..activation =
+          (EditActivation()..trigger = EditTrigger.EDIT_TRIGGER_NONE))
     ..scrolling = (ScrollConfig()
       ..scrollbars = ScrollBarsMode.SCROLLBAR_BOTH
       ..flingEnabled = true

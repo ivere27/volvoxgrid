@@ -207,14 +207,6 @@ enum PendingAction {
         click_caret: Option<i32>,
         caret_end: Option<bool>,
     },
-    BeforeDropdownOpen {
-        row: i32,
-        col: i32,
-        force: bool,
-        seed_text: Option<String>,
-        click_caret: Option<i32>,
-        caret_end: Option<bool>,
-    },
     ToggleCheckbox {
         row: i32,
         col: i32,
@@ -327,6 +319,57 @@ fn engine_value_to_proto(v: &CellValueData) -> CellValue {
             value: Some(cell_value::Value::Timestamp(*ts)),
         },
         CellValueData::Empty => CellValue { value: None },
+    }
+}
+
+fn editor_value_from_text(text: String) -> EditorValue {
+    EditorValue {
+        value: Some(CellValue {
+            value: Some(cell_value::Value::Text(text.clone())),
+        }),
+        edit_text: Some(text.clone()),
+        display_text: Some(text),
+    }
+}
+
+fn editor_value_to_text(value: &EditorValue) -> String {
+    if let Some(text) = value.edit_text.as_ref() {
+        return text.clone();
+    }
+    value
+        .value
+        .as_ref()
+        .map(|value| match value.value.as_ref() {
+            Some(cell_value::Value::Text(v)) => v.clone(),
+            Some(cell_value::Value::Number(v)) => v.to_string(),
+            Some(cell_value::Value::Flag(v)) => v.to_string(),
+            Some(cell_value::Value::Raw(v)) => String::from_utf8_lossy(v).into_owned(),
+            Some(cell_value::Value::Timestamp(v)) => v.to_string(),
+            None => String::new(),
+        })
+        .unwrap_or_default()
+}
+
+fn editor_session_command_is_current(
+    grid: &volvoxgrid_engine::grid::VolvoxGrid,
+    session: &EditorSessionCommand,
+) -> bool {
+    if !grid.edit.is_active() {
+        return false;
+    }
+    let current_session_id = grid.edit.session_serial as i64;
+    session.session_id == current_session_id && session.state_version == grid.edit.state_version
+}
+
+fn editor_spec_from_list(list: ListEditorParams) -> EditorSpec {
+    EditorSpec {
+        kind: EditorKind::EditorSelect as i32,
+        owner: EditorOwner::Engine as i32,
+        presentation: EditorPresentation::EditorCanvas as i32,
+        validation_mode: ValidationMode::ValidationBlock as i32,
+        validation_trigger: ValidationTrigger::OnCommit as i32,
+        list: Some(list),
+        ..Default::default()
     }
 }
 
@@ -574,8 +617,10 @@ fn sales_demo_column_defs_local(scale: f32) -> Vec<ColumnDef> {
                 def.data_type = Some(ColumnDataType::ColumnDataBoolean as i32);
             }
             8 => {
-                def.dropdown = Some(volvoxgrid_engine::edit::legacy_dropdown_items_to_dropdown(
-                    "Active|Pending|Shipped|Returned|Cancelled",
+                def.editor = Some(editor_spec_from_list(
+                    volvoxgrid_engine::edit::legacy_dropdown_items_to_dropdown(
+                        "Active|Pending|Shipped|Returned|Cancelled",
+                    ),
                 ));
             }
             _ => {}
@@ -662,7 +707,7 @@ fn apply_local_sales_demo_chrome(grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
     grid.extend_last_col = true;
     grid.tab_behavior = 1;
     grid.edit_trigger_mode = 0;
-    grid.dropdown_trigger = 1;
+    grid.dropdown_trigger = volvoxgrid_engine::grid::EDITOR_BUTTON_ALWAYS;
     grid.dropdown_search = false;
     grid.fling_enabled = true;
     grid.fling_impulse_gain = 220.0;
@@ -1829,7 +1874,14 @@ fn begin_edit_session_core(
     }
     let stored_text = grid.cells.get_text(row, col).to_string();
     let display_text = grid.get_display_text(row, col);
-    grid.edit.start_edit(row, col, &display_text);
+    let reason = if click_caret.is_some() {
+        EditStartReason::EditStartClickCaret
+    } else if caret_end == Some(true) {
+        EditStartReason::EditStartF2
+    } else {
+        EditStartReason::EditStartUnspecified
+    };
+    grid.edit.start_edit(row, col, reason, &display_text);
     if let Some(dropdown) = dropdown.as_ref() {
         grid.edit.parse_dropdown(dropdown);
     } else {
@@ -1903,28 +1955,6 @@ fn begin_edit_session_after_before(
         force,
         false,
         true,
-        seed_text,
-        click_caret,
-        caret_end,
-    );
-}
-
-fn begin_edit_session_after_dropdown_before(
-    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
-    row: i32,
-    col: i32,
-    force: bool,
-    seed_text: Option<String>,
-    click_caret: Option<i32>,
-    caret_end: Option<bool>,
-) {
-    begin_edit_session_core(
-        grid,
-        row,
-        col,
-        force,
-        false,
-        false,
         seed_text,
         click_caret,
         caret_end,
@@ -2084,38 +2114,6 @@ fn request_before_checkbox_toggle(
         event_id,
         volvoxgrid_engine::event::GridEventData::BeforeEdit { row, col },
     );
-    true
-}
-
-fn request_before_dropdown_open(
-    grid_id: i64,
-    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
-    row: i32,
-    col: i32,
-    force: bool,
-    seed_text: Option<String>,
-    click_caret: Option<i32>,
-    caret_end: Option<bool>,
-) -> bool {
-    let Some(event) = grid.before_dropdown_open_event(row, col) else {
-        return false;
-    };
-    let event_id = next_event_id();
-    PENDING_ACTIONS.lock().unwrap().insert(
-        (grid_id, event_id),
-        PendingActionEntry {
-            created_at: Instant::now(),
-            action: PendingAction::BeforeDropdownOpen {
-                row,
-                col,
-                force,
-                seed_text,
-                click_caret,
-                caret_end,
-            },
-        },
-    );
-    grid.events.push_with_id(event_id, event);
     true
 }
 
@@ -2358,42 +2356,7 @@ fn apply_pending_action(grid_id: i64, action: PendingAction, cancel: bool) {
             if cancel {
                 return;
             }
-            if grid.active_dropdown(row, col).is_some()
-                && request_before_dropdown_open(
-                    grid_id,
-                    grid,
-                    row,
-                    col,
-                    force,
-                    seed_text.clone(),
-                    click_caret,
-                    caret_end,
-                )
-            {
-                return;
-            }
             begin_edit_session_after_before(
-                grid,
-                row,
-                col,
-                force,
-                seed_text,
-                click_caret,
-                caret_end,
-            );
-        }
-        PendingAction::BeforeDropdownOpen {
-            row,
-            col,
-            force,
-            seed_text,
-            click_caret,
-            caret_end,
-        } => {
-            if cancel {
-                return;
-            }
-            begin_edit_session_after_dropdown_before(
                 grid,
                 row,
                 col,
@@ -4984,114 +4947,165 @@ impl VolvoxGridServiceRuntime for ActiveXRuntime {
     }
 
     fn edit(&self, request: EditCommand) -> Result<EditState, String> {
-        let grid_id = request.grid_id;
-        let state = self.manager().with_grid(grid_id, |grid| {
+        let state = self.manager().with_grid(request.grid_id, |grid| {
             match request.command {
                 Some(edit_command::Command::Start(start)) => {
                     begin_edit_session(grid, start.row, start.col, true);
                 }
-                Some(edit_command::Command::Commit(commit)) => {
-                    if grid.edit.is_active() {
-                        grid.edit.flush_preedit();
-                        let row = grid.edit.edit_row;
-                        let col = grid.edit.edit_col;
-                        let old_text = grid.cells.get_text(row, col).to_string();
-                        let new_text = commit.text.unwrap_or_else(|| grid.edit.edit_text.clone());
-                        let committed = normalize_committed_edit_text(grid, row, col, &new_text);
-                        grid.edit.cancel();
-                        grid.events.push(
-                            volvoxgrid_engine::event::GridEventData::CellEditValidate {
-                                row,
-                                col,
-                                edit_text: committed.clone(),
-                            },
-                        );
-                        apply_committed_edit_text(grid, row, col, old_text, committed);
-                    }
-                }
-                Some(edit_command::Command::Cancel(_)) => {
-                    if grid.edit.is_active() {
-                        let active_combo =
-                            grid.active_dropdown_list(grid.edit.edit_row, grid.edit.edit_col);
-                        grid.edit.cancel();
-                        if !active_combo.is_empty() {
-                            grid.events
-                                .push(volvoxgrid_engine::event::GridEventData::DropdownClosed);
+                Some(edit_command::Command::Session(session)) => {
+                    if editor_session_command_is_current(grid, &session) {
+                        match session.command {
+                            Some(editor_session_command::Command::Commit(commit)) => {
+                                if grid.edit.is_active() {
+                                    grid.edit.flush_preedit();
+                                    let row = grid.edit.edit_row;
+                                    let col = grid.edit.edit_col;
+                                    let old_text = grid.cells.get_text(row, col).to_string();
+                                    let new_text = commit
+                                        .value
+                                        .as_ref()
+                                        .map(editor_value_to_text)
+                                        .unwrap_or_else(|| grid.edit.edit_text.clone());
+                                    let committed =
+                                        normalize_committed_edit_text(grid, row, col, &new_text);
+                                    grid.edit.cancel();
+                                    grid.events.push(
+                                        volvoxgrid_engine::event::GridEventData::CellEditValidate {
+                                            row,
+                                            col,
+                                            edit_text: committed.clone(),
+                                        },
+                                    );
+                                    apply_committed_edit_text(grid, row, col, old_text, committed);
+                                }
+                            }
+                            Some(editor_session_command::Command::Cancel(_)) => {
+                                if grid.edit.is_active() {
+                                    let active_combo = grid.active_dropdown_list(
+                                        grid.edit.edit_row,
+                                        grid.edit.edit_col,
+                                    );
+                                    grid.edit.cancel();
+                                    if !active_combo.is_empty() {
+                                        grid.events.push(
+                                            volvoxgrid_engine::event::GridEventData::DropdownClosed,
+                                        );
+                                    }
+                                    grid.mark_dirty();
+                                }
+                            }
+                            Some(editor_session_command::Command::ValueChanged(value_changed)) => {
+                                if grid.edit.is_active() {
+                                    let raw = value_changed
+                                        .value
+                                        .as_ref()
+                                        .map(editor_value_to_text)
+                                        .unwrap_or_default();
+                                    let t = truncate_to_char_count(&raw, grid.edit_max_length);
+                                    grid.edit.edit_text = t.clone();
+                                    grid.edit.sel_start = t.chars().count() as i32;
+                                    grid.edit.sel_length = 0;
+                                    grid.events.push(
+                                        volvoxgrid_engine::event::GridEventData::CellEditChange {
+                                            text: t,
+                                        },
+                                    );
+                                }
+                            }
+                            Some(editor_session_command::Command::SelectionChanged(sel)) => {
+                                if grid.edit.is_active() {
+                                    if let Some(selection) = sel.selection {
+                                        grid.edit.set_sel_start(selection.start);
+                                        grid.edit.set_sel_length(selection.length);
+                                    }
+                                }
+                            }
+                            Some(editor_session_command::Command::PreeditChanged(preedit)) => {
+                                if grid.edit.is_active() {
+                                    if preedit.commit {
+                                        grid.edit.commit_preedit(&preedit.text);
+                                    } else if preedit.text.is_empty() {
+                                        grid.edit.cancel_preedit();
+                                    } else {
+                                        grid.edit.set_preedit(&preedit.text, preedit.cursor);
+                                    }
+                                    grid.mark_dirty();
+                                }
+                            }
+                            Some(editor_session_command::Command::CustomAction(action)) => {
+                                if grid.edit.is_active() {
+                                    let event =
+                                        volvoxgrid_engine::event::GridEventData::CustomEditorAction {
+                                            session_id: grid.edit.session_serial as i64,
+                                            row: grid.edit.edit_row,
+                                            col: grid.edit.edit_col,
+                                            action_id: action.action_id,
+                                            payload: action.payload,
+                                        };
+                                    grid.events.push(event);
+                                }
+                            }
+                            None => {}
                         }
-                        grid.mark_dirty();
                     }
                 }
-                Some(edit_command::Command::SetText(set_text)) => {
-                    if grid.edit.is_active() {
-                        let t = truncate_to_char_count(&set_text.text, grid.edit_max_length);
-                        grid.edit.edit_text = t.clone();
-                        grid.edit.sel_start = t.chars().count() as i32;
-                        grid.edit.sel_length = 0;
-                        grid.events
-                            .push(volvoxgrid_engine::event::GridEventData::CellEditChange {
-                                text: t,
-                            });
-                    }
-                }
-                Some(edit_command::Command::SetSelection(sel)) => {
-                    if grid.edit.is_active() {
-                        grid.edit.set_sel_start(sel.start);
-                        grid.edit.set_sel_length(sel.length);
-                    }
-                }
-                Some(edit_command::Command::SetHighlights(_)) => {}
-                Some(edit_command::Command::SetPreedit(preedit)) => {
-                    if grid.edit.is_active() {
-                        if preedit.commit {
-                            grid.edit.commit_preedit(&preedit.text);
-                        } else if preedit.text.is_empty() {
-                            grid.edit.cancel_preedit();
-                        } else {
-                            grid.edit.set_preedit(&preedit.text, preedit.cursor);
-                        }
-                        grid.mark_dirty();
-                    }
-                }
-                Some(edit_command::Command::Finish(_)) => {
-                    if grid.edit.is_active() {
-                        grid.edit.flush_preedit();
-                        let row = grid.edit.edit_row;
-                        let col = grid.edit.edit_col;
-                        let old_text = grid.cells.get_text(row, col).to_string();
-                        let new_text = grid.edit.edit_text.clone();
-                        let committed = normalize_committed_edit_text(grid, row, col, &new_text);
-                        grid.edit.cancel();
-                        grid.events.push(
-                            volvoxgrid_engine::event::GridEventData::CellEditValidate {
-                                row,
-                                col,
-                                edit_text: committed.clone(),
-                            },
-                        );
-                        apply_committed_edit_text(grid, row, col, old_text, committed);
-                    }
-                }
-                None => {}
+                Some(edit_command::Command::GetState(_)) | None => {}
             }
 
-            EditState {
-                active: grid.edit.is_active(),
-                row: grid.edit.edit_row,
-                col: grid.edit.edit_col,
-                text: grid.edit.edit_text.clone(),
-                sel_start: grid.edit.sel_start,
-                sel_length: grid.edit.sel_length,
-                composing: grid.edit.composing,
-                preedit_text: grid.edit.preedit_text.clone(),
-                ui_mode: match grid.edit.ui_mode {
-                    volvoxgrid_engine::edit::EditUiMode::EnterMode => EditUiMode::Enter as i32,
-                    volvoxgrid_engine::edit::EditUiMode::EditMode => EditUiMode::Edit as i32,
-                },
-                x: 0.0,
-                y: 0.0,
-                width: 0.0,
-                height: 0.0,
-                max_length: grid.edit_max_length,
+            let text = grid.edit.edit_text.clone();
+            let active = grid.edit.is_active();
+            if !active {
+                EditState {
+                    active: false,
+                    session: None,
+                }
+            } else {
+                let ui_mode = match grid.edit.ui_mode {
+                    volvoxgrid_engine::edit::EditUiMode::EnterMode => EditUiMode::Enter,
+                    volvoxgrid_engine::edit::EditUiMode::EditMode => EditUiMode::Edit,
+                };
+                let accepts_text = grid.edit.accepts_text_input();
+                EditState {
+                    active: true,
+                    session: Some(EditorSession {
+                        session_id: grid.edit.session_serial as i64,
+                        row: grid.edit.edit_row,
+                        col: grid.edit.edit_col,
+                        viewport_rect: Some(Rect::default()),
+                        editor: Some(EditorSpec {
+                            kind: EditorKind::EditorText as i32,
+                            owner: EditorOwner::HostNative as i32,
+                            presentation: EditorPresentation::EditorInline as i32,
+                            validation_mode: ValidationMode::ValidationBlock as i32,
+                            validation_trigger: ValidationTrigger::OnCommit as i32,
+                            text: Some(TextEditorParams {
+                                max_length: grid.edit_max_length,
+                                mask: grid.edit_mask.clone(),
+                                allow_newlines: false,
+                                input_type: InputType::Text as i32,
+                            }),
+                            ..Default::default()
+                        }),
+                        value: Some(editor_value_from_text(text)),
+                        selection: Some(TextSelection {
+                            start: grid.edit.sel_start,
+                            length: grid.edit.sel_length,
+                        }),
+                        ui_mode: ui_mode as i32,
+                        capabilities: Some(EditorCapabilities {
+                            accepts_text_input: accepts_text,
+                            supports_selection: accepts_text,
+                            supports_cut: accepts_text,
+                            supports_paste: accepts_text,
+                            supports_undo: accepts_text,
+                        }),
+                        reason: grid.edit.start_reason as i32,
+                        state_version: grid.edit.state_version,
+                        composing: grid.edit.composing,
+                        preedit_text: grid.edit.preedit_text.clone(),
+                        validation_errors: Vec::new(),
+                    }),
+                }
             }
         })?;
         Ok(state)
@@ -5688,50 +5702,83 @@ fn engine_event_to_proto(
                 text,
             }))
         }
-        E::KeyDownEdit { key_code, modifier } => {
-            Some(grid_event::Event::KeyDownEdit(KeyDownEditEvent {
-                key_code,
-                modifier,
-            }))
-        }
-        E::KeyPressEdit { key_ascii } => Some(grid_event::Event::KeyPressEdit(KeyPressEditEvent {
-            key_ascii,
-        })),
-        E::KeyUpEdit { key_code, modifier } => Some(grid_event::Event::KeyUpEdit(KeyUpEditEvent {
+        E::KeyDownEdit {
+            session_id,
+            key_code,
+            modifier,
+        } => Some(grid_event::Event::KeyDownEdit(KeyDownEditEvent {
+            session_id,
             key_code,
             modifier,
         })),
-        E::CellEditConfigureStyle { row, col } => Some(grid_event::Event::CellEditConfigureStyle(
-            CellEditConfigureStyleEvent { row, col },
-        )),
-        E::CellEditConfigureWindow { row, col } => Some(
-            grid_event::Event::CellEditConfigureWindow(CellEditConfigureWindowEvent { row, col }),
-        ),
-        E::BeforeDropdownOpen {
+        E::KeyPressEdit {
+            session_id,
+            key_ascii,
+        } => Some(grid_event::Event::KeyPressEdit(KeyPressEditEvent {
+            session_id,
+            key_ascii,
+        })),
+        E::KeyUpEdit {
+            session_id,
+            key_code,
+            modifier,
+        } => Some(grid_event::Event::KeyUpEdit(KeyUpEditEvent {
+            session_id,
+            key_code,
+            modifier,
+        })),
+        E::EditValidationRequest {
+            request_id,
+            session_id,
             row,
             col,
-            x,
-            y,
-            width,
-            height,
-            dropdown,
-            current_value,
-            selected_index,
-        } => Some(grid_event::Event::BeforeDropdownOpen(
-            BeforeDropdownOpenEvent {
+            value,
+        } => Some(grid_event::Event::EditValidationRequest(
+            EditValidationRequest {
+                request_id,
+                session_id,
                 row,
                 col,
-                x,
-                y,
-                width,
-                height,
-                dropdown: Some(dropdown),
-                current_value,
-                selected_index,
+                value: Some(value),
             },
         )),
-        E::DropdownClosed => Some(grid_event::Event::DropdownClosed(DropdownClosedEvent {})),
-        E::DropdownOpened => Some(grid_event::Event::DropdownOpened(DropdownOpenedEvent {})),
+        E::EditorListItemsRequest {
+            request_id,
+            session_id,
+            data_source_id,
+            filter_text,
+            offset,
+            limit,
+        } => Some(grid_event::Event::EditorListItemsRequest(
+            EditorListItemsRequest {
+                request_id,
+                session_id,
+                data_source_id,
+                filter_text,
+                offset,
+                limit,
+            },
+        )),
+        E::CellEditConfigureStyle { .. }
+        | E::CellEditConfigureWindow { .. }
+        | E::BeforeDropdownOpen { .. }
+        | E::DropdownClosed
+        | E::DropdownOpened => None,
+        E::CustomEditorAction {
+            session_id,
+            row,
+            col,
+            action_id,
+            payload,
+        } => Some(grid_event::Event::CustomEditorAction(
+            CustomEditorActionEvent {
+                session_id,
+                row,
+                col,
+                action_id,
+                payload,
+            },
+        )),
         E::CellChanged {
             row,
             col,
@@ -7958,8 +8005,15 @@ fn handle_pointer_down_after_before_mouse(
             request_before_checkbox_toggle(grid_id, g, hit.row, hit.col);
         }
 
-        let is_cell_like =
-            area == HitArea::Cell || area == HitArea::FixedRow || area == HitArea::FixedCol;
+        let is_cell_like = matches!(
+            area,
+            HitArea::Cell
+                | HitArea::CellText
+                | HitArea::CellPicture
+                | HitArea::CellButtonPicture
+                | HitArea::FixedRow
+                | HitArea::FixedCol
+        );
         let combo_list = if is_cell_like {
             g.active_dropdown_list(hit.row, hit.col)
         } else {
@@ -8122,7 +8176,6 @@ pub extern "C" fn volvox_grid_key_down_native(id: i64, key_code: i32, modifier: 
             let sel_row = g.selection.row;
             let sel_col = g.selection.col;
             let queued_checkbox_toggle = (key_code == 32 || key_code == 13)
-                && !g.host_key_dispatch
                 && !was_editing
                 && !g.is_editing()
                 && input::selected_outline_label_keyboard_target(g).is_none()
@@ -8130,7 +8183,6 @@ pub extern "C" fn volvox_grid_key_down_native(id: i64, key_code: i32, modifier: 
             if !queued_checkbox_toggle
                 && key_code == 113
                 && !input::is_boolean_checkbox_cell(g, sel_row, sel_col)
-                && !g.host_key_dispatch
                 && g.edit_trigger_mode >= 1
                 && !was_editing
             {
@@ -8169,11 +8221,7 @@ pub extern "C" fn volvox_grid_key_press_native(id: i64, char_code: u32) -> i32 {
                     ..InputBehavior::default()
                 },
             );
-            if !was_editing
-                && !g.host_key_dispatch
-                && g.edit_trigger_mode >= 1
-                && g.type_ahead_mode == 0
-            {
+            if !was_editing && g.edit_trigger_mode >= 1 && g.type_ahead_mode == 0 {
                 let sel_row = g.selection.row;
                 let sel_col = g.selection.col;
                 if input::is_boolean_checkbox_cell(g, sel_row, sel_col) {

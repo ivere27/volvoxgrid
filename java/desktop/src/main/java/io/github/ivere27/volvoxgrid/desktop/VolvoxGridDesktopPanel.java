@@ -1,7 +1,7 @@
 package io.github.ivere27.volvoxgrid.desktop;
 
 import io.github.ivere27.volvoxgrid.BufferReady;
-import io.github.ivere27.volvoxgrid.BeforeDropdownOpenEvent;
+import io.github.ivere27.volvoxgrid.CellValue;
 import io.github.ivere27.volvoxgrid.ConfigureRequest;
 import io.github.ivere27.volvoxgrid.CreateRequest;
 import io.github.ivere27.volvoxgrid.CreateResponse;
@@ -10,14 +10,22 @@ import io.github.ivere27.volvoxgrid.CellRange;
 import io.github.ivere27.volvoxgrid.ClipboardResponse;
 import io.github.ivere27.volvoxgrid.CompareResponse;
 import io.github.ivere27.volvoxgrid.DestroyRequest;
-import io.github.ivere27.volvoxgrid.Dropdown;
 import io.github.ivere27.volvoxgrid.EditCancel;
 import io.github.ivere27.volvoxgrid.EditCommand;
 import io.github.ivere27.volvoxgrid.EditCommit;
-import io.github.ivere27.volvoxgrid.EditSetSelection;
-import io.github.ivere27.volvoxgrid.EditSetText;
+import io.github.ivere27.volvoxgrid.EditConfig;
+import io.github.ivere27.volvoxgrid.EditGetState;
 import io.github.ivere27.volvoxgrid.EditUiMode;
-import io.github.ivere27.volvoxgrid.EditRequest;
+import io.github.ivere27.volvoxgrid.EditorKind;
+import io.github.ivere27.volvoxgrid.EditorOwner;
+import io.github.ivere27.volvoxgrid.EditorPresentation;
+import io.github.ivere27.volvoxgrid.EditorSession;
+import io.github.ivere27.volvoxgrid.EditorSessionCommand;
+import io.github.ivere27.volvoxgrid.EditorSessionStarted;
+import io.github.ivere27.volvoxgrid.EditorSessionUpdated;
+import io.github.ivere27.volvoxgrid.EditorSpec;
+import io.github.ivere27.volvoxgrid.EditorValue;
+import io.github.ivere27.volvoxgrid.EditorValueChanged;
 import io.github.ivere27.volvoxgrid.EditState;
 import io.github.ivere27.volvoxgrid.EventDecision;
 import io.github.ivere27.volvoxgrid.FramePacingMode;
@@ -29,7 +37,9 @@ import io.github.ivere27.volvoxgrid.GridConfig;
 import io.github.ivere27.volvoxgrid.GridEvent;
 import io.github.ivere27.volvoxgrid.GpuSurfaceReady;
 import io.github.ivere27.volvoxgrid.LayoutConfig;
+import io.github.ivere27.volvoxgrid.ListEditorParams;
 import io.github.ivere27.volvoxgrid.PointerEvent;
+import io.github.ivere27.volvoxgrid.Rect;
 import io.github.ivere27.volvoxgrid.RenderConfig;
 import io.github.ivere27.volvoxgrid.RenderInput;
 import io.github.ivere27.volvoxgrid.RenderOutput;
@@ -39,6 +49,8 @@ import io.github.ivere27.volvoxgrid.ScrollEvent;
 import io.github.ivere27.volvoxgrid.SelectRequest;
 import io.github.ivere27.volvoxgrid.SelectionMode;
 import io.github.ivere27.volvoxgrid.SelectionState;
+import io.github.ivere27.volvoxgrid.TextSelection;
+import io.github.ivere27.volvoxgrid.TextSelectionChanged;
 import io.github.ivere27.volvoxgrid.common.VolvoxGridHost;
 import io.github.ivere27.volvoxgrid.common.RendererBackend;
 import java.awt.Canvas;
@@ -81,7 +93,7 @@ import java.text.AttributedCharacterIterator;
 import javax.swing.BorderFactory;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
-import javax.swing.JTextField;
+import javax.swing.JTextArea;
 import javax.swing.event.CaretEvent;
 import javax.swing.event.CaretListener;
 import javax.swing.event.DocumentEvent;
@@ -115,6 +127,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     }
 
     @FunctionalInterface
+    @Deprecated
     public interface BeforeDropdownOpenListener {
         void onBeforeDropdownOpen(BeforeDropdownOpenDetails details);
     }
@@ -134,8 +147,8 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         void onCompare(CompareDetails details);
     }
 
-    public interface EditRequestListener {
-        void onEditRequest(EditRequest request);
+    public interface EditorSessionStartedListener {
+        void onEditorSessionStarted(EditorSessionStarted request);
     }
 
     public static final class BeforeEditDetails {
@@ -171,6 +184,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         }
     }
 
+    @Deprecated
     public static final class BeforeDropdownOpenDetails {
         private final GridEvent rawEvent;
         private final int row;
@@ -179,23 +193,22 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         private final float y;
         private final float width;
         private final float height;
-        private final Dropdown dropdown;
+        private final ListEditorParams dropdown;
         private final String currentValue;
         private final int selectedIndex;
         private boolean cancel;
 
         private BeforeDropdownOpenDetails(GridEvent rawEvent) {
             this.rawEvent = rawEvent;
-            BeforeDropdownOpenEvent event = rawEvent.getBeforeDropdownOpen();
-            this.row = event.getRow();
-            this.col = event.getCol();
-            this.x = event.getX();
-            this.y = event.getY();
-            this.width = event.getWidth();
-            this.height = event.getHeight();
-            this.dropdown = event.hasDropdown() ? event.getDropdown() : Dropdown.getDefaultInstance();
-            this.currentValue = event.getCurrentValue();
-            this.selectedIndex = event.getSelectedIndex();
+            this.row = 0;
+            this.col = 0;
+            this.x = 0;
+            this.y = 0;
+            this.width = 0;
+            this.height = 0;
+            this.dropdown = ListEditorParams.getDefaultInstance();
+            this.currentValue = "";
+            this.selectedIndex = -1;
         }
 
         public GridEvent getRawEvent() { return rawEvent; }
@@ -205,7 +218,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         public float getY() { return y; }
         public float getWidth() { return width; }
         public float getHeight() { return height; }
-        public Dropdown getDropdown() { return dropdown; }
+        public ListEditorParams getDropdown() { return dropdown; }
         public String getCurrentValue() { return currentValue; }
         public int getSelectedIndex() { return selectedIndex; }
         public boolean isCancel() { return cancel; }
@@ -384,7 +397,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     private volatile CellEditValidatingListener cellEditValidatingListener;
     private volatile BeforeSortListener beforeSortListener;
     private volatile CompareListener compareListener;
-    private volatile EditRequestListener editRequestListener;
+    private volatile EditorSessionStartedListener editorSessionStartedListener;
     private volatile boolean decisionChannelEnabled = false;
     private volatile boolean engineEditing = false;
     private volatile CursorType engineCursor = CursorType.CURSOR_DEFAULT;
@@ -392,7 +405,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     private volatile int editSelectionRow = -1;
     private volatile int editSelectionCol = -1;
     private final JPanel editOverlayHost;
-    private final JTextField editOverlay;
+    private final JTextArea editOverlay;
     private final Canvas gpuSurfaceCanvas;
     private volatile boolean suppressEditOverlayTextChanged = false;
     private volatile boolean suppressEditOverlayCommit = false;
@@ -404,6 +417,8 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     private volatile boolean overlayImeComposing = false;
     private volatile boolean overlayImeDocumentManaged = false;
     private volatile long overlayImeSyncSerial = 0L;
+    private volatile long activeEditorSessionId = 0L;
+    private volatile long activeEditorStateVersion = 0L;
     private volatile boolean discardNextProxyImeCommit = false;
     private volatile boolean discardNextHiddenProxyDocumentMutation = false;
     private volatile boolean pendingHostEditOverlayStart = false;
@@ -473,8 +488,10 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         editOverlayHost.setVisible(true);
         editOverlayHost.setFocusable(false);
 
-        editOverlay = new JTextField();
+        editOverlay = new JTextArea();
         editOverlay.enableInputMethods(true);
+        editOverlay.setLineWrap(false);
+        editOverlay.setWrapStyleWord(false);
         editOverlay.setBorder(BorderFactory.createEmptyBorder(0, 3, 0, 3));
         ((AbstractDocument) editOverlay.getDocument()).setDocumentFilter(new DocumentFilter() {
             @Override
@@ -617,6 +634,11 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
                     .setTargetFrameRateHz(AUTO_FALLBACK_FRAME_RATE_HZ)
                     .build()
             )
+            .setEditing(
+                EditConfig.newBuilder()
+                    .setDefaultEditor(defaultHostTextEditor())
+                    .build()
+            )
             .build();
 
         CreateResponse response = client.create(
@@ -744,11 +766,9 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         }
     }
 
+    @Deprecated
     public void setBeforeDropdownOpenListener(BeforeDropdownOpenListener listener) {
         this.beforeDropdownOpenListener = listener;
-        if (listener != null) {
-            ensureDecisionChannelEnabled();
-        }
     }
 
     public void setCellEditValidatingListener(CellEditValidatingListener listener) {
@@ -769,8 +789,8 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         this.compareListener = listener;
     }
 
-    public void setEditRequestListener(EditRequestListener listener) {
-        this.editRequestListener = listener;
+    public void setEditorSessionStartedListener(EditorSessionStartedListener listener) {
+        this.editorSessionStartedListener = listener;
     }
 
     public void setSelectionModeValue(int value) {
@@ -1136,27 +1156,46 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         });
     }
 
-    private void showEditOverlay(EditRequest request) {
+    private void showEditOverlay(EditorSessionStarted request) {
         VolvoxGridDesktopClient c = client;
         long id = gridId;
-        if (request == null || c == null || id == 0L) {
+        if (request == null || !request.hasSession() || !request.getSession().hasViewportRect()
+            || c == null || id == 0L) {
+            return;
+        }
+        // Engine-drawn editor: host MUST NOT mount an overlay.
+        if (request.getSession().getEditor().getPresentation()
+                == EditorPresentation.EDITOR_CANVAS) {
+            EditorSession session = request.getSession();
+            if (editOverlayDisplayed) {
+                hideEditOverlay(false);
+            }
+            activeEditorSessionId = session.getSessionId();
+            activeEditorStateVersion = session.getStateVersion();
+            engineEditing = true;
+            focusEditOverlayProxyLater();
             return;
         }
 
-        int x = Math.max(0, Math.round(request.getX()));
-        int y = Math.max(0, Math.round(request.getY()));
-        int w = Math.max(1, Math.round(request.getWidth()));
-        int h = Math.max(1, Math.round(request.getHeight()));
+        io.github.ivere27.volvoxgrid.EditorSession session = request.getSession();
+        int x = Math.max(0, Math.round(session.getViewportRect().getX()));
+        int y = Math.max(0, Math.round(session.getViewportRect().getY()));
+        int w = Math.max(1, Math.round(session.getViewportRect().getWidth()));
+        int h = Math.max(1, Math.round(session.getViewportRect().getHeight()));
         boolean sameCell = editOverlayDisplayed
-            && editOverlayRow == request.getRow()
-            && editOverlayCol == request.getCol();
+            && editOverlayRow == session.getRow()
+            && editOverlayCol == session.getCol();
         boolean preserveFieldState = pendingHostEditOverlayStart && pendingHostEditOverlayPreserveFieldState;
 
-        editOverlayRow = request.getRow();
-        editOverlayCol = request.getCol();
-        editOverlayMaxLength = request.getMaxLength();
-        editOverlayUiMode = request.getUiMode();
+        editOverlayRow = session.getRow();
+        editOverlayCol = session.getCol();
+        editOverlayMaxLength = session.hasEditor() && session.getEditor().hasText()
+            ? session.getEditor().getText().getMaxLength()
+            : 0;
+        editOverlayUiMode = session.getUiMode();
         editOverlayDisplayed = true;
+        activeEditorSessionId = session.getSessionId();
+        activeEditorStateVersion = session.getStateVersion();
         applyDisplayedEditOverlayStyle();
         editOverlayHost.setBounds(x, y, w, h);
         editOverlay.setBounds(1, 1, Math.max(1, w - 2), Math.max(1, h - 2));
@@ -1164,20 +1203,21 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         editOverlay.setColumns(0);
 
         if (!sameCell && !preserveFieldState) {
-            String text = request.getCurrentValue();
-            int selStart = request.getSelStart();
-            int selLength = request.getSelLength();
+            String text = session.hasValue() ? editorValueText(session.getValue()) : "";
+            int selStart = session.hasSelection() ? session.getSelection().getStart() : 0;
+            int selLength = session.hasSelection() ? session.getSelection().getLength() : codePointLength(text);
 
-            // The EditRequest snapshot may be stale — characters typed between
+            // The session-start snapshot may be stale: characters typed between
             // its creation and this invokeLater may already be in the engine.
             // Read the engine's current state to avoid losing them.
             EditState currentState = getCurrentEditState();
-            if (currentState != null && currentState.getActive()
-                && currentState.getRow() == request.getRow()
-                && currentState.getCol() == request.getCol()) {
-                text = currentState.getText();
-                selStart = currentState.getSelStart();
-                selLength = currentState.getSelLength();
+            if (currentState != null && currentState.getActive() && currentState.hasSession()
+                && currentState.getSession().getRow() == session.getRow()
+                && currentState.getSession().getCol() == session.getCol()) {
+                updateEditorSessionFromState(currentState);
+                text = editStateText(currentState);
+                selStart = editStateSelStart(currentState);
+                selLength = editStateSelLength(currentState);
             }
             String pendingText = pendingHostEditOverlayText;
             boolean seededFromPendingText = pendingHostEditOverlayStart && pendingText != null;
@@ -1216,6 +1256,57 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         schedulePendingHostEditOverlayStartClear();
     }
 
+    private static EditorSpec defaultHostTextEditor() {
+        return EditorSpec.newBuilder()
+            .setKind(EditorKind.EDITOR_TEXT)
+            .setOwner(EditorOwner.EDITOR_OWNER_HOST_NATIVE)
+            .setPresentation(EditorPresentation.EDITOR_INLINE)
+            .build();
+    }
+
+    private static boolean isTextEditableSession(EditState state) {
+        return state != null
+            && state.getActive()
+            && state.hasSession()
+            && isTextEditableSession(state.getSession());
+    }
+
+    private static boolean isTextEditableSession(EditorSession session) {
+        if (session == null) {
+            return false;
+        }
+        if (!session.hasEditor()) {
+            return true;
+        }
+        switch (session.getEditor().getKind()) {
+            case EDITOR_TEXT:
+            case EDITOR_MULTILINE_TEXT:
+            case EDITOR_NUMBER:
+            case EDITOR_COMBO:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private static boolean isReadonlySelectSession(EditState state) {
+        return state != null
+            && state.getActive()
+            && state.hasSession()
+            && isReadonlySelectSession(state.getSession());
+    }
+
+    private static boolean isReadonlySelectSession(EditorSession session) {
+        if (session == null || !session.hasEditor()) {
+            return false;
+        }
+        EditorSpec editor = session.getEditor();
+        if (editor.getKind() == EditorKind.EDITOR_SELECT) {
+            return true;
+        }
+        return editor.hasList() && !editor.getList().getAllowCustomValue();
+    }
+
     private void hideEditOverlay(boolean focusHost) {
         suppressEditOverlayCommit = true;
         try {
@@ -1224,6 +1315,8 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
             editOverlayMaxLength = 0;
             editOverlayUiMode = EditUiMode.EDIT_UI_MODE_ENTER;
             editOverlayDisplayed = false;
+            activeEditorSessionId = 0L;
+            activeEditorStateVersion = 0L;
         } finally {
             suppressEditOverlayCommit = false;
         }
@@ -1236,6 +1329,67 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         overlayImeDocumentManaged = false;
         overlayImeSyncSerial = 0L;
         clearPendingHostEditOverlayStart();
+    }
+
+    private EditorSessionCommand.Builder editSessionCommandBuilder() {
+        if ((activeEditorSessionId == 0L || activeEditorStateVersion == 0L)
+            && client != null
+            && gridId != 0L) {
+            try {
+                updateEditorSessionFromState(
+                    client.edit(
+                        EditCommand.newBuilder()
+                            .setGridId(gridId)
+                            .setGetState(EditGetState.newBuilder().build())
+                            .build()
+                    )
+                );
+            } catch (Exception ex) {
+                LOG.log(Level.FINER, "GetEditState for session command failed", ex);
+            }
+        }
+        EditorSessionCommand.Builder builder = EditorSessionCommand.newBuilder();
+        if (activeEditorSessionId != 0L) {
+            builder.setSessionId(activeEditorSessionId);
+        }
+        if (activeEditorStateVersion != 0L) {
+            builder.setStateVersion(activeEditorStateVersion);
+        }
+        return builder;
+    }
+
+    private void updateEditorSessionFromState(EditState state) {
+        if (state != null && state.getActive() && state.hasSession()) {
+            io.github.ivere27.volvoxgrid.EditorSession session = state.getSession();
+            activeEditorSessionId = session.getSessionId();
+            activeEditorStateVersion = session.getStateVersion();
+        }
+    }
+
+    private void handleEditorUpdated(EditorSessionUpdated update) {
+        if (update == null) {
+            return;
+        }
+        if (activeEditorSessionId == 0L || update.getSessionId() == activeEditorSessionId) {
+            activeEditorSessionId = update.getSessionId();
+            activeEditorStateVersion = update.getStateVersion();
+        }
+        if (update.hasVisible() && !update.getVisible()) {
+            hideEditOverlay(false);
+            return;
+        }
+        if (!editOverlayDisplayed || !update.hasViewportRect()) {
+            return;
+        }
+        int x = Math.max(0, Math.round(update.getViewportRect().getX()));
+        int y = Math.max(0, Math.round(update.getViewportRect().getY()));
+        int w = Math.max(1, Math.round(update.getViewportRect().getWidth()));
+        int h = Math.max(1, Math.round(update.getViewportRect().getHeight()));
+        applyDisplayedEditOverlayStyle();
+        editOverlayHost.setBounds(x, y, w, h);
+        editOverlay.setBounds(1, 1, Math.max(1, w - 2), Math.max(1, h - 2));
+        editOverlayHost.repaint();
+        editOverlayHost.revalidate();
     }
 
     private void handleEditOverlayTextChanged() {
@@ -1343,6 +1497,11 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
                 return;
             case java.awt.event.KeyEvent.VK_ENTER:
                 e.consume();
+                if (e.isAltDown()) {
+                    editOverlay.replaceSelection("\n");
+                    syncEditOverlaySelectionToEngine();
+                    return;
+                }
                 endEditOverlayComposition();
                 commitEditOverlay(
                     Integer.valueOf(e.isShiftDown() ? 38 : 40),
@@ -1353,6 +1512,9 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
             case java.awt.event.KeyEvent.VK_RIGHT:
             case java.awt.event.KeyEvent.VK_UP:
             case java.awt.event.KeyEvent.VK_DOWN:
+                if (editOverlay.getText() != null && editOverlay.getText().contains("\n")) {
+                    return;
+                }
                 if (editOverlayUiMode != EditUiMode.EDIT_UI_MODE_EDIT) {
                     e.consume();
                     endEditOverlayComposition();
@@ -1504,10 +1666,15 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
             EditState state = c.edit(
                 EditCommand.newBuilder()
                     .setGridId(id)
-                    .setCommit(EditCommit.newBuilder().setText(editOverlay.getText()).build())
+                    .setSession(editSessionCommandBuilder()
+                        .setCommit(EditCommit.newBuilder()
+                            .setValue(editorValueFromText(editOverlay.getText()))
+                            .build())
+                        .build())
                     .build()
             );
             requestFrame();
+            updateEditorSessionFromState(state);
             stillEditing = state != null && state.getActive();
         } catch (Exception ex) {
             LOG.log(Level.FINER, "Edit commit failed", ex);
@@ -1539,10 +1706,13 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
             EditState state = c.edit(
                 EditCommand.newBuilder()
                     .setGridId(id)
-                    .setCancel(EditCancel.newBuilder().build())
+                    .setSession(editSessionCommandBuilder()
+                        .setCancel(EditCancel.newBuilder().build())
+                        .build())
                     .build()
             );
             requestFrame();
+            updateEditorSessionFromState(state);
             stillEditing = state != null && state.getActive();
         } catch (Exception ex) {
             LOG.log(Level.FINER, "Edit cancel failed", ex);
@@ -1646,11 +1816,11 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         }
 
         EditState state = getCurrentEditState();
-        if (state == null || !state.getActive()) {
+        if (!isTextEditableSession(state)) {
             return false;
         }
 
-        String text = state.getText();
+        String text = editStateText(state);
         int textLength = codePointLength(text);
         int anchor = resolveEditSelectionAnchor(state, textLength);
         int caret = resolveEditCaret(state, anchor, textLength);
@@ -1683,10 +1853,13 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     private boolean handleCopyShortcut() {
         EditState state = engineEditing ? getCurrentEditState() : null;
         if (state != null && state.getActive()) {
-            if (state.getSelLength() <= 0) {
+            if (!isTextEditableSession(state)) {
                 return true;
             }
-            setSystemClipboardText(extractSelectionText(state.getText(), state.getSelStart(), state.getSelLength()));
+            if (editStateSelLength(state) <= 0) {
+                return true;
+            }
+            setSystemClipboardText(extractSelectionText(editStateText(state), editStateSelStart(state), editStateSelLength(state)));
             return true;
         }
 
@@ -1703,12 +1876,15 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     private boolean handleCutShortcut() {
         EditState state = engineEditing ? getCurrentEditState() : null;
         if (state != null && state.getActive()) {
-            if (state.getSelLength() <= 0) {
+            if (!isTextEditableSession(state)) {
                 return true;
             }
-            setSystemClipboardText(extractSelectionText(state.getText(), state.getSelStart(), state.getSelLength()));
+            if (editStateSelLength(state) <= 0) {
+                return true;
+            }
+            setSystemClipboardText(extractSelectionText(editStateText(state), editStateSelStart(state), editStateSelLength(state)));
             applyEditText(editTextWithoutSelection(state));
-            applyEditSelection(clampCodePointIndex(state.getText(), state.getSelStart()), 0);
+            applyEditSelection(clampCodePointIndex(editStateText(state), editStateSelStart(state)), 0);
             resetEditSelectionAnchor();
             requestFrame();
             return true;
@@ -1733,9 +1909,21 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
 
         EditState state = engineEditing ? getCurrentEditState() : null;
         if (state != null && state.getActive()) {
+            if (!isTextEditableSession(state)) {
+                if (isReadonlySelectSession(state)) {
+                    try {
+                        createController().paste(clipboardText);
+                        requestFrame();
+                    } catch (Exception ex) {
+                        LOG.log(Level.FINER, "Read-only select paste shortcut failed", ex);
+                        return false;
+                    }
+                }
+                return true;
+            }
             applyEditText(replaceEditSelection(state, clipboardText));
             applyEditSelection(
-                clampCodePointIndex(state.getText(), state.getSelStart()) + codePointLength(clipboardText),
+                clampCodePointIndex(editStateText(state), editStateSelStart(state)) + codePointLength(clipboardText),
                 0
             );
             resetEditSelectionAnchor();
@@ -1778,12 +1966,17 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
             return;
         }
         try {
-            c.edit(
+            EditState state = c.edit(
                 EditCommand.newBuilder()
                     .setGridId(id)
-                    .setSetText(EditSetText.newBuilder().setText(text == null ? "" : text).build())
+                    .setSession(editSessionCommandBuilder()
+                        .setValueChanged(EditorValueChanged.newBuilder()
+                            .setValue(editorValueFromText(text))
+                            .build())
+                        .build())
                     .build()
             );
+            updateEditorSessionFromState(state);
         } catch (Exception ex) {
             LOG.log(Level.FINER, "EditSetText failed", ex);
         }
@@ -1796,17 +1989,20 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
             return;
         }
         try {
-            c.edit(
+            EditState state = c.edit(
                 EditCommand.newBuilder()
                     .setGridId(id)
-                    .setSetSelection(
-                        EditSetSelection.newBuilder()
-                            .setStart(Math.max(0, start))
-                            .setLength(Math.max(0, length))
-                            .build()
-                    )
+                    .setSession(editSessionCommandBuilder()
+                        .setSelectionChanged(TextSelectionChanged.newBuilder()
+                            .setSelection(TextSelection.newBuilder()
+                                .setStart(Math.max(0, start))
+                                .setLength(Math.max(0, length))
+                                .build())
+                            .build())
+                        .build())
                     .build()
             );
+            updateEditorSessionFromState(state);
         } catch (Exception ex) {
             LOG.log(Level.FINER, "EditSetSelection failed", ex);
         }
@@ -1836,6 +2032,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
                         io.github.ivere27.volvoxgrid.EditStart.newBuilder()
                             .setRow(selection.getActiveRow())
                             .setCol(selection.getActiveCol())
+                            .setReason(io.github.ivere27.volvoxgrid.EditStartReason.EDIT_START_IME_COMPOSITION)
                             .build()
                     )
                     .build()
@@ -1862,13 +2059,21 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
             return true;
         }
         EditState state = ensureImeEditSessionStarted();
-        if (state == null || !state.getActive()) {
+        if (!isTextEditableSession(state)) {
+            if (state != null && state.getActive()) {
+                EditorSessionStarted immediateRequest = immediateEditorSessionStartedFromState(state);
+                if (immediateRequest != null) {
+                    SwingUtilities.invokeLater(() -> showEditOverlay(immediateRequest));
+                }
+                requestFrameImmediate();
+                return pendingText == null || pendingText.isEmpty();
+            }
             return false;
         }
         pendingHostEditOverlayStart = true;
         pendingHostEditOverlayText = pendingText;
         pendingHostEditOverlayPreserveFieldState = preserveFieldState;
-        EditRequest immediateRequest = immediateEditRequestFromState(state);
+        EditorSessionStarted immediateRequest = immediateEditorSessionStartedFromState(state);
         if (immediateRequest != null) {
             SwingUtilities.invokeLater(() -> showEditOverlay(immediateRequest));
         }
@@ -1877,13 +2082,14 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     }
 
     private int resolveEditSelectionAnchor(EditState state, int textLength) {
-        if (editSelectionRow != state.getRow() || editSelectionCol != state.getCol()) {
+        io.github.ivere27.volvoxgrid.EditorSession s = state.getSession();
+        if (editSelectionRow != s.getRow() || editSelectionCol != s.getCol()) {
             editSelectionAnchor = -1;
-            editSelectionRow = state.getRow();
-            editSelectionCol = state.getCol();
+            editSelectionRow = s.getRow();
+            editSelectionCol = s.getCol();
         }
         if (editSelectionAnchor < 0) {
-            editSelectionAnchor = clampCodePointIndex(state.getText(), state.getSelStart());
+            editSelectionAnchor = clampCodePointIndex(editStateText(state), editStateSelStart(state));
         } else {
             editSelectionAnchor = Math.max(0, Math.min(editSelectionAnchor, textLength));
         }
@@ -1891,9 +2097,9 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     }
 
     private int resolveEditCaret(EditState state, int anchor, int textLength) {
-        int selStart = clampCodePointIndex(state.getText(), state.getSelStart());
-        int selEnd = Math.min(textLength, selStart + Math.max(0, state.getSelLength()));
-        if (state.getSelLength() <= 0) {
+        int selStart = clampCodePointIndex(editStateText(state), editStateSelStart(state));
+        int selEnd = Math.min(textLength, selStart + Math.max(0, editStateSelLength(state)));
+        if (editStateSelLength(state) <= 0) {
             return selStart;
         }
         if (anchor <= selStart) {
@@ -1954,6 +2160,58 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         return safe.codePointCount(0, safe.length());
     }
 
+    private static String editorValueText(EditorValue value) {
+        if (value == null) {
+            return "";
+        }
+        if (value.hasEditText()) {
+            return value.getEditText();
+        }
+        if (!value.hasValue()) {
+            return "";
+        }
+        CellValue cellValue = value.getValue();
+        switch (cellValue.getValueCase()) {
+            case TEXT:
+                return cellValue.getText();
+            case NUMBER:
+                return Double.toString(cellValue.getNumber());
+            case FLAG:
+                return Boolean.toString(cellValue.getFlag());
+            case TIMESTAMP:
+                return Long.toString(cellValue.getTimestamp());
+            default:
+                return "";
+        }
+    }
+
+    private static EditorValue editorValueFromText(String text) {
+        String value = text == null ? "" : text;
+        return EditorValue.newBuilder()
+            .setValue(CellValue.newBuilder().setText(value).build())
+            .setEditText(value)
+            .setDisplayText(value)
+            .build();
+    }
+
+    private static String editStateText(EditState state) {
+        if (state == null || !state.hasSession()) return "";
+        io.github.ivere27.volvoxgrid.EditorSession s = state.getSession();
+        return s.hasValue() ? editorValueText(s.getValue()) : "";
+    }
+
+    private static int editStateSelStart(EditState state) {
+        if (state == null || !state.hasSession()) return 0;
+        io.github.ivere27.volvoxgrid.EditorSession s = state.getSession();
+        return s.hasSelection() ? s.getSelection().getStart() : 0;
+    }
+
+    private static int editStateSelLength(EditState state) {
+        if (state == null || !state.hasSession()) return 0;
+        io.github.ivere27.volvoxgrid.EditorSession s = state.getSession();
+        return s.hasSelection() ? s.getSelection().getLength() : 0;
+    }
+
     private static int clampCodePointIndex(String text, int index) {
         return Math.max(0, Math.min(index, codePointLength(text)));
     }
@@ -1990,17 +2248,17 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     }
 
     private static String editTextWithoutSelection(EditState state) {
-        String text = state.getText();
-        int start = clampCodePointIndex(text, state.getSelStart());
-        int end = clampCodePointIndex(text, start + Math.max(0, state.getSelLength()));
+        String text = editStateText(state);
+        int start = clampCodePointIndex(text, editStateSelStart(state));
+        int end = clampCodePointIndex(text, start + Math.max(0, editStateSelLength(state)));
         String safe = text == null ? "" : text;
         return safe.substring(0, utf16Index(safe, start)) + safe.substring(utf16Index(safe, end));
     }
 
     private static String replaceEditSelection(EditState state, String insertedText) {
-        String text = state.getText();
-        int start = clampCodePointIndex(text, state.getSelStart());
-        int end = clampCodePointIndex(text, start + Math.max(0, state.getSelLength()));
+        String text = editStateText(state);
+        int start = clampCodePointIndex(text, editStateSelStart(state));
+        int end = clampCodePointIndex(text, start + Math.max(0, editStateSelLength(state)));
         String safe = text == null ? "" : text;
         String replacement = insertedText == null ? "" : insertedText;
         return safe.substring(0, utf16Index(safe, start))
@@ -2253,6 +2511,9 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         }
         if ((awtModifiers & InputEvent.ALT_DOWN_MASK) != 0) {
             flags |= 4;
+        }
+        if ((awtModifiers & InputEvent.META_DOWN_MASK) != 0) {
+            flags |= 8;
         }
         return flags;
     }
@@ -2797,14 +3058,12 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
 
     private boolean wantsCancelableGridEvents() {
         return beforeEditListener != null
-            || beforeDropdownOpenListener != null
             || cellEditValidatingListener != null
             || beforeSortListener != null;
     }
 
     private boolean isCancelableGridEvent(GridEvent event) {
         return event.hasBeforeEdit()
-            || event.hasBeforeDropdownOpen()
             || event.hasCellEditValidate()
             || event.hasBeforeSort()
             || event.hasBeforeNodeToggle()
@@ -2953,15 +3212,6 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
                 return details.isCancel();
             }
 
-            if (event.hasBeforeDropdownOpen()) {
-                BeforeDropdownOpenListener listener = beforeDropdownOpenListener;
-                BeforeDropdownOpenDetails details = new BeforeDropdownOpenDetails(event);
-                if (listener != null) {
-                    listener.onBeforeDropdownOpen(details);
-                }
-                return details.isCancel();
-            }
-
             if (event.hasCellEditValidate()) {
                 CellEditValidatingListener listener = cellEditValidatingListener;
                 CellEditValidatingDetails details = new CellEditValidatingDetails(
@@ -3006,16 +3256,19 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
             } else if (completedTarget != null && completedTarget != displayTarget) {
                 queuePendingResize(completedTarget.width, completedTarget.height);
             }
-        } else if (output.hasEditRequest()) {
-            EditRequest request = output.getEditRequest();
+        } else if (output.hasEditorStarted()) {
+            EditorSessionStarted request = output.getEditorStarted();
             SwingUtilities.invokeLater(() -> showEditOverlay(request));
-            EditRequestListener listener = editRequestListener;
+            EditorSessionStartedListener listener = editorSessionStartedListener;
             if (listener != null) {
-                SwingUtilities.invokeLater(() -> listener.onEditRequest(request));
+                SwingUtilities.invokeLater(() -> listener.onEditorSessionStarted(request));
             }
+        } else if (output.hasEditorUpdated()) {
+            EditorSessionUpdated update = output.getEditorUpdated();
+            SwingUtilities.invokeLater(() -> handleEditorUpdated(update));
         } else if (output.hasCursor()) {
             applyEngineCursor(output.getCursor().getCursor());
-        } else if (output.hasDropdownRequest()) {
+        } else if (output.hasEditorEnded()) {
             SwingUtilities.invokeLater(() -> hideEditOverlay(false));
         } else if (output.hasTooltipRequest()) {
             String text = output.getTooltipRequest().getText();
@@ -3337,26 +3590,31 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         pendingHostEditOverlaySuppressedText = pendingHostEditOverlaySuppressedText + text;
     }
 
-    private static EditRequest immediateEditRequestFromState(EditState state) {
-        if (state == null || !state.getActive()) {
+    private static EditorSessionStarted immediateEditorSessionStartedFromState(EditState state) {
+        if (state == null || !state.getActive() || !state.hasSession()) {
             return null;
         }
-        if (state.getWidth() <= 0f || state.getHeight() <= 0f) {
+        io.github.ivere27.volvoxgrid.EditorSession s = state.getSession();
+        if (!s.hasViewportRect() || s.getViewportRect().getWidth() <= 0f || s.getViewportRect().getHeight() <= 0f) {
             return null;
         }
-        return EditRequest.newBuilder()
-            .setRow(state.getRow())
-            .setCol(state.getCol())
-            .setX(state.getX())
-            .setY(state.getY())
-            .setWidth(state.getWidth())
-            .setHeight(state.getHeight())
-            .setCurrentValue(state.getText())
-            .setSelStart(state.getSelStart())
-            .setSelLength(state.getSelLength())
-            .setUiMode(state.getUiMode())
-            .setMaxLength(state.getMaxLength())
-            .build();
+        io.github.ivere27.volvoxgrid.EditorSession.Builder out = io.github.ivere27.volvoxgrid.EditorSession.newBuilder()
+            .setSessionId(s.getSessionId())
+            .setStateVersion(s.getStateVersion())
+            .setRow(s.getRow())
+            .setCol(s.getCol())
+            .setViewportRect(s.getViewportRect())
+            .setUiMode(s.getUiMode());
+        if (s.hasEditor()) out.setEditor(s.getEditor());
+        if (s.hasValue()) out.setValue(s.getValue());
+        if (s.hasCapabilities()) out.setCapabilities(s.getCapabilities());
+        out.setReason(s.getReason());
+        if (s.hasSelection()) {
+            out.setSelection(s.getSelection());
+        } else {
+            out.setSelection(TextSelection.newBuilder().setStart(0).setLength(codePointLength(editStateText(state))).build());
+        }
+        return EditorSessionStarted.newBuilder().setSession(out.build()).build();
     }
 
     private static String committedInputMethodText(InputMethodEvent event) {

@@ -152,6 +152,10 @@ declare module "volvoxgrid" {
     searchable?: boolean;
   }
 
+  /**
+   * @deprecated Dropdown-open cancellation is no longer emitted. Use
+   * onBeforeEdit or editor list data-source APIs instead.
+   */
   export interface VolvoxGridBeforeDropdownOpenDetails {
     eventId: bigint;
     rawEvent: Uint8Array;
@@ -310,6 +314,10 @@ declare module "volvoxgrid" {
     get cursorCol(): number;
     set cursorCol(value: number);
     onBeforeEdit: ((details: VolvoxGridBeforeEditDetails) => void) | null;
+    /**
+     * @deprecated Dropdown-open cancellation is no longer emitted. Use
+     * onBeforeEdit or editor list data-source APIs instead.
+     */
     onBeforeDropdownOpen: ((details: VolvoxGridBeforeDropdownOpenDetails) => void) | null;
     onCellEditValidating: ((details: VolvoxGridCellEditValidatingDetails) => void) | null;
     onBeforeSort: ((details: VolvoxGridBeforeSortDetails) => void) | null;
@@ -340,8 +348,6 @@ declare module "volvoxgrid" {
     focusBorder: number;
     editTrigger: number;
     editable: boolean;
-    dropdownTrigger: number;
-    dropdownSearch: boolean;
     editMaxLength: number;
     editText: string;
     rendererMode: number;

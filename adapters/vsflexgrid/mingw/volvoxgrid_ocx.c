@@ -133,29 +133,6 @@ static int32_t vfg_decode_field2_i32(const uint8_t *data, int32_t len, int32_t f
     return fallback;
 }
 
-static int32_t vfg_decode_i32_field(
-    const uint8_t *data, int32_t len, uint32_t target_field, int32_t fallback)
-{
-    int32_t pos = 0;
-    if (!data || len < 0) return fallback;
-
-    while (pos < len) {
-        uint64_t key = 0;
-        uint64_t value = 0;
-        uint32_t field_no;
-        uint32_t wire_type;
-        if (!vfg_read_varint(data, len, &pos, &key)) return fallback;
-        field_no = (uint32_t)(key >> 3);
-        wire_type = (uint32_t)(key & 0x7);
-        if (field_no == target_field && wire_type == 0) {
-            if (!vfg_read_varint(data, len, &pos, &value)) return fallback;
-            return (int32_t)value;
-        }
-        if (!vfg_skip_wire(data, len, &pos, wire_type)) return fallback;
-    }
-    return fallback;
-}
-
 static double vfg_decode_double_field(
     const uint8_t *data, int32_t len, uint32_t target_field, double fallback)
 {
@@ -1714,6 +1691,7 @@ static HRESULT vfg_try_public_dispatch_fallback(
 static HRESULT vfg_notify_view_change(VolvoxGridObject *obj);
 static HRESULT vfg_invalidate_control(VolvoxGridObject *obj);
 static HRESULT vfg_resize_control_window(VolvoxGridObject *obj);
+static void vfg_update_host_cursor(VolvoxGridObject *obj);
 static HRESULT vfg_activate_in_place(
     VolvoxGridObject *obj, HWND hwndParent, const RECT *lprcPosRect, BOOL ui_activate);
 static HRESULT vfg_deactivate_in_place(VolvoxGridObject *obj);
@@ -1724,6 +1702,8 @@ static HRESULT vfg_handle_pointer_move(
     VolvoxGridObject *obj, float x, float y, int32_t button, int32_t modifier);
 static HRESULT vfg_handle_pointer_up(
     VolvoxGridObject *obj, float x, float y, int32_t button, int32_t modifier);
+static HRESULT vfg_handle_clipboard_command(
+    VolvoxGridObject *obj, int32_t command, BOOL *handled);
 static HRESULT vfg_handle_key_down(
     VolvoxGridObject *obj, int32_t key_code, int32_t modifier);
 static HRESULT vfg_handle_key_press(
@@ -2710,73 +2690,6 @@ static int32_t vfg_utf8_char_count(const char *utf8, int32_t len) {
     return count;
 }
 
-static int32_t vfg_utf8_byte_offset_for_char_index(const char *utf8, int32_t len, int32_t char_index) {
-    int32_t pos = 0;
-    int32_t count = 0;
-
-    if (!utf8 || len <= 0 || char_index <= 0) return 0;
-    while (pos < len && count < char_index) {
-        int step = vfg_utf8_char_size((unsigned char)utf8[pos]);
-        if (step <= 0 || pos + step > len) step = 1;
-        pos += step;
-        count++;
-    }
-    return pos;
-}
-
-static char *vfg_utf8_replace_range(
-    const char *base,
-    int32_t base_len,
-    int32_t start_chars,
-    int32_t remove_chars,
-    const char *insert,
-    int32_t insert_len,
-    int32_t *out_len)
-{
-    int32_t total_chars;
-    int32_t start_char;
-    int32_t end_char;
-    int32_t start_byte;
-    int32_t end_byte;
-    int32_t next_len;
-    char *next;
-
-    if (out_len) *out_len = 0;
-    if (!base) {
-        base = "";
-        base_len = 0;
-    }
-    if (!insert) {
-        insert = "";
-        insert_len = 0;
-    }
-
-    total_chars = vfg_utf8_char_count(base, base_len);
-    start_char = start_chars < 0 ? 0 : start_chars;
-    if (start_char > total_chars) start_char = total_chars;
-    end_char = start_char + (remove_chars < 0 ? 0 : remove_chars);
-    if (end_char > total_chars) end_char = total_chars;
-
-    start_byte = vfg_utf8_byte_offset_for_char_index(base, base_len, start_char);
-    end_byte = vfg_utf8_byte_offset_for_char_index(base, base_len, end_char);
-    next_len = start_byte + insert_len + (base_len - end_byte);
-    next = (char *)HeapAlloc(GetProcessHeap(), 0, (SIZE_T)next_len + 1);
-    if (!next) return NULL;
-
-    if (start_byte > 0) {
-        memcpy(next, base, (size_t)start_byte);
-    }
-    if (insert_len > 0) {
-        memcpy(next + start_byte, insert, (size_t)insert_len);
-    }
-    if (base_len - end_byte > 0) {
-        memcpy(next + start_byte + insert_len, base + end_byte, (size_t)(base_len - end_byte));
-    }
-    next[next_len] = '\0';
-    if (out_len) *out_len = next_len;
-    return next;
-}
-
 static BOOL vfg_set_system_clipboard_utf8(const char *utf8, int utf8len) {
     BOOL ok = FALSE;
     BSTR wide = utf8_to_bstr(utf8, utf8len);
@@ -2861,88 +2774,6 @@ static uint8_t *vfg_query_edit_state_payload(int64_t grid_id, int32_t *out_len) 
     return volvox_grid_edit_pb(buf, pos, out_len);
 }
 
-static int32_t vfg_query_edit_state_i32_field(int64_t grid_id, uint32_t field_no, int32_t fallback) {
-    int32_t out_len = 0;
-    int32_t value = fallback;
-    uint8_t *out = vfg_query_edit_state_payload(grid_id, &out_len);
-    if (out) {
-        value = vfg_decode_i32_field(out, out_len, field_no, fallback);
-        volvox_grid_free(out, 0);
-    }
-    return value;
-}
-
-static char *vfg_query_edit_state_string_field(int64_t grid_id, uint32_t field_no, int *out_len) {
-    int32_t resp_len = 0;
-    uint8_t *out = vfg_query_edit_state_payload(grid_id, &resp_len);
-    return vfg_take_string_field_response(out, resp_len, field_no, out_len);
-}
-
-static int32_t vfg_get_edit_sel_start_compat(int64_t grid_id) {
-    return vfg_query_edit_state_i32_field(grid_id, 5, 0);
-}
-
-static int32_t vfg_get_edit_sel_length_compat(int64_t grid_id) {
-    return vfg_query_edit_state_i32_field(grid_id, 6, 0);
-}
-
-static int32_t vfg_set_edit_selection_compat(int64_t grid_id, int32_t start, int32_t length) {
-    uint8_t buf[32];
-    uint8_t inner[16];
-    int pos = 0;
-    int ilen = 0;
-    int32_t out_len = 0;
-    uint8_t *out;
-
-    buf[pos++] = 0x08;
-    pos += vfg_write_varint(buf + pos, (uint64_t)grid_id);
-    inner[ilen++] = 0x08;
-    ilen += vfg_write_varint(inner + ilen, (uint64_t)(uint32_t)start);
-    inner[ilen++] = 0x10;
-    ilen += vfg_write_varint(inner + ilen, (uint64_t)(uint32_t)length);
-    buf[pos++] = 0x32;
-    pos += vfg_write_varint(buf + pos, (uint64_t)ilen);
-    memcpy(buf + pos, inner, (size_t)ilen);
-    pos += ilen;
-
-    out = volvox_grid_edit_pb(buf, pos, &out_len);
-    return vfg_take_status_response(out);
-}
-
-static int32_t vfg_set_edit_text_compat(int64_t grid_id, const char *utf8, int32_t utf8len) {
-    uint8_t *buf;
-    int pos = 0;
-    int32_t out_len = 0;
-    uint8_t *out;
-    int capacity;
-    int inner_len;
-
-    if (!utf8) {
-        utf8 = "";
-        utf8len = 0;
-    }
-
-    inner_len = 1 + vfg_varint_len((uint64_t)utf8len) + utf8len;
-    capacity = utf8len + 32;
-    buf = (uint8_t *)HeapAlloc(GetProcessHeap(), 0, (SIZE_T)capacity);
-    if (!buf) return -1;
-
-    buf[pos++] = 0x08;
-    pos += vfg_write_varint(buf + pos, (uint64_t)grid_id);
-    buf[pos++] = 0x2A;
-    pos += vfg_write_varint(buf + pos, (uint64_t)inner_len);
-    buf[pos++] = 0x0A;
-    pos += vfg_write_varint(buf + pos, (uint64_t)utf8len);
-    if (utf8len > 0) {
-        memcpy(buf + pos, utf8, (size_t)utf8len);
-        pos += utf8len;
-    }
-
-    out = volvox_grid_edit_pb(buf, pos, &out_len);
-    HeapFree(GetProcessHeap(), 0, buf);
-    return vfg_take_status_response(out);
-}
-
 static int32_t vfg_set_preedit_compat(
     int64_t grid_id,
     const char *utf8,
@@ -2991,43 +2822,6 @@ static int32_t vfg_set_preedit_compat(
     out = volvox_grid_edit_pb(buf, pos, &out_len);
     HeapFree(GetProcessHeap(), 0, buf);
     return vfg_take_status_response(out);
-}
-
-static char *vfg_get_edit_text_utf8(int64_t grid_id, int *out_len) {
-    return vfg_query_edit_state_string_field(grid_id, 4, out_len);
-}
-
-static char *vfg_get_edit_sel_text_utf8(int64_t grid_id, int *out_len) {
-    int edit_len = 0;
-    int sel_start;
-    int sel_length;
-    int start_byte;
-    int end_byte;
-    int selected_len;
-    char *edit_text = vfg_get_edit_text_utf8(grid_id, &edit_len);
-    char *selected;
-
-    if (out_len) *out_len = 0;
-    if (!edit_text) return NULL;
-
-    sel_start = vfg_get_edit_sel_start_compat(grid_id);
-    sel_length = vfg_get_edit_sel_length_compat(grid_id);
-    start_byte = vfg_utf8_byte_offset_for_char_index(edit_text, edit_len, sel_start);
-    end_byte = vfg_utf8_byte_offset_for_char_index(edit_text, edit_len, sel_start + sel_length);
-    if (end_byte < start_byte) end_byte = start_byte;
-    selected_len = end_byte - start_byte;
-    selected = (char *)HeapAlloc(GetProcessHeap(), 0, (SIZE_T)selected_len + 1);
-    if (!selected) {
-        HeapFree(GetProcessHeap(), 0, edit_text);
-        return NULL;
-    }
-    if (selected_len > 0) {
-        memcpy(selected, edit_text + start_byte, (size_t)selected_len);
-    }
-    selected[selected_len] = '\0';
-    if (out_len) *out_len = selected_len;
-    HeapFree(GetProcessHeap(), 0, edit_text);
-    return selected;
 }
 
 static int vfg_query_edit_active(int64_t grid_id) {
@@ -3098,102 +2892,41 @@ static int32_t vfg_paste_grid_selection_from_clipboard(int64_t grid_id) {
     return status;
 }
 
-static int32_t vfg_copy_or_cut_active_edit(int64_t grid_id, BOOL cut) {
-    int sel_start;
-    int sel_length;
-    int selected_len = 0;
-    int edit_len = 0;
-    int next_len = 0;
-    char *selected = NULL;
-    char *edit_text = NULL;
-    char *next_text = NULL;
-    int32_t status = 0;
-
-    sel_start = vfg_get_edit_sel_start_compat(grid_id);
-    sel_length = vfg_get_edit_sel_length_compat(grid_id);
-    selected = vfg_get_edit_sel_text_utf8(grid_id, &selected_len);
-    if (!selected) return -1;
-
-    if (sel_length <= 0 || selected_len <= 0) {
-        HeapFree(GetProcessHeap(), 0, selected);
-        return 0;
+static HRESULT vfg_finish_clipboard_command(VolvoxGridObject *obj, int32_t status) {
+    HRESULT hr;
+    if (status != 0) return E_FAIL;
+    hr = vfg_pump_engine_events(obj);
+    if (SUCCEEDED(hr)) {
+        vfg_update_host_cursor(obj);
+        vfg_invalidate_control(obj);
     }
-
-    if (!vfg_set_system_clipboard_utf8(selected, selected_len)) {
-        HeapFree(GetProcessHeap(), 0, selected);
-        return -1;
-    }
-
-    if (!cut) {
-        HeapFree(GetProcessHeap(), 0, selected);
-        return 0;
-    }
-
-    edit_text = vfg_get_edit_text_utf8(grid_id, &edit_len);
-    if (!edit_text) {
-        HeapFree(GetProcessHeap(), 0, selected);
-        return -1;
-    }
-
-    next_text = vfg_utf8_replace_range(edit_text, edit_len, sel_start, sel_length, "", 0, &next_len);
-    if (!next_text) {
-        HeapFree(GetProcessHeap(), 0, edit_text);
-        HeapFree(GetProcessHeap(), 0, selected);
-        return -1;
-    }
-
-    status = vfg_set_edit_text_compat(grid_id, next_text, next_len);
-    if (status == 0) status = vfg_set_edit_selection_compat(grid_id, sel_start, 0);
-
-    HeapFree(GetProcessHeap(), 0, next_text);
-    HeapFree(GetProcessHeap(), 0, edit_text);
-    HeapFree(GetProcessHeap(), 0, selected);
-    return status;
+    return hr;
 }
 
-static int32_t vfg_paste_active_edit_from_clipboard(int64_t grid_id) {
-    int clip_len = 0;
-    int edit_len = 0;
-    int next_len = 0;
-    int sel_start;
-    int sel_length;
-    int caret_chars;
+static HRESULT vfg_handle_clipboard_command(
+    VolvoxGridObject *obj, int32_t command, BOOL *handled)
+{
     int32_t status = 0;
-    char *clip = vfg_get_system_clipboard_utf8(&clip_len);
-    char *edit_text = NULL;
-    char *next_text = NULL;
 
-    if (!clip) return -1;
+    if (handled) *handled = TRUE;
+    if (!obj) return E_POINTER;
 
-    sel_start = vfg_get_edit_sel_start_compat(grid_id);
-    sel_length = vfg_get_edit_sel_length_compat(grid_id);
-    edit_text = vfg_get_edit_text_utf8(grid_id, &edit_len);
-    if (!edit_text) {
-        edit_text = (char *)HeapAlloc(GetProcessHeap(), 0, 1);
-        if (!edit_text) {
-            HeapFree(GetProcessHeap(), 0, clip);
-            return -1;
-        }
-        edit_text[0] = '\0';
-        edit_len = 0;
+    switch (command) {
+    case 67: /* Ctrl+C / Copy */
+        status = vfg_copy_or_cut_grid_selection(obj->grid_id, FALSE);
+        break;
+    case 88: /* Ctrl+X / Cut */
+        status = vfg_copy_or_cut_grid_selection(obj->grid_id, TRUE);
+        break;
+    case 86: /* Ctrl+V / Paste */
+        status = vfg_paste_grid_selection_from_clipboard(obj->grid_id);
+        break;
+    default:
+        if (handled) *handled = FALSE;
+        return S_FALSE;
     }
 
-    next_text =
-        vfg_utf8_replace_range(edit_text, edit_len, sel_start, sel_length, clip, clip_len, &next_len);
-    if (!next_text) {
-        HeapFree(GetProcessHeap(), 0, edit_text);
-        HeapFree(GetProcessHeap(), 0, clip);
-        return -1;
-    }
-
-    caret_chars = sel_start + vfg_utf8_char_count(clip, clip_len);
-    status = vfg_set_edit_text_compat(grid_id, next_text, next_len);
-    if (status == 0) status = vfg_set_edit_selection_compat(grid_id, caret_chars, 0);
-
-    HeapFree(GetProcessHeap(), 0, next_text);
-    HeapFree(GetProcessHeap(), 0, edit_text);
-    HeapFree(GetProcessHeap(), 0, clip);
-    return status;
+    return vfg_finish_clipboard_command(obj, status);
 }
 
 
@@ -5819,7 +5552,14 @@ static HRESULT vfg_handle_key_down(
     VolvoxGridObject *obj, int32_t key_code, int32_t modifier)
 {
     HRESULT hr;
+    BOOL handled = FALSE;
     if (!obj) return E_POINTER;
+
+    if ((modifier & 2) && !(modifier & 4)) {
+        hr = vfg_handle_clipboard_command(obj, key_code, &handled);
+        if (handled) return hr;
+    }
+
     if (volvox_grid_key_down_native(obj->grid_id, key_code, modifier) != 0) {
         return E_FAIL;
     }
@@ -5984,6 +5724,27 @@ static LRESULT CALLBACK vfg_control_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPAR
     case WM_TIMER:
         if (obj && wp == VFG_EVENT_TIMER_ID) {
             vfg_pump_engine_events(obj);
+            return 0;
+        }
+        break;
+    case WM_COPY:
+        if (obj) {
+            BOOL handled = FALSE;
+            vfg_handle_clipboard_command(obj, 67, &handled);
+            return 0;
+        }
+        break;
+    case WM_CUT:
+        if (obj) {
+            BOOL handled = FALSE;
+            vfg_handle_clipboard_command(obj, 88, &handled);
+            return 0;
+        }
+        break;
+    case WM_PASTE:
+        if (obj) {
+            BOOL handled = FALSE;
+            vfg_handle_clipboard_command(obj, 86, &handled);
             return 0;
         }
         break;
@@ -11991,32 +11752,8 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
     case DISPID_VG_KEYDOWN:
         if (wFlags & DISPATCH_METHOD) {
             int32_t key_code = 0, modifier = 0;
-            int32_t status = 0;
-            int editing_active = 0;
             if (pDispParams->cArgs >= 1) variant_to_i4(ARG(0), &key_code);
             if (pDispParams->cArgs >= 2) variant_to_i4(ARG(1), &modifier);
-            if ((modifier & 2) && !(modifier & 4)) {
-                editing_active = vfg_query_edit_active(gid);
-                switch (key_code) {
-                case 67:
-                    status = editing_active
-                        ? vfg_copy_or_cut_active_edit(gid, FALSE)
-                        : vfg_copy_or_cut_grid_selection(gid, FALSE);
-                    return status == 0 ? S_OK : E_FAIL;
-                case 88:
-                    status = editing_active
-                        ? vfg_copy_or_cut_active_edit(gid, TRUE)
-                        : vfg_copy_or_cut_grid_selection(gid, TRUE);
-                    return status == 0 ? S_OK : E_FAIL;
-                case 86:
-                    status = editing_active
-                        ? vfg_paste_active_edit_from_clipboard(gid)
-                        : vfg_paste_grid_selection_from_clipboard(gid);
-                    return status == 0 ? S_OK : E_FAIL;
-                default:
-                    break;
-                }
-            }
             return SUCCEEDED(vfg_handle_key_down(obj, key_code, modifier)) ? S_OK : E_FAIL;
         }
         break;
@@ -12027,24 +11764,17 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
     case DISPID_VG_DELETE_COMPAT:
         if (wFlags & DISPATCH_METHOD) {
             int32_t status = 0;
-            int editing_active = vfg_query_edit_active(gid);
             if (dispIdMember == DISPID_VG_COPY_COMPAT) {
-                status = editing_active
-                    ? vfg_copy_or_cut_active_edit(gid, FALSE)
-                    : vfg_copy_or_cut_grid_selection(gid, FALSE);
+                status = vfg_copy_or_cut_grid_selection(gid, FALSE);
             } else if (dispIdMember == DISPID_VG_CUT_COMPAT) {
-                status = editing_active
-                    ? vfg_copy_or_cut_active_edit(gid, TRUE)
-                    : vfg_copy_or_cut_grid_selection(gid, TRUE);
+                status = vfg_copy_or_cut_grid_selection(gid, TRUE);
             } else if (dispIdMember == DISPID_VG_PASTE_COMPAT) {
-                status = editing_active
-                    ? vfg_paste_active_edit_from_clipboard(gid)
-                    : vfg_paste_grid_selection_from_clipboard(gid);
+                status = vfg_paste_grid_selection_from_clipboard(gid);
             } else {
                 int32_t out_len = 0;
                 status = vfg_take_status_response(volvox_grid_delete(gid, &out_len));
             }
-            return status == 0 ? S_OK : E_FAIL;
+            return SUCCEEDED(vfg_finish_clipboard_command(obj, status)) ? S_OK : E_FAIL;
         }
         break;
 
@@ -12604,8 +12334,23 @@ static HRESULT STDMETHODCALLTYPE VFG_IPAO_ContextSensitiveHelp(IOleInPlaceActive
 static HRESULT STDMETHODCALLTYPE VFG_IPAO_TranslateAccelerator(IOleInPlaceActiveObject *This, LPMSG lpmsg) {
     VolvoxGridObject *obj = OBJ_FROM_INPLACEACTIVEOBJECT(This);
     UINT msg;
+    int modifier;
     if (!obj || !lpmsg || !obj->hwnd_ctrl) return S_FALSE;
     msg = lpmsg->message;
+    modifier = vfg_current_modifier_flags();
+    if ((msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN) &&
+        (modifier & 2) && !(modifier & 4)) {
+        switch (lpmsg->wParam) {
+        case 65: /* Ctrl+A */
+        case 67: /* Ctrl+C */
+        case 86: /* Ctrl+V */
+        case 88: /* Ctrl+X */
+            SendMessageW(obj->hwnd_ctrl, WM_KEYDOWN, lpmsg->wParam, lpmsg->lParam);
+            return S_OK;
+        default:
+            break;
+        }
+    }
     if ((msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN) &&
         lpmsg->wParam == VK_TAB &&
         volvox_grid_get_tab_behavior_native(obj->grid_id) == 1) {

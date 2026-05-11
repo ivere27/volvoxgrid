@@ -12,12 +12,14 @@ import io.github.ivere27.volvoxgrid.ColumnDataType
 import io.github.ivere27.volvoxgrid.ColumnDef
 import io.github.ivere27.volvoxgrid.ColIndicatorConfig
 import io.github.ivere27.volvoxgrid.DefineColumnsRequest
-import io.github.ivere27.volvoxgrid.Dropdown
-import io.github.ivere27.volvoxgrid.DropdownItem
 import io.github.ivere27.volvoxgrid.DropdownItemLayout
-import io.github.ivere27.volvoxgrid.DropdownTrigger
+import io.github.ivere27.volvoxgrid.EditActivation
 import io.github.ivere27.volvoxgrid.EditConfig
 import io.github.ivere27.volvoxgrid.EditTrigger
+import io.github.ivere27.volvoxgrid.EditorKind
+import io.github.ivere27.volvoxgrid.EditorOwner
+import io.github.ivere27.volvoxgrid.EditorPresentation
+import io.github.ivere27.volvoxgrid.EditorSpec
 import io.github.ivere27.volvoxgrid.FillHandlePosition
 import io.github.ivere27.volvoxgrid.GridConfig
 import io.github.ivere27.volvoxgrid.GridLineStyle
@@ -34,6 +36,8 @@ import io.github.ivere27.volvoxgrid.InteractionConfig
 import io.github.ivere27.volvoxgrid.LayoutConfig
 import io.github.ivere27.volvoxgrid.LoadDataStatus
 import io.github.ivere27.volvoxgrid.LoadDataOptions
+import io.github.ivere27.volvoxgrid.ListEditorParams
+import io.github.ivere27.volvoxgrid.ListItem
 import io.github.ivere27.volvoxgrid.OutlineConfig
 import io.github.ivere27.volvoxgrid.RegionStyle
 import io.github.ivere27.volvoxgrid.ResizePolicy
@@ -145,7 +149,7 @@ object SalesJsonDemo {
                     def.align = Align.ALIGN_CENTER_CENTER
                     def.dataType = ColumnDataType.COLUMN_DATA_BOOLEAN
                 }
-                8 -> def.setDropdown(salesStatusDropdown())
+                8 -> def.setEditor(salesStatusEditor())
             }
             if (col == 0 || col == 1) {
                 def.span = true
@@ -155,13 +159,18 @@ object SalesJsonDemo {
         return builder.build()
     }
 
-    private fun salesStatusDropdown(): Dropdown {
-        val dropdown = Dropdown.newBuilder()
+    private fun salesStatusEditor(): EditorSpec {
+        val list = ListEditorParams.newBuilder()
             .setItemLayout(DropdownItemLayout.DROPDOWN_ITEM_AUTO)
         for (label in salesStatusItems) {
-            dropdown.addItems(DropdownItem.newBuilder().setLabel(label).build())
+            list.addStaticItems(ListItem.newBuilder().setLabel(label).build())
         }
-        return dropdown.build()
+        return EditorSpec.newBuilder()
+            .setKind(EditorKind.EDITOR_SELECT)
+            .setOwner(EditorOwner.EDITOR_OWNER_ENGINE)
+            .setPresentation(EditorPresentation.EDITOR_CANVAS)
+            .setList(list)
+            .build()
     }
 
     private fun applySalesSubtotalDecorations(controller: VolvoxGridController, subtotalRows: List<Int>) {
@@ -305,9 +314,9 @@ object SalesJsonDemo {
             )
             .setEditing(
                 EditConfig.newBuilder()
-                    .setTrigger(EditTrigger.EDIT_TRIGGER_NONE)
-                    .setDropdownTrigger(DropdownTrigger.DROPDOWN_ALWAYS)
-                    .setDropdownSearch(false)
+                    .setActivation(EditActivation.newBuilder()
+                        .setTrigger(EditTrigger.EDIT_TRIGGER_NONE)
+                        .build())
                     .build()
             )
             .setScrolling(
