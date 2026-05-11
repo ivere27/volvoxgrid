@@ -30,9 +30,10 @@ pub(crate) fn create_grid_spec(request: &CreateRequest) -> CreateGridSpec {
     }
 }
 
-pub(crate) const DEFAULT_COL_INDICATOR_MODE_BITS: u32 =
-    ColIndicatorCellMode::ColIndicatorCellHeaderText as u32
-        | ColIndicatorCellMode::ColIndicatorCellSortGlyph as u32;
+pub(crate) const DEFAULT_COL_INDICATOR_MODES: [i32; 2] = [
+    ColIndicatorCellMode::ColIndicatorCellHeaderText as i32,
+    ColIndicatorCellMode::ColIndicatorCellSortGlyph as i32,
+];
 
 fn default_row_indicator_slots() -> Vec<volvoxgrid_engine::indicator::RowIndicatorSlotState> {
     vec![
@@ -68,7 +69,7 @@ pub(crate) fn apply_default_indicator_bands(grid: &mut Grid) {
         grid.indicator_bands.col_top.default_row_height_px =
             volvoxgrid_engine::indicator::DEFAULT_COL_INDICATOR_ROW_HEIGHT;
     }
-    grid.indicator_bands.col_top.mode_bits = DEFAULT_COL_INDICATOR_MODE_BITS;
+    grid.indicator_bands.col_top.cell_modes = DEFAULT_COL_INDICATOR_MODES.to_vec();
     grid.layout.invalidate();
     grid.dirty = true;
 }

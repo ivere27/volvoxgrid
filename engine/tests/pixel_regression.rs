@@ -242,15 +242,15 @@ fn apply_sales_demo_chrome(grid: &mut VolvoxGrid) {
     grid.indicator_bands.col_top.visible = true;
     grid.indicator_bands.col_top.band_rows = 1;
     grid.indicator_bands.col_top.default_row_height_px = sp(grid, 28);
-    grid.indicator_bands.col_top.mode_bits = (pb::ColIndicatorCellMode::ColIndicatorCellHeaderText
-        as u32)
-        | (pb::ColIndicatorCellMode::ColIndicatorCellSortGlyph as u32);
+    grid.indicator_bands.col_top.cell_modes = vec![
+        pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as i32,
+        pb::ColIndicatorCellMode::ColIndicatorCellSortGlyph as i32,
+    ];
     grid.indicator_bands.col_top.back_color = Some(0xFFF9FAFB);
     grid.indicator_bands.col_top.fore_color = Some(0xFF111827);
     grid.indicator_bands.col_top.grid_color = Some(0xFFD1D5DB);
     grid.indicator_bands.col_top.allow_resize = true;
     grid.indicator_bands.corner_top_start.visible = false;
-    grid.indicator_bands.corner_top_start.mode_bits = 0;
     grid.indicator_bands.corner_top_start.custom_key.clear();
     grid.indicator_bands.corner_top_start.data.clear();
 

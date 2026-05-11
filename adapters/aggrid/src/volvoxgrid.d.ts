@@ -195,6 +195,43 @@ declare module "volvoxgrid" {
     uniform?: boolean;
   }
 
+  export interface VolvoxGridRowIndicatorSlot {
+    kind?: number;
+    width?: number;
+    visible?: boolean;
+    customKey?: string;
+    data?: Uint8Array;
+  }
+
+  export interface VolvoxGridRowIndicatorConfig {
+    visible?: boolean;
+    width?: number;
+    background?: number;
+    foreground?: number;
+    gridLines?: number;
+    gridColor?: number;
+    autoSize?: boolean;
+    allowResize?: boolean;
+    allowSelect?: boolean;
+    allowReorder?: boolean;
+    slots?: ReadonlyArray<VolvoxGridRowIndicatorSlot>;
+  }
+
+  export interface VolvoxGridColumnIndicatorConfig {
+    visible?: boolean;
+    defaultRowHeight?: number;
+    bandRows?: number;
+    cellModes?: ReadonlyArray<number>;
+    background?: number;
+    foreground?: number;
+    gridLines?: number;
+    gridColor?: number;
+    autoSize?: boolean;
+    allowResize?: boolean;
+    allowReorder?: boolean;
+    allowMenu?: boolean;
+  }
+
   export interface VolvoxGridPadding {
     left?: number;
     top?: number;
@@ -322,6 +359,8 @@ declare module "volvoxgrid" {
     setFontName(name: string): void;
     setFontSize(size: number): void;
     setGridLines(mode: number): void;
+    setColumnIndicatorTopConfig(config: VolvoxGridColumnIndicatorConfig): void;
+    setRowIndicatorStartConfig(config: VolvoxGridRowIndicatorConfig): void;
     setHeaderFeatures(features: VolvoxGridHeaderFeatures): void;
     setResizePolicy(policy: VolvoxGridResizePolicy): void;
     setCellStyle(row: number, col: number, style: VolvoxGridCellStyle): void;

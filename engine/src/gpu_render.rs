@@ -1977,8 +1977,8 @@ mod tests {
         grid.indicator_bands.col_top.visible = true;
         grid.indicator_bands.col_top.band_rows = 1;
         grid.indicator_bands.col_top.default_row_height_px = 24;
-        grid.indicator_bands.col_top.mode_bits =
-            pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as u32;
+        grid.indicator_bands.col_top.cell_modes =
+            vec![pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as i32];
 
         for row in 0..grid.rows {
             grid.set_row_height(row, 20 + (row % 3) * 4);

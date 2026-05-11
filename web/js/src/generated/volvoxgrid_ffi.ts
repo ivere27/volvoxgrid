@@ -904,15 +904,17 @@ export const ColIndicatorCellFields = {
   "col1": 3,
   "col2": 4,
   "text": 5,
-  "mode_bits": 6,
   "custom_key": 7,
   "data": 8,
+  "modes": 9,
+} as const;
+export const ColIndicatorCellModesFields = {
+  "modes": 1,
 } as const;
 export const ColIndicatorConfigFields = {
   "visible": 1,
   "default_row_height": 2,
   "band_rows": 3,
-  "mode_bits": 4,
   "background": 5,
   "foreground": 6,
   "grid_lines": 7,
@@ -923,6 +925,7 @@ export const ColIndicatorConfigFields = {
   "allow_menu": 12,
   "row_defs": 13,
   "cells": 14,
+  "cell_modes": 15,
 } as const;
 export const ColIndicatorRowDefFields = {
   "index": 1,
@@ -975,7 +978,6 @@ export const ConfigureResponseFields = {
 } as const;
 export const CornerIndicatorConfigFields = {
   "visible": 1,
-  "mode_bits": 2,
   "background": 3,
   "foreground": 4,
   "custom_key": 5,
@@ -1398,12 +1400,12 @@ export const GridEventTargetFields = {
   "band": 2,
   "slot_index": 3,
   "slot_kind": 4,
-  "sub_mode_bits": 5,
   "custom_key": 6,
   "text": 7,
   "int_value": 8,
   "status_flags": 9,
   "data": 10,
+  "sub_mode": 11,
 } as const;
 export const GridLinesFields = {
   "style": 1,

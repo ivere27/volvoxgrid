@@ -1567,15 +1567,17 @@ export const ColIndicatorCellFields = {
   "col1": 3,
   "col2": 4,
   "text": 5,
-  "mode_bits": 6,
   "custom_key": 7,
   "data": 8,
+  "modes": 9,
+} as const;
+export const ColIndicatorCellModesFields = {
+  "modes": 1,
 } as const;
 export const ColIndicatorConfigFields = {
   "visible": 1,
   "default_row_height": 2,
   "band_rows": 3,
-  "mode_bits": 4,
   "background": 5,
   "foreground": 6,
   "grid_lines": 7,
@@ -1586,6 +1588,7 @@ export const ColIndicatorConfigFields = {
   "allow_menu": 12,
   "row_defs": 13,
   "cells": 14,
+  "cell_modes": 15,
 } as const;
 export const ColIndicatorRowDefFields = {
   "index": 1,
@@ -1638,7 +1641,6 @@ export const ConfigureResponseFields = {
 } as const;
 export const CornerIndicatorConfigFields = {
   "visible": 1,
-  "mode_bits": 2,
   "background": 3,
   "foreground": 4,
   "custom_key": 5,
@@ -2061,12 +2063,12 @@ export const GridEventTargetFields = {
   "band": 2,
   "slot_index": 3,
   "slot_kind": 4,
-  "sub_mode_bits": 5,
   "custom_key": 6,
   "text": 7,
   "int_value": 8,
   "status_flags": 9,
   "data": 10,
+  "sub_mode": 11,
 } as const;
 export const GridLinesFields = {
   "style": 1,
@@ -6238,14 +6240,6 @@ export class ColIndicatorCell implements LiteMessage {
       optional: true,
     },
     {
-      no: 6,
-      name: "mode_bits",
-      jsonName: "modeBits",
-      prop: "modeBits",
-      kind: "uint32" as ProtoKind,
-      optional: true,
-    },
-    {
       no: 7,
       name: "custom_key",
       jsonName: "customKey",
@@ -6261,15 +6255,24 @@ export class ColIndicatorCell implements LiteMessage {
       kind: "bytes" as ProtoKind,
       optional: true,
     },
+    {
+      no: 9,
+      name: "modes",
+      jsonName: "modes",
+      prop: "modes",
+      kind: "message" as ProtoKind,
+      optional: true,
+      messageType: "ColIndicatorCellModes",
+    },
   ];
   row1: number = 0;
   row2: number = 0;
   col1: number = 0;
   col2: number = 0;
   text: string = "";
-  modeBits: number = 0;
   customKey: string = "";
   data?: Uint8Array;
+  modes?: ColIndicatorCellModes;
 
   constructor(init?: Partial<ColIndicatorCell>) {
     initMessage(this, ColIndicatorCell.fields, init as Record<string, unknown> | undefined);
@@ -6296,6 +6299,46 @@ export class ColIndicatorCell implements LiteMessage {
   }
 }
 registerMessage(ColIndicatorCell);
+export class ColIndicatorCellModes implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.ColIndicatorCellModes" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "modes",
+      jsonName: "modes",
+      prop: "modes",
+      kind: "enum" as ProtoKind,
+      repeated: true,
+      enumType: ColIndicatorCellMode,
+    },
+  ];
+  modes: ColIndicatorCellMode[] = [];
+
+  constructor(init?: Partial<ColIndicatorCellModes>) {
+    initMessage(this, ColIndicatorCellModes.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): ColIndicatorCellModes {
+    return decodeMessage(ColIndicatorCellModes, data);
+  }
+
+  static parseFrom(data: Uint8Array): ColIndicatorCellModes {
+    return ColIndicatorCellModes.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, ColIndicatorCellModes.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, ColIndicatorCellModes.fields);
+  }
+}
+registerMessage(ColIndicatorCellModes);
 export class ColIndicatorConfig implements LiteMessage {
   static readonly typeName = "volvoxgrid.v1.ColIndicatorConfig" as const;
   static readonly fields: readonly ProtoFieldInfo[] = [
@@ -6321,14 +6364,6 @@ export class ColIndicatorConfig implements LiteMessage {
       jsonName: "bandRows",
       prop: "bandRows",
       kind: "int32" as ProtoKind,
-      optional: true,
-    },
-    {
-      no: 4,
-      name: "mode_bits",
-      jsonName: "modeBits",
-      prop: "modeBits",
-      kind: "uint32" as ProtoKind,
       optional: true,
     },
     {
@@ -6414,11 +6449,19 @@ export class ColIndicatorConfig implements LiteMessage {
       repeated: true,
       messageType: "ColIndicatorCell",
     },
+    {
+      no: 15,
+      name: "cell_modes",
+      jsonName: "cellModes",
+      prop: "cellModes",
+      kind: "message" as ProtoKind,
+      optional: true,
+      messageType: "ColIndicatorCellModes",
+    },
   ];
   visible: boolean = false;
   defaultRowHeight: number = 0;
   bandRows: number = 0;
-  modeBits: number = 0;
   background: number = 0;
   foreground: number = 0;
   gridLines: GridLineStyle = 0;
@@ -6429,6 +6472,7 @@ export class ColIndicatorConfig implements LiteMessage {
   allowMenu: boolean = false;
   rowDefs: ColIndicatorRowDef[] = [];
   cells: ColIndicatorCell[] = [];
+  cellModes?: ColIndicatorCellModes;
 
   constructor(init?: Partial<ColIndicatorConfig>) {
     initMessage(this, ColIndicatorConfig.fields, init as Record<string, unknown> | undefined);
@@ -6983,14 +7027,6 @@ export class CornerIndicatorConfig implements LiteMessage {
       optional: true,
     },
     {
-      no: 2,
-      name: "mode_bits",
-      jsonName: "modeBits",
-      prop: "modeBits",
-      kind: "uint32" as ProtoKind,
-      optional: true,
-    },
-    {
       no: 3,
       name: "background",
       jsonName: "background",
@@ -7033,7 +7069,6 @@ export class CornerIndicatorConfig implements LiteMessage {
     },
   ];
   visible: boolean = false;
-  modeBits: number = 0;
   background: number = 0;
   foreground: number = 0;
   customKey: string = "";
@@ -11705,13 +11740,6 @@ export class GridEventTarget implements LiteMessage {
       kind: "int32" as ProtoKind,
     },
     {
-      no: 5,
-      name: "sub_mode_bits",
-      jsonName: "subModeBits",
-      prop: "subModeBits",
-      kind: "uint32" as ProtoKind,
-    },
-    {
       no: 6,
       name: "custom_key",
       jsonName: "customKey",
@@ -11746,17 +11774,24 @@ export class GridEventTarget implements LiteMessage {
       prop: "data",
       kind: "bytes" as ProtoKind,
     },
+    {
+      no: 11,
+      name: "sub_mode",
+      jsonName: "subMode",
+      prop: "subMode",
+      kind: "int32" as ProtoKind,
+    },
   ];
   kind: GridTargetKind = 0;
   band: IndicatorBand = 0;
   slotIndex: number = 0;
   slotKind: number = 0;
-  subModeBits: number = 0;
   customKey: string = "";
   text: string = "";
   intValue: bigint = 0n;
   statusFlags: number = 0;
   data?: Uint8Array;
+  subMode: number = 0;
 
   constructor(init?: Partial<GridEventTarget>) {
     initMessage(this, GridEventTarget.fields, init as Record<string, unknown> | undefined);

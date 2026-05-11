@@ -53,39 +53,16 @@ class CellTextEntry {
   });
 }
 
-int _colIndicatorModeBits(Iterable<ColIndicatorCellMode> modes) =>
-    modes.fold<int>(0, (bits, mode) => bits | mode.value);
+ColIndicatorCellModes _colIndicatorCellModes(
+  Iterable<ColIndicatorCellMode> modes,
+) =>
+    ColIndicatorCellModes()..modes.addAll(modes);
 
 RowIndicatorSlot _rowIndicatorSlot(RowIndicatorSlotKind kind, int width) =>
     RowIndicatorSlot()
       ..kind = kind
       ..width = width
       ..visible = true;
-
-List<RowIndicatorSlot> _rowIndicatorSlotsFromModeBits(int modeBits) {
-  final slots = <RowIndicatorSlot>[];
-  void add(int bit, RowIndicatorSlotKind kind, int width) {
-    if ((modeBits & bit) != 0) {
-      slots.add(_rowIndicatorSlot(kind, width));
-    }
-  }
-
-  add(1, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NUMBERS, 35);
-  add(2, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CURRENT, 18);
-  add(4, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_SELECTION, 17);
-  add(8, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CHECKBOX, 18);
-  add(16, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_HANDLE, 18);
-  add(32, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_EDITING, 18);
-  add(64, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_MODIFIED, 18);
-  add(128, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_ERROR, 18);
-  add(256, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NEW_ROW, 18);
-  add(512, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_EXPANDER, 18);
-  add(1024, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_RESIZE, 18);
-  add(2048, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_ACTION, 18);
-  add(4096, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_STATUS_ICON, 18);
-  add(8192, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CUSTOM, 18);
-  return slots;
-}
 
 IndicatorsConfig _defaultIndicatorsConfig() => IndicatorsConfig()
   ..rowStart = (RowIndicatorConfig()
@@ -99,7 +76,7 @@ IndicatorsConfig _defaultIndicatorsConfig() => IndicatorsConfig()
   ..colTop = (ColIndicatorConfig()
     ..visible = true
     ..bandRows = 1
-    ..modeBits = _colIndicatorModeBits([
+    ..cellModes = _colIndicatorCellModes([
       ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT,
       ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH,
     ]));
@@ -289,11 +266,19 @@ class VolvoxGridController extends ChangeNotifier {
     );
   }
 
-  /// Set the top column-indicator content bitmask.
-  Future<void> setColumnIndicatorTopModeBits(int modeBits) async {
-    final top = ColIndicatorConfig()..modeBits = modeBits;
+  /// Get the top column-indicator band configuration.
+  Future<ColIndicatorConfig> getColumnIndicatorTopConfig() async {
+    final config = await _getConfig();
+    if (!config.hasIndicators() || !config.indicators.hasColTop()) {
+      return ColIndicatorConfig();
+    }
+    return config.indicators.colTop;
+  }
+
+  /// Set the top column-indicator band configuration.
+  Future<void> setColumnIndicatorTopConfig(ColIndicatorConfig config) async {
     await _configure(
-      GridConfig()..indicators = (IndicatorsConfig()..colTop = top),
+      GridConfig()..indicators = (IndicatorsConfig()..colTop = config),
     );
   }
 
@@ -313,17 +298,19 @@ class VolvoxGridController extends ChangeNotifier {
     );
   }
 
-  /// Set the start-side row-indicator content bitmask.
-  Future<void> setRowIndicatorStartModeBits(int modeBits) async {
-    final row = RowIndicatorConfig();
-    final slots = _rowIndicatorSlotsFromModeBits(modeBits);
-    if (slots.isEmpty) {
-      row.visible = false;
-    } else {
-      row.slots.addAll(slots);
+  /// Get the start-side row-indicator band configuration.
+  Future<RowIndicatorConfig> getRowIndicatorStartConfig() async {
+    final config = await _getConfig();
+    if (!config.hasIndicators() || !config.indicators.hasRowStart()) {
+      return RowIndicatorConfig();
     }
+    return config.indicators.rowStart;
+  }
+
+  /// Set the start-side row-indicator band configuration.
+  Future<void> setRowIndicatorStartConfig(RowIndicatorConfig config) async {
     await _configure(
-      GridConfig()..indicators = (IndicatorsConfig()..rowStart = row),
+      GridConfig()..indicators = (IndicatorsConfig()..rowStart = config),
     );
   }
 

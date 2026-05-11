@@ -7,6 +7,11 @@ import io.github.ivere27.volvoxgrid.common.GridCellText;
 import io.github.ivere27.volvoxgrid.common.GridCellRange;
 import io.github.ivere27.volvoxgrid.common.GridSelection;
 import io.github.ivere27.volvoxgrid.common.RendererBackend;
+import io.github.ivere27.volvoxgrid.common.VolvoxGridColumnIndicatorCellMode;
+import io.github.ivere27.volvoxgrid.common.VolvoxGridColumnIndicatorConfig;
+import io.github.ivere27.volvoxgrid.common.VolvoxGridRowIndicatorConfig;
+import io.github.ivere27.volvoxgrid.common.VolvoxGridRowIndicatorSlot;
+import io.github.ivere27.volvoxgrid.common.VolvoxGridRowIndicatorSlotKind;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -17,9 +22,6 @@ import java.util.Objects;
 public final class VolvoxGridDesktopController implements VolvoxGridController {
     private static final int DEFAULT_ROW_INDICATOR_WIDTH_PX = 35;
     private static final int DEFAULT_COL_INDICATOR_BAND_ROWS = 1;
-    private static final int DEFAULT_COL_INDICATOR_MODE_BITS =
-        ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT.getNumber()
-            | ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH.getNumber();
 
     private final VolvoxGridDesktopClient client;
     private final long gridId;
@@ -39,53 +41,120 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
         return slots;
     }
 
-    private static List<RowIndicatorSlot> rowIndicatorSlotsFromModeBits(int value) {
-        ArrayList<RowIndicatorSlot> slots = new ArrayList<>();
-        addRowIndicatorSlot(slots, value, 1, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NUMBERS, DEFAULT_ROW_INDICATOR_WIDTH_PX);
-        addRowIndicatorSlot(slots, value, 2, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CURRENT, 18);
-        addRowIndicatorSlot(slots, value, 4, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_SELECTION, 17);
-        addRowIndicatorSlot(slots, value, 8, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CHECKBOX, 18);
-        addRowIndicatorSlot(slots, value, 16, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_HANDLE, 18);
-        addRowIndicatorSlot(slots, value, 32, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_EDITING, 18);
-        addRowIndicatorSlot(slots, value, 64, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_MODIFIED, 18);
-        addRowIndicatorSlot(slots, value, 128, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_ERROR, 18);
-        addRowIndicatorSlot(slots, value, 256, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NEW_ROW, 18);
-        addRowIndicatorSlot(slots, value, 512, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_EXPANDER, 18);
-        addRowIndicatorSlot(slots, value, 1024, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_RESIZE, 18);
-        addRowIndicatorSlot(slots, value, 2048, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_ACTION, 18);
-        addRowIndicatorSlot(slots, value, 4096, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_STATUS_ICON, 18);
-        addRowIndicatorSlot(slots, value, 8192, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CUSTOM, 18);
-        return slots;
-    }
-
-    private static void addRowIndicatorSlot(List<RowIndicatorSlot> slots, int value, int bit, RowIndicatorSlotKind kind, int width) {
-        if ((value & bit) != 0) {
-            slots.add(rowIndicatorSlot(kind, width));
-        }
-    }
-
-    private static int rowIndicatorModeBitsFromSlots(RowIndicatorConfig config) {
-        int bits = 0;
-        for (RowIndicatorSlot slot : config.getSlotsList()) {
-            switch (slot.getKind()) {
-                case ROW_INDICATOR_SLOT_NUMBERS: bits |= 1; break;
-                case ROW_INDICATOR_SLOT_CURRENT: bits |= 2; break;
-                case ROW_INDICATOR_SLOT_SELECTION: bits |= 4; break;
-                case ROW_INDICATOR_SLOT_CHECKBOX: bits |= 8; break;
-                case ROW_INDICATOR_SLOT_HANDLE: bits |= 16; break;
-                case ROW_INDICATOR_SLOT_EDITING: bits |= 32; break;
-                case ROW_INDICATOR_SLOT_MODIFIED: bits |= 64; break;
-                case ROW_INDICATOR_SLOT_ERROR: bits |= 128; break;
-                case ROW_INDICATOR_SLOT_NEW_ROW: bits |= 256; break;
-                case ROW_INDICATOR_SLOT_EXPANDER: bits |= 512; break;
-                case ROW_INDICATOR_SLOT_RESIZE: bits |= 1024; break;
-                case ROW_INDICATOR_SLOT_ACTION: bits |= 2048; break;
-                case ROW_INDICATOR_SLOT_STATUS_ICON: bits |= 4096; break;
-                case ROW_INDICATOR_SLOT_CUSTOM: bits |= 8192; break;
-                default: break;
+    private static ColIndicatorCellModes columnIndicatorCellModes(Iterable<VolvoxGridColumnIndicatorCellMode> modes) {
+        ColIndicatorCellModes.Builder builder = ColIndicatorCellModes.newBuilder();
+        for (VolvoxGridColumnIndicatorCellMode mode : modes) {
+            ColIndicatorCellMode protoMode = ColIndicatorCellMode.forNumber(mode.getNumber());
+            if (protoMode != null) {
+                builder.addModes(protoMode);
             }
         }
-        return bits;
+        return builder.build();
+    }
+
+    private static List<VolvoxGridColumnIndicatorCellMode> columnIndicatorModesToCommon(
+        Iterable<ColIndicatorCellMode> protoModes
+    ) {
+        ArrayList<VolvoxGridColumnIndicatorCellMode> commonModes = new ArrayList<>();
+        for (ColIndicatorCellMode mode : protoModes) {
+            VolvoxGridColumnIndicatorCellMode commonMode =
+                VolvoxGridColumnIndicatorCellMode.forNumber(mode.getNumber());
+            if (commonMode != VolvoxGridColumnIndicatorCellMode.None) {
+                commonModes.add(commonMode);
+            }
+        }
+        return commonModes;
+    }
+
+    private static VolvoxGridColumnIndicatorConfig toCommonColumnIndicatorConfig(ColIndicatorConfig config) {
+        VolvoxGridColumnIndicatorConfig.Builder builder = VolvoxGridColumnIndicatorConfig.builder();
+        if (config.hasVisible()) builder.visible(config.getVisible());
+        if (config.hasDefaultRowHeight()) builder.defaultRowHeight(config.getDefaultRowHeight());
+        if (config.hasBandRows()) builder.bandRows(config.getBandRows());
+        if (config.hasCellModes()) builder.cellModes(columnIndicatorModesToCommon(config.getCellModes().getModesList()));
+        if (config.hasBackground()) builder.background(Integer.toUnsignedLong(config.getBackground()));
+        if (config.hasForeground()) builder.foreground(Integer.toUnsignedLong(config.getForeground()));
+        if (config.hasGridLines()) builder.gridLines(config.getGridLines().getNumber());
+        if (config.hasGridColor()) builder.gridColor(Integer.toUnsignedLong(config.getGridColor()));
+        if (config.hasAutoSize()) builder.autoSize(config.getAutoSize());
+        if (config.hasAllowResize()) builder.allowResize(config.getAllowResize());
+        if (config.hasAllowReorder()) builder.allowReorder(config.getAllowReorder());
+        if (config.hasAllowMenu()) builder.allowMenu(config.getAllowMenu());
+        return builder.build();
+    }
+
+    private static ColIndicatorConfig toProtoColumnIndicatorConfig(VolvoxGridColumnIndicatorConfig config) {
+        ColIndicatorConfig.Builder builder = ColIndicatorConfig.newBuilder();
+        if (config.getVisible() != null) builder.setVisible(config.getVisible());
+        if (config.getDefaultRowHeight() != null) builder.setDefaultRowHeight(config.getDefaultRowHeight());
+        if (config.getBandRows() != null) builder.setBandRows(config.getBandRows());
+        if (config.hasCellModes()) builder.setCellModes(columnIndicatorCellModes(config.getCellModes()));
+        if (config.getBackground() != null) builder.setBackground(config.getBackground().intValue());
+        if (config.getForeground() != null) builder.setForeground(config.getForeground().intValue());
+        if (config.getGridLines() != null) {
+            GridLineStyle style = GridLineStyle.forNumber(config.getGridLines());
+            if (style != null) builder.setGridLines(style);
+        }
+        if (config.getGridColor() != null) builder.setGridColor(config.getGridColor().intValue());
+        if (config.getAutoSize() != null) builder.setAutoSize(config.getAutoSize());
+        if (config.getAllowResize() != null) builder.setAllowResize(config.getAllowResize());
+        if (config.getAllowReorder() != null) builder.setAllowReorder(config.getAllowReorder());
+        if (config.getAllowMenu() != null) builder.setAllowMenu(config.getAllowMenu());
+        return builder.build();
+    }
+
+    private static VolvoxGridRowIndicatorConfig toCommonRowIndicatorConfig(RowIndicatorConfig config) {
+        VolvoxGridRowIndicatorConfig.Builder builder = VolvoxGridRowIndicatorConfig.builder();
+        if (config.hasVisible()) builder.visible(config.getVisible());
+        if (config.hasWidth()) builder.width(config.getWidth());
+        if (config.hasBackground()) builder.background(Integer.toUnsignedLong(config.getBackground()));
+        if (config.hasForeground()) builder.foreground(Integer.toUnsignedLong(config.getForeground()));
+        if (config.hasGridLines()) builder.gridLines(config.getGridLines().getNumber());
+        if (config.hasGridColor()) builder.gridColor(Integer.toUnsignedLong(config.getGridColor()));
+        if (config.hasAutoSize()) builder.autoSize(config.getAutoSize());
+        if (config.hasAllowResize()) builder.allowResize(config.getAllowResize());
+        if (config.hasAllowSelect()) builder.allowSelect(config.getAllowSelect());
+        if (config.hasAllowReorder()) builder.allowReorder(config.getAllowReorder());
+        for (RowIndicatorSlot slot : config.getSlotsList()) {
+            builder.addSlot(
+                new VolvoxGridRowIndicatorSlot(
+                    VolvoxGridRowIndicatorSlotKind.forNumber(slot.getKind().getNumber()),
+                    slot.hasWidth() ? slot.getWidth() : null,
+                    slot.hasVisible() ? slot.getVisible() : null,
+                    slot.hasCustomKey() ? slot.getCustomKey() : null,
+                    slot.hasData() ? slot.getData().toByteArray() : null
+                )
+            );
+        }
+        return builder.build();
+    }
+
+    private static RowIndicatorConfig toProtoRowIndicatorConfig(VolvoxGridRowIndicatorConfig config) {
+        RowIndicatorConfig.Builder builder = RowIndicatorConfig.newBuilder();
+        if (config.getVisible() != null) builder.setVisible(config.getVisible());
+        if (config.getWidth() != null) builder.setWidth(config.getWidth());
+        if (config.getBackground() != null) builder.setBackground(config.getBackground().intValue());
+        if (config.getForeground() != null) builder.setForeground(config.getForeground().intValue());
+        if (config.getGridLines() != null) {
+            GridLineStyle style = GridLineStyle.forNumber(config.getGridLines());
+            if (style != null) builder.setGridLines(style);
+        }
+        if (config.getGridColor() != null) builder.setGridColor(config.getGridColor().intValue());
+        if (config.getAutoSize() != null) builder.setAutoSize(config.getAutoSize());
+        if (config.getAllowResize() != null) builder.setAllowResize(config.getAllowResize());
+        if (config.getAllowSelect() != null) builder.setAllowSelect(config.getAllowSelect());
+        if (config.getAllowReorder() != null) builder.setAllowReorder(config.getAllowReorder());
+        for (VolvoxGridRowIndicatorSlot slot : config.getSlots()) {
+            RowIndicatorSlotKind kind = RowIndicatorSlotKind.forNumber(slot.getKind().getNumber());
+            RowIndicatorSlot.Builder slotBuilder = RowIndicatorSlot.newBuilder()
+                .setKind(kind == null ? RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NONE : kind);
+            if (slot.getWidth() != null) slotBuilder.setWidth(slot.getWidth());
+            if (slot.getVisible() != null) slotBuilder.setVisible(slot.getVisible());
+            if (slot.getCustomKey() != null) slotBuilder.setCustomKey(slot.getCustomKey());
+            if (slot.getData() != null) slotBuilder.setData(ByteString.copyFrom(slot.getData()));
+            builder.addSlots(slotBuilder);
+        }
+        return builder.build();
     }
 
     private static RowIndicatorConfig defaultRowIndicatorStartConfig() {
@@ -100,7 +169,12 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
         return ColIndicatorConfig.newBuilder()
             .setVisible(true)
             .setBandRows(DEFAULT_COL_INDICATOR_BAND_ROWS)
-            .setModeBits(DEFAULT_COL_INDICATOR_MODE_BITS)
+            .setCellModes(
+                ColIndicatorCellModes.newBuilder()
+                    .addModes(ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT)
+                    .addModes(ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH)
+                    .build()
+            )
             .build();
     }
 
@@ -212,25 +286,21 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
     }
 
     @Override
-    public int getColumnIndicatorTopModeBits() throws SynurangDesktopBridge.SynurangBridgeException {
+    public VolvoxGridColumnIndicatorConfig getColumnIndicatorTopConfig() throws SynurangDesktopBridge.SynurangBridgeException {
         GridConfig config = getConfig();
         if (!config.hasIndicators() || !config.getIndicators().hasColTop()) {
-            return 0;
+            return VolvoxGridColumnIndicatorConfig.builder().build();
         }
-        return config.getIndicators().getColTop().getModeBits();
+        return toCommonColumnIndicatorConfig(config.getIndicators().getColTop());
     }
 
     @Override
-    public void setColumnIndicatorTopModeBits(int value) throws SynurangDesktopBridge.SynurangBridgeException {
+    public void setColumnIndicatorTopConfig(VolvoxGridColumnIndicatorConfig value) throws SynurangDesktopBridge.SynurangBridgeException {
         configure(
             GridConfig.newBuilder()
                 .setIndicators(
                     IndicatorsConfig.newBuilder()
-                        .setColTop(
-                            ColIndicatorConfig.newBuilder()
-                                .setModeBits(value)
-                                .build()
-                        )
+                        .setColTop(toProtoColumnIndicatorConfig(Objects.requireNonNull(value, "value")))
                         .build()
                 )
                 .build()
@@ -294,28 +364,21 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
     }
 
     @Override
-    public int getRowIndicatorStartModeBits() throws SynurangDesktopBridge.SynurangBridgeException {
+    public VolvoxGridRowIndicatorConfig getRowIndicatorStartConfig() throws SynurangDesktopBridge.SynurangBridgeException {
         GridConfig config = getConfig();
         if (!config.hasIndicators() || !config.getIndicators().hasRowStart()) {
-            return 0;
+            return VolvoxGridRowIndicatorConfig.builder().build();
         }
-        return rowIndicatorModeBitsFromSlots(config.getIndicators().getRowStart());
+        return toCommonRowIndicatorConfig(config.getIndicators().getRowStart());
     }
 
     @Override
-    public void setRowIndicatorStartModeBits(int value) throws SynurangDesktopBridge.SynurangBridgeException {
-        RowIndicatorConfig.Builder row = RowIndicatorConfig.newBuilder();
-        List<RowIndicatorSlot> slots = rowIndicatorSlotsFromModeBits(value);
-        if (slots.isEmpty()) {
-            row.setVisible(false);
-        } else {
-            row.addAllSlots(slots);
-        }
+    public void setRowIndicatorStartConfig(VolvoxGridRowIndicatorConfig value) throws SynurangDesktopBridge.SynurangBridgeException {
         configure(
             GridConfig.newBuilder()
                 .setIndicators(
                     IndicatorsConfig.newBuilder()
-                        .setRowStart(row.build())
+                        .setRowStart(toProtoRowIndicatorConfig(Objects.requireNonNull(value, "value")))
                         .build()
                 )
                 .build()

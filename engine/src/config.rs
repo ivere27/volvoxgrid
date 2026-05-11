@@ -379,8 +379,8 @@ fn apply_col_indicator_config(
     if let Some(v) = cfg.band_rows {
         target.band_rows = v.max(0);
     }
-    if let Some(v) = cfg.mode_bits {
-        target.mode_bits = v;
+    if let Some(v) = &cfg.cell_modes {
+        target.cell_modes = v.modes.clone();
     }
     if let Some(v) = cfg.background {
         target.back_color = Some(v);
@@ -426,7 +426,7 @@ fn apply_col_indicator_config(
                 col1: cell.col1.unwrap_or(0).max(0),
                 col2: cell.col2.unwrap_or(0).max(0),
                 text: cell.text.clone().unwrap_or_default(),
-                mode_bits: cell.mode_bits.unwrap_or(0),
+                modes: cell.modes.as_ref().map(|modes| modes.modes.clone()),
                 custom_key: cell.custom_key.clone().unwrap_or_default(),
                 data: cell.data.clone().unwrap_or_default(),
             })
@@ -439,7 +439,6 @@ fn col_indicator_to_proto(src: &crate::indicator::ColIndicatorState) -> v1::ColI
         visible: Some(src.visible),
         default_row_height: Some(src.default_row_height_px.max(1)),
         band_rows: Some(src.band_rows.max(0)),
-        mode_bits: Some(src.mode_bits),
         background: src.back_color,
         foreground: src.fore_color,
         grid_lines: src.grid_lines,
@@ -465,11 +464,16 @@ fn col_indicator_to_proto(src: &crate::indicator::ColIndicatorState) -> v1::ColI
                 col1: Some(cell.col1.max(0)),
                 col2: Some(cell.col2.max(0)),
                 text: Some(cell.text.clone()),
-                mode_bits: Some(cell.mode_bits),
                 custom_key: Some(cell.custom_key.clone()),
                 data: Some(cell.data.clone()),
+                modes: cell.modes.as_ref().map(|modes| v1::ColIndicatorCellModes {
+                    modes: modes.clone(),
+                }),
             })
             .collect(),
+        cell_modes: Some(v1::ColIndicatorCellModes {
+            modes: src.cell_modes.clone(),
+        }),
     }
 }
 
@@ -479,9 +483,6 @@ fn apply_corner_indicator_config(
 ) {
     if let Some(v) = cfg.visible {
         target.visible = v;
-    }
-    if let Some(v) = cfg.mode_bits {
-        target.mode_bits = v;
     }
     if let Some(v) = cfg.background {
         target.back_color = Some(v);
@@ -514,7 +515,6 @@ fn apply_corner_indicator_config(
 fn corner_indicator_to_proto(src: &CornerIndicatorState) -> v1::CornerIndicatorConfig {
     v1::CornerIndicatorConfig {
         visible: Some(src.visible),
-        mode_bits: Some(src.mode_bits),
         background: src.back_color,
         foreground: src.fore_color,
         custom_key: Some(src.custom_key.clone()),

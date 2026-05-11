@@ -73,10 +73,12 @@ fn main() {
                 col_top: Some(ColIndicatorConfig {
                     visible: Some(true),
                     band_rows: Some(1),
-                    mode_bits: Some(
-                        (ColIndicatorCellMode::ColIndicatorCellHeaderText as u32)
-                            | (ColIndicatorCellMode::ColIndicatorCellSortGlyph as u32),
-                    ),
+                    cell_modes: Some(ColIndicatorCellModes {
+                        modes: vec![
+                            ColIndicatorCellMode::ColIndicatorCellHeaderText as i32,
+                            ColIndicatorCellMode::ColIndicatorCellSortGlyph as i32,
+                        ],
+                    }),
                     ..Default::default()
                 }),
                 row_start: Some(RowIndicatorConfig {

@@ -1502,10 +1502,9 @@ function pbEncodeHierarchyOutlineConfig(maxOutlineDepth: number, maxOutlineLevel
   const colTop: number[] = [];
   colTop.push(...pbEncodeTag(ColIndicatorConfigFields.visible, 0), ...pbEncodeBool(true));
   colTop.push(...pbEncodeInt32Field(ColIndicatorConfigFields.band_rows, 1));
-  colTop.push(...pbEncodeUint32Field(
-    ColIndicatorConfigFields.mode_bits,
-    ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT,
-  ));
+  const colTopModes: number[] = [];
+  colTopModes.push(...pbEncodeInt32Field(1, ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT));
+  colTop.push(...pbEncodeMessageField(ColIndicatorConfigFields.cell_modes, new Uint8Array(colTopModes)));
   colTop.push(...pbEncodeUint32Field(ColIndicatorConfigFields.background, 0xFFFAFAF9));
   colTop.push(...pbEncodeUint32Field(ColIndicatorConfigFields.foreground, 0xFF1C1917));
   colTop.push(...pbEncodeUint32Field(ColIndicatorConfigFields.grid_color, 0xFFD6D3D1));
@@ -1650,11 +1649,10 @@ function pbEncodeSalesDemoConfig(): Uint8Array {
   colTop.push(...pbEncodeTag(ColIndicatorConfigFields.visible, 0), ...pbEncodeBool(true));
   colTop.push(...pbEncodeInt32Field(ColIndicatorConfigFields.default_row_height, 28));
   colTop.push(...pbEncodeInt32Field(ColIndicatorConfigFields.band_rows, 1));
-  colTop.push(...pbEncodeUint32Field(
-    ColIndicatorConfigFields.mode_bits,
-    ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT |
-      ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH,
-  ));
+  const colTopModes: number[] = [];
+  colTopModes.push(...pbEncodeInt32Field(1, ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT));
+  colTopModes.push(...pbEncodeInt32Field(1, ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH));
+  colTop.push(...pbEncodeMessageField(ColIndicatorConfigFields.cell_modes, new Uint8Array(colTopModes)));
   colTop.push(...pbEncodeUint32Field(ColIndicatorConfigFields.background, 0xFFF9FAFB));
   colTop.push(...pbEncodeUint32Field(ColIndicatorConfigFields.foreground, 0xFF111827));
   colTop.push(...pbEncodeUint32Field(ColIndicatorConfigFields.grid_color, 0xFFD1D5DB));

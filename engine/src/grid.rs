@@ -16,7 +16,9 @@ use crate::control::CellControl;
 use crate::drag::DragState;
 use crate::edit::EditState;
 use crate::event::{EventQueue, EventTarget};
-use crate::indicator::{ColIndicatorRowDefState, IndicatorBandsState, RowIndicatorState};
+use crate::indicator::{
+    col_indicator_modes_contain, ColIndicatorRowDefState, IndicatorBandsState, RowIndicatorState,
+};
 use crate::layout::LayoutCache;
 use crate::outline::OutlineState;
 use crate::proto::volvoxgrid::v1 as pb;
@@ -3838,7 +3840,6 @@ impl VolvoxGrid {
 
         let mut heights: Vec<i32> = (0..row_count).map(|row| band.row_height_px(row)).collect();
         let padding = self.style.fixed_cell_padding.vertical().max(2);
-        let header_mode = pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as u32;
         let mut changed = false;
 
         if band.cells.is_empty()
@@ -3864,14 +3865,15 @@ impl VolvoxGrid {
             if row1 >= heights.len() || row2 >= heights.len() {
                 continue;
             }
-            let mode_bits = if cell.mode_bits != 0 {
-                cell.mode_bits
-            } else {
-                band.mode_bits
-            };
+            let modes = band.effective_modes_for_cell(cell);
             let text = if !cell.text.trim().is_empty() {
                 cell.text.clone()
-            } else if cell.col1 == cell.col2 && (mode_bits & header_mode != 0) {
+            } else if cell.col1 == cell.col2
+                && col_indicator_modes_contain(
+                    modes,
+                    pb::ColIndicatorCellMode::ColIndicatorCellHeaderText,
+                )
+            {
                 self.column_header_text(cell.col1)
             } else {
                 String::new()
@@ -6332,8 +6334,8 @@ mod tests {
         grid.style.font_size = 40.0;
         grid.indicator_bands.col_top.visible = true;
         grid.indicator_bands.col_top.band_rows = 1;
-        grid.indicator_bands.col_top.mode_bits =
-            pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as u32;
+        grid.indicator_bands.col_top.cell_modes =
+            vec![pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as i32];
         grid.columns[0].caption = "품명".to_string();
         grid.columns[1].caption = "고객명".to_string();
 

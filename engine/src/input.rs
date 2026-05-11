@@ -3,6 +3,7 @@ use crate::compose::ComposeResult;
 use crate::control::CellControl;
 use crate::event::{EventTarget, GridEventData};
 use crate::grid::{ActiveIndicatorTarget, HoverTarget, VolvoxGrid};
+use crate::indicator::{col_indicator_modes_contain, primary_col_indicator_mode};
 use crate::proto::volvoxgrid::v1 as pb;
 use crate::scrollbar::{
     bump_scrollbar_fade, compute_scrollbar_geometry, normalize_scrollbar_mode,
@@ -1586,18 +1587,18 @@ fn col_indicator_sort_arrow_box_size(cell_h: i32, scale: f32) -> i32 {
     device_box.min(cell_h.saturating_sub(2).max(0))
 }
 
-fn col_indicator_sub_mode_bits(
+fn col_indicator_sub_mode(
     grid: &VolvoxGrid,
     col: i32,
-    mode_bits: u32,
+    modes: &[i32],
     cell_height: i32,
     x_in_col: f32,
-) -> u32 {
+) -> i32 {
     if col < 0 || col >= grid.cols {
         return 0;
     }
-    let sort_mode = pb::ColIndicatorCellMode::ColIndicatorCellSortGlyph as u32;
-    if mode_bits & sort_mode != 0 && grid.header_features & 1 != 0 {
+    let sort_mode = pb::ColIndicatorCellMode::ColIndicatorCellSortGlyph;
+    if col_indicator_modes_contain(modes, sort_mode) && grid.header_features & 1 != 0 {
         let (_, _, col_w, _) = grid.layout.cell_rect(0, col);
         let glyph_box =
             col_indicator_sort_arrow_box_size(cell_height, grid.scale).min((col_w - 4).max(0));
@@ -1605,7 +1606,7 @@ fn col_indicator_sub_mode_bits(
             let glyph_x = (col_w - glyph_box - 4).max(2);
             let x = x_in_col as i32;
             if x >= glyph_x && x < glyph_x + glyph_box {
-                return sort_mode;
+                return sort_mode as i32;
             }
         }
     }
@@ -1624,20 +1625,18 @@ fn col_indicator_target_for_hit(grid: &VolvoxGrid, hit: &HitTestResult) -> Event
         {
             continue;
         }
-        let mode_bits = if cell.mode_bits != 0 {
-            cell.mode_bits
-        } else {
-            band.mode_bits
-        };
+        let modes = band.effective_modes_for_cell(cell);
         let cell_height = col_indicator_cell_height(band, cell.row1, cell.row2);
-        let sub_mode_bits =
-            col_indicator_sub_mode_bits(grid, hit.col, mode_bits, cell_height, hit.x_in_cell);
-        let slot_kind = if sub_mode_bits != 0 {
-            sub_mode_bits as i32
-        } else if mode_bits & (pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as u32) != 0 {
+        let sub_mode = col_indicator_sub_mode(grid, hit.col, modes, cell_height, hit.x_in_cell);
+        let slot_kind = if sub_mode != 0 {
+            sub_mode
+        } else if col_indicator_modes_contain(
+            modes,
+            pb::ColIndicatorCellMode::ColIndicatorCellHeaderText,
+        ) {
             pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as i32
         } else {
-            mode_bits as i32
+            primary_col_indicator_mode(modes)
         };
         let cell_data = cell.data.clone();
         return EventTarget {
@@ -1645,7 +1644,7 @@ fn col_indicator_target_for_hit(grid: &VolvoxGrid, hit: &HitTestResult) -> Event
             band: pb::IndicatorBand::ColTop as i32,
             slot_index: slot_index as i32,
             slot_kind,
-            sub_mode_bits,
+            sub_mode,
             custom_key: cell.custom_key.clone(),
             data: cell_data,
             ..EventTarget::default()
@@ -1655,14 +1654,14 @@ fn col_indicator_target_for_hit(grid: &VolvoxGrid, hit: &HitTestResult) -> Event
     let slot_kind = if band.has_mode(pb::ColIndicatorCellMode::ColIndicatorCellHeaderText) {
         pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as i32
     } else {
-        band.mode_bits as i32
+        primary_col_indicator_mode(&band.cell_modes)
     };
     EventTarget {
         kind: pb::GridTargetKind::GridTargetColIndicator as i32,
         band: pb::IndicatorBand::ColTop as i32,
         slot_index: -1,
         slot_kind,
-        sub_mode_bits: 0,
+        sub_mode: 0,
         custom_key: String::new(),
         ..EventTarget::default()
     }
@@ -1765,7 +1764,7 @@ fn enrich_col_indicator_target(grid: &VolvoxGrid, col: i32, target: &mut EventTa
 
     let kind = target.slot_kind;
     let is_sort_glyph = kind == Mode::ColIndicatorCellSortGlyph as i32
-        || (target.sub_mode_bits & Mode::ColIndicatorCellSortGlyph as u32 != 0);
+        || target.sub_mode == Mode::ColIndicatorCellSortGlyph as i32;
 
     if kind == Mode::ColIndicatorCellHeaderText as i32 && grid.fixed_rows > 0 {
         target.text = grid.get_display_text(0, col);
@@ -1944,7 +1943,7 @@ fn target_identity_from_hit(grid: &VolvoxGrid, hit: &HitTestResult) -> EventTarg
             kind: pb::GridTargetKind::GridTargetColIndicator as i32,
             band: pb::IndicatorBand::ColTop as i32,
             slot_kind: pb::ColIndicatorCellMode::ColIndicatorCellResizeHandle as i32,
-            sub_mode_bits: pb::ColIndicatorCellMode::ColIndicatorCellResizeHandle as u32,
+            sub_mode: pb::ColIndicatorCellMode::ColIndicatorCellResizeHandle as i32,
             ..EventTarget::default()
         },
         HitArea::IndicatorCornerTopStart => {
@@ -1997,7 +1996,7 @@ fn same_hover_target_identity(prev: &HoverTarget, next: &HoverTarget) -> bool {
         && prev.target.band == next.target.band
         && prev.target.slot_index == next.target.slot_index
         && prev.target.slot_kind == next.target.slot_kind
-        && prev.target.sub_mode_bits == next.target.sub_mode_bits
+        && prev.target.sub_mode == next.target.sub_mode
         && prev.target.custom_key == next.target.custom_key
         && hover_target_identity_int_value(&prev.target)
             == hover_target_identity_int_value(&next.target)
@@ -2311,22 +2310,18 @@ fn target_from_active_indicator(grid: &VolvoxGrid, active: &ActiveIndicatorTarge
         let band = &grid.indicator_bands.col_top;
         if active.slot_index >= 0 {
             if let Some(cell) = band.cells.get(active.slot_index as usize) {
-                let mode_bits = if cell.mode_bits != 0 {
-                    cell.mode_bits
-                } else {
-                    band.mode_bits
-                };
+                let modes = band.effective_modes_for_cell(cell);
                 return EventTarget {
                     kind: pb::GridTargetKind::GridTargetColIndicator as i32,
                     band: active.band,
                     slot_index: active.slot_index,
-                    slot_kind: if mode_bits
-                        & (pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as u32)
-                        != 0
-                    {
+                    slot_kind: if col_indicator_modes_contain(
+                        modes,
+                        pb::ColIndicatorCellMode::ColIndicatorCellHeaderText,
+                    ) {
                         pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as i32
                     } else {
-                        mode_bits as i32
+                        primary_col_indicator_mode(modes)
                     },
                     custom_key: cell.custom_key.clone(),
                     ..EventTarget::default()
@@ -2340,7 +2335,7 @@ fn target_from_active_indicator(grid: &VolvoxGrid, active: &ActiveIndicatorTarge
             slot_kind: if band.has_mode(pb::ColIndicatorCellMode::ColIndicatorCellHeaderText) {
                 pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as i32
             } else {
-                band.mode_bits as i32
+                primary_col_indicator_mode(&band.cell_modes)
             },
             ..EventTarget::default()
         };
@@ -5561,7 +5556,9 @@ mod tests {
             row2: 0,
             col1: 1,
             col2: 1,
-            mode_bits: pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as u32,
+            modes: Some(vec![
+                pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as i32,
+            ]),
             custom_key: "header-1".to_string(),
             ..Default::default()
         }];

@@ -3344,15 +3344,15 @@ namespace Volvoxgrid.V1
         private string _text;
         public string Text { get { return _text; } set { _text = value; } }
         public bool HasText { get { return _text != null; } }
-        private uint? _modeBits;
-        public uint ModeBits { get { return _modeBits.GetValueOrDefault(); } set { _modeBits = value; } }
-        public bool HasModeBits { get { return _modeBits.HasValue; } }
         private string _customKey;
         public string CustomKey { get { return _customKey; } set { _customKey = value; } }
         public bool HasCustomKey { get { return _customKey != null; } }
         private byte[] _data;
         public byte[] Data { get { return _data; } set { _data = value; } }
         public bool HasData { get { return _data != null; } }
+        private ColIndicatorCellModes _modes;
+        public ColIndicatorCellModes Modes { get { return _modes; } set { _modes = value; } }
+        public bool HasModes { get { return _modes != null; } }
 
         // ── Serialization ──
 
@@ -3369,12 +3369,12 @@ namespace Volvoxgrid.V1
                 w.WriteInt32(4, _col2.Value);
             if (_text != null)
                 w.WriteString(5, _text);
-            if (_modeBits.HasValue)
-                w.WriteInt32(6, unchecked((int)_modeBits.Value));
             if (_customKey != null)
                 w.WriteString(7, _customKey);
             if (_data != null)
                 w.WriteBytes(8, _data);
+            if (_modes != null)
+                w.WriteMessageBytes(9, _modes.ToByteArray());
             return w.ToArray();
         }
 
@@ -3397,9 +3397,56 @@ namespace Volvoxgrid.V1
                     case 3: msg.Col1 = r.ReadInt32(); break;
                     case 4: msg.Col2 = r.ReadInt32(); break;
                     case 5: msg.Text = r.ReadString(); break;
-                    case 6: msg.ModeBits = unchecked((uint)r.ReadInt32()); break;
                     case 7: msg.CustomKey = r.ReadString(); break;
                     case 8: msg.Data = r.ReadLengthDelimited(); break;
+                    case 9: msg.Modes = ColIndicatorCellModes.ParseFrom(r.ReadLengthDelimited()); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class ColIndicatorCellModes
+    {
+        public List<ColIndicatorCellMode> Modes { get; private set; } = new List<ColIndicatorCellMode>();
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            foreach (var item in Modes)
+                w.WriteInt32(1, (int)item);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<ColIndicatorCellModes> Parser = new MessageParser<ColIndicatorCellModes>(data => ParseFrom(data));
+
+        public static ColIndicatorCellModes ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new ColIndicatorCellModes();
+            var r = new ProtoReader(data);
+            var msg = new ColIndicatorCellModes();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1:
+                        if (wire == ProtoWireType.LengthDelimited)
+                        {
+                            var packed = new ProtoReader(r.ReadLengthDelimited());
+                            while (!packed.IsEof)
+                                msg.Modes.Add((ColIndicatorCellMode)packed.ReadInt32());
+                        }
+                        else
+                        {
+                            msg.Modes.Add((ColIndicatorCellMode)r.ReadInt32());
+                        }
+                        break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -3418,9 +3465,6 @@ namespace Volvoxgrid.V1
         private int? _bandRows;
         public int BandRows { get { return _bandRows.GetValueOrDefault(); } set { _bandRows = value; } }
         public bool HasBandRows { get { return _bandRows.HasValue; } }
-        private uint? _modeBits;
-        public uint ModeBits { get { return _modeBits.GetValueOrDefault(); } set { _modeBits = value; } }
-        public bool HasModeBits { get { return _modeBits.HasValue; } }
         private uint? _background;
         public uint Background { get { return _background.GetValueOrDefault(); } set { _background = value; } }
         public bool HasBackground { get { return _background.HasValue; } }
@@ -3447,6 +3491,9 @@ namespace Volvoxgrid.V1
         public bool HasAllowMenu { get { return _allowMenu.HasValue; } }
         public List<ColIndicatorRowDef> RowDefs { get; private set; } = new List<ColIndicatorRowDef>();
         public List<ColIndicatorCell> Cells { get; private set; } = new List<ColIndicatorCell>();
+        private ColIndicatorCellModes _cellModes;
+        public ColIndicatorCellModes CellModes { get { return _cellModes; } set { _cellModes = value; } }
+        public bool HasCellModes { get { return _cellModes != null; } }
 
         // ── Serialization ──
 
@@ -3459,8 +3506,6 @@ namespace Volvoxgrid.V1
                 w.WriteInt32(2, _defaultRowHeight.Value);
             if (_bandRows.HasValue)
                 w.WriteInt32(3, _bandRows.Value);
-            if (_modeBits.HasValue)
-                w.WriteInt32(4, unchecked((int)_modeBits.Value));
             if (_background.HasValue)
                 w.WriteInt32(5, unchecked((int)_background.Value));
             if (_foreground.HasValue)
@@ -3481,6 +3526,8 @@ namespace Volvoxgrid.V1
                 w.WriteMessageBytes(13, item.ToByteArray());
             foreach (var item in Cells)
                 w.WriteMessageBytes(14, item.ToByteArray());
+            if (_cellModes != null)
+                w.WriteMessageBytes(15, _cellModes.ToByteArray());
             return w.ToArray();
         }
 
@@ -3501,7 +3548,6 @@ namespace Volvoxgrid.V1
                     case 1: msg.Visible = r.ReadBool(); break;
                     case 2: msg.DefaultRowHeight = r.ReadInt32(); break;
                     case 3: msg.BandRows = r.ReadInt32(); break;
-                    case 4: msg.ModeBits = unchecked((uint)r.ReadInt32()); break;
                     case 5: msg.Background = unchecked((uint)r.ReadInt32()); break;
                     case 6: msg.Foreground = unchecked((uint)r.ReadInt32()); break;
                     case 7: msg.GridLines = (GridLineStyle)r.ReadInt32(); break;
@@ -3512,6 +3558,7 @@ namespace Volvoxgrid.V1
                     case 12: msg.AllowMenu = r.ReadBool(); break;
                     case 13: msg.RowDefs.Add(ColIndicatorRowDef.ParseFrom(r.ReadLengthDelimited())); break;
                     case 14: msg.Cells.Add(ColIndicatorCell.ParseFrom(r.ReadLengthDelimited())); break;
+                    case 15: msg.CellModes = ColIndicatorCellModes.ParseFrom(r.ReadLengthDelimited()); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -3903,9 +3950,6 @@ namespace Volvoxgrid.V1
         private bool? _visible;
         public bool Visible { get { return _visible.GetValueOrDefault(); } set { _visible = value; } }
         public bool HasVisible { get { return _visible.HasValue; } }
-        private uint? _modeBits;
-        public uint ModeBits { get { return _modeBits.GetValueOrDefault(); } set { _modeBits = value; } }
-        public bool HasModeBits { get { return _modeBits.HasValue; } }
         private uint? _background;
         public uint Background { get { return _background.GetValueOrDefault(); } set { _background = value; } }
         public bool HasBackground { get { return _background.HasValue; } }
@@ -3927,8 +3971,6 @@ namespace Volvoxgrid.V1
             var w = new ProtoWriter();
             if (_visible.HasValue)
                 w.WriteBool(1, _visible.Value);
-            if (_modeBits.HasValue)
-                w.WriteInt32(2, unchecked((int)_modeBits.Value));
             if (_background.HasValue)
                 w.WriteInt32(3, unchecked((int)_background.Value));
             if (_foreground.HasValue)
@@ -3957,7 +3999,6 @@ namespace Volvoxgrid.V1
                 switch (field)
                 {
                     case 1: msg.Visible = r.ReadBool(); break;
-                    case 2: msg.ModeBits = unchecked((uint)r.ReadInt32()); break;
                     case 3: msg.Background = unchecked((uint)r.ReadInt32()); break;
                     case 4: msg.Foreground = unchecked((uint)r.ReadInt32()); break;
                     case 5: msg.CustomKey = r.ReadString(); break;
@@ -7390,12 +7431,12 @@ namespace Volvoxgrid.V1
         public IndicatorBand Band { get; set; }
         public int SlotIndex { get; set; }
         public int SlotKind { get; set; }
-        public uint SubModeBits { get; set; }
         public string CustomKey { get; set; } = "";
         public string Text { get; set; } = "";
         public long IntValue { get; set; }
         public uint StatusFlags { get; set; }
         public byte[] Data { get; set; }
+        public int SubMode { get; set; }
 
         // ── Serialization ──
 
@@ -7406,12 +7447,12 @@ namespace Volvoxgrid.V1
             if (Band != 0) w.WriteInt32(2, (int)Band);
             if (SlotIndex != 0) w.WriteInt32(3, SlotIndex);
             if (SlotKind != 0) w.WriteInt32(4, SlotKind);
-            if (SubModeBits != 0u) w.WriteInt32(5, unchecked((int)SubModeBits));
             if (CustomKey != null && CustomKey.Length > 0) w.WriteString(6, CustomKey);
             if (Text != null && Text.Length > 0) w.WriteString(7, Text);
             if (IntValue != 0L) w.WriteInt64(8, IntValue);
             if (StatusFlags != 0u) w.WriteInt32(9, unchecked((int)StatusFlags));
             if (Data != null && Data.Length > 0) w.WriteBytes(10, Data);
+            if (SubMode != 0) w.WriteInt32(11, SubMode);
             return w.ToArray();
         }
 
@@ -7433,12 +7474,12 @@ namespace Volvoxgrid.V1
                     case 2: msg.Band = (IndicatorBand)r.ReadInt32(); break;
                     case 3: msg.SlotIndex = r.ReadInt32(); break;
                     case 4: msg.SlotKind = r.ReadInt32(); break;
-                    case 5: msg.SubModeBits = unchecked((uint)r.ReadInt32()); break;
                     case 6: msg.CustomKey = r.ReadString(); break;
                     case 7: msg.Text = r.ReadString(); break;
                     case 8: msg.IntValue = r.ReadInt64(); break;
                     case 9: msg.StatusFlags = unchecked((uint)r.ReadInt32()); break;
                     case 10: msg.Data = r.ReadLengthDelimited(); break;
+                    case 11: msg.SubMode = r.ReadInt32(); break;
                     default: r.SkipField(wire); break;
                 }
             }

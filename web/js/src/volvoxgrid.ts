@@ -178,6 +178,43 @@ export interface VolvoxGridResizePolicy {
   uniform?: boolean;
 }
 
+export interface VolvoxGridRowIndicatorSlot {
+  kind?: number;
+  width?: number;
+  visible?: boolean;
+  customKey?: string;
+  data?: Uint8Array;
+}
+
+export interface VolvoxGridRowIndicatorConfig {
+  visible?: boolean;
+  width?: number;
+  background?: number;
+  foreground?: number;
+  gridLines?: number;
+  gridColor?: number;
+  autoSize?: boolean;
+  allowResize?: boolean;
+  allowSelect?: boolean;
+  allowReorder?: boolean;
+  slots?: ReadonlyArray<VolvoxGridRowIndicatorSlot>;
+}
+
+export interface VolvoxGridColumnIndicatorConfig {
+  visible?: boolean;
+  defaultRowHeight?: number;
+  bandRows?: number;
+  cellModes?: ReadonlyArray<number>;
+  background?: number;
+  foreground?: number;
+  gridLines?: number;
+  gridColor?: number;
+  autoSize?: boolean;
+  allowResize?: boolean;
+  allowReorder?: boolean;
+  allowMenu?: boolean;
+}
+
 export interface VolvoxGridFreezePolicy {
   columns?: boolean;
   rows?: boolean;
@@ -962,43 +999,70 @@ function pbEncodeRenderPresentModeConfig(presentMode: number): Uint8Array {
   return new Uint8Array(gridConfig);
 }
 
-function pbEncodeRowIndicatorSlot(kind: number, width: number): Uint8Array {
+function pbEncodeRawBytesField(field: number, data: Uint8Array): number[] {
+  return [
+    ...pbEncodeTag(field, 2),
+    ...pbEncodeVarint(BigInt(data.length)),
+    ...data,
+  ];
+}
+
+function pbEncodeRowIndicatorSlotConfig(slot: VolvoxGridRowIndicatorSlot): Uint8Array {
   const out: number[] = [];
-  out.push(...pbEncodeTag(1, 0), ...pbEncodeInt32(kind));
-  out.push(...pbEncodeTag(2, 0), ...pbEncodeInt32(width));
-  out.push(...pbEncodeTag(3, 0), ...pbEncodeBool(true));
+  if (slot.kind != null) out.push(...pbEncodeTag(1, 0), ...pbEncodeInt32(slot.kind));
+  if (slot.width != null) out.push(...pbEncodeTag(2, 0), ...pbEncodeInt32(slot.width));
+  if (slot.visible != null) out.push(...pbEncodeTag(3, 0), ...pbEncodeBool(slot.visible));
+  if (slot.customKey != null) out.push(...pbEncodeStringField(4, slot.customKey));
+  if (slot.data != null) out.push(...pbEncodeRawBytesField(5, slot.data));
   return new Uint8Array(out);
 }
 
-function pbEncodeRowIndicatorStartModeConfig(modeBits: number, width: number): Uint8Array {
-  const normalized = Math.max(0, Math.trunc(modeBits));
+function pbEncodeRowIndicatorStartConfig(config: VolvoxGridRowIndicatorConfig): Uint8Array {
   const rowConfig: number[] = [];
-  const add = (bit: number, kind: number, slotWidth: number) => {
-    if ((normalized & bit) !== 0) {
-      rowConfig.push(...pbEncodeMessageField(12, pbEncodeRowIndicatorSlot(kind, slotWidth)));
-    }
-  };
-
-  add(1, 1, Math.max(1, Math.trunc(width)));
-  add(2, 2, 18);
-  add(4, 3, 17);
-  add(8, 4, 18);
-  add(16, 5, 18);
-  add(32, 6, 18);
-  add(64, 7, 18);
-  add(128, 8, 18);
-  add(256, 9, 18);
-  add(512, 10, 18);
-  add(1024, 11, 18);
-  add(2048, 12, 18);
-  add(4096, 13, 18);
-  add(8192, 14, 18);
-  if (rowConfig.length === 0) {
-    rowConfig.push(...pbEncodeTag(1, 0), ...pbEncodeBool(false));
+  if (config.visible != null) rowConfig.push(...pbEncodeTag(1, 0), ...pbEncodeBool(config.visible));
+  if (config.width != null) rowConfig.push(...pbEncodeTag(2, 0), ...pbEncodeInt32(config.width));
+  if (config.background != null) rowConfig.push(...pbEncodeUint32Field(4, config.background));
+  if (config.foreground != null) rowConfig.push(...pbEncodeUint32Field(5, config.foreground));
+  if (config.gridLines != null) rowConfig.push(...pbEncodeTag(6, 0), ...pbEncodeInt32(config.gridLines));
+  if (config.gridColor != null) rowConfig.push(...pbEncodeUint32Field(7, config.gridColor));
+  if (config.autoSize != null) rowConfig.push(...pbEncodeTag(8, 0), ...pbEncodeBool(config.autoSize));
+  if (config.allowResize != null) rowConfig.push(...pbEncodeTag(9, 0), ...pbEncodeBool(config.allowResize));
+  if (config.allowSelect != null) rowConfig.push(...pbEncodeTag(10, 0), ...pbEncodeBool(config.allowSelect));
+  if (config.allowReorder != null) rowConfig.push(...pbEncodeTag(11, 0), ...pbEncodeBool(config.allowReorder));
+  for (const slot of config.slots ?? []) {
+    rowConfig.push(...pbEncodeMessageField(12, pbEncodeRowIndicatorSlotConfig(slot)));
   }
 
   const indicatorsConfig: number[] = [];
   indicatorsConfig.push(...pbEncodeMessageField(1, new Uint8Array(rowConfig)));
+  const gridConfig: number[] = [];
+  gridConfig.push(...pbEncodeMessageField(11, new Uint8Array(indicatorsConfig)));
+  return new Uint8Array(gridConfig);
+}
+
+function pbEncodeColumnIndicatorTopConfig(config: VolvoxGridColumnIndicatorConfig): Uint8Array {
+  const colConfig: number[] = [];
+  if (config.visible != null) colConfig.push(...pbEncodeTag(1, 0), ...pbEncodeBool(config.visible));
+  if (config.defaultRowHeight != null) colConfig.push(...pbEncodeTag(2, 0), ...pbEncodeInt32(config.defaultRowHeight));
+  if (config.bandRows != null) colConfig.push(...pbEncodeTag(3, 0), ...pbEncodeInt32(config.bandRows));
+  if (config.cellModes != null) {
+    const modes: number[] = [];
+    for (const mode of config.cellModes) {
+      modes.push(...pbEncodeTag(1, 0), ...pbEncodeInt32(Math.max(0, Math.trunc(mode))));
+    }
+    colConfig.push(...pbEncodeMessageField(15, new Uint8Array(modes)));
+  }
+  if (config.background != null) colConfig.push(...pbEncodeUint32Field(5, config.background));
+  if (config.foreground != null) colConfig.push(...pbEncodeUint32Field(6, config.foreground));
+  if (config.gridLines != null) colConfig.push(...pbEncodeTag(7, 0), ...pbEncodeInt32(config.gridLines));
+  if (config.gridColor != null) colConfig.push(...pbEncodeUint32Field(8, config.gridColor));
+  if (config.autoSize != null) colConfig.push(...pbEncodeTag(9, 0), ...pbEncodeBool(config.autoSize));
+  if (config.allowResize != null) colConfig.push(...pbEncodeTag(10, 0), ...pbEncodeBool(config.allowResize));
+  if (config.allowReorder != null) colConfig.push(...pbEncodeTag(11, 0), ...pbEncodeBool(config.allowReorder));
+  if (config.allowMenu != null) colConfig.push(...pbEncodeTag(12, 0), ...pbEncodeBool(config.allowMenu));
+
+  const indicatorsConfig: number[] = [];
+  indicatorsConfig.push(...pbEncodeMessageField(3, new Uint8Array(colConfig)));
   const gridConfig: number[] = [];
   gridConfig.push(...pbEncodeMessageField(11, new Uint8Array(indicatorsConfig)));
   return new Uint8Array(gridConfig);
@@ -2392,7 +2456,6 @@ export class VolvoxGrid {
   private ctx: CanvasRenderingContext2D | null = null;
   private useGpu: boolean = false;
   private _presentMode: number = 0; // proto PresentMode (0=AUTO,1=FIFO,2=MAILBOX,3=IMMEDIATE)
-  private _rowIndicatorStartModeBits: number = 0;
   private animFrame: number = 0;
   private dirty: boolean = true;
   private destroyed: boolean = false;
@@ -2861,17 +2924,12 @@ export class VolvoxGrid {
     }
   }
 
-  get columnIndicatorTopModeBits(): number {
-    if (typeof this.wasm.get_col_indicator_top_mode_bits === "function") {
-      return Number(this.wasm.get_col_indicator_top_mode_bits(this.gridId));
-    }
-    return 0;
-  }
-  set columnIndicatorTopModeBits(value: number) {
-    if (typeof this.wasm.set_col_indicator_top_mode_bits === "function") {
-      this.wasm.set_col_indicator_top_mode_bits(this.gridId, Math.max(0, Math.trunc(value)));
-      this.dirty = true;
-    }
+  setColumnIndicatorTopConfig(config: VolvoxGridColumnIndicatorConfig): void {
+    this.applyProtoConfig(
+      pbEncodeColumnIndicatorTopConfig(config),
+      "column indicator top config",
+    );
+    this.dirty = true;
   }
 
   get columnIndicatorTopRowCount(): number {
@@ -2900,23 +2958,11 @@ export class VolvoxGrid {
     }
   }
 
-  get rowIndicatorStartModeBits(): number {
-    if (typeof this.wasm.get_row_indicator_start_mode_bits === "function") {
-      return Number(this.wasm.get_row_indicator_start_mode_bits(this.gridId));
-    }
-    return this._rowIndicatorStartModeBits;
-  }
-  set rowIndicatorStartModeBits(value: number) {
-    const normalized = Math.max(0, Math.trunc(value));
-    this._rowIndicatorStartModeBits = normalized;
-    if (typeof this.wasm.set_row_indicator_start_mode_bits === "function") {
-      this.wasm.set_row_indicator_start_mode_bits(this.gridId, normalized);
-    } else {
-      this.applyProtoConfig(
-        pbEncodeRowIndicatorStartModeConfig(normalized, this.rowIndicatorStartWidth),
-        "row indicator slots",
-      );
-    }
+  setRowIndicatorStartConfig(config: VolvoxGridRowIndicatorConfig): void {
+    this.applyProtoConfig(
+      pbEncodeRowIndicatorStartConfig(config),
+      "row indicator start config",
+    );
     this.dirty = true;
   }
 

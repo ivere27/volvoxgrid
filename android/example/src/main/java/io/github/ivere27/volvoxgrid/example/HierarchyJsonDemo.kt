@@ -7,6 +7,7 @@ import io.github.ivere27.volvoxgrid.Borders
 import io.github.ivere27.volvoxgrid.CellInteraction
 import io.github.ivere27.volvoxgrid.CellStyle
 import io.github.ivere27.volvoxgrid.ColIndicatorCellMode
+import io.github.ivere27.volvoxgrid.ColIndicatorCellModes
 import io.github.ivere27.volvoxgrid.ColIndicatorConfig
 import io.github.ivere27.volvoxgrid.ColumnDataType
 import io.github.ivere27.volvoxgrid.ColumnDef
@@ -405,7 +406,11 @@ object HierarchyJsonDemo {
                             .setVisible(true)
                             .setDefaultRowHeight(HEADER_ROW_HEIGHT)
                             .setBandRows(1)
-                            .setModeBits(ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT.number)
+                            .setCellModes(
+                                ColIndicatorCellModes.newBuilder()
+                                    .addModes(ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT)
+                                    .build()
+                            )
                             .setBackground(HEADER_BG)
                             .setForeground(HEADER_FG)
                             .setGridColor(FIXED_GRID_COLOR)

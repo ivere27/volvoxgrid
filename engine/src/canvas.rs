@@ -10,6 +10,7 @@
 use crate::cell::BarcodeSpec;
 use crate::control::CellControl;
 use crate::grid::{PullToRefreshState, VolvoxGrid};
+use crate::indicator::col_indicator_modes_contain;
 use crate::proto::volvoxgrid::v1 as pb;
 use crate::rich_text::utf16_index_to_byte_index;
 use crate::scrollbar::{
@@ -5278,15 +5279,14 @@ fn render_col_indicator_top<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &
         }
         let cy = row_offsets[row1].1;
         let ch = row_offsets[row1..=row2].iter().map(|(_, _, h)| *h).sum();
-        let mode_bits = if cell.mode_bits != 0 {
-            cell.mode_bits
-        } else {
-            band.mode_bits
-        };
+        let modes = band.effective_modes_for_cell(cell);
         let text = if !cell.text.trim().is_empty() {
             cell.text.clone()
         } else if cell.col1 == cell.col2
-            && (mode_bits & (pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as u32) != 0)
+            && col_indicator_modes_contain(
+                modes,
+                pb::ColIndicatorCellMode::ColIndicatorCellHeaderText,
+            )
         {
             column_header_text(grid, cell.col1)
         } else {

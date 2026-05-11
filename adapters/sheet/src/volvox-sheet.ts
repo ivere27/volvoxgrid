@@ -11,6 +11,7 @@ import * as volvoxgrid from "volvoxgrid";
 import type {
   VolvoxSheetOptions, VolvoxSheetApi, CellRef, CellRange,
   CellStyleUpdate, SpreadsheetAction, VolvoxSheetGrid,
+  VolvoxGridRowIndicatorConfig,
 } from "./types.js";
 import { encodeGridConfig } from "./proto/config-encoder.js";
 import {
@@ -78,7 +79,17 @@ const DEFAULT_CJK_FONTS = {
     url: "https://cdn.jsdelivr.net/gh/notofonts/noto-cjk@main/Sans/SubsetOTF/TC/NotoSansTC-Regular.otf",
   },
 } as const satisfies Record<string, DefaultFontSource>;
-const SHEET_ROW_INDICATOR_MODE = 1; // numbers
+const SHEET_ROW_NUMBER_SLOT_KIND = 1;
+
+function sheetRowIndicatorConfig(width: number): VolvoxGridRowIndicatorConfig {
+  const normalizedWidth = Math.max(1, Math.trunc(width));
+  return {
+    visible: true,
+    width: normalizedWidth,
+    allowResize: true,
+    slots: [{ kind: SHEET_ROW_NUMBER_SLOT_KIND, width: normalizedWidth, visible: true }],
+  };
+}
 
 const createCanvas2DTextRendererMaybe =
   (volvoxgrid as { createCanvas2DTextRenderer?: (wasm: any) => { measureText: Function; renderText: Function } })
@@ -327,8 +338,7 @@ export class VolvoxSheet implements VolvoxSheetApi {
     this.grid.showColumnHeaders = true;
     this.grid.columnIndicatorTopRowCount = 1;
     this.grid.showRowIndicator = true;
-    this.grid.rowIndicatorStartModeBits = SHEET_ROW_INDICATOR_MODE;
-    this.grid.rowIndicatorStartWidth = this.baseRowIndicatorStartWidth;
+    this.grid.setRowIndicatorStartConfig(sheetRowIndicatorConfig(this.baseRowIndicatorStartWidth));
     this.applyIndicatorTheme();
 
     this.grid.setResizePolicy({ columns: true, rows: true, uniform: false });
@@ -2525,10 +2535,10 @@ export class VolvoxSheet implements VolvoxSheetApi {
     this.grid.columnIndicatorTopRowCount = 1;
     this.setColumnHeaderHeight(this.currentColumnHeaderHeight);
     this.grid.showRowIndicator = true;
-    this.grid.rowIndicatorStartModeBits = SHEET_ROW_INDICATOR_MODE;
-    this.grid.rowIndicatorStartWidth = this.toLayoutPixels(
+    const rowIndicatorWidth = this.toLayoutPixels(
       Math.max(24, this.baseRowIndicatorStartWidth * this.responsiveScale * this.userZoomScale),
     );
+    this.grid.setRowIndicatorStartConfig(sheetRowIndicatorConfig(rowIndicatorWidth));
     this.applyIndicatorTheme();
     this.grid.invalidate();
   }

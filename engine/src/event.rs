@@ -8,7 +8,7 @@ pub struct EventTarget {
     pub band: i32,
     pub slot_index: i32,
     pub slot_kind: i32,
-    pub sub_mode_bits: u32,
+    pub sub_mode: i32,
     pub custom_key: String,
     pub text: String,
     pub int_value: i64,
@@ -37,12 +37,12 @@ impl EventTarget {
             band: self.band,
             slot_index: self.slot_index,
             slot_kind: self.slot_kind,
-            sub_mode_bits: self.sub_mode_bits,
             custom_key: self.custom_key.clone(),
             text: self.text.clone(),
             int_value: self.int_value,
             status_flags: self.status_flags,
             data: self.data.clone(),
+            sub_mode: self.sub_mode,
         }
     }
 
@@ -58,7 +58,7 @@ impl Default for EventTarget {
             band: pb::IndicatorBand::Unspecified as i32,
             slot_index: -1,
             slot_kind: 0,
-            sub_mode_bits: 0,
+            sub_mode: 0,
             custom_key: String::new(),
             text: String::new(),
             int_value: 0,

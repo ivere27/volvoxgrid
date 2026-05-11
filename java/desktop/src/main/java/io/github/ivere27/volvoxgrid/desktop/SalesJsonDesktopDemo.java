@@ -11,6 +11,7 @@ import io.github.ivere27.volvoxgrid.CellUpdate;
 import io.github.ivere27.volvoxgrid.CellValue;
 import io.github.ivere27.volvoxgrid.CheckedState;
 import io.github.ivere27.volvoxgrid.ColIndicatorCellMode;
+import io.github.ivere27.volvoxgrid.ColIndicatorCellModes;
 import io.github.ivere27.volvoxgrid.ColIndicatorConfig;
 import io.github.ivere27.volvoxgrid.ColumnDataType;
 import io.github.ivere27.volvoxgrid.ColumnDef;
@@ -462,9 +463,11 @@ final class SalesJsonDesktopDemo {
                             .setVisible(true)
                             .setDefaultRowHeight(28)
                             .setBandRows(1)
-                            .setModeBits(
-                                ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT_VALUE
-                                    | ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH_VALUE
+                            .setCellModes(
+                                ColIndicatorCellModes.newBuilder()
+                                    .addModes(ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT)
+                                    .addModes(ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH)
+                                    .build()
                             )
                             .setBackground(HEADER_BG)
                             .setForeground(HEADER_FG)

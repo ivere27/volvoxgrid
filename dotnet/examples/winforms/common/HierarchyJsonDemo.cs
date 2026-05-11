@@ -3,6 +3,12 @@ using System.Collections.Generic;
 using System.Text;
 using System.Text.RegularExpressions;
 using VolvoxGrid.DotNet;
+using ColIndicatorCellMode = Volvoxgrid.V1.ColIndicatorCellMode;
+using ColIndicatorCellModes = Volvoxgrid.V1.ColIndicatorCellModes;
+using ColIndicatorConfig = Volvoxgrid.V1.ColIndicatorConfig;
+using RowIndicatorConfig = Volvoxgrid.V1.RowIndicatorConfig;
+using RowIndicatorSlot = Volvoxgrid.V1.RowIndicatorSlot;
+using RowIndicatorSlotKind = Volvoxgrid.V1.RowIndicatorSlotKind;
 
 namespace VolvoxGrid.DotNet.Sample
 {
@@ -41,14 +47,34 @@ namespace VolvoxGrid.DotNet.Sample
             grid.HeaderFeatures = new VolvoxGridHeaderFeatures { Sort = false, Reorder = false, Chooser = false };
             grid.ShowColumnHeaders = true;
             grid.ColumnIndicatorTopRowCount = 1;
-            grid.ColumnIndicatorTopModeBits = VolvoxGridColumnIndicatorMode.HeaderText;
+            grid.ColumnIndicatorTopConfig = new ColIndicatorConfig
+            {
+                Visible = true,
+                BandRows = 1,
+                CellModes = new ColIndicatorCellModes
+                {
+                    Modes = { ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT },
+                },
+            };
             int maxOutlineDepth = MaxOutlineDepth(levels);
             int maxOutlineLevel = MaxOutlineLevel(levels);
             int outlineWidth = OutlineIndicatorWidth(maxOutlineDepth);
             int expanderWidth = outlineWidth + 280;
             grid.ShowRowIndicator = true;
-            grid.RowIndicatorStartModeBits = VolvoxGridRowIndicatorMode.Expander;
-            grid.RowIndicatorStartWidth = expanderWidth;
+            grid.RowIndicatorStartConfig = new RowIndicatorConfig
+            {
+                Visible = true,
+                Width = expanderWidth,
+                Slots =
+                {
+                    new RowIndicatorSlot
+                    {
+                        Kind = RowIndicatorSlotKind.ROW_INDICATOR_SLOT_EXPANDER,
+                        Width = expanderWidth,
+                        Visible = true,
+                    },
+                },
+            };
             grid.RowIndicatorBackColor = 0xFFFAFAF9;
             grid.RowIndicatorForeColor = 0xFF44403C;
             grid.RowIndicatorGridColor = 0xFFD6D3D1;

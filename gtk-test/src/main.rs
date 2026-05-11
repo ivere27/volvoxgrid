@@ -2479,10 +2479,12 @@ fn sales_theme_config() -> pb::GridConfig {
                 visible: Some(true),
                 default_row_height: Some(28),
                 band_rows: Some(1),
-                mode_bits: Some(
-                    (pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as u32)
-                        | (pb::ColIndicatorCellMode::ColIndicatorCellSortGlyph as u32),
-                ),
+                cell_modes: Some(pb::ColIndicatorCellModes {
+                    modes: vec![
+                        pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as i32,
+                        pb::ColIndicatorCellMode::ColIndicatorCellSortGlyph as i32,
+                    ],
+                }),
                 background: Some(0xFFF9FAFB),
                 foreground: Some(0xFF111827),
                 grid_color: Some(0xFFD1D5DB),
@@ -2658,7 +2660,9 @@ fn hierarchy_theme_config(max_outline_depth: i32, max_outline_level: i32) -> pb:
                 visible: Some(true),
                 default_row_height: Some(28),
                 band_rows: Some(1),
-                mode_bits: Some(pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as u32),
+                cell_modes: Some(pb::ColIndicatorCellModes {
+                    modes: vec![pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as i32],
+                }),
                 background: Some(0xFFFAFAF9),
                 foreground: Some(0xFF1C1917),
                 grid_color: Some(0xFFD6D3D1),

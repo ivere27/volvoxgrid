@@ -1,8 +1,14 @@
 using System;
 using System.Collections.Generic;
 using VolvoxGrid.DotNet;
+using ColIndicatorCellMode = Volvoxgrid.V1.ColIndicatorCellMode;
+using ColIndicatorCellModes = Volvoxgrid.V1.ColIndicatorCellModes;
+using ColIndicatorConfig = Volvoxgrid.V1.ColIndicatorConfig;
 using Dropdown = Volvoxgrid.V1.Dropdown;
 using DropdownItem = Volvoxgrid.V1.DropdownItem;
+using RowIndicatorConfig = Volvoxgrid.V1.RowIndicatorConfig;
+using RowIndicatorSlot = Volvoxgrid.V1.RowIndicatorSlot;
+using RowIndicatorSlotKind = Volvoxgrid.V1.RowIndicatorSlotKind;
 using SubtotalResult = Volvoxgrid.V1.SubtotalResult;
 
 namespace VolvoxGrid.DotNet.Sample
@@ -63,11 +69,34 @@ namespace VolvoxGrid.DotNet.Sample
             grid.HeaderFeatures = new VolvoxGridHeaderFeatures { Sort = true, Reorder = true, Chooser = false };
             grid.ShowColumnHeaders = true;
             grid.ColumnIndicatorTopRowCount = 1;
-            grid.ColumnIndicatorTopModeBits =
-                VolvoxGridColumnIndicatorMode.HeaderText | VolvoxGridColumnIndicatorMode.SortGlyph;
+            grid.ColumnIndicatorTopConfig = new ColIndicatorConfig
+            {
+                Visible = true,
+                BandRows = 1,
+                CellModes = new ColIndicatorCellModes
+                {
+                    Modes =
+                    {
+                        ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT,
+                        ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH,
+                    },
+                },
+            };
             grid.ShowRowIndicator = true;
-            grid.RowIndicatorStartModeBits = VolvoxGridRowIndicatorMode.Numbers;
-            grid.RowIndicatorStartWidth = 40;
+            grid.RowIndicatorStartConfig = new RowIndicatorConfig
+            {
+                Visible = true,
+                Width = 40,
+                Slots =
+                {
+                    new RowIndicatorSlot
+                    {
+                        Kind = RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NUMBERS,
+                        Width = 40,
+                        Visible = true,
+                    },
+                },
+            };
             grid.ScrollBars = VolvoxGridScrollBarsMode.Both;
             grid.FlingEnabled = true;
             grid.FlingImpulseGain = 220.0f;

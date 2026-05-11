@@ -330,7 +330,8 @@ GridConfig _hierarchyThemeConfig(int maxOutlineDepth, int maxOutlineLevel) {
         ..visible = true
         ..defaultRowHeight = _hierHeaderHeight
         ..bandRows = 1
-        ..modeBits = ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT.value
+        ..cellModes = (ColIndicatorCellModes()
+          ..modes.add(ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT))
         ..background = _hierHeaderBg
         ..foreground = _hierHeaderFg
         ..gridColor = _hierFixedGridColor

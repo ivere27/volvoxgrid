@@ -7,6 +7,7 @@ import io.github.ivere27.volvoxgrid.BorderStyle
 import io.github.ivere27.volvoxgrid.Borders
 import io.github.ivere27.volvoxgrid.CellSpanMode
 import io.github.ivere27.volvoxgrid.ColIndicatorCellMode
+import io.github.ivere27.volvoxgrid.ColIndicatorCellModes
 import io.github.ivere27.volvoxgrid.ColumnDataType
 import io.github.ivere27.volvoxgrid.ColumnDef
 import io.github.ivere27.volvoxgrid.ColIndicatorConfig
@@ -378,9 +379,11 @@ object SalesJsonDemo {
                             .setVisible(true)
                             .setDefaultRowHeight(28)
                             .setBandRows(1)
-                            .setModeBits(
-                                ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT.number or
-                                    ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH.number
+                            .setCellModes(
+                                ColIndicatorCellModes.newBuilder()
+                                    .addModes(ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT)
+                                    .addModes(ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH)
+                                    .build()
                             )
                             .setBackground(HEADER_BG)
                             .setForeground(HEADER_FG)

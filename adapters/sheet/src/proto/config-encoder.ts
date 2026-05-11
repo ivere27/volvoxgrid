@@ -188,7 +188,7 @@ export interface SheetGridConfig {
       visible?: boolean;
       defaultRowHeight?: number;
       bandRows?: number;
-      modeBits?: number;
+      cellModes?: ReadonlyArray<number>;
       background?: number;
       foreground?: number;
       gridLines?: number;
@@ -197,7 +197,6 @@ export interface SheetGridConfig {
     };
     cornerTopStart?: {
       visible?: boolean;
-      modeBits?: number;
       background?: number;
       foreground?: number;
       customKey?: string;
@@ -246,8 +245,12 @@ function encodeColIndicatorConfig(config: NonNullable<SheetGridConfig["indicator
   if (config.visible != null) out.push(...encodeTag(ProtoColIndicatorConfigFields.visible, 0), ...encodeBool(config.visible));
   if (config.defaultRowHeight != null) out.push(...encodeTag(ProtoColIndicatorConfigFields.default_row_height, 0), ...encodeInt32(config.defaultRowHeight));
   if (config.bandRows != null) out.push(...encodeTag(ProtoColIndicatorConfigFields.band_rows, 0), ...encodeInt32(config.bandRows));
-  if (config.modeBits != null) {
-    out.push(...encodeTag(ProtoColIndicatorConfigFields.mode_bits, 0), ...encodeVarintUnsigned(BigInt(config.modeBits >>> 0)));
+  if (config.cellModes != null) {
+    const modes: number[] = [];
+    for (const mode of config.cellModes) {
+      modes.push(...encodeTag(1, 0), ...encodeInt32(Math.max(0, Math.trunc(mode))));
+    }
+    out.push(...encodeMessageField(15, modes));
   }
   if (config.background != null) {
     out.push(...encodeTag(ProtoColIndicatorConfigFields.background, 0), ...encodeVarintUnsigned(BigInt(config.background >>> 0)));
@@ -267,9 +270,6 @@ function encodeCornerIndicatorConfig(config: NonNullable<SheetGridConfig["indica
   const out: number[] = [];
   if (!config) return out;
   if (config.visible != null) out.push(...encodeTag(ProtoCornerIndicatorConfigFields.visible, 0), ...encodeBool(config.visible));
-  if (config.modeBits != null) {
-    out.push(...encodeTag(ProtoCornerIndicatorConfigFields.mode_bits, 0), ...encodeVarintUnsigned(BigInt(config.modeBits >>> 0)));
-  }
   if (config.background != null) {
     out.push(...encodeTag(ProtoCornerIndicatorConfigFields.background, 0), ...encodeVarintUnsigned(BigInt(config.background >>> 0)));
   }

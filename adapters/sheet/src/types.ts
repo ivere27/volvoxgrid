@@ -1,5 +1,27 @@
 import type { VolvoxGrid } from "volvoxgrid";
 
+export interface VolvoxGridRowIndicatorSlot {
+  kind?: number;
+  width?: number;
+  visible?: boolean;
+  customKey?: string;
+  data?: Uint8Array;
+}
+
+export interface VolvoxGridRowIndicatorConfig {
+  visible?: boolean;
+  width?: number;
+  background?: number;
+  foreground?: number;
+  gridLines?: number;
+  gridColor?: number;
+  autoSize?: boolean;
+  allowResize?: boolean;
+  allowSelect?: boolean;
+  allowReorder?: boolean;
+  slots?: ReadonlyArray<VolvoxGridRowIndicatorSlot>;
+}
+
 export type VolvoxSheetGrid = VolvoxGrid & {
   onBeforeEdit: ((detail: { row: number; col: number; cancel: boolean }) => void) | null;
   onCellEditValidating:
@@ -12,7 +34,7 @@ export type VolvoxSheetGrid = VolvoxGrid & {
   showColumnHeaders: boolean;
   columnIndicatorTopRowCount: number;
   showRowIndicator: boolean;
-  rowIndicatorStartModeBits: number;
+  setRowIndicatorStartConfig(config: VolvoxGridRowIndicatorConfig): void;
   rowIndicatorStartWidth: number;
   frozenRowCount: number;
   frozenColCount: number;

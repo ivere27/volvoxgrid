@@ -6116,6 +6116,59 @@ class RenderConfig extends $pb.GeneratedMessage {
   void clearScrollBlit() => $_clearField(11);
 }
 
+class ColIndicatorCellModes extends $pb.GeneratedMessage {
+  factory ColIndicatorCellModes({
+    $core.Iterable<ColIndicatorCellMode>? modes,
+  }) {
+    final result = create();
+    if (modes != null) result.modes.addAll(modes);
+    return result;
+  }
+
+  ColIndicatorCellModes._();
+
+  factory ColIndicatorCellModes.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ColIndicatorCellModes.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ColIndicatorCellModes',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..pc<ColIndicatorCellMode>(
+        1, _omitFieldNames ? '' : 'modes', $pb.PbFieldType.KE,
+        valueOf: ColIndicatorCellMode.valueOf,
+        enumValues: ColIndicatorCellMode.values,
+        defaultEnumValue: ColIndicatorCellMode.COL_INDICATOR_CELL_NONE)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ColIndicatorCellModes clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ColIndicatorCellModes copyWith(
+          void Function(ColIndicatorCellModes) updates) =>
+      super.copyWith((message) => updates(message as ColIndicatorCellModes))
+          as ColIndicatorCellModes;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ColIndicatorCellModes create() => ColIndicatorCellModes._();
+  @$core.override
+  ColIndicatorCellModes createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ColIndicatorCellModes getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ColIndicatorCellModes>(create);
+  static ColIndicatorCellModes? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<ColIndicatorCellMode> get modes => $_getList(0);
+}
+
 class RowIndicatorSlot extends $pb.GeneratedMessage {
   factory RowIndicatorSlot({
     RowIndicatorSlotKind? kind,
@@ -6463,9 +6516,9 @@ class ColIndicatorCell extends $pb.GeneratedMessage {
     $core.int? col1,
     $core.int? col2,
     $core.String? text,
-    $core.int? modeBits,
     $core.String? customKey,
     $core.List<$core.int>? data,
+    ColIndicatorCellModes? modes,
   }) {
     final result = create();
     if (row1 != null) result.row1 = row1;
@@ -6473,9 +6526,9 @@ class ColIndicatorCell extends $pb.GeneratedMessage {
     if (col1 != null) result.col1 = col1;
     if (col2 != null) result.col2 = col2;
     if (text != null) result.text = text;
-    if (modeBits != null) result.modeBits = modeBits;
     if (customKey != null) result.customKey = customKey;
     if (data != null) result.data = data;
+    if (modes != null) result.modes = modes;
     return result;
   }
 
@@ -6497,10 +6550,11 @@ class ColIndicatorCell extends $pb.GeneratedMessage {
     ..aI(3, _omitFieldNames ? '' : 'col1')
     ..aI(4, _omitFieldNames ? '' : 'col2')
     ..aOS(5, _omitFieldNames ? '' : 'text')
-    ..aI(6, _omitFieldNames ? '' : 'modeBits', fieldType: $pb.PbFieldType.OU3)
     ..aOS(7, _omitFieldNames ? '' : 'customKey')
     ..a<$core.List<$core.int>>(
         8, _omitFieldNames ? '' : 'data', $pb.PbFieldType.OY)
+    ..aOM<ColIndicatorCellModes>(9, _omitFieldNames ? '' : 'modes',
+        subBuilder: ColIndicatorCellModes.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -6567,32 +6621,34 @@ class ColIndicatorCell extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearText() => $_clearField(5);
 
-  @$pb.TagNumber(6)
-  $core.int get modeBits => $_getIZ(5);
-  @$pb.TagNumber(6)
-  set modeBits($core.int value) => $_setUnsignedInt32(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasModeBits() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearModeBits() => $_clearField(6);
-
   @$pb.TagNumber(7)
-  $core.String get customKey => $_getSZ(6);
+  $core.String get customKey => $_getSZ(5);
   @$pb.TagNumber(7)
-  set customKey($core.String value) => $_setString(6, value);
+  set customKey($core.String value) => $_setString(5, value);
   @$pb.TagNumber(7)
-  $core.bool hasCustomKey() => $_has(6);
+  $core.bool hasCustomKey() => $_has(5);
   @$pb.TagNumber(7)
   void clearCustomKey() => $_clearField(7);
 
   @$pb.TagNumber(8)
-  $core.List<$core.int> get data => $_getN(7);
+  $core.List<$core.int> get data => $_getN(6);
   @$pb.TagNumber(8)
-  set data($core.List<$core.int> value) => $_setBytes(7, value);
+  set data($core.List<$core.int> value) => $_setBytes(6, value);
   @$pb.TagNumber(8)
-  $core.bool hasData() => $_has(7);
+  $core.bool hasData() => $_has(6);
   @$pb.TagNumber(8)
   void clearData() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  ColIndicatorCellModes get modes => $_getN(7);
+  @$pb.TagNumber(9)
+  set modes(ColIndicatorCellModes value) => $_setField(9, value);
+  @$pb.TagNumber(9)
+  $core.bool hasModes() => $_has(7);
+  @$pb.TagNumber(9)
+  void clearModes() => $_clearField(9);
+  @$pb.TagNumber(9)
+  ColIndicatorCellModes ensureModes() => $_ensure(7);
 }
 
 class ColIndicatorConfig extends $pb.GeneratedMessage {
@@ -6600,7 +6656,6 @@ class ColIndicatorConfig extends $pb.GeneratedMessage {
     $core.bool? visible,
     $core.int? defaultRowHeight,
     $core.int? bandRows,
-    $core.int? modeBits,
     $core.int? background,
     $core.int? foreground,
     GridLineStyle? gridLines,
@@ -6611,12 +6666,12 @@ class ColIndicatorConfig extends $pb.GeneratedMessage {
     $core.bool? allowMenu,
     $core.Iterable<ColIndicatorRowDef>? rowDefs,
     $core.Iterable<ColIndicatorCell>? cells,
+    ColIndicatorCellModes? cellModes,
   }) {
     final result = create();
     if (visible != null) result.visible = visible;
     if (defaultRowHeight != null) result.defaultRowHeight = defaultRowHeight;
     if (bandRows != null) result.bandRows = bandRows;
-    if (modeBits != null) result.modeBits = modeBits;
     if (background != null) result.background = background;
     if (foreground != null) result.foreground = foreground;
     if (gridLines != null) result.gridLines = gridLines;
@@ -6627,6 +6682,7 @@ class ColIndicatorConfig extends $pb.GeneratedMessage {
     if (allowMenu != null) result.allowMenu = allowMenu;
     if (rowDefs != null) result.rowDefs.addAll(rowDefs);
     if (cells != null) result.cells.addAll(cells);
+    if (cellModes != null) result.cellModes = cellModes;
     return result;
   }
 
@@ -6646,7 +6702,6 @@ class ColIndicatorConfig extends $pb.GeneratedMessage {
     ..aOB(1, _omitFieldNames ? '' : 'visible')
     ..aI(2, _omitFieldNames ? '' : 'defaultRowHeight')
     ..aI(3, _omitFieldNames ? '' : 'bandRows')
-    ..aI(4, _omitFieldNames ? '' : 'modeBits', fieldType: $pb.PbFieldType.OU3)
     ..aI(5, _omitFieldNames ? '' : 'background', fieldType: $pb.PbFieldType.OU3)
     ..aI(6, _omitFieldNames ? '' : 'foreground', fieldType: $pb.PbFieldType.OU3)
     ..aE<GridLineStyle>(7, _omitFieldNames ? '' : 'gridLines',
@@ -6660,6 +6715,8 @@ class ColIndicatorConfig extends $pb.GeneratedMessage {
         subBuilder: ColIndicatorRowDef.create)
     ..pPM<ColIndicatorCell>(14, _omitFieldNames ? '' : 'cells',
         subBuilder: ColIndicatorCell.create)
+    ..aOM<ColIndicatorCellModes>(15, _omitFieldNames ? '' : 'cellModes',
+        subBuilder: ColIndicatorCellModes.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -6708,92 +6765,94 @@ class ColIndicatorConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearBandRows() => $_clearField(3);
 
-  @$pb.TagNumber(4)
-  $core.int get modeBits => $_getIZ(3);
-  @$pb.TagNumber(4)
-  set modeBits($core.int value) => $_setUnsignedInt32(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasModeBits() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearModeBits() => $_clearField(4);
-
   @$pb.TagNumber(5)
-  $core.int get background => $_getIZ(4);
+  $core.int get background => $_getIZ(3);
   @$pb.TagNumber(5)
-  set background($core.int value) => $_setUnsignedInt32(4, value);
+  set background($core.int value) => $_setUnsignedInt32(3, value);
   @$pb.TagNumber(5)
-  $core.bool hasBackground() => $_has(4);
+  $core.bool hasBackground() => $_has(3);
   @$pb.TagNumber(5)
   void clearBackground() => $_clearField(5);
 
   @$pb.TagNumber(6)
-  $core.int get foreground => $_getIZ(5);
+  $core.int get foreground => $_getIZ(4);
   @$pb.TagNumber(6)
-  set foreground($core.int value) => $_setUnsignedInt32(5, value);
+  set foreground($core.int value) => $_setUnsignedInt32(4, value);
   @$pb.TagNumber(6)
-  $core.bool hasForeground() => $_has(5);
+  $core.bool hasForeground() => $_has(4);
   @$pb.TagNumber(6)
   void clearForeground() => $_clearField(6);
 
   @$pb.TagNumber(7)
-  GridLineStyle get gridLines => $_getN(6);
+  GridLineStyle get gridLines => $_getN(5);
   @$pb.TagNumber(7)
   set gridLines(GridLineStyle value) => $_setField(7, value);
   @$pb.TagNumber(7)
-  $core.bool hasGridLines() => $_has(6);
+  $core.bool hasGridLines() => $_has(5);
   @$pb.TagNumber(7)
   void clearGridLines() => $_clearField(7);
 
   @$pb.TagNumber(8)
-  $core.int get gridColor => $_getIZ(7);
+  $core.int get gridColor => $_getIZ(6);
   @$pb.TagNumber(8)
-  set gridColor($core.int value) => $_setUnsignedInt32(7, value);
+  set gridColor($core.int value) => $_setUnsignedInt32(6, value);
   @$pb.TagNumber(8)
-  $core.bool hasGridColor() => $_has(7);
+  $core.bool hasGridColor() => $_has(6);
   @$pb.TagNumber(8)
   void clearGridColor() => $_clearField(8);
 
   @$pb.TagNumber(9)
-  $core.bool get autoSize => $_getBF(8);
+  $core.bool get autoSize => $_getBF(7);
   @$pb.TagNumber(9)
-  set autoSize($core.bool value) => $_setBool(8, value);
+  set autoSize($core.bool value) => $_setBool(7, value);
   @$pb.TagNumber(9)
-  $core.bool hasAutoSize() => $_has(8);
+  $core.bool hasAutoSize() => $_has(7);
   @$pb.TagNumber(9)
   void clearAutoSize() => $_clearField(9);
 
   @$pb.TagNumber(10)
-  $core.bool get allowResize => $_getBF(9);
+  $core.bool get allowResize => $_getBF(8);
   @$pb.TagNumber(10)
-  set allowResize($core.bool value) => $_setBool(9, value);
+  set allowResize($core.bool value) => $_setBool(8, value);
   @$pb.TagNumber(10)
-  $core.bool hasAllowResize() => $_has(9);
+  $core.bool hasAllowResize() => $_has(8);
   @$pb.TagNumber(10)
   void clearAllowResize() => $_clearField(10);
 
   @$pb.TagNumber(11)
-  $core.bool get allowReorder => $_getBF(10);
+  $core.bool get allowReorder => $_getBF(9);
   @$pb.TagNumber(11)
-  set allowReorder($core.bool value) => $_setBool(10, value);
+  set allowReorder($core.bool value) => $_setBool(9, value);
   @$pb.TagNumber(11)
-  $core.bool hasAllowReorder() => $_has(10);
+  $core.bool hasAllowReorder() => $_has(9);
   @$pb.TagNumber(11)
   void clearAllowReorder() => $_clearField(11);
 
   @$pb.TagNumber(12)
-  $core.bool get allowMenu => $_getBF(11);
+  $core.bool get allowMenu => $_getBF(10);
   @$pb.TagNumber(12)
-  set allowMenu($core.bool value) => $_setBool(11, value);
+  set allowMenu($core.bool value) => $_setBool(10, value);
   @$pb.TagNumber(12)
-  $core.bool hasAllowMenu() => $_has(11);
+  $core.bool hasAllowMenu() => $_has(10);
   @$pb.TagNumber(12)
   void clearAllowMenu() => $_clearField(12);
 
   @$pb.TagNumber(13)
-  $pb.PbList<ColIndicatorRowDef> get rowDefs => $_getList(12);
+  $pb.PbList<ColIndicatorRowDef> get rowDefs => $_getList(11);
 
   @$pb.TagNumber(14)
-  $pb.PbList<ColIndicatorCell> get cells => $_getList(13);
+  $pb.PbList<ColIndicatorCell> get cells => $_getList(12);
+
+  @$pb.TagNumber(15)
+  ColIndicatorCellModes get cellModes => $_getN(13);
+  @$pb.TagNumber(15)
+  set cellModes(ColIndicatorCellModes value) => $_setField(15, value);
+  @$pb.TagNumber(15)
+  $core.bool hasCellModes() => $_has(13);
+  @$pb.TagNumber(15)
+  void clearCellModes() => $_clearField(15);
+  @$pb.TagNumber(15)
+  ColIndicatorCellModes ensureCellModes() => $_ensure(13);
 }
 
 class CornerIndicatorSlot extends $pb.GeneratedMessage {
@@ -6915,7 +6974,6 @@ class CornerIndicatorSlot extends $pb.GeneratedMessage {
 class CornerIndicatorConfig extends $pb.GeneratedMessage {
   factory CornerIndicatorConfig({
     $core.bool? visible,
-    $core.int? modeBits,
     $core.int? background,
     $core.int? foreground,
     $core.String? customKey,
@@ -6924,7 +6982,6 @@ class CornerIndicatorConfig extends $pb.GeneratedMessage {
   }) {
     final result = create();
     if (visible != null) result.visible = visible;
-    if (modeBits != null) result.modeBits = modeBits;
     if (background != null) result.background = background;
     if (foreground != null) result.foreground = foreground;
     if (customKey != null) result.customKey = customKey;
@@ -6947,7 +7004,6 @@ class CornerIndicatorConfig extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
     ..aOB(1, _omitFieldNames ? '' : 'visible')
-    ..aI(2, _omitFieldNames ? '' : 'modeBits', fieldType: $pb.PbFieldType.OU3)
     ..aI(3, _omitFieldNames ? '' : 'background', fieldType: $pb.PbFieldType.OU3)
     ..aI(4, _omitFieldNames ? '' : 'foreground', fieldType: $pb.PbFieldType.OU3)
     ..aOS(5, _omitFieldNames ? '' : 'customKey')
@@ -6986,53 +7042,44 @@ class CornerIndicatorConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearVisible() => $_clearField(1);
 
-  @$pb.TagNumber(2)
-  $core.int get modeBits => $_getIZ(1);
-  @$pb.TagNumber(2)
-  set modeBits($core.int value) => $_setUnsignedInt32(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasModeBits() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearModeBits() => $_clearField(2);
-
   @$pb.TagNumber(3)
-  $core.int get background => $_getIZ(2);
+  $core.int get background => $_getIZ(1);
   @$pb.TagNumber(3)
-  set background($core.int value) => $_setUnsignedInt32(2, value);
+  set background($core.int value) => $_setUnsignedInt32(1, value);
   @$pb.TagNumber(3)
-  $core.bool hasBackground() => $_has(2);
+  $core.bool hasBackground() => $_has(1);
   @$pb.TagNumber(3)
   void clearBackground() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  $core.int get foreground => $_getIZ(3);
+  $core.int get foreground => $_getIZ(2);
   @$pb.TagNumber(4)
-  set foreground($core.int value) => $_setUnsignedInt32(3, value);
+  set foreground($core.int value) => $_setUnsignedInt32(2, value);
   @$pb.TagNumber(4)
-  $core.bool hasForeground() => $_has(3);
+  $core.bool hasForeground() => $_has(2);
   @$pb.TagNumber(4)
   void clearForeground() => $_clearField(4);
 
   @$pb.TagNumber(5)
-  $core.String get customKey => $_getSZ(4);
+  $core.String get customKey => $_getSZ(3);
   @$pb.TagNumber(5)
-  set customKey($core.String value) => $_setString(4, value);
+  set customKey($core.String value) => $_setString(3, value);
   @$pb.TagNumber(5)
-  $core.bool hasCustomKey() => $_has(4);
+  $core.bool hasCustomKey() => $_has(3);
   @$pb.TagNumber(5)
   void clearCustomKey() => $_clearField(5);
 
   @$pb.TagNumber(6)
-  $core.List<$core.int> get data => $_getN(5);
+  $core.List<$core.int> get data => $_getN(4);
   @$pb.TagNumber(6)
-  set data($core.List<$core.int> value) => $_setBytes(5, value);
+  set data($core.List<$core.int> value) => $_setBytes(4, value);
   @$pb.TagNumber(6)
-  $core.bool hasData() => $_has(5);
+  $core.bool hasData() => $_has(4);
   @$pb.TagNumber(6)
   void clearData() => $_clearField(6);
 
   @$pb.TagNumber(7)
-  $pb.PbList<CornerIndicatorSlot> get slots => $_getList(6);
+  $pb.PbList<CornerIndicatorSlot> get slots => $_getList(5);
 }
 
 class IndicatorColors extends $pb.GeneratedMessage {
@@ -7270,24 +7317,24 @@ class GridEventTarget extends $pb.GeneratedMessage {
     IndicatorBand? band,
     $core.int? slotIndex,
     $core.int? slotKind,
-    $core.int? subModeBits,
     $core.String? customKey,
     $core.String? text,
     $fixnum.Int64? intValue,
     $core.int? statusFlags,
     $core.List<$core.int>? data,
+    $core.int? subMode,
   }) {
     final result = create();
     if (kind != null) result.kind = kind;
     if (band != null) result.band = band;
     if (slotIndex != null) result.slotIndex = slotIndex;
     if (slotKind != null) result.slotKind = slotKind;
-    if (subModeBits != null) result.subModeBits = subModeBits;
     if (customKey != null) result.customKey = customKey;
     if (text != null) result.text = text;
     if (intValue != null) result.intValue = intValue;
     if (statusFlags != null) result.statusFlags = statusFlags;
     if (data != null) result.data = data;
+    if (subMode != null) result.subMode = subMode;
     return result;
   }
 
@@ -7310,8 +7357,6 @@ class GridEventTarget extends $pb.GeneratedMessage {
         enumValues: IndicatorBand.values)
     ..aI(3, _omitFieldNames ? '' : 'slotIndex')
     ..aI(4, _omitFieldNames ? '' : 'slotKind')
-    ..aI(5, _omitFieldNames ? '' : 'subModeBits',
-        fieldType: $pb.PbFieldType.OU3)
     ..aOS(6, _omitFieldNames ? '' : 'customKey')
     ..aOS(7, _omitFieldNames ? '' : 'text')
     ..aInt64(8, _omitFieldNames ? '' : 'intValue')
@@ -7319,6 +7364,7 @@ class GridEventTarget extends $pb.GeneratedMessage {
         fieldType: $pb.PbFieldType.OU3)
     ..a<$core.List<$core.int>>(
         10, _omitFieldNames ? '' : 'data', $pb.PbFieldType.OY)
+    ..aI(11, _omitFieldNames ? '' : 'subMode')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -7376,59 +7422,59 @@ class GridEventTarget extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearSlotKind() => $_clearField(4);
 
-  @$pb.TagNumber(5)
-  $core.int get subModeBits => $_getIZ(4);
-  @$pb.TagNumber(5)
-  set subModeBits($core.int value) => $_setUnsignedInt32(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasSubModeBits() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearSubModeBits() => $_clearField(5);
-
   @$pb.TagNumber(6)
-  $core.String get customKey => $_getSZ(5);
+  $core.String get customKey => $_getSZ(4);
   @$pb.TagNumber(6)
-  set customKey($core.String value) => $_setString(5, value);
+  set customKey($core.String value) => $_setString(4, value);
   @$pb.TagNumber(6)
-  $core.bool hasCustomKey() => $_has(5);
+  $core.bool hasCustomKey() => $_has(4);
   @$pb.TagNumber(6)
   void clearCustomKey() => $_clearField(6);
 
   @$pb.TagNumber(7)
-  $core.String get text => $_getSZ(6);
+  $core.String get text => $_getSZ(5);
   @$pb.TagNumber(7)
-  set text($core.String value) => $_setString(6, value);
+  set text($core.String value) => $_setString(5, value);
   @$pb.TagNumber(7)
-  $core.bool hasText() => $_has(6);
+  $core.bool hasText() => $_has(5);
   @$pb.TagNumber(7)
   void clearText() => $_clearField(7);
 
   @$pb.TagNumber(8)
-  $fixnum.Int64 get intValue => $_getI64(7);
+  $fixnum.Int64 get intValue => $_getI64(6);
   @$pb.TagNumber(8)
-  set intValue($fixnum.Int64 value) => $_setInt64(7, value);
+  set intValue($fixnum.Int64 value) => $_setInt64(6, value);
   @$pb.TagNumber(8)
-  $core.bool hasIntValue() => $_has(7);
+  $core.bool hasIntValue() => $_has(6);
   @$pb.TagNumber(8)
   void clearIntValue() => $_clearField(8);
 
   @$pb.TagNumber(9)
-  $core.int get statusFlags => $_getIZ(8);
+  $core.int get statusFlags => $_getIZ(7);
   @$pb.TagNumber(9)
-  set statusFlags($core.int value) => $_setUnsignedInt32(8, value);
+  set statusFlags($core.int value) => $_setUnsignedInt32(7, value);
   @$pb.TagNumber(9)
-  $core.bool hasStatusFlags() => $_has(8);
+  $core.bool hasStatusFlags() => $_has(7);
   @$pb.TagNumber(9)
   void clearStatusFlags() => $_clearField(9);
 
   @$pb.TagNumber(10)
-  $core.List<$core.int> get data => $_getN(9);
+  $core.List<$core.int> get data => $_getN(8);
   @$pb.TagNumber(10)
-  set data($core.List<$core.int> value) => $_setBytes(9, value);
+  set data($core.List<$core.int> value) => $_setBytes(8, value);
   @$pb.TagNumber(10)
-  $core.bool hasData() => $_has(9);
+  $core.bool hasData() => $_has(8);
   @$pb.TagNumber(10)
   void clearData() => $_clearField(10);
+
+  @$pb.TagNumber(11)
+  $core.int get subMode => $_getIZ(9);
+  @$pb.TagNumber(11)
+  set subMode($core.int value) => $_setSignedInt32(9, value);
+  @$pb.TagNumber(11)
+  $core.bool hasSubMode() => $_has(9);
+  @$pb.TagNumber(11)
+  void clearSubMode() => $_clearField(11);
 }
 
 class IndicatorFocusConfig extends $pb.GeneratedMessage {

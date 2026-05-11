@@ -5,13 +5,19 @@ import io.github.ivere27.volvoxgrid.common.GridCellText
 import io.github.ivere27.volvoxgrid.common.GridCellRange
 import io.github.ivere27.volvoxgrid.common.GridSelection
 import io.github.ivere27.volvoxgrid.common.RendererBackend
+import io.github.ivere27.volvoxgrid.common.VolvoxGridColumnIndicatorCellMode as CommonColumnIndicatorCellMode
+import io.github.ivere27.volvoxgrid.common.VolvoxGridColumnIndicatorConfig as CommonColumnIndicatorConfig
+import io.github.ivere27.volvoxgrid.common.VolvoxGridRowIndicatorConfig as CommonRowIndicatorConfig
+import io.github.ivere27.volvoxgrid.common.VolvoxGridRowIndicatorSlot as CommonRowIndicatorSlot
+import io.github.ivere27.volvoxgrid.common.VolvoxGridRowIndicatorSlotKind as CommonRowIndicatorSlotKind
 
 private const val DEFAULT_ROW_INDICATOR_WIDTH_PX = 35
 private const val DEFAULT_COL_INDICATOR_BAND_ROWS = 1
 
-private val DEFAULT_COL_INDICATOR_MODE_BITS =
-    ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT.number or
-        ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH.number
+private val DEFAULT_COL_INDICATOR_MODES = listOf(
+    ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT,
+    ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH,
+)
 
 private fun rowIndicatorSlot(kind: RowIndicatorSlotKind, width: Int): RowIndicatorSlot =
     RowIndicatorSlot.newBuilder()
@@ -26,48 +32,101 @@ private fun defaultRowIndicatorSlots(): List<RowIndicatorSlot> =
         rowIndicatorSlot(RowIndicatorSlotKind.ROW_INDICATOR_SLOT_SELECTION, 17),
     )
 
-private fun rowIndicatorSlotsFromModeBits(value: Int): List<RowIndicatorSlot> {
-    val slots = mutableListOf<RowIndicatorSlot>()
-    fun add(bit: Int, kind: RowIndicatorSlotKind, width: Int) {
-        if ((value and bit) != 0) slots.add(rowIndicatorSlot(kind, width))
-    }
-    add(1, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NUMBERS, DEFAULT_ROW_INDICATOR_WIDTH_PX)
-    add(2, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CURRENT, 18)
-    add(4, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_SELECTION, 17)
-    add(8, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CHECKBOX, 18)
-    add(16, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_HANDLE, 18)
-    add(32, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_EDITING, 18)
-    add(64, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_MODIFIED, 18)
-    add(128, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_ERROR, 18)
-    add(256, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NEW_ROW, 18)
-    add(512, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_EXPANDER, 18)
-    add(1024, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_RESIZE, 18)
-    add(2048, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_ACTION, 18)
-    add(4096, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_STATUS_ICON, 18)
-    add(8192, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CUSTOM, 18)
-    return slots
+private fun columnIndicatorCellModes(modes: Iterable<CommonColumnIndicatorCellMode>): ColIndicatorCellModes =
+    ColIndicatorCellModes.newBuilder()
+        .addAllModes(modes.mapNotNull { ColIndicatorCellMode.forNumber(it.number) })
+        .build()
+
+private fun columnIndicatorModesToCommon(modes: Iterable<ColIndicatorCellMode>): List<CommonColumnIndicatorCellMode> =
+    modes
+        .map { CommonColumnIndicatorCellMode.forNumber(it.number) }
+        .filter { it != CommonColumnIndicatorCellMode.None }
+
+private fun toCommonColumnIndicatorConfig(config: ColIndicatorConfig): CommonColumnIndicatorConfig {
+    val builder = CommonColumnIndicatorConfig.builder()
+    if (config.hasVisible()) builder.visible(config.visible)
+    if (config.hasDefaultRowHeight()) builder.defaultRowHeight(config.defaultRowHeight)
+    if (config.hasBandRows()) builder.bandRows(config.bandRows)
+    if (config.hasCellModes()) builder.cellModes(columnIndicatorModesToCommon(config.cellModes.modesList))
+    if (config.hasBackground()) builder.background(config.background.toLong() and 0xffffffffL)
+    if (config.hasForeground()) builder.foreground(config.foreground.toLong() and 0xffffffffL)
+    if (config.hasGridLines()) builder.gridLines(config.gridLines.number)
+    if (config.hasGridColor()) builder.gridColor(config.gridColor.toLong() and 0xffffffffL)
+    if (config.hasAutoSize()) builder.autoSize(config.autoSize)
+    if (config.hasAllowResize()) builder.allowResize(config.allowResize)
+    if (config.hasAllowReorder()) builder.allowReorder(config.allowReorder)
+    if (config.hasAllowMenu()) builder.allowMenu(config.allowMenu)
+    return builder.build()
 }
 
-private fun rowIndicatorModeBitsFromSlots(config: RowIndicatorConfig): Int =
-    config.slotsList.fold(0) { bits, slot ->
-        bits or when (slot.kind) {
-            RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NUMBERS -> 1
-            RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CURRENT -> 2
-            RowIndicatorSlotKind.ROW_INDICATOR_SLOT_SELECTION -> 4
-            RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CHECKBOX -> 8
-            RowIndicatorSlotKind.ROW_INDICATOR_SLOT_HANDLE -> 16
-            RowIndicatorSlotKind.ROW_INDICATOR_SLOT_EDITING -> 32
-            RowIndicatorSlotKind.ROW_INDICATOR_SLOT_MODIFIED -> 64
-            RowIndicatorSlotKind.ROW_INDICATOR_SLOT_ERROR -> 128
-            RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NEW_ROW -> 256
-            RowIndicatorSlotKind.ROW_INDICATOR_SLOT_EXPANDER -> 512
-            RowIndicatorSlotKind.ROW_INDICATOR_SLOT_RESIZE -> 1024
-            RowIndicatorSlotKind.ROW_INDICATOR_SLOT_ACTION -> 2048
-            RowIndicatorSlotKind.ROW_INDICATOR_SLOT_STATUS_ICON -> 4096
-            RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CUSTOM -> 8192
-            else -> 0
-        }
+private fun toProtoColumnIndicatorConfig(config: CommonColumnIndicatorConfig): ColIndicatorConfig {
+    val builder = ColIndicatorConfig.newBuilder()
+    config.visible?.let { builder.setVisible(it) }
+    config.defaultRowHeight?.let { builder.setDefaultRowHeight(it) }
+    config.bandRows?.let { builder.setBandRows(it) }
+    if (config.hasCellModes()) {
+        builder.setCellModes(columnIndicatorCellModes(config.cellModes))
     }
+    config.background?.let { builder.setBackground(it.toInt()) }
+    config.foreground?.let { builder.setForeground(it.toInt()) }
+    config.gridLines?.let { GridLineStyle.forNumber(it)?.also(builder::setGridLines) }
+    config.gridColor?.let { builder.setGridColor(it.toInt()) }
+    config.autoSize?.let { builder.setAutoSize(it) }
+    config.allowResize?.let { builder.setAllowResize(it) }
+    config.allowReorder?.let { builder.setAllowReorder(it) }
+    config.allowMenu?.let { builder.setAllowMenu(it) }
+    return builder.build()
+}
+
+private fun toCommonRowIndicatorConfig(config: RowIndicatorConfig): CommonRowIndicatorConfig {
+    val builder = CommonRowIndicatorConfig.builder()
+    if (config.hasVisible()) builder.visible(config.visible)
+    if (config.hasWidth()) builder.width(config.width)
+    if (config.hasBackground()) builder.background(config.background.toLong() and 0xffffffffL)
+    if (config.hasForeground()) builder.foreground(config.foreground.toLong() and 0xffffffffL)
+    if (config.hasGridLines()) builder.gridLines(config.gridLines.number)
+    if (config.hasGridColor()) builder.gridColor(config.gridColor.toLong() and 0xffffffffL)
+    if (config.hasAutoSize()) builder.autoSize(config.autoSize)
+    if (config.hasAllowResize()) builder.allowResize(config.allowResize)
+    if (config.hasAllowSelect()) builder.allowSelect(config.allowSelect)
+    if (config.hasAllowReorder()) builder.allowReorder(config.allowReorder)
+    config.slotsList.forEach { slot ->
+        builder.addSlot(
+            CommonRowIndicatorSlot(
+                CommonRowIndicatorSlotKind.forNumber(slot.kind.number),
+                if (slot.hasWidth()) slot.width else null,
+                if (slot.hasVisible()) slot.visible else null,
+                if (slot.hasCustomKey()) slot.customKey else null,
+                if (slot.hasData()) slot.data.toByteArray() else null,
+            )
+        )
+    }
+    return builder.build()
+}
+
+private fun toProtoRowIndicatorConfig(config: CommonRowIndicatorConfig): RowIndicatorConfig {
+    val builder = RowIndicatorConfig.newBuilder()
+    config.visible?.let { builder.setVisible(it) }
+    config.width?.let { builder.setWidth(it) }
+    config.background?.let { builder.setBackground(it.toInt()) }
+    config.foreground?.let { builder.setForeground(it.toInt()) }
+    config.gridLines?.let { GridLineStyle.forNumber(it)?.also(builder::setGridLines) }
+    config.gridColor?.let { builder.setGridColor(it.toInt()) }
+    config.autoSize?.let { builder.setAutoSize(it) }
+    config.allowResize?.let { builder.setAllowResize(it) }
+    config.allowSelect?.let { builder.setAllowSelect(it) }
+    config.allowReorder?.let { builder.setAllowReorder(it) }
+    config.slots.forEach { slot ->
+        val slotBuilder = RowIndicatorSlot.newBuilder()
+            .setKind(RowIndicatorSlotKind.forNumber(slot.kind.number) ?: RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NONE)
+        slot.width?.let { slotBuilder.setWidth(it) }
+        slot.visible?.let { slotBuilder.setVisible(it) }
+        slot.customKey?.let { slotBuilder.setCustomKey(it) }
+        slot.data?.let { slotBuilder.setData(com.google.protobuf.ByteString.copyFrom(it)) }
+        builder.addSlots(slotBuilder)
+    }
+    return builder.build()
+}
 
 private fun defaultRowIndicatorStartConfig(): RowIndicatorConfig =
     RowIndicatorConfig.newBuilder()
@@ -80,7 +139,11 @@ private fun defaultColIndicatorTopConfig(): ColIndicatorConfig =
     ColIndicatorConfig.newBuilder()
         .setVisible(true)
         .setBandRows(DEFAULT_COL_INDICATOR_BAND_ROWS)
-        .setModeBits(DEFAULT_COL_INDICATOR_MODE_BITS)
+        .setCellModes(
+            ColIndicatorCellModes.newBuilder()
+                .addAllModes(DEFAULT_COL_INDICATOR_MODES)
+                .build()
+        )
         .build()
 
 internal fun defaultIndicatorsConfig(): IndicatorsConfig =
@@ -295,23 +358,19 @@ class VolvoxGridController(
             .build())
     }
 
-    override fun getColumnIndicatorTopModeBits(): Int {
+    override fun getColumnIndicatorTopConfig(): CommonColumnIndicatorConfig {
         val config = getConfig()
         if (!config.hasIndicators() || !config.indicators.hasColTop()) {
-            return 0
+            return CommonColumnIndicatorConfig.builder().build()
         }
-        return config.indicators.colTop.modeBits
+        return toCommonColumnIndicatorConfig(config.indicators.colTop)
     }
 
-    override fun setColumnIndicatorTopModeBits(value: Int) {
+    override fun setColumnIndicatorTopConfig(value: CommonColumnIndicatorConfig) {
         configure(GridConfig.newBuilder()
             .setIndicators(
                 IndicatorsConfig.newBuilder()
-                    .setColTop(
-                        ColIndicatorConfig.newBuilder()
-                            .setModeBits(value)
-                            .build()
-                    )
+                    .setColTop(toProtoColumnIndicatorConfig(value))
                     .build()
             )
             .build())
@@ -362,26 +421,19 @@ class VolvoxGridController(
             .build())
     }
 
-    override fun getRowIndicatorStartModeBits(): Int {
+    override fun getRowIndicatorStartConfig(): CommonRowIndicatorConfig {
         val config = getConfig()
         if (!config.hasIndicators() || !config.indicators.hasRowStart()) {
-            return 0
+            return CommonRowIndicatorConfig.builder().build()
         }
-        return rowIndicatorModeBitsFromSlots(config.indicators.rowStart)
+        return toCommonRowIndicatorConfig(config.indicators.rowStart)
     }
 
-    override fun setRowIndicatorStartModeBits(value: Int) {
-        val row = RowIndicatorConfig.newBuilder()
-        val slots = rowIndicatorSlotsFromModeBits(value)
-        if (slots.isEmpty()) {
-            row.setVisible(false)
-        } else {
-            row.addAllSlots(slots)
-        }
+    override fun setRowIndicatorStartConfig(value: CommonRowIndicatorConfig) {
         configure(GridConfig.newBuilder()
             .setIndicators(
                 IndicatorsConfig.newBuilder()
-                    .setRowStart(row.build())
+                    .setRowStart(toProtoRowIndicatorConfig(value))
                     .build()
             )
             .build())

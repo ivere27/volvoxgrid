@@ -296,8 +296,11 @@ GridConfig _salesThemeConfig() {
         ..visible = true
         ..defaultRowHeight = 28
         ..bandRows = 1
-        ..modeBits = ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT.value |
-            ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH.value
+        ..cellModes = (ColIndicatorCellModes()
+          ..modes.addAll([
+            ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT,
+            ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH,
+          ]))
         ..background = _salesHeaderBg
         ..foreground = _salesHeaderFg
         ..gridColor = _salesFixedGridColor

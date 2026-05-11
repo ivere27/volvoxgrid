@@ -1884,8 +1884,9 @@ pub fn set_show_column_headers(id: i32, visible: bool) {
             if grid.indicator_bands.col_top.band_rows <= 0 {
                 grid.indicator_bands.col_top.band_rows = 1;
             }
-            if grid.indicator_bands.col_top.mode_bits == 0 {
-                grid.indicator_bands.col_top.mode_bits = shared::DEFAULT_COL_INDICATOR_MODE_BITS;
+            if grid.indicator_bands.col_top.cell_modes.is_empty() {
+                grid.indicator_bands.col_top.cell_modes =
+                    shared::DEFAULT_COL_INDICATOR_MODES.to_vec();
             }
         }
         grid.layout.invalidate();
@@ -1896,24 +1897,6 @@ pub fn set_show_column_headers(id: i32, visible: bool) {
 #[wasm_bindgen]
 pub fn get_show_column_headers(id: i32) -> bool {
     with_grid(id, |grid| grid.indicator_bands.col_top.visible).unwrap_or(false)
-}
-
-#[wasm_bindgen]
-pub fn set_col_indicator_top_mode_bits(id: i32, mode_bits: u32) {
-    with_grid(id, |grid| {
-        grid.indicator_bands.col_top.mode_bits = mode_bits;
-        grid.indicator_bands.col_top.visible = mode_bits != 0;
-        if grid.indicator_bands.col_top.visible && grid.indicator_bands.col_top.band_rows <= 0 {
-            grid.indicator_bands.col_top.band_rows = 1;
-        }
-        grid.layout.invalidate();
-        grid.dirty = true;
-    });
-}
-
-#[wasm_bindgen]
-pub fn get_col_indicator_top_mode_bits(id: i32) -> u32 {
-    with_grid(id, |grid| grid.indicator_bands.col_top.mode_bits).unwrap_or(0)
 }
 
 #[wasm_bindgen]

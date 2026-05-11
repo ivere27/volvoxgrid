@@ -1081,10 +1081,12 @@ fn load_sales_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Result<()
                     visible: Some(true),
                     default_row_height: Some(28),
                     band_rows: Some(1),
-                    mode_bits: Some(
-                        (pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as u32)
-                            | (pb::ColIndicatorCellMode::ColIndicatorCellSortGlyph as u32),
-                    ),
+                    cell_modes: Some(pb::ColIndicatorCellModes {
+                        modes: vec![
+                            pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as i32,
+                            pb::ColIndicatorCellMode::ColIndicatorCellSortGlyph as i32,
+                        ],
+                    }),
                     allow_resize: Some(true),
                     ..Default::default()
                 }),
@@ -1390,7 +1392,9 @@ fn load_hierarchy_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Resul
                     visible: Some(true),
                     default_row_height: Some(28),
                     band_rows: Some(1),
-                    mode_bits: Some(pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as u32),
+                    cell_modes: Some(pb::ColIndicatorCellModes {
+                        modes: vec![pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as i32],
+                    }),
                     allow_resize: Some(true),
                     ..Default::default()
                 }),

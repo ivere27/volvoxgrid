@@ -154,15 +154,15 @@ fn apply_demo_column_headers(
     grid.indicator_bands.col_top.visible = true;
     grid.indicator_bands.col_top.band_rows = 1;
     grid.indicator_bands.col_top.default_row_height_px = sp(grid, band_row_height_px);
-    grid.indicator_bands.col_top.mode_bits = (pb::ColIndicatorCellMode::ColIndicatorCellHeaderText
-        as u32)
-        | (pb::ColIndicatorCellMode::ColIndicatorCellSortGlyph as u32);
+    grid.indicator_bands.col_top.cell_modes = vec![
+        pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as i32,
+        pb::ColIndicatorCellMode::ColIndicatorCellSortGlyph as i32,
+    ];
     grid.indicator_bands.col_top.back_color = Some(theme.header_bg);
     grid.indicator_bands.col_top.fore_color = Some(theme.header_fg);
     grid.indicator_bands.col_top.grid_color = Some(theme.fixed_grid_color);
     grid.indicator_bands.col_top.allow_resize = true;
     grid.indicator_bands.corner_top_start.visible = false;
-    grid.indicator_bands.corner_top_start.mode_bits = 0;
     grid.indicator_bands.corner_top_start.custom_key.clear();
     grid.indicator_bands.corner_top_start.data.clear();
 }

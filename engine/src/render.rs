@@ -338,8 +338,8 @@ mod tests {
         grid.indicator_bands.col_top.visible = true;
         grid.indicator_bands.col_top.band_rows = 1;
         grid.indicator_bands.col_top.default_row_height_px = 24;
-        grid.indicator_bands.col_top.mode_bits =
-            pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as u32;
+        grid.indicator_bands.col_top.cell_modes =
+            vec![pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as i32];
         grid.ensure_layout();
 
         let mut renderer = Renderer::with_custom_text_renderer(Box::new(SolidTextRenderer));
@@ -369,8 +369,8 @@ mod tests {
         grid.indicator_bands.col_top.visible = true;
         grid.indicator_bands.col_top.band_rows = 1;
         grid.indicator_bands.col_top.default_row_height_px = 24;
-        grid.indicator_bands.col_top.mode_bits =
-            pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as u32;
+        grid.indicator_bands.col_top.cell_modes =
+            vec![pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as i32];
         grid.selection.selection_style.back_color = Some(0xFF224466);
         grid.selection.selection_style.fore_color = Some(0xFFFFFFFF);
         grid.selection
@@ -409,8 +409,8 @@ mod tests {
         grid.indicator_bands.col_top.visible = true;
         grid.indicator_bands.col_top.band_rows = 1;
         grid.indicator_bands.col_top.default_row_height_px = 24;
-        grid.indicator_bands.col_top.mode_bits =
-            pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as u32;
+        grid.indicator_bands.col_top.cell_modes =
+            vec![pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as i32];
         grid.selection.hover_mode = HOVER_COLUMN;
         grid.selection.hover_column_style.back_color = Some(0xFF557799);
         grid.mouse_row = -1;
@@ -756,8 +756,8 @@ mod tests {
         grid.indicator_bands.col_top.visible = true;
         grid.indicator_bands.col_top.band_rows = 1;
         grid.indicator_bands.col_top.default_row_height_px = 24;
-        grid.indicator_bands.col_top.mode_bits =
-            pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as u32;
+        grid.indicator_bands.col_top.cell_modes =
+            vec![pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as i32];
 
         for row in 0..grid.rows {
             grid.set_row_height(row, 20 + (row % 3) * 4);

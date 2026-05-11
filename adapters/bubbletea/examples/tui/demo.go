@@ -419,10 +419,12 @@ func buildSalesTuiConfig(rows, cols int) *pb.GridConfig {
 				Visible:          ptr(true),
 				BandRows:         ptr(int32(1)),
 				DefaultRowHeight: ptr(int32(1)),
-				ModeBits: ptr(
-					uint32(pb.ColIndicatorCellMode_COL_INDICATOR_CELL_HEADER_TEXT) |
-						uint32(pb.ColIndicatorCellMode_COL_INDICATOR_CELL_SORT_GLYPH),
-				),
+				CellModes: &pb.ColIndicatorCellModes{
+					Modes: []pb.ColIndicatorCellMode{
+						pb.ColIndicatorCellMode_COL_INDICATOR_CELL_HEADER_TEXT,
+						pb.ColIndicatorCellMode_COL_INDICATOR_CELL_SORT_GLYPH,
+					},
+				},
 				AllowResize: ptr(false),
 			},
 		},
@@ -569,8 +571,12 @@ func buildHierarchyTuiConfig(rows, cols int, maxOutlineDepth, maxOutlineLevel in
 				Visible:          ptr(true),
 				BandRows:         ptr(int32(1)),
 				DefaultRowHeight: ptr(int32(1)),
-				ModeBits:         ptr(uint32(pb.ColIndicatorCellMode_COL_INDICATOR_CELL_HEADER_TEXT)),
-				AllowResize:      ptr(false),
+				CellModes: &pb.ColIndicatorCellModes{
+					Modes: []pb.ColIndicatorCellMode{
+						pb.ColIndicatorCellMode_COL_INDICATOR_CELL_HEADER_TEXT,
+					},
+				},
+				AllowResize: ptr(false),
 			},
 			Appearance: ptr(pb.IndicatorAppearance_INDICATOR_APPEARANCE_MODERN),
 		},
@@ -606,10 +612,12 @@ func buildStressTuiConfig(rows, cols int) *pb.GridConfig {
 				Visible:          ptr(true),
 				BandRows:         ptr(int32(1)),
 				DefaultRowHeight: ptr(int32(1)),
-				ModeBits: ptr(
-					uint32(pb.ColIndicatorCellMode_COL_INDICATOR_CELL_HEADER_TEXT) |
-						uint32(pb.ColIndicatorCellMode_COL_INDICATOR_CELL_SORT_GLYPH),
-				),
+				CellModes: &pb.ColIndicatorCellModes{
+					Modes: []pb.ColIndicatorCellMode{
+						pb.ColIndicatorCellMode_COL_INDICATOR_CELL_HEADER_TEXT,
+						pb.ColIndicatorCellMode_COL_INDICATOR_CELL_SORT_GLYPH,
+					},
+				},
 				AllowResize: ptr(false),
 			},
 		},

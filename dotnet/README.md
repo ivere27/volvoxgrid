@@ -459,6 +459,8 @@ Layout-related properties:
 
 - `ShowColumnHeaders`
 - `ShowRowIndicator`
+- `ColumnIndicatorTopConfig`
+- `RowIndicatorStartConfig`
 - `FrozenRowCount`
 - `FrozenColCount`
 - `RowCount`

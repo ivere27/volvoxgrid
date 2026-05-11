@@ -416,8 +416,14 @@ namespace VolvoxGrid.DotNet.TuiSample
                             Visible = true,
                             BandRows = 1,
                             DefaultRowHeight = 1,
-                            ModeBits = (uint)ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT
-                                | (uint)ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH,
+                            CellModes = new ColIndicatorCellModes
+                            {
+                                Modes =
+                                {
+                                    ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT,
+                                    ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH,
+                                },
+                            },
                             AllowResize = false,
                         },
                     },
@@ -606,7 +612,10 @@ namespace VolvoxGrid.DotNet.TuiSample
                             Visible = true,
                             BandRows = 1,
                             DefaultRowHeight = 1,
-                            ModeBits = (uint)ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT,
+                            CellModes = new ColIndicatorCellModes
+                            {
+                                Modes = { ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT },
+                            },
                             AllowResize = false,
                         },
                         Appearance = IndicatorAppearance.INDICATOR_APPEARANCE_MODERN,
@@ -677,8 +686,14 @@ namespace VolvoxGrid.DotNet.TuiSample
                             Visible = true,
                             BandRows = 1,
                             DefaultRowHeight = 1,
-                            ModeBits = (uint)ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT
-                                | (uint)ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH,
+                            CellModes = new ColIndicatorCellModes
+                            {
+                                Modes =
+                                {
+                                    ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT,
+                                    ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH,
+                                },
+                            },
                             AllowResize = false,
                         },
                     },

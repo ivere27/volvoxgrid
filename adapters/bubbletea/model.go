@@ -1043,14 +1043,13 @@ func resetIndicators() *pb.IndicatorsConfig {
 		Visible:          proto.Bool(false),
 		BandRows:         proto.Int32(0),
 		DefaultRowHeight: proto.Int32(1),
-		ModeBits:         proto.Uint32(0),
+		CellModes:        &pb.ColIndicatorCellModes{},
 		AllowResize:      proto.Bool(false),
 		AllowReorder:     proto.Bool(false),
 		AllowMenu:        proto.Bool(false),
 	}
 	hiddenCorner := &pb.CornerIndicatorConfig{
-		Visible:  proto.Bool(false),
-		ModeBits: proto.Uint32(0),
+		Visible: proto.Bool(false),
 		Slots: []*pb.CornerIndicatorSlot{{
 			Kind:    pb.CornerIndicatorSlotKind_CORNER_SLOT_NONE.Enum(),
 			Width:   proto.Int32(0),
@@ -1119,8 +1118,12 @@ func defaultIndicators(rows int) *pb.IndicatorsConfig {
 			Visible:          proto.Bool(true),
 			BandRows:         proto.Int32(1),
 			DefaultRowHeight: proto.Int32(1),
-			ModeBits:         proto.Uint32(uint32(pb.ColIndicatorCellMode_COL_INDICATOR_CELL_HEADER_TEXT)),
-			AllowResize:      proto.Bool(false),
+			CellModes: &pb.ColIndicatorCellModes{
+				Modes: []pb.ColIndicatorCellMode{
+					pb.ColIndicatorCellMode_COL_INDICATOR_CELL_HEADER_TEXT,
+				},
+			},
+			AllowResize: proto.Bool(false),
 		},
 	}
 }

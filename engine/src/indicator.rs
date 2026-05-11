@@ -3,6 +3,18 @@ use crate::proto::volvoxgrid::v1 as pb;
 pub const DEFAULT_ROW_INDICATOR_WIDTH: i32 = 35;
 pub const DEFAULT_COL_INDICATOR_ROW_HEIGHT: i32 = 24;
 
+pub fn col_indicator_modes_contain(modes: &[i32], mode: pb::ColIndicatorCellMode) -> bool {
+    modes.contains(&(mode as i32))
+}
+
+pub fn primary_col_indicator_mode(modes: &[i32]) -> i32 {
+    modes
+        .iter()
+        .copied()
+        .find(|mode| *mode != pb::ColIndicatorCellMode::ColIndicatorCellNone as i32)
+        .unwrap_or(pb::ColIndicatorCellMode::ColIndicatorCellNone as i32)
+}
+
 #[derive(Clone, Debug)]
 pub struct RowIndicatorSlotState {
     pub kind: i32,
@@ -148,7 +160,7 @@ pub struct ColIndicatorCellState {
     pub col1: i32,
     pub col2: i32,
     pub text: String,
-    pub mode_bits: u32,
+    pub modes: Option<Vec<i32>>,
     pub custom_key: String,
     pub data: Vec<u8>,
 }
@@ -161,7 +173,7 @@ impl Default for ColIndicatorCellState {
             col1: 0,
             col2: 0,
             text: String::new(),
-            mode_bits: 0,
+            modes: None,
             custom_key: String::new(),
             data: Vec::new(),
         }
@@ -173,7 +185,7 @@ pub struct ColIndicatorState {
     pub visible: bool,
     pub default_row_height_px: i32,
     pub band_rows: i32,
-    pub mode_bits: u32,
+    pub cell_modes: Vec<i32>,
     pub back_color: Option<u32>,
     pub fore_color: Option<u32>,
     pub grid_lines: Option<i32>,
@@ -192,7 +204,7 @@ impl Default for ColIndicatorState {
             visible: false,
             default_row_height_px: DEFAULT_COL_INDICATOR_ROW_HEIGHT,
             band_rows: 0,
-            mode_bits: 0,
+            cell_modes: Vec::new(),
             back_color: None,
             fore_color: None,
             grid_lines: None,
@@ -221,10 +233,7 @@ impl ColIndicatorState {
             .map(|cell| cell.row2.max(cell.row1) + 1)
             .max()
             .unwrap_or(0);
-        let synthesized = if self.mode_bits
-            & (pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as u32)
-            != 0
-        {
+        let synthesized = if self.has_mode(pb::ColIndicatorCellMode::ColIndicatorCellHeaderText) {
             1
         } else {
             0
@@ -252,7 +261,11 @@ impl ColIndicatorState {
     }
 
     pub fn has_mode(&self, mode: pb::ColIndicatorCellMode) -> bool {
-        self.mode_bits & (mode as u32) != 0
+        col_indicator_modes_contain(&self.cell_modes, mode)
+    }
+
+    pub fn effective_modes_for_cell<'a>(&'a self, cell: &'a ColIndicatorCellState) -> &'a [i32] {
+        cell.modes.as_deref().unwrap_or(&self.cell_modes)
     }
 }
 
@@ -398,7 +411,6 @@ pub fn resolve_indicator_button_theme(
 #[derive(Clone, Debug, Default)]
 pub struct CornerIndicatorState {
     pub visible: bool,
-    pub mode_bits: u32,
     pub back_color: Option<u32>,
     pub fore_color: Option<u32>,
     pub custom_key: String,

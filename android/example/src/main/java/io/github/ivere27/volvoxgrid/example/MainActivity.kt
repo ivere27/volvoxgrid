@@ -345,9 +345,11 @@ class MainActivity : AppCompatActivity() {
                             .setColTop(ColIndicatorConfig.newBuilder()
                                 .setVisible(true)
                                 .setBandRows(1)
-                                .setModeBits(
-                                    ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT.number or
-                                        ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH.number
+                                .setCellModes(
+                                    ColIndicatorCellModes.newBuilder()
+                                        .addModes(ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT)
+                                        .addModes(ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH)
+                                        .build()
                                 )
                                 .build())
                             .build())
