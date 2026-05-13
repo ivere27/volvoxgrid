@@ -5136,47 +5136,62 @@ impl VolvoxGrid {
     /// and emitting all required events (CellEditValidate, AfterEdit, CellChanged,
     /// DropdownClosed).  Returns true if an edit was committed.
     pub fn commit_edit(&mut self) -> bool {
-        let Some((row, col, old_text, new_text)) = self.edit.commit() else {
+        if !self.edit.is_active() {
             return false;
-        };
-
-        // Normalize: truncate, translate dropdown display→value.
-        let mut committed = truncate_chars(&new_text, self.edit_max_length);
-        if let Some(dropdown) = self.configured_dropdown(row, col) {
-            if !dropdown.allow_custom_value
-                && !dropdown.static_items.is_empty()
-                && !crate::edit::dropdown_text_matches_item_typed(&dropdown, &committed)
-            {
-                committed = old_text.clone();
-            }
-            if let Some(mapped) =
-                crate::edit::translate_dropdown_display_to_value_typed(&dropdown, &committed)
-            {
-                committed = mapped;
-            }
-        } else if col >= 0 && (col as usize) < self.columns.len() {
-            let col_list = &self.columns[col as usize].dropdown_items;
-            if !col_list.is_empty() {
-                if !col_list.starts_with('|')
-                    && !crate::edit::dropdown_text_matches_item(col_list, &committed)
-                {
-                    committed = old_text.clone();
-                }
-                if let Some(mapped) =
-                    crate::edit::translate_dropdown_display_to_value(col_list, &committed)
-                {
-                    committed = mapped;
-                }
-            }
         }
 
-        // Emit events and apply.
-        self.events
-            .push(crate::event::GridEventData::CellEditValidate {
-                row,
-                col,
-                edit_text: committed.clone(),
-            });
+        self.edit.flush_preedit();
+        let row = self.edit.edit_row;
+        let col = self.edit.edit_col;
+        let old_text = self.cells.get_text(row, col).to_string();
+        let new_text = self.edit.edit_text.clone();
+        let committed = match self.prepare_committed_edit_text(row, col, &old_text, &new_text) {
+            crate::edit::PreparedEditCommit::Commit(committed) => committed,
+            crate::edit::PreparedEditCommit::AllowInvalid { committed, errors } => {
+                if !errors.is_empty() {
+                    self.edit.set_validation_errors(errors);
+                }
+                committed
+            }
+            crate::edit::PreparedEditCommit::Block { attempted, errors } => {
+                self.edit.update_text(attempted.clone());
+                self.edit.set_sel_start(attempted.chars().count() as i32);
+                self.edit.set_sel_length(0);
+                self.edit.set_validation_errors(errors);
+                self.mark_dirty();
+                return false;
+            }
+            crate::edit::PreparedEditCommit::Revert(committed) => {
+                self.edit.cancel();
+                self.apply_committed_edit_text(row, col, old_text, committed, false);
+                return true;
+            }
+        };
+
+        let Some((row, col, old_text)) = self.edit.finish_commit_with_text(committed.clone())
+        else {
+            return false;
+        };
+        self.apply_committed_edit_text(row, col, old_text, committed, true);
+        true
+    }
+
+    fn apply_committed_edit_text(
+        &mut self,
+        row: i32,
+        col: i32,
+        old_text: String,
+        committed: String,
+        emit_validate: bool,
+    ) {
+        if emit_validate {
+            self.events
+                .push(crate::event::GridEventData::CellEditValidate {
+                    row,
+                    col,
+                    edit_text: committed.clone(),
+                });
+        }
         self.cells.set_text(row, col, committed.clone());
         self.sync_explicit_progress_from_text(row, col);
         if old_text != committed {
@@ -5199,7 +5214,124 @@ impl VolvoxGrid {
                 .push(crate::event::GridEventData::DropdownClosed);
         }
         self.mark_dirty();
-        true
+    }
+
+    fn prepare_committed_edit_text(
+        &self,
+        row: i32,
+        col: i32,
+        old_text: &str,
+        new_text: &str,
+    ) -> crate::edit::PreparedEditCommit {
+        let editor = self.editor_spec_for_commit(row, col);
+        crate::edit::prepare_committed_edit_text(&editor, old_text, new_text, self.edit_max_length)
+    }
+
+    fn editor_spec_for_commit(&self, row: i32, col: i32) -> pb::EditorSpec {
+        let mut spec = self
+            .configured_editor_spec(row, col)
+            .or_else(|| {
+                self.configured_dropdown(row, col)
+                    .map(|dropdown| pb::EditorSpec {
+                        kind: if dropdown.allow_custom_value {
+                            pb::EditorKind::EditorCombo as i32
+                        } else {
+                            pb::EditorKind::EditorSelect as i32
+                        },
+                        owner: pb::EditorOwner::Engine as i32,
+                        presentation: pb::EditorPresentation::EditorCanvas as i32,
+                        validation_mode: pb::ValidationMode::ValidationBlock as i32,
+                        validation_trigger: pb::ValidationTrigger::OnCommit as i32,
+                        validation_debounce_ms: 0,
+                        custom_editor_id: None,
+                        text: None,
+                        number: None,
+                        checkbox: None,
+                        list: Some(dropdown),
+                        date_time: None,
+                        actions: Vec::new(),
+                        custom_props: None,
+                    })
+            })
+            .unwrap_or_else(|| pb::EditorSpec {
+                kind: pb::EditorKind::EditorText as i32,
+                owner: pb::EditorOwner::Engine as i32,
+                presentation: pb::EditorPresentation::EditorCanvas as i32,
+                validation_mode: pb::ValidationMode::ValidationBlock as i32,
+                validation_trigger: pb::ValidationTrigger::OnCommit as i32,
+                validation_debounce_ms: 0,
+                custom_editor_id: None,
+                text: Some(pb::TextEditorParams {
+                    max_length: self.edit_max_length,
+                    mask: String::new(),
+                    allow_newlines: false,
+                    input_type: pb::InputType::Text as i32,
+                }),
+                number: None,
+                checkbox: None,
+                list: None,
+                date_time: None,
+                actions: Vec::new(),
+                custom_props: None,
+            });
+
+        if spec.kind == pb::EditorKind::Unspecified as i32 {
+            spec.kind = if spec
+                .list
+                .as_ref()
+                .is_some_and(|list| list.allow_custom_value)
+            {
+                pb::EditorKind::EditorCombo as i32
+            } else if spec.list.is_some() {
+                pb::EditorKind::EditorSelect as i32
+            } else {
+                pb::EditorKind::EditorText as i32
+            };
+        }
+        if spec.list.is_none() {
+            spec.list = self.configured_dropdown(row, col);
+        }
+        if matches!(
+            pb::EditorKind::try_from(spec.kind).unwrap_or(pb::EditorKind::Unspecified),
+            pb::EditorKind::EditorText | pb::EditorKind::EditorMultilineText
+        ) && spec.text.is_none()
+        {
+            spec.text = Some(pb::TextEditorParams {
+                max_length: self.edit_max_length,
+                mask: String::new(),
+                allow_newlines: spec.kind == pb::EditorKind::EditorMultilineText as i32,
+                input_type: pb::InputType::Text as i32,
+            });
+        }
+        if let Some(text) = spec.text.as_mut() {
+            if text.max_length == 0 {
+                text.max_length = self.edit_max_length;
+            }
+        }
+        spec
+    }
+
+    fn configured_editor_spec(&self, row: i32, col: i32) -> Option<pb::EditorSpec> {
+        if row >= 0 && col >= 0 {
+            if let Some(editor) = self
+                .cells
+                .get(row, col)
+                .and_then(|cell| cell.editor())
+                .cloned()
+            {
+                return Some(editor);
+            }
+        }
+        if col >= 0 {
+            if let Some(editor) = self
+                .columns
+                .get(col as usize)
+                .and_then(|column| column.editor.clone())
+            {
+                return Some(editor);
+            }
+        }
+        self.default_editor.clone()
     }
 
     /// If a cell already carries explicit progress metadata, keep the visual
@@ -5811,14 +5943,6 @@ fn dropdown_has_items(dropdown: &pb::ListEditorParams) -> bool {
     })
 }
 
-/// Truncate a string to at most `max_chars` characters.
-fn truncate_chars(input: &str, max_chars: i32) -> String {
-    if max_chars <= 0 {
-        return input.to_string();
-    }
-    input.chars().take(max_chars as usize).collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -6310,6 +6434,103 @@ mod tests {
         assert_eq!(cell.progress_color(), 0xFF22C55E);
     }
 
+    fn test_number_editor(min: Option<f64>, max: Option<f64>, nullable: bool) -> pb::EditorSpec {
+        pb::EditorSpec {
+            kind: pb::EditorKind::EditorNumber as i32,
+            validation_mode: pb::ValidationMode::ValidationBlock as i32,
+            validation_trigger: pb::ValidationTrigger::OnCommit as i32,
+            number: Some(pb::NumberEditorParams {
+                min,
+                max,
+                step: None,
+                format: String::new(),
+                nullable,
+            }),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn commit_edit_blocks_invalid_number_editor_text() {
+        let mut grid = VolvoxGrid::new(1, 320, 200, 2, 1, 1, 0);
+        grid.edit_trigger_mode = 2;
+        grid.columns[0].editor = Some(test_number_editor(None, None, false));
+        grid.cells.set_text(1, 0, "12".to_string());
+
+        grid.begin_edit(1, 0, pb::EditStartReason::EditStartProgrammatic);
+        grid.edit.update_text("abc".to_string());
+
+        assert!(!grid.commit_edit());
+        assert!(grid.is_editing());
+        assert_eq!(grid.cells.get_text(1, 0), "12");
+        assert_eq!(grid.edit.validation_errors[0].code, "number.invalid");
+    }
+
+    #[test]
+    fn commit_edit_blocks_number_outside_editor_range() {
+        let mut grid = VolvoxGrid::new(1, 320, 200, 2, 1, 1, 0);
+        grid.edit_trigger_mode = 2;
+        grid.columns[0].editor = Some(test_number_editor(Some(0.0), Some(100.0), false));
+        grid.cells.set_text(1, 0, "40".to_string());
+
+        grid.begin_edit(1, 0, pb::EditStartReason::EditStartProgrammatic);
+        grid.edit.update_text("120".to_string());
+
+        assert!(!grid.commit_edit());
+        assert!(grid.is_editing());
+        assert_eq!(grid.cells.get_text(1, 0), "40");
+        assert_eq!(grid.edit.validation_errors[0].code, "number.max");
+    }
+
+    #[test]
+    fn commit_edit_accepts_number_inside_editor_range() {
+        let mut grid = VolvoxGrid::new(1, 320, 200, 2, 1, 1, 0);
+        grid.edit_trigger_mode = 2;
+        grid.columns[0].editor = Some(test_number_editor(Some(0.0), Some(100.0), false));
+        grid.cells.set_text(1, 0, "40".to_string());
+
+        grid.begin_edit(1, 0, pb::EditStartReason::EditStartProgrammatic);
+        grid.edit.update_text("85".to_string());
+
+        assert!(grid.commit_edit());
+        assert!(!grid.is_editing());
+        assert_eq!(grid.cells.get_text(1, 0), "85");
+    }
+
+    #[test]
+    fn commit_edit_revert_mode_restores_old_value_and_closes_editor() {
+        let mut grid = VolvoxGrid::new(1, 320, 200, 2, 1, 1, 0);
+        grid.edit_trigger_mode = 2;
+        let mut editor = test_number_editor(Some(0.0), Some(100.0), false);
+        editor.validation_mode = pb::ValidationMode::ValidationRevert as i32;
+        grid.columns[0].editor = Some(editor);
+        grid.cells.set_text(1, 0, "40".to_string());
+
+        grid.begin_edit(1, 0, pb::EditStartReason::EditStartProgrammatic);
+        grid.edit.update_text("abc".to_string());
+
+        assert!(grid.commit_edit());
+        assert!(!grid.is_editing());
+        assert_eq!(grid.cells.get_text(1, 0), "40");
+    }
+
+    #[test]
+    fn commit_edit_allow_invalid_mode_commits_invalid_value() {
+        let mut grid = VolvoxGrid::new(1, 320, 200, 2, 1, 1, 0);
+        grid.edit_trigger_mode = 2;
+        let mut editor = test_number_editor(Some(0.0), Some(100.0), false);
+        editor.validation_mode = pb::ValidationMode::ValidationAllowInvalid as i32;
+        grid.columns[0].editor = Some(editor);
+        grid.cells.set_text(1, 0, "40".to_string());
+
+        grid.begin_edit(1, 0, pb::EditStartReason::EditStartProgrammatic);
+        grid.edit.update_text("abc".to_string());
+
+        assert!(grid.commit_edit());
+        assert!(!grid.is_editing());
+        assert_eq!(grid.cells.get_text(1, 0), "abc");
+    }
+
     #[test]
     fn commit_edit_rejects_custom_text_for_select_dropdown() {
         let mut grid = VolvoxGrid::new(1, 320, 200, 2, 1, 1, 0);
@@ -6320,8 +6541,10 @@ mod tests {
         grid.begin_edit(1, 0, pb::EditStartReason::EditStartProgrammatic);
         grid.edit.update_text("Injected".to_string());
 
-        assert!(grid.commit_edit());
+        assert!(!grid.commit_edit());
+        assert!(grid.is_editing());
         assert_eq!(grid.cells.get_text(1, 0), "Open");
+        assert_eq!(grid.edit.validation_errors[0].code, "select.invalid");
     }
 
     #[test]

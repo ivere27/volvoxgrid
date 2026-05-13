@@ -59,6 +59,20 @@ EditorSpec _defaultHostTextEditorSpec() => EditorSpec()
   ..owner = EditorOwner.EDITOR_OWNER_HOST_NATIVE
   ..presentation = EditorPresentation.EDITOR_INLINE;
 
+EditorSpec _hostNumberEditorSpec({double min = 0.0, double? max}) {
+  final number = NumberEditorParams()
+    ..min = min
+    ..nullable = false;
+  if (max != null) {
+    number.max = max;
+  }
+  return EditorSpec()
+    ..kind = EditorKind.EDITOR_NUMBER
+    ..owner = EditorOwner.EDITOR_OWNER_HOST_NATIVE
+    ..presentation = EditorPresentation.EDITOR_INLINE
+    ..number = number;
+}
+
 Future<void> loadSalesJsonDemo(VolvoxGridController controller) async {
   await controller.setColCount(_salesKeys.length);
   final columns = _salesDefineColumnsRequest();
@@ -164,10 +178,12 @@ DefineColumnsRequest _salesDefineColumnsRequest() {
       def.align = Align.ALIGN_RIGHT_CENTER;
       def.dataType = ColumnDataType.COLUMN_DATA_CURRENCY;
       def.format = r'$#,##0';
+      def.editor = _hostNumberEditorSpec();
     } else if (col == 6) {
       def.align = Align.ALIGN_CENTER_CENTER;
       def.dataType = ColumnDataType.COLUMN_DATA_NUMBER;
       def.progressColor = _salesAccent;
+      def.editor = _hostNumberEditorSpec(max: 100.0);
     } else if (col == 7) {
       def.align = Align.ALIGN_CENTER_CENTER;
       def.dataType = ColumnDataType.COLUMN_DATA_BOOLEAN;

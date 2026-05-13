@@ -2945,7 +2945,7 @@ namespace VolvoxGrid.DotNet
             }
         }
 
-        private List<ColumnDef> BuildColumnDefinitions() => _columns.Select((c, i) => new ColumnDef { Index = i, Key = c.FieldName, Caption = c.Caption, Width = c.Width, Hidden = !c.Visible, SortOrder = (Volvoxgrid.V1.SortOrder)c.SortDirection, SortType = (SortType)c.SortType, Align = (Align)c.Alignment, DataType = (ColumnDataType)c.DataType, Interaction = (CellInteraction)c.Interaction, Format = c.Format, ProgressColor = c.ProgressColor }).ToList();
+        private List<ColumnDef> BuildColumnDefinitions() => _columns.Select((c, i) => new ColumnDef { Index = i, Key = c.FieldName, Caption = c.Caption, Width = c.Width, Hidden = !c.Visible, SortOrder = (Volvoxgrid.V1.SortOrder)c.SortDirection, SortType = (SortType)c.SortType, Align = (Align)c.Alignment, DataType = (ColumnDataType)c.DataType, Interaction = (CellInteraction)c.Interaction, Format = c.Format, ProgressColor = c.ProgressColor, Editor = c.Editor }).ToList();
 
         private List<SortColumn> BuildSortColumns() => _columns.Select((c, i) => new { c, i }).Where(x => x.c.SortDirection != VolvoxGridSortDirection.None).Select(x => new SortColumn { Col = x.i, Order = (Volvoxgrid.V1.SortOrder)x.c.SortDirection, Type = (SortType)x.c.SortType }).ToList();
 
@@ -2967,7 +2967,8 @@ namespace VolvoxGrid.DotNet
                     DataType = s.HasDataType ? (VolvoxGridColumnDataType)s.DataType : VolvoxGridColumnDataType.String,
                     Interaction = s.HasInteraction ? (VolvoxGridCellInteraction)s.Interaction : VolvoxGridCellInteraction.Unspecified,
                     Format = s.HasFormat ? s.Format : null,
-                    ProgressColor = s.HasProgressColor ? s.ProgressColor : 0
+                    ProgressColor = s.HasProgressColor ? s.ProgressColor : 0,
+                    Editor = s.Editor
                 });
             }
         }

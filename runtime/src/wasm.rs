@@ -444,7 +444,24 @@ fn request_validate_edit(
     new_text: String,
 ) {
     let committed_text =
-        shared::normalize_committed_edit_text(grid, row, col, &old_text, &new_text);
+        match shared::prepare_committed_edit_text(grid, row, col, &old_text, &new_text) {
+            shared::PreparedEditCommit::Commit(committed) => committed,
+            shared::PreparedEditCommit::AllowInvalid { committed, errors } => {
+                shared::set_active_edit_validation_errors(grid, row, col, errors);
+                committed
+            }
+            shared::PreparedEditCommit::Block { attempted, errors } => {
+                shared::block_active_edit_commit(grid, row, col, attempted, errors);
+                return;
+            }
+            shared::PreparedEditCommit::Revert(committed) => {
+                if grid.edit.is_active() && grid.edit.edit_row == row && grid.edit.edit_col == col {
+                    grid.edit.cancel();
+                }
+                shared::apply_committed_edit_text(grid, row, col, old_text, committed);
+                return;
+            }
+        };
 
     if !decision_channel_enabled(grid_id) {
         grid.events
@@ -5717,11 +5734,8 @@ fn maybe_send_refreshed_editor_session_start(
                     visible: true,
                 },
             );
-            let reason = if state_changed {
-                EditorUpdateReason::EditorUpdateUnspecified
-            } else {
-                EditorUpdateReason::EditorUpdateGeometry
-            };
+            let reason =
+                shared::editor_update_reason_for_started_delta(&prev.request, req, state_changed);
             stream.send(shared::build_editor_updated_from_started(
                 req,
                 geometry_changed || !prev.visible,
@@ -5953,20 +5967,53 @@ impl volvoxgrid_wasm::VolvoxGridServiceRuntime for WasmRuntime {
                                         pending_text,
                                     );
                                 } else {
-                                    let committed = shared::normalize_committed_edit_text(
+                                    match shared::prepare_committed_edit_text(
                                         grid, row, col, &old_text, &new_text,
-                                    );
-                                    grid.edit.cancel();
-                                    grid.events.push(
-                                        volvoxgrid_engine::event::GridEventData::CellEditValidate {
-                                            row,
-                                            col,
-                                            edit_text: committed.clone(),
-                                        },
-                                    );
-                                    shared::apply_committed_edit_text(
-                                        grid, row, col, old_text, committed,
-                                    );
+                                    ) {
+                                        shared::PreparedEditCommit::Commit(committed) => {
+                                            grid.edit.cancel();
+                                            grid.events.push(
+                                                volvoxgrid_engine::event::GridEventData::CellEditValidate {
+                                                    row,
+                                                    col,
+                                                    edit_text: committed.clone(),
+                                                },
+                                            );
+                                            shared::apply_committed_edit_text(
+                                                grid, row, col, old_text, committed,
+                                            );
+                                        }
+                                        shared::PreparedEditCommit::AllowInvalid {
+                                            committed,
+                                            errors,
+                                        } => {
+                                            shared::set_active_edit_validation_errors(
+                                                grid, row, col, errors,
+                                            );
+                                            grid.edit.cancel();
+                                            grid.events.push(
+                                                volvoxgrid_engine::event::GridEventData::CellEditValidate {
+                                                    row,
+                                                    col,
+                                                    edit_text: committed.clone(),
+                                                },
+                                            );
+                                            shared::apply_committed_edit_text(
+                                                grid, row, col, old_text, committed,
+                                            );
+                                        }
+                                        shared::PreparedEditCommit::Block { attempted, errors } => {
+                                            shared::block_active_edit_commit(
+                                                grid, row, col, attempted, errors,
+                                            );
+                                        }
+                                        shared::PreparedEditCommit::Revert(committed) => {
+                                            grid.edit.cancel();
+                                            shared::apply_committed_edit_text(
+                                                grid, row, col, old_text, committed,
+                                            );
+                                        }
+                                    }
                                 }
                             }
                         }

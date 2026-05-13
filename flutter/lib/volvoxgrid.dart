@@ -1877,7 +1877,8 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
   void _showEditOverlay(pb.EditorSessionStarted req) {
     // Engine-drawn editor: host MUST NOT mount an overlay.
     if (req.hasSession() &&
-        req.session.editor.presentation == pb.EditorPresentation.EDITOR_CANVAS) {
+        req.session.editor.presentation ==
+            pb.EditorPresentation.EDITOR_CANVAS) {
       return;
     }
 
@@ -1988,6 +1989,47 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
         );
       });
     });
+  }
+
+  void _applyActiveEditState(pb.EditState state) {
+    if (!state.active || !state.hasSession()) {
+      return;
+    }
+    final session = state.session;
+    setState(() {
+      _editing = true;
+      _editOverlayVisible = true;
+      _editOverlayPendingReveal = false;
+      _editSessionId = session.sessionId;
+      _editStateVersion = session.stateVersion;
+      if (session.hasValue()) {
+        final nextText = _editorValueText(session.value);
+        if (_editTextController.text != nextText) {
+          _editTextController.value = TextEditingValue(
+            text: nextText,
+            selection: TextSelection.collapsed(offset: nextText.length),
+          );
+        }
+      }
+    });
+  }
+
+  Future<bool> _refreshActiveEditAfterCommit() async {
+    final pb.EditState state;
+    try {
+      state = await widget.controller.getEditState();
+    } catch (_) {
+      return false;
+    }
+    if (!mounted) {
+      return true;
+    }
+    if (state.active) {
+      _applyActiveEditState(state);
+      _requestRender();
+      return true;
+    }
+    return false;
   }
 
   void _scheduleDeferredImeOverlayReveal() {
@@ -2355,6 +2397,9 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
       sessionId: _editSessionId,
       stateVersion: _editStateVersion,
     );
+    if (await _refreshActiveEditAfterCommit()) {
+      return;
+    }
 
     if (currentRow >= 0 && currentCol >= 0) {
       try {
@@ -2388,6 +2433,9 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
       sessionId: _editSessionId,
       stateVersion: _editStateVersion,
     );
+    if (await _refreshActiveEditAfterCommit()) {
+      return;
+    }
     if (!mounted) {
       return;
     }
@@ -2476,6 +2524,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
         return;
       }
       if (state.active) {
+        _applyActiveEditState(state);
         _requestRender();
         return;
       }

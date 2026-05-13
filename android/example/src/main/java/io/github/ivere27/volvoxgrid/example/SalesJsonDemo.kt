@@ -38,6 +38,7 @@ import io.github.ivere27.volvoxgrid.LoadDataStatus
 import io.github.ivere27.volvoxgrid.LoadDataOptions
 import io.github.ivere27.volvoxgrid.ListEditorParams
 import io.github.ivere27.volvoxgrid.ListItem
+import io.github.ivere27.volvoxgrid.NumberEditorParams
 import io.github.ivere27.volvoxgrid.OutlineConfig
 import io.github.ivere27.volvoxgrid.RegionStyle
 import io.github.ivere27.volvoxgrid.ResizePolicy
@@ -139,11 +140,13 @@ object SalesJsonDemo {
                     def.align = Align.ALIGN_RIGHT_CENTER
                     def.dataType = ColumnDataType.COLUMN_DATA_CURRENCY
                     def.format = "$#,##0"
+                    def.setEditor(numberEditor(0.0))
                 }
                 6 -> {
                     def.align = Align.ALIGN_CENTER_CENTER
                     def.dataType = ColumnDataType.COLUMN_DATA_NUMBER
                     def.progressColor = ACCENT
+                    def.setEditor(numberEditor(0.0, 100.0))
                 }
                 7 -> {
                     def.align = Align.ALIGN_CENTER_CENTER
@@ -170,6 +173,21 @@ object SalesJsonDemo {
             .setOwner(EditorOwner.EDITOR_OWNER_ENGINE)
             .setPresentation(EditorPresentation.EDITOR_CANVAS)
             .setList(list)
+            .build()
+    }
+
+    private fun numberEditor(min: Double, max: Double? = null): EditorSpec {
+        val number = NumberEditorParams.newBuilder()
+            .setMin(min)
+            .setNullable(false)
+        if (max != null) {
+            number.setMax(max)
+        }
+        return EditorSpec.newBuilder()
+            .setKind(EditorKind.EDITOR_NUMBER)
+            .setOwner(EditorOwner.EDITOR_OWNER_HOST_NATIVE)
+            .setPresentation(EditorPresentation.EDITOR_INLINE)
+            .setNumber(number.build())
             .build()
     }
 

@@ -7,6 +7,7 @@ export type {
   VolvoxGridEditorSessionEndedDetails,
   VolvoxGridEditorSessionStartedDetails,
   VolvoxGridEditorSessionUpdatedDetails,
+  VolvoxGridValidationError,
 } from "./volvoxgrid.js";
 export { VolvoxGridElement } from "./volvoxgrid-element.js";
 export { setupDefaultInput, setupDefaultKeyboard, setupDefaultContextMenu } from "./default-input.js";

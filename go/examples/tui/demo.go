@@ -680,9 +680,9 @@ func buildSalesColumns() []*pb.ColumnDef {
 		{Index: 1, Width: ptr(int32(10)), Caption: ptr("Region"), Key: ptr("Region"), Span: ptr(true)},
 		{Index: 2, Width: ptr(int32(14)), Caption: ptr("Category"), Key: ptr("Category")},
 		{Index: 3, Width: ptr(int32(18)), Caption: ptr("Product"), Key: ptr("Product")},
-		{Index: 4, Width: ptr(int32(12)), Caption: ptr("Sales"), Key: ptr("Sales"), Align: ptr(pb.Align_ALIGN_RIGHT_CENTER), DataType: ptr(pb.ColumnDataType_COLUMN_DATA_CURRENCY), Format: ptr("$#,##0")},
-		{Index: 5, Width: ptr(int32(12)), Caption: ptr("Cost"), Key: ptr("Cost"), Align: ptr(pb.Align_ALIGN_RIGHT_CENTER), DataType: ptr(pb.ColumnDataType_COLUMN_DATA_CURRENCY), Format: ptr("$#,##0")},
-		{Index: 6, Width: ptr(int32(10)), Caption: ptr("Margin%"), Key: ptr("Margin"), Align: ptr(pb.Align_ALIGN_CENTER_CENTER), DataType: ptr(pb.ColumnDataType_COLUMN_DATA_NUMBER), ProgressColor: ptr(uint32(0xFF818CF8))},
+		{Index: 4, Width: ptr(int32(12)), Caption: ptr("Sales"), Key: ptr("Sales"), Align: ptr(pb.Align_ALIGN_RIGHT_CENTER), DataType: ptr(pb.ColumnDataType_COLUMN_DATA_CURRENCY), Format: ptr("$#,##0"), Editor: numberEditor(0, nil)},
+		{Index: 5, Width: ptr(int32(12)), Caption: ptr("Cost"), Key: ptr("Cost"), Align: ptr(pb.Align_ALIGN_RIGHT_CENTER), DataType: ptr(pb.ColumnDataType_COLUMN_DATA_CURRENCY), Format: ptr("$#,##0"), Editor: numberEditor(0, nil)},
+		{Index: 6, Width: ptr(int32(10)), Caption: ptr("Margin%"), Key: ptr("Margin"), Align: ptr(pb.Align_ALIGN_CENTER_CENTER), DataType: ptr(pb.ColumnDataType_COLUMN_DATA_NUMBER), ProgressColor: ptr(uint32(0xFF818CF8)), Editor: numberEditor(0, ptr(100.0))},
 		{Index: 7, Width: ptr(int32(5)), Caption: ptr("Flag"), Key: ptr("Flag"), Align: ptr(pb.Align_ALIGN_CENTER_CENTER), DataType: ptr(pb.ColumnDataType_COLUMN_DATA_BOOLEAN)},
 		{Index: 8, Width: ptr(int32(10)), Caption: ptr("Status"), Key: ptr("Status"), Editor: dropdownEditorFromLabels(salesStatusItems)},
 		{Index: 9, Width: ptr(int32(18)), Caption: ptr("Notes"), Key: ptr("Notes")},
@@ -702,6 +702,19 @@ func dropdownEditorFromLabels(items string) *pb.EditorSpec {
 		Owner:        pb.EditorOwner_EDITOR_OWNER_ENGINE,
 		Presentation: pb.EditorPresentation_EDITOR_INLINE,
 		List:         list,
+	}
+}
+
+func numberEditor(min float64, max *float64) *pb.EditorSpec {
+	return &pb.EditorSpec{
+		Kind:         pb.EditorKind_EDITOR_NUMBER,
+		Owner:        pb.EditorOwner_EDITOR_OWNER_ENGINE,
+		Presentation: pb.EditorPresentation_EDITOR_CANVAS,
+		Number: &pb.NumberEditorParams{
+			Min:      ptr(min),
+			Max:      max,
+			Nullable: false,
+		},
 	}
 }
 

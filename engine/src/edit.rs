@@ -364,6 +364,382 @@ pub fn dropdown_text_matches_item_typed(dropdown: &pb::ListEditorParams, text: &
         .any(|entry| entry.display == text || (!entry.data.is_empty() && entry.data == text))
 }
 
+pub fn validation_mode_for_editor(editor: &pb::EditorSpec) -> pb::ValidationMode {
+    pb::ValidationMode::try_from(editor.validation_mode)
+        .unwrap_or(pb::ValidationMode::ValidationBlock)
+}
+
+pub fn validation_error(
+    code: impl Into<String>,
+    message: impl Into<String>,
+    blocking: bool,
+) -> pb::ValidationError {
+    pb::ValidationError {
+        code: code.into(),
+        message: message.into(),
+        blocking,
+    }
+}
+
+pub fn validate_editor_commit_text(
+    editor: &pb::EditorSpec,
+    text: &str,
+) -> Vec<pb::ValidationError> {
+    let kind = pb::EditorKind::try_from(editor.kind).unwrap_or(pb::EditorKind::Unspecified);
+    match kind {
+        pb::EditorKind::EditorText | pb::EditorKind::EditorMultilineText => {
+            validate_text_editor_commit(editor.text.as_ref(), text)
+        }
+        pb::EditorKind::EditorNumber => validate_number_editor_commit(editor.number.as_ref(), text),
+        pb::EditorKind::EditorSelect => validate_select_editor_commit(editor.list.as_ref(), text),
+        pb::EditorKind::EditorDateTime => {
+            validate_date_time_editor_commit(editor.date_time.as_ref(), text)
+        }
+        _ => Vec::new(),
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum PreparedEditCommit {
+    Commit(String),
+    Block {
+        attempted: String,
+        errors: Vec<pb::ValidationError>,
+    },
+    Revert(String),
+    AllowInvalid {
+        committed: String,
+        errors: Vec<pb::ValidationError>,
+    },
+}
+
+pub fn prepare_committed_edit_text(
+    editor: &pb::EditorSpec,
+    old_text: &str,
+    new_text: &str,
+    grid_max_length: i32,
+) -> PreparedEditCommit {
+    let mut committed = truncate_to_char_count(
+        new_text,
+        effective_commit_max_length(editor, grid_max_length),
+    );
+
+    if let Some(list) = editor.list.as_ref() {
+        if let Some(mapped) = translate_dropdown_display_to_value_typed(list, &committed) {
+            committed = mapped;
+        }
+    }
+
+    let mut errors = validate_editor_commit_text(editor, &committed);
+    dedupe_validation_errors(&mut errors);
+
+    if errors.is_empty() {
+        return PreparedEditCommit::Commit(committed);
+    }
+
+    match validation_mode_for_editor(editor) {
+        pb::ValidationMode::ValidationRevert => PreparedEditCommit::Revert(old_text.to_string()),
+        pb::ValidationMode::ValidationAllowInvalid => {
+            PreparedEditCommit::AllowInvalid { committed, errors }
+        }
+        _ => PreparedEditCommit::Block {
+            attempted: committed,
+            errors,
+        },
+    }
+}
+
+pub fn truncate_to_char_count(input: &str, max_chars: i32) -> String {
+    if max_chars <= 0 {
+        return input.to_string();
+    }
+    input.chars().take(max_chars as usize).collect()
+}
+
+pub fn effective_commit_max_length(editor: &pb::EditorSpec, grid_max_length: i32) -> i32 {
+    let editor_max = editor
+        .text
+        .as_ref()
+        .map(|text| text.max_length)
+        .unwrap_or(0);
+    match (grid_max_length, editor_max) {
+        (grid_max, editor_max) if grid_max > 0 && editor_max > 0 => grid_max.min(editor_max),
+        (_, editor_max) if editor_max > 0 => editor_max,
+        (grid_max, _) => grid_max,
+    }
+}
+
+fn dedupe_validation_errors(errors: &mut Vec<pb::ValidationError>) {
+    let mut deduped = Vec::with_capacity(errors.len());
+    for error in errors.drain(..) {
+        if !deduped
+            .iter()
+            .any(|existing: &pb::ValidationError| existing.code == error.code)
+        {
+            deduped.push(error);
+        }
+    }
+    *errors = deduped;
+}
+
+fn validate_text_editor_commit(
+    text_params: Option<&pb::TextEditorParams>,
+    text: &str,
+) -> Vec<pb::ValidationError> {
+    let Some(params) = text_params else {
+        return Vec::new();
+    };
+    let mut errors = Vec::new();
+    if params.max_length > 0 && text.chars().count() > params.max_length as usize {
+        errors.push(validation_error(
+            "text.max_length",
+            format!("Value must be at most {} characters.", params.max_length),
+            true,
+        ));
+    }
+    if !params.allow_newlines && text.chars().any(|ch| ch == '\n' || ch == '\r') {
+        errors.push(validation_error(
+            "text.newline",
+            "Value cannot contain line breaks.",
+            true,
+        ));
+    }
+    errors
+}
+
+fn validate_number_editor_commit(
+    number_params: Option<&pb::NumberEditorParams>,
+    text: &str,
+) -> Vec<pb::ValidationError> {
+    let trimmed = text.trim();
+    let params = number_params.cloned().unwrap_or_default();
+    if trimmed.is_empty() {
+        return if params.nullable {
+            Vec::new()
+        } else {
+            vec![validation_error(
+                "number.required",
+                "Value is required.",
+                true,
+            )]
+        };
+    }
+
+    let Some(value) = parse_editor_number(trimmed) else {
+        return vec![validation_error(
+            "number.invalid",
+            "Value must be a number.",
+            true,
+        )];
+    };
+    if let Some(min) = params.min {
+        if value < min {
+            return vec![validation_error(
+                "number.min",
+                format!("Value must be greater than or equal to {}.", min),
+                true,
+            )];
+        }
+    }
+    if let Some(max) = params.max {
+        if value > max {
+            return vec![validation_error(
+                "number.max",
+                format!("Value must be less than or equal to {}.", max),
+                true,
+            )];
+        }
+    }
+    Vec::new()
+}
+
+fn validate_select_editor_commit(
+    list_params: Option<&pb::ListEditorParams>,
+    text: &str,
+) -> Vec<pb::ValidationError> {
+    let Some(list) = list_params else {
+        return Vec::new();
+    };
+    if list.static_items.is_empty() {
+        return Vec::new();
+    }
+    if dropdown_text_matches_item_typed(list, text) {
+        return Vec::new();
+    }
+    vec![validation_error(
+        "select.invalid",
+        "Value must be selected from the list.",
+        true,
+    )]
+}
+
+fn validate_date_time_editor_commit(
+    date_time_params: Option<&pb::DateTimeEditorParams>,
+    text: &str,
+) -> Vec<pb::ValidationError> {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return Vec::new();
+    }
+    let params = date_time_params.cloned().unwrap_or_default();
+    let Some(value) = parse_editor_timestamp(trimmed, params.date_only, params.time_only) else {
+        return vec![validation_error(
+            "date.invalid",
+            "Value must be a valid date or time.",
+            true,
+        )];
+    };
+    if let Some(min) = params.min_timestamp {
+        if value < min {
+            return vec![validation_error(
+                "date.min",
+                "Value is earlier than the minimum date.",
+                true,
+            )];
+        }
+    }
+    if let Some(max) = params.max_timestamp {
+        if value > max {
+            return vec![validation_error(
+                "date.max",
+                "Value is later than the maximum date.",
+                true,
+            )];
+        }
+    }
+    Vec::new()
+}
+
+fn parse_editor_number(raw: &str) -> Option<f64> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let mut negative = false;
+    let mut inner = trimmed;
+    if trimmed.starts_with('(') && trimmed.ends_with(')') && trimmed.len() > 2 {
+        negative = true;
+        inner = &trimmed[1..trimmed.len() - 1];
+    }
+
+    // Percent signs are accepted as formatting noise only: "85%" parses to
+    // 85.0, not 0.85. Display formats own percent scaling.
+    let needs_clean = inner.chars().any(|ch| matches!(ch, ',' | '$' | ' ' | '%'));
+    let parsed = if needs_clean {
+        let mut cleaned = String::with_capacity(inner.len());
+        for ch in inner.chars() {
+            if !matches!(ch, ',' | '$' | ' ' | '%') {
+                cleaned.push(ch);
+            }
+        }
+        cleaned.parse::<f64>().ok()?
+    } else {
+        inner.parse::<f64>().ok()?
+    };
+
+    if !parsed.is_finite() {
+        return None;
+    }
+    Some(if negative { -parsed } else { parsed })
+}
+
+fn parse_editor_timestamp(raw: &str, date_only: bool, time_only: bool) -> Option<i64> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    // Existing stored timestamp cells may edit as their raw epoch-millisecond
+    // integer, so integer text is accepted before loose date parsing. Ambiguous
+    // forms such as "20260513" are therefore treated as epoch milliseconds.
+    if let Ok(ms) = trimmed.parse::<i64>() {
+        return Some(ms);
+    }
+
+    let parts = trimmed
+        .split(|ch: char| !ch.is_ascii_digit())
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>();
+
+    if time_only {
+        if parts.len() < 2 || parts.len() > 3 {
+            return None;
+        }
+        let hour = parts[0].parse::<i32>().ok()?;
+        let minute = parts[1].parse::<i32>().ok()?;
+        let second = parts
+            .get(2)
+            .and_then(|value| value.parse::<i32>().ok())
+            .unwrap_or(0);
+        if !(0..=23).contains(&hour) || !(0..=59).contains(&minute) || !(0..=59).contains(&second) {
+            return None;
+        }
+        return Some((hour as i64 * 3_600 + minute as i64 * 60 + second as i64) * 1_000);
+    }
+
+    if parts.len() < 3 || (date_only && parts.len() > 3) {
+        return None;
+    }
+    let p0 = parts[0].parse::<i32>().ok()?;
+    let p1 = parts[1].parse::<i32>().ok()?;
+    let p2 = parts[2].parse::<i32>().ok()?;
+    let (year, month, day) = if parts[0].len() == 4 {
+        (p0, p1, p2)
+    } else if parts[2].len() == 4 {
+        (p2, p0, p1)
+    } else {
+        return None;
+    };
+    if !valid_ymd(year, month, day) {
+        return None;
+    }
+    let hour = parts
+        .get(3)
+        .and_then(|value| value.parse::<i32>().ok())
+        .unwrap_or(0);
+    let minute = parts
+        .get(4)
+        .and_then(|value| value.parse::<i32>().ok())
+        .unwrap_or(0);
+    let second = parts
+        .get(5)
+        .and_then(|value| value.parse::<i32>().ok())
+        .unwrap_or(0);
+    if !(0..=23).contains(&hour) || !(0..=59).contains(&minute) || !(0..=59).contains(&second) {
+        return None;
+    }
+    let days = days_from_civil(year, month, day);
+    let secs = hour as i64 * 3_600 + minute as i64 * 60 + second as i64;
+    Some(days * 86_400_000 + secs * 1_000)
+}
+
+fn valid_ymd(year: i32, month: i32, day: i32) -> bool {
+    if !(1..=12).contains(&month) {
+        return false;
+    }
+    let max_day = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if is_leap_year(year) => 29,
+        2 => 28,
+        _ => return false,
+    };
+    (1..=max_day).contains(&day)
+}
+
+fn is_leap_year(year: i32) -> bool {
+    (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
+}
+
+fn days_from_civil(y: i32, m: i32, d: i32) -> i64 {
+    let y = y as i64 - if m <= 2 { 1 } else { 0 };
+    let era = if y >= 0 { y } else { y - 399 } / 400;
+    let yoe = y - era * 400;
+    let mp = m as i64 + if m > 2 { -3 } else { 9 };
+    let doy = (153 * mp + 2) / 5 + d as i64 - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    era * 146_097 + doe - 719_468
+}
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum EditUiMode {
     #[default]
@@ -854,6 +1230,33 @@ impl EditState {
         self.cancel_preedit();
         self.vertical_caret_goal = None;
         self.record_session_end(pb::EditEndReason::EditEndCommitted, Some(result.3.clone()));
+        Some(result)
+    }
+
+    /// Finish a commit after the caller has already validated and normalized
+    /// the text. Returns `(row, col, original_text)` and records the supplied
+    /// committed text in the session-ended snapshot.
+    pub fn finish_commit_with_text(
+        &mut self,
+        committed_text: String,
+    ) -> Option<(i32, i32, String)> {
+        if !self.editing {
+            return None;
+        }
+        self.editing = false;
+        let result = (self.edit_row, self.edit_col, self.original_text.clone());
+        self.edit_row = -1;
+        self.edit_col = -1;
+        self.formula_mode = false;
+        self.formula_highlights.clear();
+        self.validation_errors.clear();
+        self.last_validation_request_id = 0;
+        self.last_list_items_request_id = 0;
+        self.clear_dropdown_search();
+        self.compose.reset();
+        self.cancel_preedit();
+        self.vertical_caret_goal = None;
+        self.record_session_end(pb::EditEndReason::EditEndCommitted, Some(committed_text));
         Some(result)
     }
 
@@ -1633,9 +2036,153 @@ mod tests {
     use crate::style::HighlightStyle;
 
     use super::{
-        translate_dropdown_display_to_value, translate_dropdown_value_to_display,
-        EditHighlightRegion, EditState,
+        prepare_committed_edit_text, translate_dropdown_display_to_value,
+        translate_dropdown_value_to_display, validate_editor_commit_text, EditHighlightRegion,
+        EditState, PreparedEditCommit,
     };
+
+    fn editor(kind: pb::EditorKind) -> pb::EditorSpec {
+        pb::EditorSpec {
+            kind: kind as i32,
+            validation_mode: pb::ValidationMode::ValidationBlock as i32,
+            validation_trigger: pb::ValidationTrigger::OnCommit as i32,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn validate_number_editor_rejects_non_numeric_and_range() {
+        let mut spec = editor(pb::EditorKind::EditorNumber);
+        spec.number = Some(pb::NumberEditorParams {
+            min: Some(0.0),
+            max: Some(100.0),
+            step: None,
+            format: String::new(),
+            nullable: false,
+        });
+
+        assert_eq!(
+            validate_editor_commit_text(&spec, "abc")[0].code,
+            "number.invalid"
+        );
+        assert_eq!(
+            validate_editor_commit_text(&spec, "120")[0].code,
+            "number.max"
+        );
+        assert!(validate_editor_commit_text(&spec, "85").is_empty());
+    }
+
+    #[test]
+    fn validate_date_time_editor_rejects_invalid_date_and_range() {
+        let mut spec = editor(pb::EditorKind::EditorDateTime);
+        spec.date_time = Some(pb::DateTimeEditorParams {
+            format: String::new(),
+            min_timestamp: Some(0),
+            max_timestamp: Some(86_400_000),
+            date_only: false,
+            time_only: false,
+        });
+
+        assert_eq!(
+            validate_editor_commit_text(&spec, "2026-02-30")[0].code,
+            "date.invalid"
+        );
+        assert_eq!(
+            validate_editor_commit_text(&spec, "1969-12-31")[0].code,
+            "date.min"
+        );
+        assert!(validate_editor_commit_text(&spec, "1970-01-02").is_empty());
+    }
+
+    #[test]
+    fn validate_date_time_editor_honors_date_only_and_time_only() {
+        let mut date_spec = editor(pb::EditorKind::EditorDateTime);
+        date_spec.date_time = Some(pb::DateTimeEditorParams {
+            format: String::new(),
+            min_timestamp: None,
+            max_timestamp: None,
+            date_only: true,
+            time_only: false,
+        });
+        assert!(validate_editor_commit_text(&date_spec, "2026-05-13").is_empty());
+        assert_eq!(
+            validate_editor_commit_text(&date_spec, "2026-05-13 12:30")[0].code,
+            "date.invalid"
+        );
+
+        let mut time_spec = editor(pb::EditorKind::EditorDateTime);
+        time_spec.date_time = Some(pb::DateTimeEditorParams {
+            format: String::new(),
+            min_timestamp: None,
+            max_timestamp: None,
+            date_only: false,
+            time_only: true,
+        });
+        assert!(validate_editor_commit_text(&time_spec, "12:30:05").is_empty());
+        assert_eq!(
+            validate_editor_commit_text(&time_spec, "25:00")[0].code,
+            "date.invalid"
+        );
+    }
+
+    #[test]
+    fn validate_text_editor_rejects_newlines_when_disabled() {
+        let mut spec = editor(pb::EditorKind::EditorText);
+        spec.text = Some(pb::TextEditorParams {
+            max_length: 0,
+            mask: String::new(),
+            allow_newlines: false,
+            input_type: pb::InputType::Text as i32,
+        });
+
+        assert_eq!(
+            validate_editor_commit_text(&spec, "a\nb")[0].code,
+            "text.newline"
+        );
+    }
+
+    #[test]
+    fn prepare_commit_truncates_to_effective_text_max_length() {
+        let mut spec = editor(pb::EditorKind::EditorText);
+        spec.text = Some(pb::TextEditorParams {
+            max_length: 3,
+            mask: String::new(),
+            allow_newlines: false,
+            input_type: pb::InputType::Text as i32,
+        });
+
+        match prepare_committed_edit_text(&spec, "old", "abcdef", 10) {
+            PreparedEditCommit::Commit(committed) => assert_eq!(committed, "abc"),
+            other => panic!("unexpected commit result: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn prepare_commit_supports_revert_and_allow_invalid_modes() {
+        let mut spec = editor(pb::EditorKind::EditorNumber);
+        spec.number = Some(pb::NumberEditorParams {
+            min: Some(0.0),
+            max: Some(100.0),
+            step: None,
+            format: String::new(),
+            nullable: false,
+        });
+
+        spec.validation_mode = pb::ValidationMode::ValidationRevert as i32;
+        match prepare_committed_edit_text(&spec, "42", "abc", 0) {
+            PreparedEditCommit::Revert(value) => assert_eq!(value, "42"),
+            other => panic!("unexpected commit result: {other:?}"),
+        }
+
+        spec.validation_mode = pb::ValidationMode::ValidationAllowInvalid as i32;
+        match prepare_committed_edit_text(&spec, "42", "abc", 0) {
+            PreparedEditCommit::AllowInvalid { committed, errors } => {
+                assert_eq!(committed, "abc");
+                assert_eq!(errors[0].code, "number.invalid");
+            }
+            other => panic!("unexpected commit result: {other:?}"),
+        }
+    }
 
     #[test]
     fn parse_dropdown_items_with_data_and_display_column() {

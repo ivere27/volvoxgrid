@@ -146,6 +146,21 @@ fn dropdown_from_labels(items: &str) -> pb::EditorSpec {
     }
 }
 
+fn number_editor(min: f64, max: Option<f64>) -> pb::EditorSpec {
+    pb::EditorSpec {
+        kind: pb::EditorKind::EditorNumber as i32,
+        owner: pb::EditorOwner::Engine as i32,
+        presentation: pb::EditorPresentation::EditorCanvas as i32,
+        number: Some(pb::NumberEditorParams {
+            min: Some(min),
+            max,
+            nullable: false,
+            ..Default::default()
+        }),
+        ..Default::default()
+    }
+}
+
 fn edit_config(trigger: i32, tab_behavior: i32) -> pb::EditConfig {
     pb::EditConfig {
         activation: Some(pb::EditActivation {
@@ -2950,6 +2965,7 @@ fn load_sales_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Result<()
                 align: Some(pb::Align::RightCenter as i32),
                 data_type: Some(pb::ColumnDataType::ColumnDataCurrency as i32),
                 format: Some("$#,##0".to_string()),
+                editor: Some(number_editor(0.0, None)),
                 ..Default::default()
             },
             pb::ColumnDef {
@@ -2960,6 +2976,7 @@ fn load_sales_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Result<()
                 align: Some(pb::Align::RightCenter as i32),
                 data_type: Some(pb::ColumnDataType::ColumnDataCurrency as i32),
                 format: Some("$#,##0".to_string()),
+                editor: Some(number_editor(0.0, None)),
                 ..Default::default()
             },
             pb::ColumnDef {
@@ -2970,6 +2987,7 @@ fn load_sales_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Result<()
                 align: Some(pb::Align::CenterCenter as i32),
                 data_type: Some(pb::ColumnDataType::ColumnDataNumber as i32),
                 progress_color: Some(0xFF818CF8),
+                editor: Some(number_editor(0.0, Some(100.0))),
                 ..Default::default()
             },
             pb::ColumnDef {

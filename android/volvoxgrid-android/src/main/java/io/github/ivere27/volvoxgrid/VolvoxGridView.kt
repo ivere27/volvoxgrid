@@ -2631,7 +2631,7 @@ class VolvoxGridView @JvmOverloads constructor(
     }
 
     private fun commitEdit(row: Int, col: Int, text: String) {
-        try {
+        val stillEditing = try {
             val state = ffiClient?.Edit(
                 EditCommand.newBuilder()
                     .setGridId(gridId)
@@ -2645,7 +2645,15 @@ class VolvoxGridView @JvmOverloads constructor(
                     .build()
             )
             updateEditorSessionFromState(state)
-        } catch (_: FfiError) {}
+            state != null && state.active
+        } catch (_: FfiError) {
+            true
+        }
+        if (stillEditing) {
+            editOverlay?.requestFocus()
+            requestRenderFrame()
+            return
+        }
         editListener?.onEditCommit(row, col, text)
         dismissEditOverlay()
     }

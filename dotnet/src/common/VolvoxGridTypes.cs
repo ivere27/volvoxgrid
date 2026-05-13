@@ -294,6 +294,7 @@ namespace VolvoxGrid.DotNet
         public string Format { get; set; }
         public uint ProgressColor { get; set; }
         public VolvoxGridCellInteraction Interaction { get; set; }
+        public EditorSpec Editor { get; set; }
 
         public VolvoxGridColumn()
         {

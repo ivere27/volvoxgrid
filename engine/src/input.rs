@@ -572,32 +572,7 @@ fn begin_edit_from_pointer_double_click(
 }
 
 fn commit_active_edit(grid: &mut VolvoxGrid) -> bool {
-    if let Some((row, col, old_text, new_text)) = grid.edit.commit() {
-        let dropdown_list = grid.active_dropdown_list(row, col);
-        let store_text = if let Some(data_val) =
-            crate::edit::translate_dropdown_display_to_value(&dropdown_list, &new_text)
-        {
-            data_val
-        } else {
-            new_text.clone()
-        };
-        grid.events.push(GridEventData::CellEditValidate {
-            row,
-            col,
-            edit_text: new_text.clone(),
-        });
-        grid.cells.set_text(row, col, store_text);
-        grid.events.push(GridEventData::AfterEdit {
-            row,
-            col,
-            old_text,
-            new_text,
-        });
-        grid.mark_dirty();
-        true
-    } else {
-        false
-    }
+    grid.commit_edit()
 }
 
 fn apply_compose_result(grid: &mut VolvoxGrid, result: ComposeResult) -> bool {

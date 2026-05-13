@@ -20,6 +20,7 @@ import {
   EditorSessionStartedFields,
   EditorSessionUpdatedFields,
   EditorSpecFields,
+  EditorUpdateReason,
   EditorValueFields,
   GridEventFields,
   GridConfigFields,
@@ -27,6 +28,7 @@ import {
   ListItemFields,
   RenderLayerBit,
   RenderOutputFields,
+  ValidationErrorFields,
 } from "./generated/volvoxgrid_ffi.js";
 
 export { DropdownItemLayout } from "./generated/volvoxgrid_ffi.js";
@@ -177,14 +179,23 @@ export interface VolvoxGridEditorSessionStartedDetails {
   col: number;
   initialText: string;
   presentation: EditorPresentation;
+  validationErrors: VolvoxGridValidationError[];
   stateVersion: bigint;
   rawEvent: Uint8Array;
+}
+
+export interface VolvoxGridValidationError {
+  code: string;
+  message: string;
+  blocking: boolean;
 }
 
 export interface VolvoxGridEditorSessionUpdatedDetails {
   sessionId: bigint;
   text?: string;
   visible?: boolean;
+  reason: EditorUpdateReason;
+  validationErrors: VolvoxGridValidationError[];
   stateVersion: bigint;
   rawEvent: Uint8Array;
 }
@@ -2065,12 +2076,48 @@ function pbDecodeEditorSpecPresentation(data: Uint8Array): EditorPresentation {
   return presentation;
 }
 
+function pbDecodeValidationError(data: Uint8Array): VolvoxGridValidationError {
+  let offset = 0;
+  let code = "";
+  let message = "";
+  let blocking = false;
+  while (offset < data.length) {
+    const tag = pbReadVarint(data, offset);
+    offset = tag.next;
+    const field = Number(tag.value >> 3n);
+    const wire = Number(tag.value & 0x7n);
+    if (wire === 2
+      && (field === ValidationErrorFields.code || field === ValidationErrorFields.message)) {
+      const len = pbReadVarint(data, offset);
+      const n = Number(len.value);
+      const start = len.next;
+      const end = Math.min(data.length, start + n);
+      if (Number.isFinite(n) && n >= 0) {
+        const text = PB_TEXT_DECODER.decode(data.slice(start, end));
+        if (field === ValidationErrorFields.code) code = text;
+        else message = text;
+      }
+      offset = end;
+      continue;
+    }
+    if (wire === 0 && field === ValidationErrorFields.blocking) {
+      const v = pbReadVarint(data, offset);
+      offset = v.next;
+      blocking = v.value !== 0n;
+      continue;
+    }
+    offset = pbSkipField(data, offset, wire);
+  }
+  return { code, message, blocking };
+}
+
 function pbDecodeEditorSession(data: Uint8Array): {
   sessionId: bigint;
   row: number;
   col: number;
   initialText: string;
   presentation: EditorPresentation;
+  validationErrors: VolvoxGridValidationError[];
   stateVersion: bigint;
 } {
   let offset = 0;
@@ -2079,6 +2126,7 @@ function pbDecodeEditorSession(data: Uint8Array): {
   let col = -1;
   let initialText = "";
   let presentation = EditorPresentation.EDITOR_CANVAS;
+  const validationErrors: VolvoxGridValidationError[] = [];
   let stateVersion = 0n;
   while (offset < data.length) {
     const tag = pbReadVarint(data, offset);
@@ -2116,9 +2164,20 @@ function pbDecodeEditorSession(data: Uint8Array): {
       offset = end;
       continue;
     }
+    if (wire === 2 && field === EditorSessionFields.validation_errors) {
+      const len = pbReadVarint(data, offset);
+      const n = Number(len.value);
+      const start = len.next;
+      const end = Math.min(data.length, start + n);
+      if (Number.isFinite(n) && n >= 0) {
+        validationErrors.push(pbDecodeValidationError(data.slice(start, end)));
+      }
+      offset = end;
+      continue;
+    }
     offset = pbSkipField(data, offset, wire);
   }
-  return { sessionId, row, col, initialText, presentation, stateVersion };
+  return { sessionId, row, col, initialText, presentation, validationErrors, stateVersion };
 }
 
 function pbDecodeEditorSessionStarted(
@@ -2130,6 +2189,7 @@ function pbDecodeEditorSessionStarted(
   let col = -1;
   let initialText = "";
   let presentation = EditorPresentation.EDITOR_CANVAS;
+  let validationErrors: VolvoxGridValidationError[] = [];
   let stateVersion = 0n;
   while (offset < data.length) {
     const tag = pbReadVarint(data, offset);
@@ -2148,6 +2208,7 @@ function pbDecodeEditorSessionStarted(
         col = inner.col;
         initialText = inner.initialText;
         presentation = inner.presentation;
+        validationErrors = inner.validationErrors;
         stateVersion = inner.stateVersion;
       }
       offset = end;
@@ -2155,7 +2216,16 @@ function pbDecodeEditorSessionStarted(
     }
     offset = pbSkipField(data, offset, wire);
   }
-  return { sessionId, row, col, initialText, presentation, stateVersion, rawEvent: data };
+  return {
+    sessionId,
+    row,
+    col,
+    initialText,
+    presentation,
+    validationErrors,
+    stateVersion,
+    rawEvent: data,
+  };
 }
 
 function pbDecodeEditorSessionUpdated(
@@ -2166,6 +2236,8 @@ function pbDecodeEditorSessionUpdated(
   let stateVersion = 0n;
   let text: string | undefined;
   let visible: boolean | undefined;
+  let reason = EditorUpdateReason.EDITOR_UPDATE_UNSPECIFIED;
+  const validationErrors: VolvoxGridValidationError[] = [];
   while (offset < data.length) {
     const tag = pbReadVarint(data, offset);
     offset = tag.next;
@@ -2177,6 +2249,7 @@ function pbDecodeEditorSessionUpdated(
       if (field === EditorSessionUpdatedFields.session_id) sessionId = BigInt.asIntN(64, v.value);
       if (field === EditorSessionUpdatedFields.state_version) stateVersion = v.value;
       if (field === EditorSessionUpdatedFields.visible) visible = v.value !== 0n;
+      if (field === EditorSessionUpdatedFields.reason) reason = Number(v.value) as EditorUpdateReason;
       continue;
     }
     if (wire === 2 && field === EditorSessionUpdatedFields.value) {
@@ -2190,9 +2263,20 @@ function pbDecodeEditorSessionUpdated(
       offset = end;
       continue;
     }
+    if (wire === 2 && field === EditorSessionUpdatedFields.validation_errors) {
+      const len = pbReadVarint(data, offset);
+      const n = Number(len.value);
+      const start = len.next;
+      const end = Math.min(data.length, start + n);
+      if (Number.isFinite(n) && n >= 0) {
+        validationErrors.push(pbDecodeValidationError(data.slice(start, end)));
+      }
+      offset = end;
+      continue;
+    }
     offset = pbSkipField(data, offset, wire);
   }
-  return { sessionId, text, visible, stateVersion, rawEvent: data };
+  return { sessionId, text, visible, reason, validationErrors, stateVersion, rawEvent: data };
 }
 
 function pbDecodeEditorSessionEnded(
@@ -7438,7 +7522,6 @@ export class VolvoxGrid {
       this.editInput.style.display = "none";
       this.editTextArea.style.display = "none";
     }
-
     if (idx >= 0 && idx < this.editSelect.options.length) {
       if (this.editSelect.selectedIndex !== idx) {
         this.editSelect.selectedIndex = idx;

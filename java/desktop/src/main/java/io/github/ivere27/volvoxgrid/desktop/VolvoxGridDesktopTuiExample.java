@@ -44,6 +44,7 @@ import io.github.ivere27.volvoxgrid.LoadDataOptions;
 import io.github.ivere27.volvoxgrid.LoadDataResult;
 import io.github.ivere27.volvoxgrid.LoadDataStatus;
 import io.github.ivere27.volvoxgrid.NodeInfo;
+import io.github.ivere27.volvoxgrid.NumberEditorParams;
 import io.github.ivere27.volvoxgrid.OutlineConfig;
 import io.github.ivere27.volvoxgrid.RenderConfig;
 import io.github.ivere27.volvoxgrid.RendererMode;
@@ -403,6 +404,7 @@ public final class VolvoxGridDesktopTuiExample {
                     .setAlign(Align.ALIGN_RIGHT_CENTER)
                     .setDataType(ColumnDataType.COLUMN_DATA_CURRENCY)
                     .setFormat("$#,##0")
+                    .setEditor(numberEditor(0.0, null))
                     .build()
             )
             .addColumns(
@@ -414,6 +416,7 @@ public final class VolvoxGridDesktopTuiExample {
                     .setAlign(Align.ALIGN_RIGHT_CENTER)
                     .setDataType(ColumnDataType.COLUMN_DATA_CURRENCY)
                     .setFormat("$#,##0")
+                    .setEditor(numberEditor(0.0, null))
                     .build()
             )
             .addColumns(
@@ -425,6 +428,7 @@ public final class VolvoxGridDesktopTuiExample {
                     .setAlign(Align.ALIGN_CENTER_CENTER)
                     .setDataType(ColumnDataType.COLUMN_DATA_NUMBER)
                     .setProgressColor((int) 0xFF818CF8L)
+                    .setEditor(numberEditor(0.0, 100.0))
                     .build()
             )
             .addColumns(
@@ -469,6 +473,21 @@ public final class VolvoxGridDesktopTuiExample {
             .setOwner(EditorOwner.EDITOR_OWNER_ENGINE)
             .setPresentation(EditorPresentation.EDITOR_CANVAS)
             .setList(list)
+            .build();
+    }
+
+    private static EditorSpec numberEditor(double min, Double max) {
+        NumberEditorParams.Builder number = NumberEditorParams.newBuilder()
+            .setMin(min)
+            .setNullable(false);
+        if (max != null) {
+            number.setMax(max.doubleValue());
+        }
+        return EditorSpec.newBuilder()
+            .setKind(EditorKind.EDITOR_NUMBER)
+            .setOwner(EditorOwner.EDITOR_OWNER_ENGINE)
+            .setPresentation(EditorPresentation.EDITOR_CANVAS)
+            .setNumber(number.build())
             .build();
     }
 

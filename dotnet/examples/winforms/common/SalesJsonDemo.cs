@@ -4,8 +4,13 @@ using VolvoxGrid.DotNet;
 using ColIndicatorCellMode = Volvoxgrid.V1.ColIndicatorCellMode;
 using ColIndicatorCellModes = Volvoxgrid.V1.ColIndicatorCellModes;
 using ColIndicatorConfig = Volvoxgrid.V1.ColIndicatorConfig;
+using EditorKind = Volvoxgrid.V1.EditorKind;
+using EditorOwner = Volvoxgrid.V1.EditorOwner;
+using EditorPresentation = Volvoxgrid.V1.EditorPresentation;
+using EditorSpec = Volvoxgrid.V1.EditorSpec;
 using ListEditorParams = Volvoxgrid.V1.ListEditorParams;
 using ListItem = Volvoxgrid.V1.ListItem;
+using NumberEditorParams = Volvoxgrid.V1.NumberEditorParams;
 using RowIndicatorConfig = Volvoxgrid.V1.RowIndicatorConfig;
 using RowIndicatorSlot = Volvoxgrid.V1.RowIndicatorSlot;
 using RowIndicatorSlotKind = Volvoxgrid.V1.RowIndicatorSlotKind;
@@ -48,9 +53,9 @@ namespace VolvoxGrid.DotNet.Sample
                 new VolvoxGridColumn { FieldName = "Region", Caption = "Region", Width = 80 },
                 new VolvoxGridColumn { FieldName = "Category", Caption = "Category", Width = 100 },
                 new VolvoxGridColumn { FieldName = "Product", Caption = "Product", Width = 120 },
-                new VolvoxGridColumn { FieldName = "Sales", Caption = "Sales", Width = 90, DataType = VolvoxGridColumnDataType.Currency, Alignment = VolvoxGridAlign.RightCenter, Format = "$#,##0" },
-                new VolvoxGridColumn { FieldName = "Cost", Caption = "Cost", Width = 90, DataType = VolvoxGridColumnDataType.Currency, Alignment = VolvoxGridAlign.RightCenter, Format = "$#,##0" },
-                new VolvoxGridColumn { FieldName = "Margin", Caption = "Margin%", Width = 70, DataType = VolvoxGridColumnDataType.Number, Alignment = VolvoxGridAlign.CenterCenter, ProgressColor = MarginProgressColor },
+                new VolvoxGridColumn { FieldName = "Sales", Caption = "Sales", Width = 90, DataType = VolvoxGridColumnDataType.Currency, Alignment = VolvoxGridAlign.RightCenter, Format = "$#,##0", Editor = HostNumberEditor(0.0, null) },
+                new VolvoxGridColumn { FieldName = "Cost", Caption = "Cost", Width = 90, DataType = VolvoxGridColumnDataType.Currency, Alignment = VolvoxGridAlign.RightCenter, Format = "$#,##0", Editor = HostNumberEditor(0.0, null) },
+                new VolvoxGridColumn { FieldName = "Margin", Caption = "Margin%", Width = 70, DataType = VolvoxGridColumnDataType.Number, Alignment = VolvoxGridAlign.CenterCenter, ProgressColor = MarginProgressColor, Editor = HostNumberEditor(0.0, 100.0) },
                 new VolvoxGridColumn { FieldName = "Flag", Caption = "Flag", Width = 56, DataType = VolvoxGridColumnDataType.Boolean, Alignment = VolvoxGridAlign.CenterCenter },
                 new VolvoxGridColumn { FieldName = "Status", Caption = "Status", Width = 80 },
                 new VolvoxGridColumn { FieldName = "Notes", Caption = "Notes", Width = 140 },
@@ -156,6 +161,19 @@ namespace VolvoxGrid.DotNet.Sample
                     }
                 }
             }, true);
+        }
+
+        private static EditorSpec HostNumberEditor(double min, double? max)
+        {
+            var number = new NumberEditorParams { Min = min, Nullable = false };
+            if (max.HasValue) number.Max = max.Value;
+            return new EditorSpec
+            {
+                Kind = EditorKind.EDITOR_NUMBER,
+                Owner = EditorOwner.EDITOR_OWNER_HOST_NATIVE,
+                Presentation = EditorPresentation.EDITOR_INLINE,
+                Number = number,
+            };
         }
 
         private static ListEditorParams DropdownFromLabels(string items)

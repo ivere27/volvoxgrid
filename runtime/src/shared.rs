@@ -3,6 +3,7 @@
 use volvoxgrid_engine::proto::volvoxgrid::v1::*;
 
 type Grid = volvoxgrid_engine::grid::VolvoxGrid;
+pub(crate) use volvoxgrid_engine::edit::PreparedEditCommit;
 
 pub(crate) struct CreateGridSpec {
     pub rows: i32,
@@ -596,43 +597,51 @@ pub(crate) fn truncate_to_char_count(input: &str, max_chars: i32) -> String {
     input.chars().take(max_chars as usize).collect()
 }
 
-pub(crate) fn normalize_committed_edit_text(
+pub(crate) fn prepare_committed_edit_text(
     grid: &mut Grid,
     row: i32,
     col: i32,
     old_text: &str,
     new_text: &str,
-) -> String {
-    let mut committed = truncate_to_char_count(new_text, grid.edit_max_length);
+) -> PreparedEditCommit {
+    let editor = active_editor_spec(grid, row, col);
+    volvoxgrid_engine::edit::prepare_committed_edit_text(
+        &editor,
+        old_text,
+        new_text,
+        grid.edit_max_length,
+    )
+}
 
-    if let Some(dropdown) = grid.configured_dropdown(row, col) {
-        if !dropdown.allow_custom_value
-            && !dropdown.static_items.is_empty()
-            && !volvoxgrid_engine::edit::dropdown_text_matches_item_typed(&dropdown, &committed)
-        {
-            return old_text.to_string();
-        }
-        if let Some(mapped) = volvoxgrid_engine::edit::translate_dropdown_display_to_value_typed(
-            &dropdown, &committed,
-        ) {
-            committed = mapped;
-        }
-    } else if col >= 0 && (col as usize) < grid.columns.len() {
-        let col_list = &grid.columns[col as usize].dropdown_items;
-        if !col_list.is_empty() {
-            if !col_list.starts_with('|')
-                && !volvoxgrid_engine::edit::dropdown_text_matches_item(col_list, &committed)
-            {
-                return old_text.to_string();
-            }
-            if let Some(mapped) =
-                volvoxgrid_engine::edit::translate_dropdown_display_to_value(col_list, &committed)
-            {
-                committed = mapped;
-            }
-        }
+pub(crate) fn block_active_edit_commit(
+    grid: &mut Grid,
+    row: i32,
+    col: i32,
+    attempted: String,
+    errors: Vec<ValidationError>,
+) {
+    if grid.edit.is_active() && grid.edit.edit_row == row && grid.edit.edit_col == col {
+        grid.edit.update_text(attempted.clone());
+        grid.edit.set_sel_start(attempted.chars().count() as i32);
+        grid.edit.set_sel_length(0);
+        grid.edit.set_validation_errors(errors);
     }
-    committed
+    grid.mark_dirty();
+}
+
+pub(crate) fn set_active_edit_validation_errors(
+    grid: &mut Grid,
+    row: i32,
+    col: i32,
+    errors: Vec<ValidationError>,
+) {
+    if errors.is_empty() {
+        return;
+    }
+    if grid.edit.is_active() && grid.edit.edit_row == row && grid.edit.edit_col == col {
+        grid.edit.set_validation_errors(errors);
+        grid.mark_dirty();
+    }
 }
 
 pub(crate) fn apply_committed_edit_text(
@@ -1270,6 +1279,33 @@ pub(crate) fn build_editor_updated_geometry(
     }
 }
 
+pub(crate) fn editor_update_reason_for_started_delta(
+    previous: &EditorSessionStarted,
+    current: &EditorSessionStarted,
+    state_changed: bool,
+) -> EditorUpdateReason {
+    if !state_changed {
+        return EditorUpdateReason::EditorUpdateGeometry;
+    }
+
+    let empty: &[ValidationError] = &[];
+    let previous_errors = previous
+        .session
+        .as_ref()
+        .map(|session| session.validation_errors.as_slice())
+        .unwrap_or(empty);
+    let current_errors = current
+        .session
+        .as_ref()
+        .map(|session| session.validation_errors.as_slice())
+        .unwrap_or(empty);
+    if previous_errors != current_errors {
+        EditorUpdateReason::EditorUpdateValidation
+    } else {
+        EditorUpdateReason::EditorUpdateUnspecified
+    }
+}
+
 pub(crate) fn build_editor_updated_from_started(
     req: &EditorSessionStarted,
     include_geometry: bool,
@@ -1407,4 +1443,82 @@ pub(crate) fn expand_sort_request_columns(
     }
 
     sort_keys
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn number_editor(min: Option<f64>, max: Option<f64>) -> EditorSpec {
+        EditorSpec {
+            kind: EditorKind::EditorNumber as i32,
+            validation_mode: ValidationMode::ValidationBlock as i32,
+            validation_trigger: ValidationTrigger::OnCommit as i32,
+            number: Some(NumberEditorParams {
+                min,
+                max,
+                step: None,
+                format: String::new(),
+                nullable: false,
+            }),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn prepare_committed_edit_text_uses_runtime_editor_resolution() {
+        let mut grid = volvoxgrid_engine::grid::VolvoxGrid::new(1, 320, 200, 2, 1, 1, 0);
+        grid.columns[0].editor = Some(number_editor(Some(0.0), Some(100.0)));
+
+        match prepare_committed_edit_text(&mut grid, 1, 0, "40", "120") {
+            PreparedEditCommit::Block { attempted, errors } => {
+                assert_eq!(attempted, "120");
+                assert_eq!(errors[0].code, "number.max");
+            }
+            other => panic!("unexpected commit result: {other:?}"),
+        }
+    }
+
+    fn editor_started_with_errors(
+        state_version: u64,
+        validation_errors: Vec<ValidationError>,
+    ) -> EditorSessionStarted {
+        EditorSessionStarted {
+            session: Some(EditorSession {
+                session_id: 7,
+                state_version,
+                validation_errors,
+                ..Default::default()
+            }),
+        }
+    }
+
+    #[test]
+    fn editor_delta_reason_marks_validation_error_changes() {
+        let previous = editor_started_with_errors(
+            3,
+            vec![ValidationError {
+                code: "number.invalid".to_string(),
+                message: "Enter a number.".to_string(),
+                blocking: true,
+            }],
+        );
+        let current = editor_started_with_errors(4, Vec::new());
+
+        assert_eq!(
+            editor_update_reason_for_started_delta(&previous, &current, true),
+            EditorUpdateReason::EditorUpdateValidation
+        );
+    }
+
+    #[test]
+    fn editor_delta_reason_keeps_generic_state_when_errors_do_not_change() {
+        let previous = editor_started_with_errors(3, Vec::new());
+        let current = editor_started_with_errors(4, Vec::new());
+
+        assert_eq!(
+            editor_update_reason_for_started_delta(&previous, &current, true),
+            EditorUpdateReason::EditorUpdateUnspecified
+        );
+    }
 }

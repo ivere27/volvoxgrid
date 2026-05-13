@@ -495,6 +495,26 @@ List editor semantics come from `EditorSpec.kind` and `ListEditorParams.allow_cu
 
 Host wrappers that use native text editors for normal cell editing should still keep select/dropdown lists engine-owned and canvas-presented unless they implement the same select-only restrictions.
 
+### Commit Validation
+
+Commit-time validation is layered:
+
+- `ColumnDef.data_type` controls display, sort, formatting, and aggregation behavior. It does not by itself make editing numeric, date-only, or list-only.
+- `EditorSpec.kind` plus editor params controls built-in edit validation.
+- `CellEditValidate` is for application rules that cannot be expressed by the editor params.
+
+Built-in validation runs before `CellEditValidate`. If it fails with `VALIDATION_BLOCK`, the editor stays open and `EditorSession.validation_errors` / `EditorSessionUpdated.validation_errors` carries the error state.
+
+Built-in commit checks:
+
+- `EDITOR_NUMBER`: committed text must parse as a finite number; `NumberEditorParams.nullable=false` rejects empty text; `min` and `max` enforce numeric range.
+- `EDITOR_DATE_TIME`: non-empty committed text must parse as a date/time; `min_timestamp` and `max_timestamp` enforce range.
+- `EDITOR_SELECT`: committed text must match an enabled list item when static items are available.
+- `EDITOR_COMBO`: list items may be chosen, but custom text is allowed.
+- `EDITOR_TEXT` / `EDITOR_MULTILINE_TEXT`: `max_length` and `allow_newlines` are enforced at commit.
+
+Use `CellEditValidate` for cross-cell, cross-row, server, permission, duplicate-key, formula, or other business validation. For example, a `Margin` column can use `EDITOR_NUMBER` with `min=0` and `max=100`; a rule such as `Cost <= Sales` belongs in `CellEditValidate`.
+
 ### Updating
 
 For an existing session, the engine emits `EditorSessionUpdated`. This is a sparse delta against the cached `EditorSessionStarted.session`.

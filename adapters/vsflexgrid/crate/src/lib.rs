@@ -373,6 +373,23 @@ fn editor_spec_from_list(list: ListEditorParams) -> EditorSpec {
     }
 }
 
+fn editor_spec_from_number(min: f64, max: Option<f64>) -> EditorSpec {
+    EditorSpec {
+        kind: EditorKind::EditorNumber as i32,
+        owner: EditorOwner::Engine as i32,
+        presentation: EditorPresentation::EditorCanvas as i32,
+        validation_mode: ValidationMode::ValidationBlock as i32,
+        validation_trigger: ValidationTrigger::OnCommit as i32,
+        number: Some(NumberEditorParams {
+            min: Some(min),
+            max,
+            nullable: false,
+            ..Default::default()
+        }),
+        ..Default::default()
+    }
+}
+
 fn ensure_layout(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) {
     grid.ensure_layout();
 }
@@ -607,10 +624,12 @@ fn sales_demo_column_defs_local(scale: f32) -> Vec<ColumnDef> {
                 def.align = Some(Align::RightCenter as i32);
                 def.data_type = Some(ColumnDataType::ColumnDataCurrency as i32);
                 def.format = Some("$#,##0".to_string());
+                def.editor = Some(editor_spec_from_number(0.0, None));
             }
             6 => {
                 def.align = Some(Align::CenterCenter as i32);
                 def.data_type = Some(ColumnDataType::ColumnDataNumber as i32);
+                def.editor = Some(editor_spec_from_number(0.0, Some(100.0)));
             }
             7 => {
                 def.align = Some(Align::CenterCenter as i32);

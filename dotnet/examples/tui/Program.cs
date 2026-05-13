@@ -777,9 +777,9 @@ namespace VolvoxGrid.DotNet.TuiSample
                 new ColumnDef { Index = 1, Width = 10, Caption = "Region", Key = "Region", Span = true },
                 new ColumnDef { Index = 2, Width = 14, Caption = "Category", Key = "Category" },
                 new ColumnDef { Index = 3, Width = 18, Caption = "Product", Key = "Product" },
-                new ColumnDef { Index = 4, Width = 12, Caption = "Sales", Key = "Sales", Align = Align.ALIGN_RIGHT_CENTER, DataType = ColumnDataType.COLUMN_DATA_CURRENCY, Format = "$#,##0" },
-                new ColumnDef { Index = 5, Width = 12, Caption = "Cost", Key = "Cost", Align = Align.ALIGN_RIGHT_CENTER, DataType = ColumnDataType.COLUMN_DATA_CURRENCY, Format = "$#,##0" },
-                new ColumnDef { Index = 6, Width = 10, Caption = "Margin%", Key = "Margin", Align = Align.ALIGN_CENTER_CENTER, DataType = ColumnDataType.COLUMN_DATA_NUMBER, ProgressColor = 0xFF818CF8u },
+                new ColumnDef { Index = 4, Width = 12, Caption = "Sales", Key = "Sales", Align = Align.ALIGN_RIGHT_CENTER, DataType = ColumnDataType.COLUMN_DATA_CURRENCY, Format = "$#,##0", Editor = NumberEditor(0.0, null) },
+                new ColumnDef { Index = 5, Width = 12, Caption = "Cost", Key = "Cost", Align = Align.ALIGN_RIGHT_CENTER, DataType = ColumnDataType.COLUMN_DATA_CURRENCY, Format = "$#,##0", Editor = NumberEditor(0.0, null) },
+                new ColumnDef { Index = 6, Width = 10, Caption = "Margin%", Key = "Margin", Align = Align.ALIGN_CENTER_CENTER, DataType = ColumnDataType.COLUMN_DATA_NUMBER, ProgressColor = 0xFF818CF8u, Editor = NumberEditor(0.0, 100.0) },
                 new ColumnDef { Index = 7, Width = 5, Caption = "Flag", Key = "Flag", Align = Align.ALIGN_CENTER_CENTER, DataType = ColumnDataType.COLUMN_DATA_BOOLEAN },
                 new ColumnDef { Index = 8, Width = 10, Caption = "Status", Key = "Status", Editor = ListEditorFromLabels(SalesStatusItems) },
                 new ColumnDef { Index = 9, Width = 18, Caption = "Notes", Key = "Notes" },
@@ -800,6 +800,19 @@ namespace VolvoxGrid.DotNet.TuiSample
                 Owner = EditorOwner.EDITOR_OWNER_ENGINE,
                 Presentation = EditorPresentation.EDITOR_INLINE,
                 List = list,
+            };
+        }
+
+        private static EditorSpec NumberEditor(double min, double? max)
+        {
+            var number = new NumberEditorParams { Min = min, Nullable = false };
+            if (max.HasValue) number.Max = max.Value;
+            return new EditorSpec
+            {
+                Kind = EditorKind.EDITOR_NUMBER,
+                Owner = EditorOwner.EDITOR_OWNER_ENGINE,
+                Presentation = EditorPresentation.EDITOR_CANVAS,
+                Number = number,
             };
         }
 

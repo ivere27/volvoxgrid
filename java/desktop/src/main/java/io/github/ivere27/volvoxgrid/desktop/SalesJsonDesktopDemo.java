@@ -44,6 +44,7 @@ import io.github.ivere27.volvoxgrid.LoadDataResult;
 import io.github.ivere27.volvoxgrid.LoadDataStatus;
 import io.github.ivere27.volvoxgrid.LoadDataOptions;
 import io.github.ivere27.volvoxgrid.NodeInfo;
+import io.github.ivere27.volvoxgrid.NumberEditorParams;
 import io.github.ivere27.volvoxgrid.OutlineConfig;
 import io.github.ivere27.volvoxgrid.RegionStyle;
 import io.github.ivere27.volvoxgrid.ResizePolicy;
@@ -103,6 +104,7 @@ final class SalesJsonDesktopDemo {
                     .setCaption("Margin%")
                     .setKey("Margin")
                     .setWidth(COL_WIDTHS[6])
+                    .setEditor(hostNumberEditor(0.0, 100.0))
                     .build())
                 .addColumns(column(7, Align.ALIGN_CENTER_CENTER)
                     .setDataType(ColumnDataType.COLUMN_DATA_BOOLEAN)
@@ -517,6 +519,22 @@ final class SalesJsonDesktopDemo {
             .setCaption(caption)
             .setDataType(ColumnDataType.COLUMN_DATA_CURRENCY)
             .setFormat("$#,##0")
+            .setEditor(hostNumberEditor(0.0, null))
+            .build();
+    }
+
+    private static EditorSpec hostNumberEditor(double min, Double max) {
+        NumberEditorParams.Builder number = NumberEditorParams.newBuilder()
+            .setMin(min)
+            .setNullable(false);
+        if (max != null) {
+            number.setMax(max.doubleValue());
+        }
+        return EditorSpec.newBuilder()
+            .setKind(EditorKind.EDITOR_NUMBER)
+            .setOwner(EditorOwner.EDITOR_OWNER_HOST_NATIVE)
+            .setPresentation(EditorPresentation.EDITOR_INLINE)
+            .setNumber(number.build())
             .build();
     }
 

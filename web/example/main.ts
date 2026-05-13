@@ -11,7 +11,12 @@
  * so the host only provides platform glue.
  */
 
-import { VolvoxGrid, type VolvoxGridContextMenuRequest, type VolvoxGridDropdown } from "../js/src/volvoxgrid.js";
+import {
+  VolvoxGrid,
+  type VolvoxGridContextMenuRequest,
+  type VolvoxGridDropdown,
+  type VolvoxGridValidationError,
+} from "../js/src/volvoxgrid.js";
 import { setupDefaultInput } from "../js/src/default-input.js";
 import { createCanvas2DTextRenderer } from "../js/src/canvas2d-text-renderer.js";
 import {
@@ -51,6 +56,7 @@ import {
   EditorOwner,
   EditorPresentation,
   EditorSpecFields,
+  EditorUpdateReason,
   FillHandlePosition,
   FocusBorderStyle,
   FontFields,
@@ -73,6 +79,7 @@ import {
   ListEditorParamsFields,
   ListItemFields,
   LoadDataStatus,
+  NumberEditorParamsFields,
   OutlineConfigFields,
   PaddingFields,
   PresentMode,
@@ -196,9 +203,9 @@ const SALES_COLUMN_SETUP = [
   { caption: "Region", key: "Region", align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, span: true },
   { caption: "Category", key: "Category", align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, span: false },
   { caption: "Product", key: "Product", align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, span: false },
-  { caption: "Sales", key: "Sales", align: Align.ALIGN_RIGHT_CENTER, dataType: ColumnDataType.COLUMN_DATA_CURRENCY, format: "$#,##0", dropdownItems: undefined, span: false },
-  { caption: "Cost", key: "Cost", align: Align.ALIGN_RIGHT_CENTER, dataType: ColumnDataType.COLUMN_DATA_CURRENCY, format: "$#,##0", dropdownItems: undefined, span: false },
-  { caption: "Margin%", key: "Margin", align: Align.ALIGN_CENTER_CENTER, dataType: ColumnDataType.COLUMN_DATA_NUMBER, format: undefined, dropdownItems: undefined, span: false },
+  { caption: "Sales", key: "Sales", align: Align.ALIGN_RIGHT_CENTER, dataType: ColumnDataType.COLUMN_DATA_CURRENCY, format: "$#,##0", dropdownItems: undefined, numberEditor: { min: 0 }, span: false },
+  { caption: "Cost", key: "Cost", align: Align.ALIGN_RIGHT_CENTER, dataType: ColumnDataType.COLUMN_DATA_CURRENCY, format: "$#,##0", dropdownItems: undefined, numberEditor: { min: 0 }, span: false },
+  { caption: "Margin%", key: "Margin", align: Align.ALIGN_CENTER_CENTER, dataType: ColumnDataType.COLUMN_DATA_NUMBER, format: undefined, dropdownItems: undefined, numberEditor: { min: 0, max: 100 }, span: false },
   { caption: "Flag", key: "Flag", align: Align.ALIGN_CENTER_CENTER, dataType: ColumnDataType.COLUMN_DATA_BOOLEAN, format: undefined, dropdownItems: undefined, span: false },
   { caption: "Status", key: "Status", align: undefined, dataType: undefined, format: undefined, dropdownItems: SALES_STATUS_ITEMS, span: false },
   { caption: "Notes", key: "Notes", align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, span: false },
@@ -229,6 +236,11 @@ type DemoColumnSetup = {
   dataType?: number;
   format?: string;
   dropdownItems?: string;
+  numberEditor?: {
+    min?: number;
+    max?: number;
+    nullable?: boolean;
+  };
   interaction?: number;
   hidden?: boolean;
   span?: boolean;
@@ -813,6 +825,12 @@ function pbEncodeFloatField(field: number, value: number): number[] {
   return [...pbEncodeTag(field, 5), ...Array.from(new Uint8Array(buf))];
 }
 
+function pbEncodeDoubleField(field: number, value: number): number[] {
+  const buf = new ArrayBuffer(8);
+  new DataView(buf).setFloat64(0, value, true);
+  return [...pbEncodeTag(field, 1), ...Array.from(new Uint8Array(buf))];
+}
+
 function pbEncodeBorder(style: number, color: number): Uint8Array {
   const out: number[] = [];
   out.push(...pbEncodeInt32Field(BorderFields.style, style));
@@ -1307,6 +1325,8 @@ function pbEncodeColumnDef(
   out.push(...pbEncodeStringField(ColumnDefFields.key, setup.key));
   if (setup.dropdownItems != null) {
     out.push(...pbEncodeMessageField(ColumnDefFields.editor, pbEncodeDropdownEditorFromLabels(setup.dropdownItems)));
+  } else if (setup.numberEditor != null) {
+    out.push(...pbEncodeMessageField(ColumnDefFields.editor, pbEncodeNumberEditor(setup.numberEditor)));
   }
   if (setup.hidden != null) {
     out.push(...pbEncodeTag(ColumnDefFields.hidden, 0), ...pbEncodeBool(setup.hidden));
@@ -1343,6 +1363,26 @@ function pbEncodeDropdownEditorFromLabels(items: string): Uint8Array {
   editor.push(...pbEncodeInt32Field(EditorSpecFields.owner, EditorOwner.EDITOR_OWNER_ENGINE));
   editor.push(...pbEncodeInt32Field(EditorSpecFields.presentation, EditorPresentation.EDITOR_CANVAS));
   editor.push(...pbEncodeMessageField(EditorSpecFields.list, new Uint8Array(list)));
+  return new Uint8Array(editor);
+}
+
+function pbEncodeNumberEditor(options: { min?: number; max?: number; nullable?: boolean }): Uint8Array {
+  const number: number[] = [];
+  if (options.min != null) {
+    number.push(...pbEncodeDoubleField(NumberEditorParamsFields.min, options.min));
+  }
+  if (options.max != null) {
+    number.push(...pbEncodeDoubleField(NumberEditorParamsFields.max, options.max));
+  }
+  if (options.nullable === true) {
+    number.push(...pbEncodeTag(NumberEditorParamsFields.nullable, 0), ...pbEncodeBool(true));
+  }
+
+  const editor: number[] = [];
+  editor.push(...pbEncodeInt32Field(EditorSpecFields.kind, EditorKind.EDITOR_NUMBER));
+  editor.push(...pbEncodeInt32Field(EditorSpecFields.owner, EditorOwner.EDITOR_OWNER_HOST_NATIVE));
+  editor.push(...pbEncodeInt32Field(EditorSpecFields.presentation, EditorPresentation.EDITOR_INLINE));
+  editor.push(...pbEncodeMessageField(EditorSpecFields.number, new Uint8Array(number)));
   return new Uint8Array(editor);
 }
 
@@ -2521,6 +2561,40 @@ async function main() {
     }
   }
 
+  function logDebugValidationErrors(
+    source: string,
+    sessionId: bigint,
+    validationErrors: VolvoxGridValidationError[],
+    force: boolean = false,
+  ): void {
+    if (!debugEventLoggingEnabled || (!force && validationErrors.length === 0)) {
+      return;
+    }
+    console.log("VolvoxGrid validation_errors", {
+      source,
+      sessionId: sessionId.toString(),
+      validation_errors: validationErrors,
+    });
+  }
+
+  function validationErrorSummary(validationErrors: VolvoxGridValidationError[]): string {
+    return validationErrors
+      .map((error) => error.message || error.code)
+      .filter((message) => message.length > 0)
+      .join("; ");
+  }
+
+  function updateExampleValidationFeedback(
+    validationErrors: VolvoxGridValidationError[],
+    forceClear: boolean = false,
+  ): void {
+    if (validationErrors.length > 0) {
+      updateStatus(`Validation: ${validationErrorSummary(validationErrors)}`);
+    } else if (forceClear) {
+      updateStatus();
+    }
+  }
+
   function drainHierarchyActionClickEvents(rawEvent: Uint8Array): void {
     if (currentDemo !== "hierarchy") {
       return;
@@ -2550,6 +2624,20 @@ async function main() {
   grid.onGridEventRaw = (rawEvent: Uint8Array) => {
     logDebugGridEvent(rawEvent);
     drainHierarchyActionClickEvents(rawEvent);
+  };
+  grid.onEditorSessionStarted = (details) => {
+    logDebugValidationErrors("editor_started", details.sessionId, details.validationErrors);
+    updateExampleValidationFeedback(details.validationErrors);
+  };
+  grid.onEditorSessionUpdated = (details) => {
+    const isValidationUpdate = details.reason === EditorUpdateReason.EDITOR_UPDATE_VALIDATION;
+    logDebugValidationErrors(
+      "editor_updated",
+      details.sessionId,
+      details.validationErrors,
+      isValidationUpdate,
+    );
+    updateExampleValidationFeedback(details.validationErrors, isValidationUpdate);
   };
 
   function normalizeLayerMask(raw: number): number {
