@@ -292,6 +292,86 @@ func (BorderAppearance) EnumDescriptor() ([]byte, []int) {
 	return file_volvoxgrid_proto_rawDescGZIP(), []int{3}
 }
 
+// Built-in visual themes. Each preset is a complete look — when applied via
+// GridConfig.theme_preset it sets StyleConfig (cell/fixed/header colors,
+// alternate row, sheet, grid lines, border appearance), SelectionConfig
+// visual fields (selection/hover/active cell/indicator row+col styles),
+// ScrollBarConfig (appearance + colors), and IndicatorsConfig (appearance +
+// colors). Other fields (modes, sizes, visibility, behavior toggles) are
+// left untouched.
+//
+// Resolution: inside a single Configure() call, the engine first applies the
+// preset's baked palette, then merges any explicit GridConfig fields. Explicit
+// fields always win. The preset itself is not stored — GetConfig() returns
+// the resolved values.
+type ThemePreset int32
+
+const (
+	ThemePreset_THEME_NONE    ThemePreset = 0 // no-op — leave existing style fields alone
+	ThemePreset_THEME_CLASSIC ThemePreset = 1 // legacy datagrid look: raised borders,
+	// gray fixed cells, classic scrollbar/indicator,
+	// system-blue selection.
+	ThemePreset_THEME_LIGHT ThemePreset = 2 // clean modern light: flat borders, soft gray
+	// header (#F9FAFB), indigo accent (#6366F1),
+	// overlay scrollbar, modern indicator.
+	ThemePreset_THEME_DARK ThemePreset = 3 // clean modern dark: flat borders, #1E1E1E body,
+	// blue accent (#569CD6), modern scrollbar.
+	ThemePreset_THEME_HIGH_CONTRAST ThemePreset = 4 // accessibility: pure black/white/yellow palette,
+	// classic scrollbar+indicator (thick, solid).
+	ThemePreset_THEME_MONOKAI ThemePreset = 5 // editor-style dark: #272822 body, pink/cyan/olive
+	// accents, flat borders.
+	ThemePreset_THEME_AMBER ThemePreset = 6 // warm light theme: stone neutrals, amber accent
+)
+
+// Enum value maps for ThemePreset.
+var (
+	ThemePreset_name = map[int32]string{
+		0: "THEME_NONE",
+		1: "THEME_CLASSIC",
+		2: "THEME_LIGHT",
+		3: "THEME_DARK",
+		4: "THEME_HIGH_CONTRAST",
+		5: "THEME_MONOKAI",
+		6: "THEME_AMBER",
+	}
+	ThemePreset_value = map[string]int32{
+		"THEME_NONE":          0,
+		"THEME_CLASSIC":       1,
+		"THEME_LIGHT":         2,
+		"THEME_DARK":          3,
+		"THEME_HIGH_CONTRAST": 4,
+		"THEME_MONOKAI":       5,
+		"THEME_AMBER":         6,
+	}
+)
+
+func (x ThemePreset) Enum() *ThemePreset {
+	p := new(ThemePreset)
+	*p = x
+	return p
+}
+
+func (x ThemePreset) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ThemePreset) Descriptor() protoreflect.EnumDescriptor {
+	return file_volvoxgrid_proto_enumTypes[4].Descriptor()
+}
+
+func (ThemePreset) Type() protoreflect.EnumType {
+	return &file_volvoxgrid_proto_enumTypes[4]
+}
+
+func (x ThemePreset) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ThemePreset.Descriptor instead.
+func (ThemePreset) EnumDescriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{4}
+}
+
 type TextEffect int32
 
 const (
@@ -331,11 +411,11 @@ func (x TextEffect) String() string {
 }
 
 func (TextEffect) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[4].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[5].Descriptor()
 }
 
 func (TextEffect) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[4]
+	return &file_volvoxgrid_proto_enumTypes[5]
 }
 
 func (x TextEffect) Number() protoreflect.EnumNumber {
@@ -344,7 +424,7 @@ func (x TextEffect) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use TextEffect.Descriptor instead.
 func (TextEffect) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{4}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{5}
 }
 
 type TextRenderMode int32
@@ -383,11 +463,11 @@ func (x TextRenderMode) String() string {
 }
 
 func (TextRenderMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[5].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[6].Descriptor()
 }
 
 func (TextRenderMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[5]
+	return &file_volvoxgrid_proto_enumTypes[6]
 }
 
 func (x TextRenderMode) Number() protoreflect.EnumNumber {
@@ -396,7 +476,7 @@ func (x TextRenderMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use TextRenderMode.Descriptor instead.
 func (TextRenderMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{5}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{6}
 }
 
 type TextHintingMode int32
@@ -435,11 +515,11 @@ func (x TextHintingMode) String() string {
 }
 
 func (TextHintingMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[6].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[7].Descriptor()
 }
 
 func (TextHintingMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[6]
+	return &file_volvoxgrid_proto_enumTypes[7]
 }
 
 func (x TextHintingMode) Number() protoreflect.EnumNumber {
@@ -448,7 +528,7 @@ func (x TextHintingMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use TextHintingMode.Descriptor instead.
 func (TextHintingMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{6}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{7}
 }
 
 type TextBaseline int32
@@ -484,11 +564,11 @@ func (x TextBaseline) String() string {
 }
 
 func (TextBaseline) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[7].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[8].Descriptor()
 }
 
 func (TextBaseline) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[7]
+	return &file_volvoxgrid_proto_enumTypes[8]
 }
 
 func (x TextBaseline) Number() protoreflect.EnumNumber {
@@ -497,7 +577,7 @@ func (x TextBaseline) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use TextBaseline.Descriptor instead.
 func (TextBaseline) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{7}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{8}
 }
 
 // Cell text alignment: "horizontal_vertical".
@@ -559,11 +639,11 @@ func (x Align) String() string {
 }
 
 func (Align) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[8].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[9].Descriptor()
 }
 
 func (Align) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[8]
+	return &file_volvoxgrid_proto_enumTypes[9]
 }
 
 func (x Align) Number() protoreflect.EnumNumber {
@@ -572,7 +652,7 @@ func (x Align) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use Align.Descriptor instead.
 func (Align) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{8}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{9}
 }
 
 type ImageAlignment int32
@@ -632,11 +712,11 @@ func (x ImageAlignment) String() string {
 }
 
 func (ImageAlignment) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[9].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[10].Descriptor()
 }
 
 func (ImageAlignment) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[9]
+	return &file_volvoxgrid_proto_enumTypes[10]
 }
 
 func (x ImageAlignment) Number() protoreflect.EnumNumber {
@@ -645,7 +725,7 @@ func (x ImageAlignment) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ImageAlignment.Descriptor instead.
 func (ImageAlignment) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{9}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{10}
 }
 
 type BarcodeSymbology int32
@@ -714,11 +794,11 @@ func (x BarcodeSymbology) String() string {
 }
 
 func (BarcodeSymbology) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[10].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[11].Descriptor()
 }
 
 func (BarcodeSymbology) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[10]
+	return &file_volvoxgrid_proto_enumTypes[11]
 }
 
 func (x BarcodeSymbology) Number() protoreflect.EnumNumber {
@@ -727,7 +807,7 @@ func (x BarcodeSymbology) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use BarcodeSymbology.Descriptor instead.
 func (BarcodeSymbology) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{10}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{11}
 }
 
 type BarcodeCaptionPosition int32
@@ -763,11 +843,11 @@ func (x BarcodeCaptionPosition) String() string {
 }
 
 func (BarcodeCaptionPosition) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[11].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[12].Descriptor()
 }
 
 func (BarcodeCaptionPosition) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[11]
+	return &file_volvoxgrid_proto_enumTypes[12]
 }
 
 func (x BarcodeCaptionPosition) Number() protoreflect.EnumNumber {
@@ -776,7 +856,7 @@ func (x BarcodeCaptionPosition) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use BarcodeCaptionPosition.Descriptor instead.
 func (BarcodeCaptionPosition) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{11}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{12}
 }
 
 type BarcodeCheckDigitMode int32
@@ -814,11 +894,11 @@ func (x BarcodeCheckDigitMode) String() string {
 }
 
 func (BarcodeCheckDigitMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[12].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[13].Descriptor()
 }
 
 func (BarcodeCheckDigitMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[12]
+	return &file_volvoxgrid_proto_enumTypes[13]
 }
 
 func (x BarcodeCheckDigitMode) Number() protoreflect.EnumNumber {
@@ -827,7 +907,7 @@ func (x BarcodeCheckDigitMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use BarcodeCheckDigitMode.Descriptor instead.
 func (BarcodeCheckDigitMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{12}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{13}
 }
 
 type BarcodeTextEncoding int32
@@ -866,11 +946,11 @@ func (x BarcodeTextEncoding) String() string {
 }
 
 func (BarcodeTextEncoding) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[13].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[14].Descriptor()
 }
 
 func (BarcodeTextEncoding) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[13]
+	return &file_volvoxgrid_proto_enumTypes[14]
 }
 
 func (x BarcodeTextEncoding) Number() protoreflect.EnumNumber {
@@ -879,7 +959,7 @@ func (x BarcodeTextEncoding) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use BarcodeTextEncoding.Descriptor instead.
 func (BarcodeTextEncoding) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{13}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{14}
 }
 
 type BarcodeQrErrorCorrection int32
@@ -921,11 +1001,11 @@ func (x BarcodeQrErrorCorrection) String() string {
 }
 
 func (BarcodeQrErrorCorrection) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[14].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[15].Descriptor()
 }
 
 func (BarcodeQrErrorCorrection) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[14]
+	return &file_volvoxgrid_proto_enumTypes[15]
 }
 
 func (x BarcodeQrErrorCorrection) Number() protoreflect.EnumNumber {
@@ -934,7 +1014,7 @@ func (x BarcodeQrErrorCorrection) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use BarcodeQrErrorCorrection.Descriptor instead.
 func (BarcodeQrErrorCorrection) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{14}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{15}
 }
 
 type BarcodeRenderStatus int32
@@ -976,11 +1056,11 @@ func (x BarcodeRenderStatus) String() string {
 }
 
 func (BarcodeRenderStatus) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[15].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[16].Descriptor()
 }
 
 func (BarcodeRenderStatus) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[15]
+	return &file_volvoxgrid_proto_enumTypes[16]
 }
 
 func (x BarcodeRenderStatus) Number() protoreflect.EnumNumber {
@@ -989,7 +1069,7 @@ func (x BarcodeRenderStatus) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use BarcodeRenderStatus.Descriptor instead.
 func (BarcodeRenderStatus) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{15}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{16}
 }
 
 type CheckedState int32
@@ -1025,11 +1105,11 @@ func (x CheckedState) String() string {
 }
 
 func (CheckedState) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[16].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[17].Descriptor()
 }
 
 func (CheckedState) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[16]
+	return &file_volvoxgrid_proto_enumTypes[17]
 }
 
 func (x CheckedState) Number() protoreflect.EnumNumber {
@@ -1038,7 +1118,7 @@ func (x CheckedState) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use CheckedState.Descriptor instead.
 func (CheckedState) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{16}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{17}
 }
 
 type FillHandlePosition int32
@@ -1083,11 +1163,11 @@ func (x FillHandlePosition) String() string {
 }
 
 func (FillHandlePosition) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[17].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[18].Descriptor()
 }
 
 func (FillHandlePosition) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[17]
+	return &file_volvoxgrid_proto_enumTypes[18]
 }
 
 func (x FillHandlePosition) Number() protoreflect.EnumNumber {
@@ -1096,7 +1176,7 @@ func (x FillHandlePosition) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use FillHandlePosition.Descriptor instead.
 func (FillHandlePosition) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{17}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{18}
 }
 
 type ColumnDataType int32
@@ -1138,11 +1218,11 @@ func (x ColumnDataType) String() string {
 }
 
 func (ColumnDataType) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[18].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[19].Descriptor()
 }
 
 func (ColumnDataType) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[18]
+	return &file_volvoxgrid_proto_enumTypes[19]
 }
 
 func (x ColumnDataType) Number() protoreflect.EnumNumber {
@@ -1151,7 +1231,7 @@ func (x ColumnDataType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ColumnDataType.Descriptor instead.
 func (ColumnDataType) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{18}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{19}
 }
 
 // Type coercion strategy during cell writes and data loading.
@@ -1195,11 +1275,11 @@ func (x CoercionMode) String() string {
 }
 
 func (CoercionMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[19].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[20].Descriptor()
 }
 
 func (CoercionMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[19]
+	return &file_volvoxgrid_proto_enumTypes[20]
 }
 
 func (x CoercionMode) Number() protoreflect.EnumNumber {
@@ -1208,7 +1288,7 @@ func (x CoercionMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use CoercionMode.Descriptor instead.
 func (CoercionMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{19}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{20}
 }
 
 // What happens when a cell write fails type validation.
@@ -1252,11 +1332,11 @@ func (x WriteErrorMode) String() string {
 }
 
 func (WriteErrorMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[20].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[21].Descriptor()
 }
 
 func (WriteErrorMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[20]
+	return &file_volvoxgrid_proto_enumTypes[21]
 }
 
 func (x WriteErrorMode) Number() protoreflect.EnumNumber {
@@ -1265,7 +1345,7 @@ func (x WriteErrorMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use WriteErrorMode.Descriptor instead.
 func (WriteErrorMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{20}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{21}
 }
 
 type CellInteraction int32
@@ -1304,11 +1384,11 @@ func (x CellInteraction) String() string {
 }
 
 func (CellInteraction) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[21].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[22].Descriptor()
 }
 
 func (CellInteraction) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[21]
+	return &file_volvoxgrid_proto_enumTypes[22]
 }
 
 func (x CellInteraction) Number() protoreflect.EnumNumber {
@@ -1317,7 +1397,7 @@ func (x CellInteraction) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use CellInteraction.Descriptor instead.
 func (CellInteraction) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{21}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{22}
 }
 
 // How the first row of loaded data is interpreted.
@@ -1358,11 +1438,11 @@ func (x HeaderPolicy) String() string {
 }
 
 func (HeaderPolicy) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[22].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[23].Descriptor()
 }
 
 func (HeaderPolicy) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[22]
+	return &file_volvoxgrid_proto_enumTypes[23]
 }
 
 func (x HeaderPolicy) Number() protoreflect.EnumNumber {
@@ -1371,7 +1451,7 @@ func (x HeaderPolicy) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use HeaderPolicy.Descriptor instead.
 func (HeaderPolicy) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{22}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{23}
 }
 
 // Column type inference strategy during data loading.
@@ -1413,11 +1493,11 @@ func (x TypePolicy) String() string {
 }
 
 func (TypePolicy) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[23].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[24].Descriptor()
 }
 
 func (TypePolicy) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[23]
+	return &file_volvoxgrid_proto_enumTypes[24]
 }
 
 func (x TypePolicy) Number() protoreflect.EnumNumber {
@@ -1426,7 +1506,7 @@ func (x TypePolicy) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use TypePolicy.Descriptor instead.
 func (TypePolicy) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{23}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{24}
 }
 
 type LoadDataStatus int32
@@ -1462,11 +1542,11 @@ func (x LoadDataStatus) String() string {
 }
 
 func (LoadDataStatus) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[24].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[25].Descriptor()
 }
 
 func (LoadDataStatus) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[24]
+	return &file_volvoxgrid_proto_enumTypes[25]
 }
 
 func (x LoadDataStatus) Number() protoreflect.EnumNumber {
@@ -1475,7 +1555,7 @@ func (x LoadDataStatus) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use LoadDataStatus.Descriptor instead.
 func (LoadDataStatus) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{24}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{25}
 }
 
 // How user selection is interpreted. See engine/src/selection.rs.
@@ -1539,11 +1619,11 @@ func (x SelectionMode) String() string {
 }
 
 func (SelectionMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[25].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[26].Descriptor()
 }
 
 func (SelectionMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[25]
+	return &file_volvoxgrid_proto_enumTypes[26]
 }
 
 func (x SelectionMode) Number() protoreflect.EnumNumber {
@@ -1552,7 +1632,7 @@ func (x SelectionMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use SelectionMode.Descriptor instead.
 func (SelectionMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{25}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{26}
 }
 
 type FocusBorderStyle int32
@@ -1594,11 +1674,11 @@ func (x FocusBorderStyle) String() string {
 }
 
 func (FocusBorderStyle) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[26].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[27].Descriptor()
 }
 
 func (FocusBorderStyle) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[26]
+	return &file_volvoxgrid_proto_enumTypes[27]
 }
 
 func (x FocusBorderStyle) Number() protoreflect.EnumNumber {
@@ -1607,7 +1687,7 @@ func (x FocusBorderStyle) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use FocusBorderStyle.Descriptor instead.
 func (FocusBorderStyle) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{26}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{27}
 }
 
 type SelectionVisibility int32
@@ -1643,11 +1723,11 @@ func (x SelectionVisibility) String() string {
 }
 
 func (SelectionVisibility) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[27].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[28].Descriptor()
 }
 
 func (SelectionVisibility) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[27]
+	return &file_volvoxgrid_proto_enumTypes[28]
 }
 
 func (x SelectionVisibility) Number() protoreflect.EnumNumber {
@@ -1656,7 +1736,7 @@ func (x SelectionVisibility) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use SelectionVisibility.Descriptor instead.
 func (SelectionVisibility) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{27}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{28}
 }
 
 // Controls how cell editing is activated. See engine/src/input.rs.
@@ -1698,11 +1778,11 @@ func (x EditTrigger) String() string {
 }
 
 func (EditTrigger) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[28].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[29].Descriptor()
 }
 
 func (EditTrigger) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[28]
+	return &file_volvoxgrid_proto_enumTypes[29]
 }
 
 func (x EditTrigger) Number() protoreflect.EnumNumber {
@@ -1711,7 +1791,7 @@ func (x EditTrigger) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use EditTrigger.Descriptor instead.
 func (EditTrigger) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{28}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{29}
 }
 
 type DropdownItemLayout int32
@@ -1750,11 +1830,11 @@ func (x DropdownItemLayout) String() string {
 }
 
 func (DropdownItemLayout) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[29].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[30].Descriptor()
 }
 
 func (DropdownItemLayout) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[29]
+	return &file_volvoxgrid_proto_enumTypes[30]
 }
 
 func (x DropdownItemLayout) Number() protoreflect.EnumNumber {
@@ -1763,7 +1843,7 @@ func (x DropdownItemLayout) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use DropdownItemLayout.Descriptor instead.
 func (DropdownItemLayout) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{29}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{30}
 }
 
 type TabBehavior int32
@@ -1796,11 +1876,11 @@ func (x TabBehavior) String() string {
 }
 
 func (TabBehavior) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[30].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[31].Descriptor()
 }
 
 func (TabBehavior) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[30]
+	return &file_volvoxgrid_proto_enumTypes[31]
 }
 
 func (x TabBehavior) Number() protoreflect.EnumNumber {
@@ -1809,7 +1889,7 @@ func (x TabBehavior) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use TabBehavior.Descriptor instead.
 func (TabBehavior) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{30}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{31}
 }
 
 type EditorKind int32
@@ -1866,11 +1946,11 @@ func (x EditorKind) String() string {
 }
 
 func (EditorKind) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[31].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[32].Descriptor()
 }
 
 func (EditorKind) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[31]
+	return &file_volvoxgrid_proto_enumTypes[32]
 }
 
 func (x EditorKind) Number() protoreflect.EnumNumber {
@@ -1879,7 +1959,7 @@ func (x EditorKind) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use EditorKind.Descriptor instead.
 func (EditorKind) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{31}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{32}
 }
 
 type EditorOwner int32
@@ -1915,11 +1995,11 @@ func (x EditorOwner) String() string {
 }
 
 func (EditorOwner) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[32].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[33].Descriptor()
 }
 
 func (EditorOwner) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[32]
+	return &file_volvoxgrid_proto_enumTypes[33]
 }
 
 func (x EditorOwner) Number() protoreflect.EnumNumber {
@@ -1928,7 +2008,7 @@ func (x EditorOwner) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use EditorOwner.Descriptor instead.
 func (EditorOwner) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{32}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{33}
 }
 
 // Who renders the editor surface.
@@ -1977,11 +2057,11 @@ func (x EditorPresentation) String() string {
 }
 
 func (EditorPresentation) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[33].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[34].Descriptor()
 }
 
 func (EditorPresentation) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[33]
+	return &file_volvoxgrid_proto_enumTypes[34]
 }
 
 func (x EditorPresentation) Number() protoreflect.EnumNumber {
@@ -1990,7 +2070,7 @@ func (x EditorPresentation) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use EditorPresentation.Descriptor instead.
 func (EditorPresentation) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{33}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{34}
 }
 
 type ValidationMode int32
@@ -2026,11 +2106,11 @@ func (x ValidationMode) String() string {
 }
 
 func (ValidationMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[34].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[35].Descriptor()
 }
 
 func (ValidationMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[34]
+	return &file_volvoxgrid_proto_enumTypes[35]
 }
 
 func (x ValidationMode) Number() protoreflect.EnumNumber {
@@ -2039,7 +2119,7 @@ func (x ValidationMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ValidationMode.Descriptor instead.
 func (ValidationMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{34}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{35}
 }
 
 type ValidationTrigger int32
@@ -2078,11 +2158,11 @@ func (x ValidationTrigger) String() string {
 }
 
 func (ValidationTrigger) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[35].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[36].Descriptor()
 }
 
 func (ValidationTrigger) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[35]
+	return &file_volvoxgrid_proto_enumTypes[36]
 }
 
 func (x ValidationTrigger) Number() protoreflect.EnumNumber {
@@ -2091,7 +2171,7 @@ func (x ValidationTrigger) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ValidationTrigger.Descriptor instead.
 func (ValidationTrigger) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{35}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{36}
 }
 
 type InputType int32
@@ -2136,11 +2216,11 @@ func (x InputType) String() string {
 }
 
 func (InputType) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[36].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[37].Descriptor()
 }
 
 func (InputType) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[36]
+	return &file_volvoxgrid_proto_enumTypes[37]
 }
 
 func (x InputType) Number() protoreflect.EnumNumber {
@@ -2149,7 +2229,7 @@ func (x InputType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use InputType.Descriptor instead.
 func (InputType) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{36}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{37}
 }
 
 type ButtonRole int32
@@ -2188,11 +2268,11 @@ func (x ButtonRole) String() string {
 }
 
 func (ButtonRole) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[37].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[38].Descriptor()
 }
 
 func (ButtonRole) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[37]
+	return &file_volvoxgrid_proto_enumTypes[38]
 }
 
 func (x ButtonRole) Number() protoreflect.EnumNumber {
@@ -2201,7 +2281,7 @@ func (x ButtonRole) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ButtonRole.Descriptor instead.
 func (ButtonRole) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{37}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{38}
 }
 
 type SortOrder int32
@@ -2237,11 +2317,11 @@ func (x SortOrder) String() string {
 }
 
 func (SortOrder) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[38].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[39].Descriptor()
 }
 
 func (SortOrder) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[38]
+	return &file_volvoxgrid_proto_enumTypes[39]
 }
 
 func (x SortOrder) Number() protoreflect.EnumNumber {
@@ -2250,7 +2330,7 @@ func (x SortOrder) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use SortOrder.Descriptor instead.
 func (SortOrder) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{38}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{39}
 }
 
 // Comparison strategy for sorting.
@@ -2305,11 +2385,11 @@ func (x SortType) String() string {
 }
 
 func (SortType) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[39].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[40].Descriptor()
 }
 
 func (SortType) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[39]
+	return &file_volvoxgrid_proto_enumTypes[40]
 }
 
 func (x SortType) Number() protoreflect.EnumNumber {
@@ -2318,7 +2398,7 @@ func (x SortType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use SortType.Descriptor instead.
 func (SortType) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{39}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{40}
 }
 
 type TreeIndicatorStyle int32
@@ -2360,11 +2440,11 @@ func (x TreeIndicatorStyle) String() string {
 }
 
 func (TreeIndicatorStyle) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[40].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[41].Descriptor()
 }
 
 func (TreeIndicatorStyle) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[40]
+	return &file_volvoxgrid_proto_enumTypes[41]
 }
 
 func (x TreeIndicatorStyle) Number() protoreflect.EnumNumber {
@@ -2373,7 +2453,7 @@ func (x TreeIndicatorStyle) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use TreeIndicatorStyle.Descriptor instead.
 func (TreeIndicatorStyle) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{40}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{41}
 }
 
 type GroupTotalPosition int32
@@ -2406,11 +2486,11 @@ func (x GroupTotalPosition) String() string {
 }
 
 func (GroupTotalPosition) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[41].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[42].Descriptor()
 }
 
 func (GroupTotalPosition) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[41]
+	return &file_volvoxgrid_proto_enumTypes[42]
 }
 
 func (x GroupTotalPosition) Number() protoreflect.EnumNumber {
@@ -2419,7 +2499,7 @@ func (x GroupTotalPosition) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use GroupTotalPosition.Descriptor instead.
 func (GroupTotalPosition) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{41}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{42}
 }
 
 // Aggregate functions for Subtotal() and Aggregate() RPCs.
@@ -2505,11 +2585,11 @@ func (x AggregateType) String() string {
 }
 
 func (AggregateType) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[42].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[43].Descriptor()
 }
 
 func (AggregateType) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[42]
+	return &file_volvoxgrid_proto_enumTypes[43]
 }
 
 func (x AggregateType) Number() protoreflect.EnumNumber {
@@ -2518,7 +2598,7 @@ func (x AggregateType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use AggregateType.Descriptor instead.
 func (AggregateType) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{42}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{43}
 }
 
 // Content-based cell merging. The engine compares adjacent cell values
@@ -2582,11 +2662,11 @@ func (x CellSpanMode) String() string {
 }
 
 func (CellSpanMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[43].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[44].Descriptor()
 }
 
 func (CellSpanMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[43]
+	return &file_volvoxgrid_proto_enumTypes[44]
 }
 
 func (x CellSpanMode) Number() protoreflect.EnumNumber {
@@ -2595,7 +2675,7 @@ func (x CellSpanMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use CellSpanMode.Descriptor instead.
 func (CellSpanMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{43}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{44}
 }
 
 // Text normalization used when comparing cells for content-based spans
@@ -2636,11 +2716,11 @@ func (x SpanCompareMode) String() string {
 }
 
 func (SpanCompareMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[44].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[45].Descriptor()
 }
 
 func (SpanCompareMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[44]
+	return &file_volvoxgrid_proto_enumTypes[45]
 }
 
 func (x SpanCompareMode) Number() protoreflect.EnumNumber {
@@ -2649,7 +2729,7 @@ func (x SpanCompareMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use SpanCompareMode.Descriptor instead.
 func (SpanCompareMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{44}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{45}
 }
 
 type ScrollBarsMode int32
@@ -2688,11 +2768,11 @@ func (x ScrollBarsMode) String() string {
 }
 
 func (ScrollBarsMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[45].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[46].Descriptor()
 }
 
 func (ScrollBarsMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[45]
+	return &file_volvoxgrid_proto_enumTypes[46]
 }
 
 func (x ScrollBarsMode) Number() protoreflect.EnumNumber {
@@ -2701,7 +2781,7 @@ func (x ScrollBarsMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ScrollBarsMode.Descriptor instead.
 func (ScrollBarsMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{45}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{46}
 }
 
 type ScrollBarMode int32
@@ -2737,11 +2817,11 @@ func (x ScrollBarMode) String() string {
 }
 
 func (ScrollBarMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[46].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[47].Descriptor()
 }
 
 func (ScrollBarMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[46]
+	return &file_volvoxgrid_proto_enumTypes[47]
 }
 
 func (x ScrollBarMode) Number() protoreflect.EnumNumber {
@@ -2750,7 +2830,7 @@ func (x ScrollBarMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ScrollBarMode.Descriptor instead.
 func (ScrollBarMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{46}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{47}
 }
 
 type ScrollBarAppearance int32
@@ -2789,11 +2869,11 @@ func (x ScrollBarAppearance) String() string {
 }
 
 func (ScrollBarAppearance) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[47].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[48].Descriptor()
 }
 
 func (ScrollBarAppearance) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[47]
+	return &file_volvoxgrid_proto_enumTypes[48]
 }
 
 func (x ScrollBarAppearance) Number() protoreflect.EnumNumber {
@@ -2802,7 +2882,7 @@ func (x ScrollBarAppearance) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ScrollBarAppearance.Descriptor instead.
 func (ScrollBarAppearance) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{47}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{48}
 }
 
 type IndicatorAppearance int32
@@ -2838,11 +2918,11 @@ func (x IndicatorAppearance) String() string {
 }
 
 func (IndicatorAppearance) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[48].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[49].Descriptor()
 }
 
 func (IndicatorAppearance) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[48]
+	return &file_volvoxgrid_proto_enumTypes[49]
 }
 
 func (x IndicatorAppearance) Number() protoreflect.EnumNumber {
@@ -2851,7 +2931,7 @@ func (x IndicatorAppearance) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use IndicatorAppearance.Descriptor instead.
 func (IndicatorAppearance) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{48}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{49}
 }
 
 type PinPosition int32
@@ -2887,11 +2967,11 @@ func (x PinPosition) String() string {
 }
 
 func (PinPosition) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[49].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[50].Descriptor()
 }
 
 func (PinPosition) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[49]
+	return &file_volvoxgrid_proto_enumTypes[50]
 }
 
 func (x PinPosition) Number() protoreflect.EnumNumber {
@@ -2900,7 +2980,7 @@ func (x PinPosition) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use PinPosition.Descriptor instead.
 func (PinPosition) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{49}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{50}
 }
 
 type StickyEdge int32
@@ -2945,11 +3025,11 @@ func (x StickyEdge) String() string {
 }
 
 func (StickyEdge) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[50].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[51].Descriptor()
 }
 
 func (StickyEdge) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[50]
+	return &file_volvoxgrid_proto_enumTypes[51]
 }
 
 func (x StickyEdge) Number() protoreflect.EnumNumber {
@@ -2958,7 +3038,7 @@ func (x StickyEdge) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use StickyEdge.Descriptor instead.
 func (StickyEdge) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{50}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{51}
 }
 
 // Type-ahead (incremental search) mode. See engine/src/search.rs.
@@ -3002,11 +3082,11 @@ func (x TypeAheadMode) String() string {
 }
 
 func (TypeAheadMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[51].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[52].Descriptor()
 }
 
 func (TypeAheadMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[51]
+	return &file_volvoxgrid_proto_enumTypes[52]
 }
 
 func (x TypeAheadMode) Number() protoreflect.EnumNumber {
@@ -3015,7 +3095,7 @@ func (x TypeAheadMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use TypeAheadMode.Descriptor instead.
 func (TypeAheadMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{51}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{52}
 }
 
 type AutoSizeMode int32
@@ -3051,11 +3131,11 @@ func (x AutoSizeMode) String() string {
 }
 
 func (AutoSizeMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[52].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[53].Descriptor()
 }
 
 func (AutoSizeMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[52]
+	return &file_volvoxgrid_proto_enumTypes[53]
 }
 
 func (x AutoSizeMode) Number() protoreflect.EnumNumber {
@@ -3064,7 +3144,7 @@ func (x AutoSizeMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use AutoSizeMode.Descriptor instead.
 func (AutoSizeMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{52}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{53}
 }
 
 type DragMode int32
@@ -3100,11 +3180,11 @@ func (x DragMode) String() string {
 }
 
 func (DragMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[53].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[54].Descriptor()
 }
 
 func (DragMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[53]
+	return &file_volvoxgrid_proto_enumTypes[54]
 }
 
 func (x DragMode) Number() protoreflect.EnumNumber {
@@ -3113,7 +3193,7 @@ func (x DragMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use DragMode.Descriptor instead.
 func (DragMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{53}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{54}
 }
 
 type DropMode int32
@@ -3149,11 +3229,11 @@ func (x DropMode) String() string {
 }
 
 func (DropMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[54].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[55].Descriptor()
 }
 
 func (DropMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[54]
+	return &file_volvoxgrid_proto_enumTypes[55]
 }
 
 func (x DropMode) Number() protoreflect.EnumNumber {
@@ -3162,7 +3242,7 @@ func (x DropMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use DropMode.Descriptor instead.
 func (DropMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{54}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{55}
 }
 
 type CustomRenderMode int32
@@ -3198,11 +3278,11 @@ func (x CustomRenderMode) String() string {
 }
 
 func (CustomRenderMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[55].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[56].Descriptor()
 }
 
 func (CustomRenderMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[55]
+	return &file_volvoxgrid_proto_enumTypes[56]
 }
 
 func (x CustomRenderMode) Number() protoreflect.EnumNumber {
@@ -3211,7 +3291,7 @@ func (x CustomRenderMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use CustomRenderMode.Descriptor instead.
 func (CustomRenderMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{55}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{56}
 }
 
 type ApplyScope int32
@@ -3244,11 +3324,11 @@ func (x ApplyScope) String() string {
 }
 
 func (ApplyScope) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[56].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[57].Descriptor()
 }
 
 func (ApplyScope) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[56]
+	return &file_volvoxgrid_proto_enumTypes[57]
 }
 
 func (x ApplyScope) Number() protoreflect.EnumNumber {
@@ -3257,7 +3337,7 @@ func (x ApplyScope) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ApplyScope.Descriptor instead.
 func (ApplyScope) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{56}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{57}
 }
 
 // Rendering backend selection. See GUI.md and TUI.md.
@@ -3324,11 +3404,11 @@ func (x RendererMode) String() string {
 }
 
 func (RendererMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[57].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[58].Descriptor()
 }
 
 func (RendererMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[57]
+	return &file_volvoxgrid_proto_enumTypes[58]
 }
 
 func (x RendererMode) Number() protoreflect.EnumNumber {
@@ -3337,7 +3417,7 @@ func (x RendererMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use RendererMode.Descriptor instead.
 func (RendererMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{57}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{58}
 }
 
 type PresentMode int32
@@ -3376,11 +3456,11 @@ func (x PresentMode) String() string {
 }
 
 func (PresentMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[58].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[59].Descriptor()
 }
 
 func (PresentMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[58]
+	return &file_volvoxgrid_proto_enumTypes[59]
 }
 
 func (x PresentMode) Number() protoreflect.EnumNumber {
@@ -3389,7 +3469,7 @@ func (x PresentMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use PresentMode.Descriptor instead.
 func (PresentMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{58}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{59}
 }
 
 type FramePacingMode int32
@@ -3428,11 +3508,11 @@ func (x FramePacingMode) String() string {
 }
 
 func (FramePacingMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[59].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[60].Descriptor()
 }
 
 func (FramePacingMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[59]
+	return &file_volvoxgrid_proto_enumTypes[60]
 }
 
 func (x FramePacingMode) Number() protoreflect.EnumNumber {
@@ -3441,7 +3521,7 @@ func (x FramePacingMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use FramePacingMode.Descriptor instead.
 func (FramePacingMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{59}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{60}
 }
 
 type ClearScope int32
@@ -3483,11 +3563,11 @@ func (x ClearScope) String() string {
 }
 
 func (ClearScope) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[60].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[61].Descriptor()
 }
 
 func (ClearScope) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[60]
+	return &file_volvoxgrid_proto_enumTypes[61]
 }
 
 func (x ClearScope) Number() protoreflect.EnumNumber {
@@ -3496,7 +3576,7 @@ func (x ClearScope) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ClearScope.Descriptor instead.
 func (ClearScope) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{60}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{61}
 }
 
 type ClearRegion int32
@@ -3544,11 +3624,11 @@ func (x ClearRegion) String() string {
 }
 
 func (ClearRegion) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[61].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[62].Descriptor()
 }
 
 func (ClearRegion) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[61]
+	return &file_volvoxgrid_proto_enumTypes[62]
 }
 
 func (x ClearRegion) Number() protoreflect.EnumNumber {
@@ -3557,7 +3637,7 @@ func (x ClearRegion) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ClearRegion.Descriptor instead.
 func (ClearRegion) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{61}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{62}
 }
 
 // Export formats. See engine/src/save.rs.
@@ -3613,11 +3693,11 @@ func (x ExportFormat) String() string {
 }
 
 func (ExportFormat) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[62].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[63].Descriptor()
 }
 
 func (ExportFormat) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[62]
+	return &file_volvoxgrid_proto_enumTypes[63]
 }
 
 func (x ExportFormat) Number() protoreflect.EnumNumber {
@@ -3626,7 +3706,7 @@ func (x ExportFormat) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ExportFormat.Descriptor instead.
 func (ExportFormat) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{62}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{63}
 }
 
 type ExportScope int32
@@ -3665,11 +3745,11 @@ func (x ExportScope) String() string {
 }
 
 func (ExportScope) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[63].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[64].Descriptor()
 }
 
 func (ExportScope) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[63]
+	return &file_volvoxgrid_proto_enumTypes[64]
 }
 
 func (x ExportScope) Number() protoreflect.EnumNumber {
@@ -3678,7 +3758,7 @@ func (x ExportScope) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ExportScope.Descriptor instead.
 func (ExportScope) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{63}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{64}
 }
 
 type PrintOrientation int32
@@ -3711,11 +3791,11 @@ func (x PrintOrientation) String() string {
 }
 
 func (PrintOrientation) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[64].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[65].Descriptor()
 }
 
 func (PrintOrientation) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[64]
+	return &file_volvoxgrid_proto_enumTypes[65]
 }
 
 func (x PrintOrientation) Number() protoreflect.EnumNumber {
@@ -3724,7 +3804,7 @@ func (x PrintOrientation) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use PrintOrientation.Descriptor instead.
 func (PrintOrientation) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{64}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{65}
 }
 
 type NodeRelation int32
@@ -3766,11 +3846,11 @@ func (x NodeRelation) String() string {
 }
 
 func (NodeRelation) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[65].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[66].Descriptor()
 }
 
 func (NodeRelation) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[65]
+	return &file_volvoxgrid_proto_enumTypes[66]
 }
 
 func (x NodeRelation) Number() protoreflect.EnumNumber {
@@ -3779,7 +3859,7 @@ func (x NodeRelation) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use NodeRelation.Descriptor instead.
 func (NodeRelation) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{65}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{66}
 }
 
 type IconAlign int32
@@ -3821,11 +3901,11 @@ func (x IconAlign) String() string {
 }
 
 func (IconAlign) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[66].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[67].Descriptor()
 }
 
 func (IconAlign) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[66]
+	return &file_volvoxgrid_proto_enumTypes[67]
 }
 
 func (x IconAlign) Number() protoreflect.EnumNumber {
@@ -3834,7 +3914,7 @@ func (x IconAlign) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use IconAlign.Descriptor instead.
 func (IconAlign) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{66}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{67}
 }
 
 // Which sub-element of a cell was hit. Used in ClickEvent to tell the
@@ -3882,11 +3962,11 @@ func (x CellHitArea) String() string {
 }
 
 func (CellHitArea) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[67].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[68].Descriptor()
 }
 
 func (CellHitArea) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[67]
+	return &file_volvoxgrid_proto_enumTypes[68]
 }
 
 func (x CellHitArea) Number() protoreflect.EnumNumber {
@@ -3895,7 +3975,7 @@ func (x CellHitArea) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use CellHitArea.Descriptor instead.
 func (CellHitArea) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{67}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{68}
 }
 
 // ── Scrolling ──
@@ -3932,11 +4012,11 @@ func (x PullToRefreshTheme) String() string {
 }
 
 func (PullToRefreshTheme) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[68].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[69].Descriptor()
 }
 
 func (PullToRefreshTheme) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[68]
+	return &file_volvoxgrid_proto_enumTypes[69]
 }
 
 func (x PullToRefreshTheme) Number() protoreflect.EnumNumber {
@@ -3945,7 +4025,7 @@ func (x PullToRefreshTheme) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use PullToRefreshTheme.Descriptor instead.
 func (PullToRefreshTheme) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{68}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{69}
 }
 
 // ── Render layer bit positions (for render_layer_mask bitmask) ──
@@ -4060,11 +4140,11 @@ func (x RenderLayerBit) String() string {
 }
 
 func (RenderLayerBit) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[69].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[70].Descriptor()
 }
 
 func (RenderLayerBit) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[69]
+	return &file_volvoxgrid_proto_enumTypes[70]
 }
 
 func (x RenderLayerBit) Number() protoreflect.EnumNumber {
@@ -4073,7 +4153,7 @@ func (x RenderLayerBit) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use RenderLayerBit.Descriptor instead.
 func (RenderLayerBit) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{69}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{70}
 }
 
 type GridTargetKind int32
@@ -4118,11 +4198,11 @@ func (x GridTargetKind) String() string {
 }
 
 func (GridTargetKind) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[70].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[71].Descriptor()
 }
 
 func (GridTargetKind) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[70]
+	return &file_volvoxgrid_proto_enumTypes[71]
 }
 
 func (x GridTargetKind) Number() protoreflect.EnumNumber {
@@ -4131,7 +4211,7 @@ func (x GridTargetKind) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use GridTargetKind.Descriptor instead.
 func (GridTargetKind) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{70}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{71}
 }
 
 type IndicatorBand int32
@@ -4185,11 +4265,11 @@ func (x IndicatorBand) String() string {
 }
 
 func (IndicatorBand) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[71].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[72].Descriptor()
 }
 
 func (IndicatorBand) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[71]
+	return &file_volvoxgrid_proto_enumTypes[72]
 }
 
 func (x IndicatorBand) Number() protoreflect.EnumNumber {
@@ -4198,7 +4278,7 @@ func (x IndicatorBand) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use IndicatorBand.Descriptor instead.
 func (IndicatorBand) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{71}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{72}
 }
 
 type RowIndicatorSlotKind int32
@@ -4270,11 +4350,11 @@ func (x RowIndicatorSlotKind) String() string {
 }
 
 func (RowIndicatorSlotKind) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[72].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[73].Descriptor()
 }
 
 func (RowIndicatorSlotKind) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[72]
+	return &file_volvoxgrid_proto_enumTypes[73]
 }
 
 func (x RowIndicatorSlotKind) Number() protoreflect.EnumNumber {
@@ -4283,7 +4363,7 @@ func (x RowIndicatorSlotKind) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use RowIndicatorSlotKind.Descriptor instead.
 func (RowIndicatorSlotKind) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{72}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{73}
 }
 
 type ColIndicatorCellMode int32
@@ -4352,11 +4432,11 @@ func (x ColIndicatorCellMode) String() string {
 }
 
 func (ColIndicatorCellMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[73].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[74].Descriptor()
 }
 
 func (ColIndicatorCellMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[73]
+	return &file_volvoxgrid_proto_enumTypes[74]
 }
 
 func (x ColIndicatorCellMode) Number() protoreflect.EnumNumber {
@@ -4365,7 +4445,7 @@ func (x ColIndicatorCellMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ColIndicatorCellMode.Descriptor instead.
 func (ColIndicatorCellMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{73}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{74}
 }
 
 type CornerIndicatorSlotKind int32
@@ -4404,11 +4484,11 @@ func (x CornerIndicatorSlotKind) String() string {
 }
 
 func (CornerIndicatorSlotKind) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[74].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[75].Descriptor()
 }
 
 func (CornerIndicatorSlotKind) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[74]
+	return &file_volvoxgrid_proto_enumTypes[75]
 }
 
 func (x CornerIndicatorSlotKind) Number() protoreflect.EnumNumber {
@@ -4417,7 +4497,7 @@ func (x CornerIndicatorSlotKind) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use CornerIndicatorSlotKind.Descriptor instead.
 func (CornerIndicatorSlotKind) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{74}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{75}
 }
 
 // Bitmask values for GridEventTarget.status_flags. Combined per slot kind;
@@ -4485,11 +4565,11 @@ func (x GridEventTargetFlag) String() string {
 }
 
 func (GridEventTargetFlag) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[75].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[76].Descriptor()
 }
 
 func (GridEventTargetFlag) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[75]
+	return &file_volvoxgrid_proto_enumTypes[76]
 }
 
 func (x GridEventTargetFlag) Number() protoreflect.EnumNumber {
@@ -4498,7 +4578,7 @@ func (x GridEventTargetFlag) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use GridEventTargetFlag.Descriptor instead.
 func (GridEventTargetFlag) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{75}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{76}
 }
 
 type ComposeMethod int32
@@ -4537,11 +4617,11 @@ func (x ComposeMethod) String() string {
 }
 
 func (ComposeMethod) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[76].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[77].Descriptor()
 }
 
 func (ComposeMethod) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[76]
+	return &file_volvoxgrid_proto_enumTypes[77]
 }
 
 func (x ComposeMethod) Number() protoreflect.EnumNumber {
@@ -4550,7 +4630,7 @@ func (x ComposeMethod) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ComposeMethod.Descriptor instead.
 func (ComposeMethod) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{76}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{77}
 }
 
 // Edit UI mode. See engine/src/edit.rs EditUiMode.
@@ -4590,11 +4670,11 @@ func (x EditUiMode) String() string {
 }
 
 func (EditUiMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[77].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[78].Descriptor()
 }
 
 func (EditUiMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[77]
+	return &file_volvoxgrid_proto_enumTypes[78]
 }
 
 func (x EditUiMode) Number() protoreflect.EnumNumber {
@@ -4603,7 +4683,7 @@ func (x EditUiMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use EditUiMode.Descriptor instead.
 func (EditUiMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{77}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{78}
 }
 
 type ErrorCode int32
@@ -4657,11 +4737,11 @@ func (x ErrorCode) String() string {
 }
 
 func (ErrorCode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[78].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[79].Descriptor()
 }
 
 func (ErrorCode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[78]
+	return &file_volvoxgrid_proto_enumTypes[79]
 }
 
 func (x ErrorCode) Number() protoreflect.EnumNumber {
@@ -4670,7 +4750,7 @@ func (x ErrorCode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ErrorCode.Descriptor instead.
 func (ErrorCode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{78}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{79}
 }
 
 type DemoDataFormat int32
@@ -4703,11 +4783,11 @@ func (x DemoDataFormat) String() string {
 }
 
 func (DemoDataFormat) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[79].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[80].Descriptor()
 }
 
 func (DemoDataFormat) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[79]
+	return &file_volvoxgrid_proto_enumTypes[80]
 }
 
 func (x DemoDataFormat) Number() protoreflect.EnumNumber {
@@ -4716,7 +4796,7 @@ func (x DemoDataFormat) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use DemoDataFormat.Descriptor instead.
 func (DemoDataFormat) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{79}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{80}
 }
 
 type TerminalColorLevel int32
@@ -4755,11 +4835,11 @@ func (x TerminalColorLevel) String() string {
 }
 
 func (TerminalColorLevel) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[80].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[81].Descriptor()
 }
 
 func (TerminalColorLevel) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[80]
+	return &file_volvoxgrid_proto_enumTypes[81]
 }
 
 func (x TerminalColorLevel) Number() protoreflect.EnumNumber {
@@ -4768,7 +4848,7 @@ func (x TerminalColorLevel) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use TerminalColorLevel.Descriptor instead.
 func (TerminalColorLevel) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{80}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{81}
 }
 
 type FrameKind int32
@@ -4804,11 +4884,11 @@ func (x FrameKind) String() string {
 }
 
 func (FrameKind) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[81].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[82].Descriptor()
 }
 
 func (FrameKind) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[81]
+	return &file_volvoxgrid_proto_enumTypes[82]
 }
 
 func (x FrameKind) Number() protoreflect.EnumNumber {
@@ -4817,7 +4897,7 @@ func (x FrameKind) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use FrameKind.Descriptor instead.
 func (FrameKind) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{81}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{82}
 }
 
 // Semantic cursor hint emitted by the engine. Adapters map this to their
@@ -4885,11 +4965,11 @@ func (x CursorType) String() string {
 }
 
 func (CursorType) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[82].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[83].Descriptor()
 }
 
 func (CursorType) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[82]
+	return &file_volvoxgrid_proto_enumTypes[83]
 }
 
 func (x CursorType) Number() protoreflect.EnumNumber {
@@ -4898,7 +4978,7 @@ func (x CursorType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use CursorType.Descriptor instead.
 func (CursorType) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{82}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{83}
 }
 
 // Gesture / source that initiated an edit. The engine derives EditUiMode from
@@ -4957,11 +5037,11 @@ func (x EditStartReason) String() string {
 }
 
 func (EditStartReason) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[83].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[84].Descriptor()
 }
 
 func (EditStartReason) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[83]
+	return &file_volvoxgrid_proto_enumTypes[84]
 }
 
 func (x EditStartReason) Number() protoreflect.EnumNumber {
@@ -4970,7 +5050,7 @@ func (x EditStartReason) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use EditStartReason.Descriptor instead.
 func (EditStartReason) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{83}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{84}
 }
 
 type EditEndReason int32
@@ -5018,11 +5098,11 @@ func (x EditEndReason) String() string {
 }
 
 func (EditEndReason) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[84].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[85].Descriptor()
 }
 
 func (EditEndReason) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[84]
+	return &file_volvoxgrid_proto_enumTypes[85]
 }
 
 func (x EditEndReason) Number() protoreflect.EnumNumber {
@@ -5031,7 +5111,7 @@ func (x EditEndReason) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use EditEndReason.Descriptor instead.
 func (EditEndReason) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{84}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{85}
 }
 
 type EditorUpdateReason int32
@@ -5079,11 +5159,11 @@ func (x EditorUpdateReason) String() string {
 }
 
 func (EditorUpdateReason) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[85].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[86].Descriptor()
 }
 
 func (EditorUpdateReason) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[85]
+	return &file_volvoxgrid_proto_enumTypes[86]
 }
 
 func (x EditorUpdateReason) Number() protoreflect.EnumNumber {
@@ -5092,7 +5172,7 @@ func (x EditorUpdateReason) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use EditorUpdateReason.Descriptor instead.
 func (EditorUpdateReason) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{85}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{86}
 }
 
 type ArchiveRequest_Action int32
@@ -5134,11 +5214,11 @@ func (x ArchiveRequest_Action) String() string {
 }
 
 func (ArchiveRequest_Action) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[86].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[87].Descriptor()
 }
 
 func (ArchiveRequest_Action) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[86]
+	return &file_volvoxgrid_proto_enumTypes[87]
 }
 
 func (x ArchiveRequest_Action) Number() protoreflect.EnumNumber {
@@ -5186,11 +5266,11 @@ func (x PointerEvent_Type) String() string {
 }
 
 func (PointerEvent_Type) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[87].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[88].Descriptor()
 }
 
 func (PointerEvent_Type) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[87]
+	return &file_volvoxgrid_proto_enumTypes[88]
 }
 
 func (x PointerEvent_Type) Number() protoreflect.EnumNumber {
@@ -5238,11 +5318,11 @@ func (x ZoomEvent_Phase) String() string {
 }
 
 func (ZoomEvent_Phase) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[88].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[89].Descriptor()
 }
 
 func (ZoomEvent_Phase) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[88]
+	return &file_volvoxgrid_proto_enumTypes[89]
 }
 
 func (x ZoomEvent_Phase) Number() protoreflect.EnumNumber {
@@ -5290,11 +5370,11 @@ func (x KeyEvent_Type) String() string {
 }
 
 func (KeyEvent_Type) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[89].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[90].Descriptor()
 }
 
 func (KeyEvent_Type) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[89]
+	return &file_volvoxgrid_proto_enumTypes[90]
 }
 
 func (x KeyEvent_Type) Number() protoreflect.EnumNumber {
@@ -5336,11 +5416,11 @@ func (x TerminalCommand_Kind) String() string {
 }
 
 func (TerminalCommand_Kind) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[90].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[91].Descriptor()
 }
 
 func (TerminalCommand_Kind) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[90]
+	return &file_volvoxgrid_proto_enumTypes[91]
 }
 
 func (x TerminalCommand_Kind) Number() protoreflect.EnumNumber {
@@ -9408,18 +9488,22 @@ func (x *HeaderFeatures) GetChooser() bool {
 }
 
 type GridConfig struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Layout        *LayoutConfig          `protobuf:"bytes,1,opt,name=layout,proto3" json:"layout,omitempty"`
-	Style         *StyleConfig           `protobuf:"bytes,2,opt,name=style,proto3" json:"style,omitempty"`
-	Selection     *SelectionConfig       `protobuf:"bytes,3,opt,name=selection,proto3" json:"selection,omitempty"`
-	Editing       *EditConfig            `protobuf:"bytes,4,opt,name=editing,proto3" json:"editing,omitempty"`
-	Scrolling     *ScrollConfig          `protobuf:"bytes,5,opt,name=scrolling,proto3" json:"scrolling,omitempty"`
-	Outline       *OutlineConfig         `protobuf:"bytes,6,opt,name=outline,proto3" json:"outline,omitempty"`
-	Span          *SpanConfig            `protobuf:"bytes,7,opt,name=span,proto3" json:"span,omitempty"`
-	Interaction   *InteractionConfig     `protobuf:"bytes,8,opt,name=interaction,proto3" json:"interaction,omitempty"`
-	Rendering     *RenderConfig          `protobuf:"bytes,9,opt,name=rendering,proto3" json:"rendering,omitempty"`
-	Version       string                 `protobuf:"bytes,10,opt,name=version,proto3" json:"version,omitempty"`
-	Indicators    *IndicatorsConfig      `protobuf:"bytes,11,opt,name=indicators,proto3" json:"indicators,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Layout      *LayoutConfig          `protobuf:"bytes,1,opt,name=layout,proto3" json:"layout,omitempty"`
+	Style       *StyleConfig           `protobuf:"bytes,2,opt,name=style,proto3" json:"style,omitempty"`
+	Selection   *SelectionConfig       `protobuf:"bytes,3,opt,name=selection,proto3" json:"selection,omitempty"`
+	Editing     *EditConfig            `protobuf:"bytes,4,opt,name=editing,proto3" json:"editing,omitempty"`
+	Scrolling   *ScrollConfig          `protobuf:"bytes,5,opt,name=scrolling,proto3" json:"scrolling,omitempty"`
+	Outline     *OutlineConfig         `protobuf:"bytes,6,opt,name=outline,proto3" json:"outline,omitempty"`
+	Span        *SpanConfig            `protobuf:"bytes,7,opt,name=span,proto3" json:"span,omitempty"`
+	Interaction *InteractionConfig     `protobuf:"bytes,8,opt,name=interaction,proto3" json:"interaction,omitempty"`
+	Rendering   *RenderConfig          `protobuf:"bytes,9,opt,name=rendering,proto3" json:"rendering,omitempty"`
+	Version     string                 `protobuf:"bytes,10,opt,name=version,proto3" json:"version,omitempty"`
+	Indicators  *IndicatorsConfig      `protobuf:"bytes,11,opt,name=indicators,proto3" json:"indicators,omitempty"`
+	// Apply a built-in visual theme before the other fields in this Configure()
+	// call. See ThemePreset for resolution rules. Not stored — GetConfig()
+	// returns the resolved style/selection/scrolling/indicators.
+	ThemePreset   *ThemePreset `protobuf:"varint,12,opt,name=theme_preset,json=themePreset,proto3,enum=volvoxgrid.v1.ThemePreset,oneof" json:"theme_preset,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -9529,6 +9613,13 @@ func (x *GridConfig) GetIndicators() *IndicatorsConfig {
 		return x.Indicators
 	}
 	return nil
+}
+
+func (x *GridConfig) GetThemePreset() ThemePreset {
+	if x != nil && x.ThemePreset != nil {
+		return *x.ThemePreset
+	}
+	return ThemePreset_THEME_NONE
 }
 
 // ── Layout ──
@@ -26914,7 +27005,7 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\n" +
 	"\b_reorderB\n" +
 	"\n" +
-	"\b_chooser\"\xe2\x04\n" +
+	"\b_chooser\"\xb7\x05\n" +
 	"\n" +
 	"GridConfig\x123\n" +
 	"\x06layout\x18\x01 \x01(\v2\x1b.volvoxgrid.v1.LayoutConfigR\x06layout\x120\n" +
@@ -26930,7 +27021,9 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	" \x01(\tR\aversion\x12?\n" +
 	"\n" +
 	"indicators\x18\v \x01(\v2\x1f.volvoxgrid.v1.IndicatorsConfigR\n" +
-	"indicators\"\xb1\x04\n" +
+	"indicators\x12B\n" +
+	"\ftheme_preset\x18\f \x01(\x0e2\x1a.volvoxgrid.v1.ThemePresetH\x00R\vthemePreset\x88\x01\x01B\x0f\n" +
+	"\r_theme_preset\"\xb1\x04\n" +
 	"\fLayoutConfig\x12\x17\n" +
 	"\x04rows\x18\x01 \x01(\x05H\x00R\x04rows\x88\x01\x01\x12\x17\n" +
 	"\x04cols\x18\x02 \x01(\x05H\x01R\x04cols\x88\x01\x01\x12\"\n" +
@@ -28583,7 +28676,17 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\x10BorderAppearance\x12\x1a\n" +
 	"\x16BORDER_APPEARANCE_FLAT\x10\x00\x12\x1c\n" +
 	"\x18BORDER_APPEARANCE_RAISED\x10\x01\x12\x1c\n" +
-	"\x18BORDER_APPEARANCE_SUBTLE\x10\x02*\x90\x01\n" +
+	"\x18BORDER_APPEARANCE_SUBTLE\x10\x02*\x8e\x01\n" +
+	"\vThemePreset\x12\x0e\n" +
+	"\n" +
+	"THEME_NONE\x10\x00\x12\x11\n" +
+	"\rTHEME_CLASSIC\x10\x01\x12\x0f\n" +
+	"\vTHEME_LIGHT\x10\x02\x12\x0e\n" +
+	"\n" +
+	"THEME_DARK\x10\x03\x12\x17\n" +
+	"\x13THEME_HIGH_CONTRAST\x10\x04\x12\x11\n" +
+	"\rTHEME_MONOKAI\x10\x05\x12\x0f\n" +
+	"\vTHEME_AMBER\x10\x06*\x90\x01\n" +
 	"\n" +
 	"TextEffect\x12\x14\n" +
 	"\x10TEXT_EFFECT_NONE\x10\x00\x12\x16\n" +
@@ -29211,898 +29314,900 @@ func file_volvoxgrid_proto_rawDescGZIP() []byte {
 	return file_volvoxgrid_proto_rawDescData
 }
 
-var file_volvoxgrid_proto_enumTypes = make([]protoimpl.EnumInfo, 91)
+var file_volvoxgrid_proto_enumTypes = make([]protoimpl.EnumInfo, 92)
 var file_volvoxgrid_proto_msgTypes = make([]protoimpl.MessageInfo, 284)
 var file_volvoxgrid_proto_goTypes = []any{
 	(BorderStyle)(0),                    // 0: volvoxgrid.v1.BorderStyle
 	(GridLineStyle)(0),                  // 1: volvoxgrid.v1.GridLineStyle
 	(GridLineDirection)(0),              // 2: volvoxgrid.v1.GridLineDirection
 	(BorderAppearance)(0),               // 3: volvoxgrid.v1.BorderAppearance
-	(TextEffect)(0),                     // 4: volvoxgrid.v1.TextEffect
-	(TextRenderMode)(0),                 // 5: volvoxgrid.v1.TextRenderMode
-	(TextHintingMode)(0),                // 6: volvoxgrid.v1.TextHintingMode
-	(TextBaseline)(0),                   // 7: volvoxgrid.v1.TextBaseline
-	(Align)(0),                          // 8: volvoxgrid.v1.Align
-	(ImageAlignment)(0),                 // 9: volvoxgrid.v1.ImageAlignment
-	(BarcodeSymbology)(0),               // 10: volvoxgrid.v1.BarcodeSymbology
-	(BarcodeCaptionPosition)(0),         // 11: volvoxgrid.v1.BarcodeCaptionPosition
-	(BarcodeCheckDigitMode)(0),          // 12: volvoxgrid.v1.BarcodeCheckDigitMode
-	(BarcodeTextEncoding)(0),            // 13: volvoxgrid.v1.BarcodeTextEncoding
-	(BarcodeQrErrorCorrection)(0),       // 14: volvoxgrid.v1.BarcodeQrErrorCorrection
-	(BarcodeRenderStatus)(0),            // 15: volvoxgrid.v1.BarcodeRenderStatus
-	(CheckedState)(0),                   // 16: volvoxgrid.v1.CheckedState
-	(FillHandlePosition)(0),             // 17: volvoxgrid.v1.FillHandlePosition
-	(ColumnDataType)(0),                 // 18: volvoxgrid.v1.ColumnDataType
-	(CoercionMode)(0),                   // 19: volvoxgrid.v1.CoercionMode
-	(WriteErrorMode)(0),                 // 20: volvoxgrid.v1.WriteErrorMode
-	(CellInteraction)(0),                // 21: volvoxgrid.v1.CellInteraction
-	(HeaderPolicy)(0),                   // 22: volvoxgrid.v1.HeaderPolicy
-	(TypePolicy)(0),                     // 23: volvoxgrid.v1.TypePolicy
-	(LoadDataStatus)(0),                 // 24: volvoxgrid.v1.LoadDataStatus
-	(SelectionMode)(0),                  // 25: volvoxgrid.v1.SelectionMode
-	(FocusBorderStyle)(0),               // 26: volvoxgrid.v1.FocusBorderStyle
-	(SelectionVisibility)(0),            // 27: volvoxgrid.v1.SelectionVisibility
-	(EditTrigger)(0),                    // 28: volvoxgrid.v1.EditTrigger
-	(DropdownItemLayout)(0),             // 29: volvoxgrid.v1.DropdownItemLayout
-	(TabBehavior)(0),                    // 30: volvoxgrid.v1.TabBehavior
-	(EditorKind)(0),                     // 31: volvoxgrid.v1.EditorKind
-	(EditorOwner)(0),                    // 32: volvoxgrid.v1.EditorOwner
-	(EditorPresentation)(0),             // 33: volvoxgrid.v1.EditorPresentation
-	(ValidationMode)(0),                 // 34: volvoxgrid.v1.ValidationMode
-	(ValidationTrigger)(0),              // 35: volvoxgrid.v1.ValidationTrigger
-	(InputType)(0),                      // 36: volvoxgrid.v1.InputType
-	(ButtonRole)(0),                     // 37: volvoxgrid.v1.ButtonRole
-	(SortOrder)(0),                      // 38: volvoxgrid.v1.SortOrder
-	(SortType)(0),                       // 39: volvoxgrid.v1.SortType
-	(TreeIndicatorStyle)(0),             // 40: volvoxgrid.v1.TreeIndicatorStyle
-	(GroupTotalPosition)(0),             // 41: volvoxgrid.v1.GroupTotalPosition
-	(AggregateType)(0),                  // 42: volvoxgrid.v1.AggregateType
-	(CellSpanMode)(0),                   // 43: volvoxgrid.v1.CellSpanMode
-	(SpanCompareMode)(0),                // 44: volvoxgrid.v1.SpanCompareMode
-	(ScrollBarsMode)(0),                 // 45: volvoxgrid.v1.ScrollBarsMode
-	(ScrollBarMode)(0),                  // 46: volvoxgrid.v1.ScrollBarMode
-	(ScrollBarAppearance)(0),            // 47: volvoxgrid.v1.ScrollBarAppearance
-	(IndicatorAppearance)(0),            // 48: volvoxgrid.v1.IndicatorAppearance
-	(PinPosition)(0),                    // 49: volvoxgrid.v1.PinPosition
-	(StickyEdge)(0),                     // 50: volvoxgrid.v1.StickyEdge
-	(TypeAheadMode)(0),                  // 51: volvoxgrid.v1.TypeAheadMode
-	(AutoSizeMode)(0),                   // 52: volvoxgrid.v1.AutoSizeMode
-	(DragMode)(0),                       // 53: volvoxgrid.v1.DragMode
-	(DropMode)(0),                       // 54: volvoxgrid.v1.DropMode
-	(CustomRenderMode)(0),               // 55: volvoxgrid.v1.CustomRenderMode
-	(ApplyScope)(0),                     // 56: volvoxgrid.v1.ApplyScope
-	(RendererMode)(0),                   // 57: volvoxgrid.v1.RendererMode
-	(PresentMode)(0),                    // 58: volvoxgrid.v1.PresentMode
-	(FramePacingMode)(0),                // 59: volvoxgrid.v1.FramePacingMode
-	(ClearScope)(0),                     // 60: volvoxgrid.v1.ClearScope
-	(ClearRegion)(0),                    // 61: volvoxgrid.v1.ClearRegion
-	(ExportFormat)(0),                   // 62: volvoxgrid.v1.ExportFormat
-	(ExportScope)(0),                    // 63: volvoxgrid.v1.ExportScope
-	(PrintOrientation)(0),               // 64: volvoxgrid.v1.PrintOrientation
-	(NodeRelation)(0),                   // 65: volvoxgrid.v1.NodeRelation
-	(IconAlign)(0),                      // 66: volvoxgrid.v1.IconAlign
-	(CellHitArea)(0),                    // 67: volvoxgrid.v1.CellHitArea
-	(PullToRefreshTheme)(0),             // 68: volvoxgrid.v1.PullToRefreshTheme
-	(RenderLayerBit)(0),                 // 69: volvoxgrid.v1.RenderLayerBit
-	(GridTargetKind)(0),                 // 70: volvoxgrid.v1.GridTargetKind
-	(IndicatorBand)(0),                  // 71: volvoxgrid.v1.IndicatorBand
-	(RowIndicatorSlotKind)(0),           // 72: volvoxgrid.v1.RowIndicatorSlotKind
-	(ColIndicatorCellMode)(0),           // 73: volvoxgrid.v1.ColIndicatorCellMode
-	(CornerIndicatorSlotKind)(0),        // 74: volvoxgrid.v1.CornerIndicatorSlotKind
-	(GridEventTargetFlag)(0),            // 75: volvoxgrid.v1.GridEventTargetFlag
-	(ComposeMethod)(0),                  // 76: volvoxgrid.v1.ComposeMethod
-	(EditUiMode)(0),                     // 77: volvoxgrid.v1.EditUiMode
-	(ErrorCode)(0),                      // 78: volvoxgrid.v1.ErrorCode
-	(DemoDataFormat)(0),                 // 79: volvoxgrid.v1.DemoDataFormat
-	(TerminalColorLevel)(0),             // 80: volvoxgrid.v1.TerminalColorLevel
-	(FrameKind)(0),                      // 81: volvoxgrid.v1.FrameKind
-	(CursorType)(0),                     // 82: volvoxgrid.v1.CursorType
-	(EditStartReason)(0),                // 83: volvoxgrid.v1.EditStartReason
-	(EditEndReason)(0),                  // 84: volvoxgrid.v1.EditEndReason
-	(EditorUpdateReason)(0),             // 85: volvoxgrid.v1.EditorUpdateReason
-	(ArchiveRequest_Action)(0),          // 86: volvoxgrid.v1.ArchiveRequest.Action
-	(PointerEvent_Type)(0),              // 87: volvoxgrid.v1.PointerEvent.Type
-	(ZoomEvent_Phase)(0),                // 88: volvoxgrid.v1.ZoomEvent.Phase
-	(KeyEvent_Type)(0),                  // 89: volvoxgrid.v1.KeyEvent.Type
-	(TerminalCommand_Kind)(0),           // 90: volvoxgrid.v1.TerminalCommand.Kind
-	(*Font)(nil),                        // 91: volvoxgrid.v1.Font
-	(*Padding)(nil),                     // 92: volvoxgrid.v1.Padding
-	(*Border)(nil),                      // 93: volvoxgrid.v1.Border
-	(*Borders)(nil),                     // 94: volvoxgrid.v1.Borders
-	(*GridLines)(nil),                   // 95: volvoxgrid.v1.GridLines
-	(*Separator)(nil),                   // 96: volvoxgrid.v1.Separator
-	(*TextRendering)(nil),               // 97: volvoxgrid.v1.TextRendering
-	(*ImageData)(nil),                   // 98: volvoxgrid.v1.ImageData
-	(*BarcodeEncodingOptions)(nil),      // 99: volvoxgrid.v1.BarcodeEncodingOptions
-	(*BarcodeRenderOptions)(nil),        // 100: volvoxgrid.v1.BarcodeRenderOptions
-	(*BarcodeCaptionOptions)(nil),       // 101: volvoxgrid.v1.BarcodeCaptionOptions
-	(*BarcodeData)(nil),                 // 102: volvoxgrid.v1.BarcodeData
-	(*CellRange)(nil),                   // 103: volvoxgrid.v1.CellRange
-	(*Rect)(nil),                        // 104: volvoxgrid.v1.Rect
-	(*CellValue)(nil),                   // 105: volvoxgrid.v1.CellValue
-	(*StructValue)(nil),                 // 106: volvoxgrid.v1.StructValue
-	(*StructField)(nil),                 // 107: volvoxgrid.v1.StructField
-	(*ScalarValue)(nil),                 // 108: volvoxgrid.v1.ScalarValue
-	(*RichText)(nil),                    // 109: volvoxgrid.v1.RichText
-	(*TextFormatRun)(nil),               // 110: volvoxgrid.v1.TextFormatRun
-	(*TextRunStyle)(nil),                // 111: volvoxgrid.v1.TextRunStyle
-	(*EditorSpec)(nil),                  // 112: volvoxgrid.v1.EditorSpec
-	(*TextEditorParams)(nil),            // 113: volvoxgrid.v1.TextEditorParams
-	(*NumberEditorParams)(nil),          // 114: volvoxgrid.v1.NumberEditorParams
-	(*CheckboxEditorParams)(nil),        // 115: volvoxgrid.v1.CheckboxEditorParams
-	(*DateTimeEditorParams)(nil),        // 116: volvoxgrid.v1.DateTimeEditorParams
-	(*EditorAction)(nil),                // 117: volvoxgrid.v1.EditorAction
-	(*ListEditorParams)(nil),            // 118: volvoxgrid.v1.ListEditorParams
-	(*ListItem)(nil),                    // 119: volvoxgrid.v1.ListItem
-	(*ListDataSource)(nil),              // 120: volvoxgrid.v1.ListDataSource
-	(*EditorValue)(nil),                 // 121: volvoxgrid.v1.EditorValue
-	(*TextSelection)(nil),               // 122: volvoxgrid.v1.TextSelection
-	(*ValidationError)(nil),             // 123: volvoxgrid.v1.ValidationError
-	(*EditActivation)(nil),              // 124: volvoxgrid.v1.EditActivation
-	(*ScrollBarColors)(nil),             // 125: volvoxgrid.v1.ScrollBarColors
-	(*ScrollBarConfig)(nil),             // 126: volvoxgrid.v1.ScrollBarConfig
-	(*RegionStyle)(nil),                 // 127: volvoxgrid.v1.RegionStyle
-	(*CellStyle)(nil),                   // 128: volvoxgrid.v1.CellStyle
-	(*HighlightStyle)(nil),              // 129: volvoxgrid.v1.HighlightStyle
-	(*HeaderMarkSize)(nil),              // 130: volvoxgrid.v1.HeaderMarkSize
-	(*HeaderSeparator)(nil),             // 131: volvoxgrid.v1.HeaderSeparator
-	(*HeaderResizeHandle)(nil),          // 132: volvoxgrid.v1.HeaderResizeHandle
-	(*HeaderStyle)(nil),                 // 133: volvoxgrid.v1.HeaderStyle
-	(*IconSlots)(nil),                   // 134: volvoxgrid.v1.IconSlots
-	(*IconStyle)(nil),                   // 135: volvoxgrid.v1.IconStyle
-	(*IconSlotStyles)(nil),              // 136: volvoxgrid.v1.IconSlotStyles
-	(*IconPictures)(nil),                // 137: volvoxgrid.v1.IconPictures
-	(*IconTheme)(nil),                   // 138: volvoxgrid.v1.IconTheme
-	(*HoverConfig)(nil),                 // 139: volvoxgrid.v1.HoverConfig
-	(*ResizePolicy)(nil),                // 140: volvoxgrid.v1.ResizePolicy
-	(*FreezePolicy)(nil),                // 141: volvoxgrid.v1.FreezePolicy
-	(*HeaderFeatures)(nil),              // 142: volvoxgrid.v1.HeaderFeatures
-	(*GridConfig)(nil),                  // 143: volvoxgrid.v1.GridConfig
-	(*LayoutConfig)(nil),                // 144: volvoxgrid.v1.LayoutConfig
-	(*StyleConfig)(nil),                 // 145: volvoxgrid.v1.StyleConfig
-	(*SelectionConfig)(nil),             // 146: volvoxgrid.v1.SelectionConfig
-	(*EditConfig)(nil),                  // 147: volvoxgrid.v1.EditConfig
-	(*PullToRefreshConfig)(nil),         // 148: volvoxgrid.v1.PullToRefreshConfig
-	(*ScrollConfig)(nil),                // 149: volvoxgrid.v1.ScrollConfig
-	(*OutlineConfig)(nil),               // 150: volvoxgrid.v1.OutlineConfig
-	(*SpanConfig)(nil),                  // 151: volvoxgrid.v1.SpanConfig
-	(*InteractionConfig)(nil),           // 152: volvoxgrid.v1.InteractionConfig
-	(*RenderConfig)(nil),                // 153: volvoxgrid.v1.RenderConfig
-	(*ColIndicatorCellModes)(nil),       // 154: volvoxgrid.v1.ColIndicatorCellModes
-	(*RowIndicatorSlot)(nil),            // 155: volvoxgrid.v1.RowIndicatorSlot
-	(*RowIndicatorConfig)(nil),          // 156: volvoxgrid.v1.RowIndicatorConfig
-	(*ColIndicatorRowDef)(nil),          // 157: volvoxgrid.v1.ColIndicatorRowDef
-	(*ColIndicatorCell)(nil),            // 158: volvoxgrid.v1.ColIndicatorCell
-	(*ColIndicatorConfig)(nil),          // 159: volvoxgrid.v1.ColIndicatorConfig
-	(*CornerIndicatorSlot)(nil),         // 160: volvoxgrid.v1.CornerIndicatorSlot
-	(*CornerIndicatorConfig)(nil),       // 161: volvoxgrid.v1.CornerIndicatorConfig
-	(*IndicatorColors)(nil),             // 162: volvoxgrid.v1.IndicatorColors
-	(*GridEventTarget)(nil),             // 163: volvoxgrid.v1.GridEventTarget
-	(*IndicatorFocusConfig)(nil),        // 164: volvoxgrid.v1.IndicatorFocusConfig
-	(*IndicatorsConfig)(nil),            // 165: volvoxgrid.v1.IndicatorsConfig
-	(*ColumnDef)(nil),                   // 166: volvoxgrid.v1.ColumnDef
-	(*DefineColumnsRequest)(nil),        // 167: volvoxgrid.v1.DefineColumnsRequest
-	(*SchemaResponse)(nil),              // 168: volvoxgrid.v1.SchemaResponse
-	(*RowDef)(nil),                      // 169: volvoxgrid.v1.RowDef
-	(*RowStatus)(nil),                   // 170: volvoxgrid.v1.RowStatus
-	(*DefineRowsRequest)(nil),           // 171: volvoxgrid.v1.DefineRowsRequest
-	(*CellUpdate)(nil),                  // 172: volvoxgrid.v1.CellUpdate
-	(*UpdateCellsRequest)(nil),          // 173: volvoxgrid.v1.UpdateCellsRequest
-	(*GetCellsRequest)(nil),             // 174: volvoxgrid.v1.GetCellsRequest
-	(*CellData)(nil),                    // 175: volvoxgrid.v1.CellData
-	(*CellsResponse)(nil),               // 176: volvoxgrid.v1.CellsResponse
-	(*TypeViolation)(nil),               // 177: volvoxgrid.v1.TypeViolation
-	(*WriteResult)(nil),                 // 178: volvoxgrid.v1.WriteResult
-	(*LoadTableRequest)(nil),            // 179: volvoxgrid.v1.LoadTableRequest
-	(*FieldMapping)(nil),                // 180: volvoxgrid.v1.FieldMapping
-	(*CsvOptions)(nil),                  // 181: volvoxgrid.v1.CsvOptions
-	(*JsonOptions)(nil),                 // 182: volvoxgrid.v1.JsonOptions
-	(*LoadDataOptions)(nil),             // 183: volvoxgrid.v1.LoadDataOptions
-	(*LoadDataRequest)(nil),             // 184: volvoxgrid.v1.LoadDataRequest
-	(*AppendDataRequest)(nil),           // 185: volvoxgrid.v1.AppendDataRequest
-	(*LoadDataResult)(nil),              // 186: volvoxgrid.v1.LoadDataResult
-	(*ClearRequest)(nil),                // 187: volvoxgrid.v1.ClearRequest
-	(*InsertRowsRequest)(nil),           // 188: volvoxgrid.v1.InsertRowsRequest
-	(*RemoveRowsRequest)(nil),           // 189: volvoxgrid.v1.RemoveRowsRequest
-	(*MoveColumnRequest)(nil),           // 190: volvoxgrid.v1.MoveColumnRequest
-	(*MoveRowRequest)(nil),              // 191: volvoxgrid.v1.MoveRowRequest
-	(*SelectRequest)(nil),               // 192: volvoxgrid.v1.SelectRequest
-	(*SelectionState)(nil),              // 193: volvoxgrid.v1.SelectionState
-	(*HighlightRegion)(nil),             // 194: volvoxgrid.v1.HighlightRegion
-	(*EditSetHighlights)(nil),           // 195: volvoxgrid.v1.EditSetHighlights
-	(*EditCommand)(nil),                 // 196: volvoxgrid.v1.EditCommand
-	(*EditStart)(nil),                   // 197: volvoxgrid.v1.EditStart
-	(*EditGetState)(nil),                // 198: volvoxgrid.v1.EditGetState
-	(*EditorSessionCommand)(nil),        // 199: volvoxgrid.v1.EditorSessionCommand
-	(*EditorValueChanged)(nil),          // 200: volvoxgrid.v1.EditorValueChanged
-	(*TextSelectionChanged)(nil),        // 201: volvoxgrid.v1.TextSelectionChanged
-	(*EditorPreeditChanged)(nil),        // 202: volvoxgrid.v1.EditorPreeditChanged
-	(*EditCommit)(nil),                  // 203: volvoxgrid.v1.EditCommit
-	(*EditCancel)(nil),                  // 204: volvoxgrid.v1.EditCancel
-	(*CustomEditorAction)(nil),          // 205: volvoxgrid.v1.CustomEditorAction
-	(*EditorSession)(nil),               // 206: volvoxgrid.v1.EditorSession
-	(*EditorCapabilities)(nil),          // 207: volvoxgrid.v1.EditorCapabilities
-	(*EditState)(nil),                   // 208: volvoxgrid.v1.EditState
-	(*SortColumn)(nil),                  // 209: volvoxgrid.v1.SortColumn
-	(*SortRequest)(nil),                 // 210: volvoxgrid.v1.SortRequest
-	(*SubtotalRequest)(nil),             // 211: volvoxgrid.v1.SubtotalRequest
-	(*SubtotalResult)(nil),              // 212: volvoxgrid.v1.SubtotalResult
-	(*AutoSizeRequest)(nil),             // 213: volvoxgrid.v1.AutoSizeRequest
-	(*OutlineRequest)(nil),              // 214: volvoxgrid.v1.OutlineRequest
-	(*GetNodeRequest)(nil),              // 215: volvoxgrid.v1.GetNodeRequest
-	(*NodeInfo)(nil),                    // 216: volvoxgrid.v1.NodeInfo
-	(*FindRequest)(nil),                 // 217: volvoxgrid.v1.FindRequest
-	(*TextQuery)(nil),                   // 218: volvoxgrid.v1.TextQuery
-	(*RegexQuery)(nil),                  // 219: volvoxgrid.v1.RegexQuery
-	(*FindResponse)(nil),                // 220: volvoxgrid.v1.FindResponse
-	(*AggregateRequest)(nil),            // 221: volvoxgrid.v1.AggregateRequest
-	(*AggregateResponse)(nil),           // 222: volvoxgrid.v1.AggregateResponse
-	(*GetMergedRangeRequest)(nil),       // 223: volvoxgrid.v1.GetMergedRangeRequest
-	(*MergeCellsRequest)(nil),           // 224: volvoxgrid.v1.MergeCellsRequest
-	(*UnmergeCellsRequest)(nil),         // 225: volvoxgrid.v1.UnmergeCellsRequest
-	(*MergedRegionsResponse)(nil),       // 226: volvoxgrid.v1.MergedRegionsResponse
-	(*MemoryUsageResponse)(nil),         // 227: volvoxgrid.v1.MemoryUsageResponse
-	(*ClipboardCommand)(nil),            // 228: volvoxgrid.v1.ClipboardCommand
-	(*ClipboardCopy)(nil),               // 229: volvoxgrid.v1.ClipboardCopy
-	(*ClipboardCut)(nil),                // 230: volvoxgrid.v1.ClipboardCut
-	(*ClipboardPaste)(nil),              // 231: volvoxgrid.v1.ClipboardPaste
-	(*ClipboardDelete)(nil),             // 232: volvoxgrid.v1.ClipboardDelete
-	(*ClipboardResponse)(nil),           // 233: volvoxgrid.v1.ClipboardResponse
-	(*ExportRequest)(nil),               // 234: volvoxgrid.v1.ExportRequest
-	(*ExportResponse)(nil),              // 235: volvoxgrid.v1.ExportResponse
-	(*PrintRequest)(nil),                // 236: volvoxgrid.v1.PrintRequest
-	(*PrintResponse)(nil),               // 237: volvoxgrid.v1.PrintResponse
-	(*PrintPage)(nil),                   // 238: volvoxgrid.v1.PrintPage
-	(*ArchiveRequest)(nil),              // 239: volvoxgrid.v1.ArchiveRequest
-	(*ArchiveResponse)(nil),             // 240: volvoxgrid.v1.ArchiveResponse
-	(*CreateRequest)(nil),               // 241: volvoxgrid.v1.CreateRequest
-	(*CreateResponse)(nil),              // 242: volvoxgrid.v1.CreateResponse
-	(*DestroyRequest)(nil),              // 243: volvoxgrid.v1.DestroyRequest
-	(*GetConfigRequest)(nil),            // 244: volvoxgrid.v1.GetConfigRequest
-	(*GetSchemaRequest)(nil),            // 245: volvoxgrid.v1.GetSchemaRequest
-	(*GetSelectionRequest)(nil),         // 246: volvoxgrid.v1.GetSelectionRequest
-	(*GetMergedRegionsRequest)(nil),     // 247: volvoxgrid.v1.GetMergedRegionsRequest
-	(*GetMemoryUsageRequest)(nil),       // 248: volvoxgrid.v1.GetMemoryUsageRequest
-	(*RefreshRequest)(nil),              // 249: volvoxgrid.v1.RefreshRequest
-	(*EventStreamRequest)(nil),          // 250: volvoxgrid.v1.EventStreamRequest
-	(*ResizeViewportRequest)(nil),       // 251: volvoxgrid.v1.ResizeViewportRequest
-	(*ShowCellRequest)(nil),             // 252: volvoxgrid.v1.ShowCellRequest
-	(*SetRowRequest)(nil),               // 253: volvoxgrid.v1.SetRowRequest
-	(*SetColRequest)(nil),               // 254: volvoxgrid.v1.SetColRequest
-	(*SetRedrawRequest)(nil),            // 255: volvoxgrid.v1.SetRedrawRequest
-	(*ConfigureRequest)(nil),            // 256: volvoxgrid.v1.ConfigureRequest
-	(*LoadFontDataRequest)(nil),         // 257: volvoxgrid.v1.LoadFontDataRequest
-	(*LoadDemoRequest)(nil),             // 258: volvoxgrid.v1.LoadDemoRequest
-	(*GetDemoDataRequest)(nil),          // 259: volvoxgrid.v1.GetDemoDataRequest
-	(*GetDemoDataResponse)(nil),         // 260: volvoxgrid.v1.GetDemoDataResponse
-	(*DestroyResponse)(nil),             // 261: volvoxgrid.v1.DestroyResponse
-	(*ConfigureResponse)(nil),           // 262: volvoxgrid.v1.ConfigureResponse
-	(*LoadFontDataResponse)(nil),        // 263: volvoxgrid.v1.LoadFontDataResponse
-	(*DefineColumnsResponse)(nil),       // 264: volvoxgrid.v1.DefineColumnsResponse
-	(*DefineRowsResponse)(nil),          // 265: volvoxgrid.v1.DefineRowsResponse
-	(*InsertRowsResponse)(nil),          // 266: volvoxgrid.v1.InsertRowsResponse
-	(*RemoveRowsResponse)(nil),          // 267: volvoxgrid.v1.RemoveRowsResponse
-	(*MoveColumnResponse)(nil),          // 268: volvoxgrid.v1.MoveColumnResponse
-	(*MoveRowResponse)(nil),             // 269: volvoxgrid.v1.MoveRowResponse
-	(*ClearResponse)(nil),               // 270: volvoxgrid.v1.ClearResponse
-	(*SelectResponse)(nil),              // 271: volvoxgrid.v1.SelectResponse
-	(*ShowCellResponse)(nil),            // 272: volvoxgrid.v1.ShowCellResponse
-	(*SetTopRowResponse)(nil),           // 273: volvoxgrid.v1.SetTopRowResponse
-	(*SetLeftColResponse)(nil),          // 274: volvoxgrid.v1.SetLeftColResponse
-	(*SortResponse)(nil),                // 275: volvoxgrid.v1.SortResponse
-	(*AutoSizeResponse)(nil),            // 276: volvoxgrid.v1.AutoSizeResponse
-	(*OutlineResponse)(nil),             // 277: volvoxgrid.v1.OutlineResponse
-	(*MergeCellsResponse)(nil),          // 278: volvoxgrid.v1.MergeCellsResponse
-	(*UnmergeCellsResponse)(nil),        // 279: volvoxgrid.v1.UnmergeCellsResponse
-	(*ResizeViewportResponse)(nil),      // 280: volvoxgrid.v1.ResizeViewportResponse
-	(*SetRedrawResponse)(nil),           // 281: volvoxgrid.v1.SetRedrawResponse
-	(*RefreshResponse)(nil),             // 282: volvoxgrid.v1.RefreshResponse
-	(*LoadDemoResponse)(nil),            // 283: volvoxgrid.v1.LoadDemoResponse
-	(*RenderInput)(nil),                 // 284: volvoxgrid.v1.RenderInput
-	(*CompareResponse)(nil),             // 285: volvoxgrid.v1.CompareResponse
-	(*EditValidationResponse)(nil),      // 286: volvoxgrid.v1.EditValidationResponse
-	(*EditorListItemsResponse)(nil),     // 287: volvoxgrid.v1.EditorListItemsResponse
-	(*ViewportState)(nil),               // 288: volvoxgrid.v1.ViewportState
-	(*PointerEvent)(nil),                // 289: volvoxgrid.v1.PointerEvent
-	(*ScrollEvent)(nil),                 // 290: volvoxgrid.v1.ScrollEvent
-	(*ZoomEvent)(nil),                   // 291: volvoxgrid.v1.ZoomEvent
-	(*KeyEvent)(nil),                    // 292: volvoxgrid.v1.KeyEvent
-	(*BufferReady)(nil),                 // 293: volvoxgrid.v1.BufferReady
-	(*TerminalInputBytes)(nil),          // 294: volvoxgrid.v1.TerminalInputBytes
-	(*TerminalCapabilities)(nil),        // 295: volvoxgrid.v1.TerminalCapabilities
-	(*TerminalViewport)(nil),            // 296: volvoxgrid.v1.TerminalViewport
-	(*TerminalCommand)(nil),             // 297: volvoxgrid.v1.TerminalCommand
-	(*GpuSurfaceReady)(nil),             // 298: volvoxgrid.v1.GpuSurfaceReady
-	(*EventDecision)(nil),               // 299: volvoxgrid.v1.EventDecision
-	(*RenderOutput)(nil),                // 300: volvoxgrid.v1.RenderOutput
-	(*FrameDone)(nil),                   // 301: volvoxgrid.v1.FrameDone
-	(*GpuFrameDone)(nil),                // 302: volvoxgrid.v1.GpuFrameDone
-	(*FrameMetrics)(nil),                // 303: volvoxgrid.v1.FrameMetrics
-	(*SelectionUpdate)(nil),             // 304: volvoxgrid.v1.SelectionUpdate
-	(*CursorChange)(nil),                // 305: volvoxgrid.v1.CursorChange
-	(*EditorSessionStarted)(nil),        // 306: volvoxgrid.v1.EditorSessionStarted
-	(*EditorSessionUpdated)(nil),        // 307: volvoxgrid.v1.EditorSessionUpdated
-	(*EditorSessionEnded)(nil),          // 308: volvoxgrid.v1.EditorSessionEnded
-	(*TooltipRequest)(nil),              // 309: volvoxgrid.v1.TooltipRequest
-	(*GridEvent)(nil),                   // 310: volvoxgrid.v1.GridEvent
-	(*CellFocusChangingEvent)(nil),      // 311: volvoxgrid.v1.CellFocusChangingEvent
-	(*CellFocusChangedEvent)(nil),       // 312: volvoxgrid.v1.CellFocusChangedEvent
-	(*SelectionChangingEvent)(nil),      // 313: volvoxgrid.v1.SelectionChangingEvent
-	(*SelectionChangedEvent)(nil),       // 314: volvoxgrid.v1.SelectionChangedEvent
-	(*EnterCellEvent)(nil),              // 315: volvoxgrid.v1.EnterCellEvent
-	(*LeaveCellEvent)(nil),              // 316: volvoxgrid.v1.LeaveCellEvent
-	(*BeforeEditEvent)(nil),             // 317: volvoxgrid.v1.BeforeEditEvent
-	(*StartEditEvent)(nil),              // 318: volvoxgrid.v1.StartEditEvent
-	(*AfterEditEvent)(nil),              // 319: volvoxgrid.v1.AfterEditEvent
-	(*CellEditValidateEvent)(nil),       // 320: volvoxgrid.v1.CellEditValidateEvent
-	(*CellEditChangeEvent)(nil),         // 321: volvoxgrid.v1.CellEditChangeEvent
-	(*KeyDownEditEvent)(nil),            // 322: volvoxgrid.v1.KeyDownEditEvent
-	(*KeyPressEditEvent)(nil),           // 323: volvoxgrid.v1.KeyPressEditEvent
-	(*KeyUpEditEvent)(nil),              // 324: volvoxgrid.v1.KeyUpEditEvent
-	(*EditValidationRequest)(nil),       // 325: volvoxgrid.v1.EditValidationRequest
-	(*EditorListItemsRequest)(nil),      // 326: volvoxgrid.v1.EditorListItemsRequest
-	(*CustomEditorActionEvent)(nil),     // 327: volvoxgrid.v1.CustomEditorActionEvent
-	(*CellChangedEvent)(nil),            // 328: volvoxgrid.v1.CellChangedEvent
-	(*RowStatusChangeEvent)(nil),        // 329: volvoxgrid.v1.RowStatusChangeEvent
-	(*BeforeSortEvent)(nil),             // 330: volvoxgrid.v1.BeforeSortEvent
-	(*AfterSortEvent)(nil),              // 331: volvoxgrid.v1.AfterSortEvent
-	(*CompareEvent)(nil),                // 332: volvoxgrid.v1.CompareEvent
-	(*BeforeNodeToggleEvent)(nil),       // 333: volvoxgrid.v1.BeforeNodeToggleEvent
-	(*AfterNodeToggleEvent)(nil),        // 334: volvoxgrid.v1.AfterNodeToggleEvent
-	(*TreeChildrenRequestedEvent)(nil),  // 335: volvoxgrid.v1.TreeChildrenRequestedEvent
-	(*BeforeTreeNodeToggleEvent)(nil),   // 336: volvoxgrid.v1.BeforeTreeNodeToggleEvent
-	(*AfterTreeNodeToggleEvent)(nil),    // 337: volvoxgrid.v1.AfterTreeNodeToggleEvent
-	(*TreeNodeActivateEvent)(nil),       // 338: volvoxgrid.v1.TreeNodeActivateEvent
-	(*TreeNodeContextMenuEvent)(nil),    // 339: volvoxgrid.v1.TreeNodeContextMenuEvent
-	(*BeforeScrollEvent)(nil),           // 340: volvoxgrid.v1.BeforeScrollEvent
-	(*AfterScrollEvent)(nil),            // 341: volvoxgrid.v1.AfterScrollEvent
-	(*ScrollTooltipEvent)(nil),          // 342: volvoxgrid.v1.ScrollTooltipEvent
-	(*BeforeUserResizeEvent)(nil),       // 343: volvoxgrid.v1.BeforeUserResizeEvent
-	(*AfterUserResizeEvent)(nil),        // 344: volvoxgrid.v1.AfterUserResizeEvent
-	(*AfterUserFreezeEvent)(nil),        // 345: volvoxgrid.v1.AfterUserFreezeEvent
-	(*BeforeMoveColumnEvent)(nil),       // 346: volvoxgrid.v1.BeforeMoveColumnEvent
-	(*AfterMoveColumnEvent)(nil),        // 347: volvoxgrid.v1.AfterMoveColumnEvent
-	(*BeforeMoveRowEvent)(nil),          // 348: volvoxgrid.v1.BeforeMoveRowEvent
-	(*AfterMoveRowEvent)(nil),           // 349: volvoxgrid.v1.AfterMoveRowEvent
-	(*BeforeMouseDownEvent)(nil),        // 350: volvoxgrid.v1.BeforeMouseDownEvent
-	(*MouseDownEvent)(nil),              // 351: volvoxgrid.v1.MouseDownEvent
-	(*MouseUpEvent)(nil),                // 352: volvoxgrid.v1.MouseUpEvent
-	(*MouseMoveEvent)(nil),              // 353: volvoxgrid.v1.MouseMoveEvent
-	(*ClickEvent)(nil),                  // 354: volvoxgrid.v1.ClickEvent
-	(*DblClickEvent)(nil),               // 355: volvoxgrid.v1.DblClickEvent
-	(*KeyDownEvent)(nil),                // 356: volvoxgrid.v1.KeyDownEvent
-	(*KeyPressEvent)(nil),               // 357: volvoxgrid.v1.KeyPressEvent
-	(*KeyUpEvent)(nil),                  // 358: volvoxgrid.v1.KeyUpEvent
-	(*CustomRenderCellEvent)(nil),       // 359: volvoxgrid.v1.CustomRenderCellEvent
-	(*DragStartEvent)(nil),              // 360: volvoxgrid.v1.DragStartEvent
-	(*DragOverEvent)(nil),               // 361: volvoxgrid.v1.DragOverEvent
-	(*DragDropEvent)(nil),               // 362: volvoxgrid.v1.DragDropEvent
-	(*DragCompleteEvent)(nil),           // 363: volvoxgrid.v1.DragCompleteEvent
-	(*TypeAheadStartedEvent)(nil),       // 364: volvoxgrid.v1.TypeAheadStartedEvent
-	(*TypeAheadEndedEvent)(nil),         // 365: volvoxgrid.v1.TypeAheadEndedEvent
-	(*DataRefreshingEvent)(nil),         // 366: volvoxgrid.v1.DataRefreshingEvent
-	(*DataRefreshedEvent)(nil),          // 367: volvoxgrid.v1.DataRefreshedEvent
-	(*FilterDataEvent)(nil),             // 368: volvoxgrid.v1.FilterDataEvent
-	(*PullToRefreshTriggeredEvent)(nil), // 369: volvoxgrid.v1.PullToRefreshTriggeredEvent
-	(*PullToRefreshCanceledEvent)(nil),  // 370: volvoxgrid.v1.PullToRefreshCanceledEvent
-	(*ErrorEvent)(nil),                  // 371: volvoxgrid.v1.ErrorEvent
-	(*BeforePageBreakEvent)(nil),        // 372: volvoxgrid.v1.BeforePageBreakEvent
-	(*StartPageEvent)(nil),              // 373: volvoxgrid.v1.StartPageEvent
-	(*GetHeaderRowEvent)(nil),           // 374: volvoxgrid.v1.GetHeaderRowEvent
+	(ThemePreset)(0),                    // 4: volvoxgrid.v1.ThemePreset
+	(TextEffect)(0),                     // 5: volvoxgrid.v1.TextEffect
+	(TextRenderMode)(0),                 // 6: volvoxgrid.v1.TextRenderMode
+	(TextHintingMode)(0),                // 7: volvoxgrid.v1.TextHintingMode
+	(TextBaseline)(0),                   // 8: volvoxgrid.v1.TextBaseline
+	(Align)(0),                          // 9: volvoxgrid.v1.Align
+	(ImageAlignment)(0),                 // 10: volvoxgrid.v1.ImageAlignment
+	(BarcodeSymbology)(0),               // 11: volvoxgrid.v1.BarcodeSymbology
+	(BarcodeCaptionPosition)(0),         // 12: volvoxgrid.v1.BarcodeCaptionPosition
+	(BarcodeCheckDigitMode)(0),          // 13: volvoxgrid.v1.BarcodeCheckDigitMode
+	(BarcodeTextEncoding)(0),            // 14: volvoxgrid.v1.BarcodeTextEncoding
+	(BarcodeQrErrorCorrection)(0),       // 15: volvoxgrid.v1.BarcodeQrErrorCorrection
+	(BarcodeRenderStatus)(0),            // 16: volvoxgrid.v1.BarcodeRenderStatus
+	(CheckedState)(0),                   // 17: volvoxgrid.v1.CheckedState
+	(FillHandlePosition)(0),             // 18: volvoxgrid.v1.FillHandlePosition
+	(ColumnDataType)(0),                 // 19: volvoxgrid.v1.ColumnDataType
+	(CoercionMode)(0),                   // 20: volvoxgrid.v1.CoercionMode
+	(WriteErrorMode)(0),                 // 21: volvoxgrid.v1.WriteErrorMode
+	(CellInteraction)(0),                // 22: volvoxgrid.v1.CellInteraction
+	(HeaderPolicy)(0),                   // 23: volvoxgrid.v1.HeaderPolicy
+	(TypePolicy)(0),                     // 24: volvoxgrid.v1.TypePolicy
+	(LoadDataStatus)(0),                 // 25: volvoxgrid.v1.LoadDataStatus
+	(SelectionMode)(0),                  // 26: volvoxgrid.v1.SelectionMode
+	(FocusBorderStyle)(0),               // 27: volvoxgrid.v1.FocusBorderStyle
+	(SelectionVisibility)(0),            // 28: volvoxgrid.v1.SelectionVisibility
+	(EditTrigger)(0),                    // 29: volvoxgrid.v1.EditTrigger
+	(DropdownItemLayout)(0),             // 30: volvoxgrid.v1.DropdownItemLayout
+	(TabBehavior)(0),                    // 31: volvoxgrid.v1.TabBehavior
+	(EditorKind)(0),                     // 32: volvoxgrid.v1.EditorKind
+	(EditorOwner)(0),                    // 33: volvoxgrid.v1.EditorOwner
+	(EditorPresentation)(0),             // 34: volvoxgrid.v1.EditorPresentation
+	(ValidationMode)(0),                 // 35: volvoxgrid.v1.ValidationMode
+	(ValidationTrigger)(0),              // 36: volvoxgrid.v1.ValidationTrigger
+	(InputType)(0),                      // 37: volvoxgrid.v1.InputType
+	(ButtonRole)(0),                     // 38: volvoxgrid.v1.ButtonRole
+	(SortOrder)(0),                      // 39: volvoxgrid.v1.SortOrder
+	(SortType)(0),                       // 40: volvoxgrid.v1.SortType
+	(TreeIndicatorStyle)(0),             // 41: volvoxgrid.v1.TreeIndicatorStyle
+	(GroupTotalPosition)(0),             // 42: volvoxgrid.v1.GroupTotalPosition
+	(AggregateType)(0),                  // 43: volvoxgrid.v1.AggregateType
+	(CellSpanMode)(0),                   // 44: volvoxgrid.v1.CellSpanMode
+	(SpanCompareMode)(0),                // 45: volvoxgrid.v1.SpanCompareMode
+	(ScrollBarsMode)(0),                 // 46: volvoxgrid.v1.ScrollBarsMode
+	(ScrollBarMode)(0),                  // 47: volvoxgrid.v1.ScrollBarMode
+	(ScrollBarAppearance)(0),            // 48: volvoxgrid.v1.ScrollBarAppearance
+	(IndicatorAppearance)(0),            // 49: volvoxgrid.v1.IndicatorAppearance
+	(PinPosition)(0),                    // 50: volvoxgrid.v1.PinPosition
+	(StickyEdge)(0),                     // 51: volvoxgrid.v1.StickyEdge
+	(TypeAheadMode)(0),                  // 52: volvoxgrid.v1.TypeAheadMode
+	(AutoSizeMode)(0),                   // 53: volvoxgrid.v1.AutoSizeMode
+	(DragMode)(0),                       // 54: volvoxgrid.v1.DragMode
+	(DropMode)(0),                       // 55: volvoxgrid.v1.DropMode
+	(CustomRenderMode)(0),               // 56: volvoxgrid.v1.CustomRenderMode
+	(ApplyScope)(0),                     // 57: volvoxgrid.v1.ApplyScope
+	(RendererMode)(0),                   // 58: volvoxgrid.v1.RendererMode
+	(PresentMode)(0),                    // 59: volvoxgrid.v1.PresentMode
+	(FramePacingMode)(0),                // 60: volvoxgrid.v1.FramePacingMode
+	(ClearScope)(0),                     // 61: volvoxgrid.v1.ClearScope
+	(ClearRegion)(0),                    // 62: volvoxgrid.v1.ClearRegion
+	(ExportFormat)(0),                   // 63: volvoxgrid.v1.ExportFormat
+	(ExportScope)(0),                    // 64: volvoxgrid.v1.ExportScope
+	(PrintOrientation)(0),               // 65: volvoxgrid.v1.PrintOrientation
+	(NodeRelation)(0),                   // 66: volvoxgrid.v1.NodeRelation
+	(IconAlign)(0),                      // 67: volvoxgrid.v1.IconAlign
+	(CellHitArea)(0),                    // 68: volvoxgrid.v1.CellHitArea
+	(PullToRefreshTheme)(0),             // 69: volvoxgrid.v1.PullToRefreshTheme
+	(RenderLayerBit)(0),                 // 70: volvoxgrid.v1.RenderLayerBit
+	(GridTargetKind)(0),                 // 71: volvoxgrid.v1.GridTargetKind
+	(IndicatorBand)(0),                  // 72: volvoxgrid.v1.IndicatorBand
+	(RowIndicatorSlotKind)(0),           // 73: volvoxgrid.v1.RowIndicatorSlotKind
+	(ColIndicatorCellMode)(0),           // 74: volvoxgrid.v1.ColIndicatorCellMode
+	(CornerIndicatorSlotKind)(0),        // 75: volvoxgrid.v1.CornerIndicatorSlotKind
+	(GridEventTargetFlag)(0),            // 76: volvoxgrid.v1.GridEventTargetFlag
+	(ComposeMethod)(0),                  // 77: volvoxgrid.v1.ComposeMethod
+	(EditUiMode)(0),                     // 78: volvoxgrid.v1.EditUiMode
+	(ErrorCode)(0),                      // 79: volvoxgrid.v1.ErrorCode
+	(DemoDataFormat)(0),                 // 80: volvoxgrid.v1.DemoDataFormat
+	(TerminalColorLevel)(0),             // 81: volvoxgrid.v1.TerminalColorLevel
+	(FrameKind)(0),                      // 82: volvoxgrid.v1.FrameKind
+	(CursorType)(0),                     // 83: volvoxgrid.v1.CursorType
+	(EditStartReason)(0),                // 84: volvoxgrid.v1.EditStartReason
+	(EditEndReason)(0),                  // 85: volvoxgrid.v1.EditEndReason
+	(EditorUpdateReason)(0),             // 86: volvoxgrid.v1.EditorUpdateReason
+	(ArchiveRequest_Action)(0),          // 87: volvoxgrid.v1.ArchiveRequest.Action
+	(PointerEvent_Type)(0),              // 88: volvoxgrid.v1.PointerEvent.Type
+	(ZoomEvent_Phase)(0),                // 89: volvoxgrid.v1.ZoomEvent.Phase
+	(KeyEvent_Type)(0),                  // 90: volvoxgrid.v1.KeyEvent.Type
+	(TerminalCommand_Kind)(0),           // 91: volvoxgrid.v1.TerminalCommand.Kind
+	(*Font)(nil),                        // 92: volvoxgrid.v1.Font
+	(*Padding)(nil),                     // 93: volvoxgrid.v1.Padding
+	(*Border)(nil),                      // 94: volvoxgrid.v1.Border
+	(*Borders)(nil),                     // 95: volvoxgrid.v1.Borders
+	(*GridLines)(nil),                   // 96: volvoxgrid.v1.GridLines
+	(*Separator)(nil),                   // 97: volvoxgrid.v1.Separator
+	(*TextRendering)(nil),               // 98: volvoxgrid.v1.TextRendering
+	(*ImageData)(nil),                   // 99: volvoxgrid.v1.ImageData
+	(*BarcodeEncodingOptions)(nil),      // 100: volvoxgrid.v1.BarcodeEncodingOptions
+	(*BarcodeRenderOptions)(nil),        // 101: volvoxgrid.v1.BarcodeRenderOptions
+	(*BarcodeCaptionOptions)(nil),       // 102: volvoxgrid.v1.BarcodeCaptionOptions
+	(*BarcodeData)(nil),                 // 103: volvoxgrid.v1.BarcodeData
+	(*CellRange)(nil),                   // 104: volvoxgrid.v1.CellRange
+	(*Rect)(nil),                        // 105: volvoxgrid.v1.Rect
+	(*CellValue)(nil),                   // 106: volvoxgrid.v1.CellValue
+	(*StructValue)(nil),                 // 107: volvoxgrid.v1.StructValue
+	(*StructField)(nil),                 // 108: volvoxgrid.v1.StructField
+	(*ScalarValue)(nil),                 // 109: volvoxgrid.v1.ScalarValue
+	(*RichText)(nil),                    // 110: volvoxgrid.v1.RichText
+	(*TextFormatRun)(nil),               // 111: volvoxgrid.v1.TextFormatRun
+	(*TextRunStyle)(nil),                // 112: volvoxgrid.v1.TextRunStyle
+	(*EditorSpec)(nil),                  // 113: volvoxgrid.v1.EditorSpec
+	(*TextEditorParams)(nil),            // 114: volvoxgrid.v1.TextEditorParams
+	(*NumberEditorParams)(nil),          // 115: volvoxgrid.v1.NumberEditorParams
+	(*CheckboxEditorParams)(nil),        // 116: volvoxgrid.v1.CheckboxEditorParams
+	(*DateTimeEditorParams)(nil),        // 117: volvoxgrid.v1.DateTimeEditorParams
+	(*EditorAction)(nil),                // 118: volvoxgrid.v1.EditorAction
+	(*ListEditorParams)(nil),            // 119: volvoxgrid.v1.ListEditorParams
+	(*ListItem)(nil),                    // 120: volvoxgrid.v1.ListItem
+	(*ListDataSource)(nil),              // 121: volvoxgrid.v1.ListDataSource
+	(*EditorValue)(nil),                 // 122: volvoxgrid.v1.EditorValue
+	(*TextSelection)(nil),               // 123: volvoxgrid.v1.TextSelection
+	(*ValidationError)(nil),             // 124: volvoxgrid.v1.ValidationError
+	(*EditActivation)(nil),              // 125: volvoxgrid.v1.EditActivation
+	(*ScrollBarColors)(nil),             // 126: volvoxgrid.v1.ScrollBarColors
+	(*ScrollBarConfig)(nil),             // 127: volvoxgrid.v1.ScrollBarConfig
+	(*RegionStyle)(nil),                 // 128: volvoxgrid.v1.RegionStyle
+	(*CellStyle)(nil),                   // 129: volvoxgrid.v1.CellStyle
+	(*HighlightStyle)(nil),              // 130: volvoxgrid.v1.HighlightStyle
+	(*HeaderMarkSize)(nil),              // 131: volvoxgrid.v1.HeaderMarkSize
+	(*HeaderSeparator)(nil),             // 132: volvoxgrid.v1.HeaderSeparator
+	(*HeaderResizeHandle)(nil),          // 133: volvoxgrid.v1.HeaderResizeHandle
+	(*HeaderStyle)(nil),                 // 134: volvoxgrid.v1.HeaderStyle
+	(*IconSlots)(nil),                   // 135: volvoxgrid.v1.IconSlots
+	(*IconStyle)(nil),                   // 136: volvoxgrid.v1.IconStyle
+	(*IconSlotStyles)(nil),              // 137: volvoxgrid.v1.IconSlotStyles
+	(*IconPictures)(nil),                // 138: volvoxgrid.v1.IconPictures
+	(*IconTheme)(nil),                   // 139: volvoxgrid.v1.IconTheme
+	(*HoverConfig)(nil),                 // 140: volvoxgrid.v1.HoverConfig
+	(*ResizePolicy)(nil),                // 141: volvoxgrid.v1.ResizePolicy
+	(*FreezePolicy)(nil),                // 142: volvoxgrid.v1.FreezePolicy
+	(*HeaderFeatures)(nil),              // 143: volvoxgrid.v1.HeaderFeatures
+	(*GridConfig)(nil),                  // 144: volvoxgrid.v1.GridConfig
+	(*LayoutConfig)(nil),                // 145: volvoxgrid.v1.LayoutConfig
+	(*StyleConfig)(nil),                 // 146: volvoxgrid.v1.StyleConfig
+	(*SelectionConfig)(nil),             // 147: volvoxgrid.v1.SelectionConfig
+	(*EditConfig)(nil),                  // 148: volvoxgrid.v1.EditConfig
+	(*PullToRefreshConfig)(nil),         // 149: volvoxgrid.v1.PullToRefreshConfig
+	(*ScrollConfig)(nil),                // 150: volvoxgrid.v1.ScrollConfig
+	(*OutlineConfig)(nil),               // 151: volvoxgrid.v1.OutlineConfig
+	(*SpanConfig)(nil),                  // 152: volvoxgrid.v1.SpanConfig
+	(*InteractionConfig)(nil),           // 153: volvoxgrid.v1.InteractionConfig
+	(*RenderConfig)(nil),                // 154: volvoxgrid.v1.RenderConfig
+	(*ColIndicatorCellModes)(nil),       // 155: volvoxgrid.v1.ColIndicatorCellModes
+	(*RowIndicatorSlot)(nil),            // 156: volvoxgrid.v1.RowIndicatorSlot
+	(*RowIndicatorConfig)(nil),          // 157: volvoxgrid.v1.RowIndicatorConfig
+	(*ColIndicatorRowDef)(nil),          // 158: volvoxgrid.v1.ColIndicatorRowDef
+	(*ColIndicatorCell)(nil),            // 159: volvoxgrid.v1.ColIndicatorCell
+	(*ColIndicatorConfig)(nil),          // 160: volvoxgrid.v1.ColIndicatorConfig
+	(*CornerIndicatorSlot)(nil),         // 161: volvoxgrid.v1.CornerIndicatorSlot
+	(*CornerIndicatorConfig)(nil),       // 162: volvoxgrid.v1.CornerIndicatorConfig
+	(*IndicatorColors)(nil),             // 163: volvoxgrid.v1.IndicatorColors
+	(*GridEventTarget)(nil),             // 164: volvoxgrid.v1.GridEventTarget
+	(*IndicatorFocusConfig)(nil),        // 165: volvoxgrid.v1.IndicatorFocusConfig
+	(*IndicatorsConfig)(nil),            // 166: volvoxgrid.v1.IndicatorsConfig
+	(*ColumnDef)(nil),                   // 167: volvoxgrid.v1.ColumnDef
+	(*DefineColumnsRequest)(nil),        // 168: volvoxgrid.v1.DefineColumnsRequest
+	(*SchemaResponse)(nil),              // 169: volvoxgrid.v1.SchemaResponse
+	(*RowDef)(nil),                      // 170: volvoxgrid.v1.RowDef
+	(*RowStatus)(nil),                   // 171: volvoxgrid.v1.RowStatus
+	(*DefineRowsRequest)(nil),           // 172: volvoxgrid.v1.DefineRowsRequest
+	(*CellUpdate)(nil),                  // 173: volvoxgrid.v1.CellUpdate
+	(*UpdateCellsRequest)(nil),          // 174: volvoxgrid.v1.UpdateCellsRequest
+	(*GetCellsRequest)(nil),             // 175: volvoxgrid.v1.GetCellsRequest
+	(*CellData)(nil),                    // 176: volvoxgrid.v1.CellData
+	(*CellsResponse)(nil),               // 177: volvoxgrid.v1.CellsResponse
+	(*TypeViolation)(nil),               // 178: volvoxgrid.v1.TypeViolation
+	(*WriteResult)(nil),                 // 179: volvoxgrid.v1.WriteResult
+	(*LoadTableRequest)(nil),            // 180: volvoxgrid.v1.LoadTableRequest
+	(*FieldMapping)(nil),                // 181: volvoxgrid.v1.FieldMapping
+	(*CsvOptions)(nil),                  // 182: volvoxgrid.v1.CsvOptions
+	(*JsonOptions)(nil),                 // 183: volvoxgrid.v1.JsonOptions
+	(*LoadDataOptions)(nil),             // 184: volvoxgrid.v1.LoadDataOptions
+	(*LoadDataRequest)(nil),             // 185: volvoxgrid.v1.LoadDataRequest
+	(*AppendDataRequest)(nil),           // 186: volvoxgrid.v1.AppendDataRequest
+	(*LoadDataResult)(nil),              // 187: volvoxgrid.v1.LoadDataResult
+	(*ClearRequest)(nil),                // 188: volvoxgrid.v1.ClearRequest
+	(*InsertRowsRequest)(nil),           // 189: volvoxgrid.v1.InsertRowsRequest
+	(*RemoveRowsRequest)(nil),           // 190: volvoxgrid.v1.RemoveRowsRequest
+	(*MoveColumnRequest)(nil),           // 191: volvoxgrid.v1.MoveColumnRequest
+	(*MoveRowRequest)(nil),              // 192: volvoxgrid.v1.MoveRowRequest
+	(*SelectRequest)(nil),               // 193: volvoxgrid.v1.SelectRequest
+	(*SelectionState)(nil),              // 194: volvoxgrid.v1.SelectionState
+	(*HighlightRegion)(nil),             // 195: volvoxgrid.v1.HighlightRegion
+	(*EditSetHighlights)(nil),           // 196: volvoxgrid.v1.EditSetHighlights
+	(*EditCommand)(nil),                 // 197: volvoxgrid.v1.EditCommand
+	(*EditStart)(nil),                   // 198: volvoxgrid.v1.EditStart
+	(*EditGetState)(nil),                // 199: volvoxgrid.v1.EditGetState
+	(*EditorSessionCommand)(nil),        // 200: volvoxgrid.v1.EditorSessionCommand
+	(*EditorValueChanged)(nil),          // 201: volvoxgrid.v1.EditorValueChanged
+	(*TextSelectionChanged)(nil),        // 202: volvoxgrid.v1.TextSelectionChanged
+	(*EditorPreeditChanged)(nil),        // 203: volvoxgrid.v1.EditorPreeditChanged
+	(*EditCommit)(nil),                  // 204: volvoxgrid.v1.EditCommit
+	(*EditCancel)(nil),                  // 205: volvoxgrid.v1.EditCancel
+	(*CustomEditorAction)(nil),          // 206: volvoxgrid.v1.CustomEditorAction
+	(*EditorSession)(nil),               // 207: volvoxgrid.v1.EditorSession
+	(*EditorCapabilities)(nil),          // 208: volvoxgrid.v1.EditorCapabilities
+	(*EditState)(nil),                   // 209: volvoxgrid.v1.EditState
+	(*SortColumn)(nil),                  // 210: volvoxgrid.v1.SortColumn
+	(*SortRequest)(nil),                 // 211: volvoxgrid.v1.SortRequest
+	(*SubtotalRequest)(nil),             // 212: volvoxgrid.v1.SubtotalRequest
+	(*SubtotalResult)(nil),              // 213: volvoxgrid.v1.SubtotalResult
+	(*AutoSizeRequest)(nil),             // 214: volvoxgrid.v1.AutoSizeRequest
+	(*OutlineRequest)(nil),              // 215: volvoxgrid.v1.OutlineRequest
+	(*GetNodeRequest)(nil),              // 216: volvoxgrid.v1.GetNodeRequest
+	(*NodeInfo)(nil),                    // 217: volvoxgrid.v1.NodeInfo
+	(*FindRequest)(nil),                 // 218: volvoxgrid.v1.FindRequest
+	(*TextQuery)(nil),                   // 219: volvoxgrid.v1.TextQuery
+	(*RegexQuery)(nil),                  // 220: volvoxgrid.v1.RegexQuery
+	(*FindResponse)(nil),                // 221: volvoxgrid.v1.FindResponse
+	(*AggregateRequest)(nil),            // 222: volvoxgrid.v1.AggregateRequest
+	(*AggregateResponse)(nil),           // 223: volvoxgrid.v1.AggregateResponse
+	(*GetMergedRangeRequest)(nil),       // 224: volvoxgrid.v1.GetMergedRangeRequest
+	(*MergeCellsRequest)(nil),           // 225: volvoxgrid.v1.MergeCellsRequest
+	(*UnmergeCellsRequest)(nil),         // 226: volvoxgrid.v1.UnmergeCellsRequest
+	(*MergedRegionsResponse)(nil),       // 227: volvoxgrid.v1.MergedRegionsResponse
+	(*MemoryUsageResponse)(nil),         // 228: volvoxgrid.v1.MemoryUsageResponse
+	(*ClipboardCommand)(nil),            // 229: volvoxgrid.v1.ClipboardCommand
+	(*ClipboardCopy)(nil),               // 230: volvoxgrid.v1.ClipboardCopy
+	(*ClipboardCut)(nil),                // 231: volvoxgrid.v1.ClipboardCut
+	(*ClipboardPaste)(nil),              // 232: volvoxgrid.v1.ClipboardPaste
+	(*ClipboardDelete)(nil),             // 233: volvoxgrid.v1.ClipboardDelete
+	(*ClipboardResponse)(nil),           // 234: volvoxgrid.v1.ClipboardResponse
+	(*ExportRequest)(nil),               // 235: volvoxgrid.v1.ExportRequest
+	(*ExportResponse)(nil),              // 236: volvoxgrid.v1.ExportResponse
+	(*PrintRequest)(nil),                // 237: volvoxgrid.v1.PrintRequest
+	(*PrintResponse)(nil),               // 238: volvoxgrid.v1.PrintResponse
+	(*PrintPage)(nil),                   // 239: volvoxgrid.v1.PrintPage
+	(*ArchiveRequest)(nil),              // 240: volvoxgrid.v1.ArchiveRequest
+	(*ArchiveResponse)(nil),             // 241: volvoxgrid.v1.ArchiveResponse
+	(*CreateRequest)(nil),               // 242: volvoxgrid.v1.CreateRequest
+	(*CreateResponse)(nil),              // 243: volvoxgrid.v1.CreateResponse
+	(*DestroyRequest)(nil),              // 244: volvoxgrid.v1.DestroyRequest
+	(*GetConfigRequest)(nil),            // 245: volvoxgrid.v1.GetConfigRequest
+	(*GetSchemaRequest)(nil),            // 246: volvoxgrid.v1.GetSchemaRequest
+	(*GetSelectionRequest)(nil),         // 247: volvoxgrid.v1.GetSelectionRequest
+	(*GetMergedRegionsRequest)(nil),     // 248: volvoxgrid.v1.GetMergedRegionsRequest
+	(*GetMemoryUsageRequest)(nil),       // 249: volvoxgrid.v1.GetMemoryUsageRequest
+	(*RefreshRequest)(nil),              // 250: volvoxgrid.v1.RefreshRequest
+	(*EventStreamRequest)(nil),          // 251: volvoxgrid.v1.EventStreamRequest
+	(*ResizeViewportRequest)(nil),       // 252: volvoxgrid.v1.ResizeViewportRequest
+	(*ShowCellRequest)(nil),             // 253: volvoxgrid.v1.ShowCellRequest
+	(*SetRowRequest)(nil),               // 254: volvoxgrid.v1.SetRowRequest
+	(*SetColRequest)(nil),               // 255: volvoxgrid.v1.SetColRequest
+	(*SetRedrawRequest)(nil),            // 256: volvoxgrid.v1.SetRedrawRequest
+	(*ConfigureRequest)(nil),            // 257: volvoxgrid.v1.ConfigureRequest
+	(*LoadFontDataRequest)(nil),         // 258: volvoxgrid.v1.LoadFontDataRequest
+	(*LoadDemoRequest)(nil),             // 259: volvoxgrid.v1.LoadDemoRequest
+	(*GetDemoDataRequest)(nil),          // 260: volvoxgrid.v1.GetDemoDataRequest
+	(*GetDemoDataResponse)(nil),         // 261: volvoxgrid.v1.GetDemoDataResponse
+	(*DestroyResponse)(nil),             // 262: volvoxgrid.v1.DestroyResponse
+	(*ConfigureResponse)(nil),           // 263: volvoxgrid.v1.ConfigureResponse
+	(*LoadFontDataResponse)(nil),        // 264: volvoxgrid.v1.LoadFontDataResponse
+	(*DefineColumnsResponse)(nil),       // 265: volvoxgrid.v1.DefineColumnsResponse
+	(*DefineRowsResponse)(nil),          // 266: volvoxgrid.v1.DefineRowsResponse
+	(*InsertRowsResponse)(nil),          // 267: volvoxgrid.v1.InsertRowsResponse
+	(*RemoveRowsResponse)(nil),          // 268: volvoxgrid.v1.RemoveRowsResponse
+	(*MoveColumnResponse)(nil),          // 269: volvoxgrid.v1.MoveColumnResponse
+	(*MoveRowResponse)(nil),             // 270: volvoxgrid.v1.MoveRowResponse
+	(*ClearResponse)(nil),               // 271: volvoxgrid.v1.ClearResponse
+	(*SelectResponse)(nil),              // 272: volvoxgrid.v1.SelectResponse
+	(*ShowCellResponse)(nil),            // 273: volvoxgrid.v1.ShowCellResponse
+	(*SetTopRowResponse)(nil),           // 274: volvoxgrid.v1.SetTopRowResponse
+	(*SetLeftColResponse)(nil),          // 275: volvoxgrid.v1.SetLeftColResponse
+	(*SortResponse)(nil),                // 276: volvoxgrid.v1.SortResponse
+	(*AutoSizeResponse)(nil),            // 277: volvoxgrid.v1.AutoSizeResponse
+	(*OutlineResponse)(nil),             // 278: volvoxgrid.v1.OutlineResponse
+	(*MergeCellsResponse)(nil),          // 279: volvoxgrid.v1.MergeCellsResponse
+	(*UnmergeCellsResponse)(nil),        // 280: volvoxgrid.v1.UnmergeCellsResponse
+	(*ResizeViewportResponse)(nil),      // 281: volvoxgrid.v1.ResizeViewportResponse
+	(*SetRedrawResponse)(nil),           // 282: volvoxgrid.v1.SetRedrawResponse
+	(*RefreshResponse)(nil),             // 283: volvoxgrid.v1.RefreshResponse
+	(*LoadDemoResponse)(nil),            // 284: volvoxgrid.v1.LoadDemoResponse
+	(*RenderInput)(nil),                 // 285: volvoxgrid.v1.RenderInput
+	(*CompareResponse)(nil),             // 286: volvoxgrid.v1.CompareResponse
+	(*EditValidationResponse)(nil),      // 287: volvoxgrid.v1.EditValidationResponse
+	(*EditorListItemsResponse)(nil),     // 288: volvoxgrid.v1.EditorListItemsResponse
+	(*ViewportState)(nil),               // 289: volvoxgrid.v1.ViewportState
+	(*PointerEvent)(nil),                // 290: volvoxgrid.v1.PointerEvent
+	(*ScrollEvent)(nil),                 // 291: volvoxgrid.v1.ScrollEvent
+	(*ZoomEvent)(nil),                   // 292: volvoxgrid.v1.ZoomEvent
+	(*KeyEvent)(nil),                    // 293: volvoxgrid.v1.KeyEvent
+	(*BufferReady)(nil),                 // 294: volvoxgrid.v1.BufferReady
+	(*TerminalInputBytes)(nil),          // 295: volvoxgrid.v1.TerminalInputBytes
+	(*TerminalCapabilities)(nil),        // 296: volvoxgrid.v1.TerminalCapabilities
+	(*TerminalViewport)(nil),            // 297: volvoxgrid.v1.TerminalViewport
+	(*TerminalCommand)(nil),             // 298: volvoxgrid.v1.TerminalCommand
+	(*GpuSurfaceReady)(nil),             // 299: volvoxgrid.v1.GpuSurfaceReady
+	(*EventDecision)(nil),               // 300: volvoxgrid.v1.EventDecision
+	(*RenderOutput)(nil),                // 301: volvoxgrid.v1.RenderOutput
+	(*FrameDone)(nil),                   // 302: volvoxgrid.v1.FrameDone
+	(*GpuFrameDone)(nil),                // 303: volvoxgrid.v1.GpuFrameDone
+	(*FrameMetrics)(nil),                // 304: volvoxgrid.v1.FrameMetrics
+	(*SelectionUpdate)(nil),             // 305: volvoxgrid.v1.SelectionUpdate
+	(*CursorChange)(nil),                // 306: volvoxgrid.v1.CursorChange
+	(*EditorSessionStarted)(nil),        // 307: volvoxgrid.v1.EditorSessionStarted
+	(*EditorSessionUpdated)(nil),        // 308: volvoxgrid.v1.EditorSessionUpdated
+	(*EditorSessionEnded)(nil),          // 309: volvoxgrid.v1.EditorSessionEnded
+	(*TooltipRequest)(nil),              // 310: volvoxgrid.v1.TooltipRequest
+	(*GridEvent)(nil),                   // 311: volvoxgrid.v1.GridEvent
+	(*CellFocusChangingEvent)(nil),      // 312: volvoxgrid.v1.CellFocusChangingEvent
+	(*CellFocusChangedEvent)(nil),       // 313: volvoxgrid.v1.CellFocusChangedEvent
+	(*SelectionChangingEvent)(nil),      // 314: volvoxgrid.v1.SelectionChangingEvent
+	(*SelectionChangedEvent)(nil),       // 315: volvoxgrid.v1.SelectionChangedEvent
+	(*EnterCellEvent)(nil),              // 316: volvoxgrid.v1.EnterCellEvent
+	(*LeaveCellEvent)(nil),              // 317: volvoxgrid.v1.LeaveCellEvent
+	(*BeforeEditEvent)(nil),             // 318: volvoxgrid.v1.BeforeEditEvent
+	(*StartEditEvent)(nil),              // 319: volvoxgrid.v1.StartEditEvent
+	(*AfterEditEvent)(nil),              // 320: volvoxgrid.v1.AfterEditEvent
+	(*CellEditValidateEvent)(nil),       // 321: volvoxgrid.v1.CellEditValidateEvent
+	(*CellEditChangeEvent)(nil),         // 322: volvoxgrid.v1.CellEditChangeEvent
+	(*KeyDownEditEvent)(nil),            // 323: volvoxgrid.v1.KeyDownEditEvent
+	(*KeyPressEditEvent)(nil),           // 324: volvoxgrid.v1.KeyPressEditEvent
+	(*KeyUpEditEvent)(nil),              // 325: volvoxgrid.v1.KeyUpEditEvent
+	(*EditValidationRequest)(nil),       // 326: volvoxgrid.v1.EditValidationRequest
+	(*EditorListItemsRequest)(nil),      // 327: volvoxgrid.v1.EditorListItemsRequest
+	(*CustomEditorActionEvent)(nil),     // 328: volvoxgrid.v1.CustomEditorActionEvent
+	(*CellChangedEvent)(nil),            // 329: volvoxgrid.v1.CellChangedEvent
+	(*RowStatusChangeEvent)(nil),        // 330: volvoxgrid.v1.RowStatusChangeEvent
+	(*BeforeSortEvent)(nil),             // 331: volvoxgrid.v1.BeforeSortEvent
+	(*AfterSortEvent)(nil),              // 332: volvoxgrid.v1.AfterSortEvent
+	(*CompareEvent)(nil),                // 333: volvoxgrid.v1.CompareEvent
+	(*BeforeNodeToggleEvent)(nil),       // 334: volvoxgrid.v1.BeforeNodeToggleEvent
+	(*AfterNodeToggleEvent)(nil),        // 335: volvoxgrid.v1.AfterNodeToggleEvent
+	(*TreeChildrenRequestedEvent)(nil),  // 336: volvoxgrid.v1.TreeChildrenRequestedEvent
+	(*BeforeTreeNodeToggleEvent)(nil),   // 337: volvoxgrid.v1.BeforeTreeNodeToggleEvent
+	(*AfterTreeNodeToggleEvent)(nil),    // 338: volvoxgrid.v1.AfterTreeNodeToggleEvent
+	(*TreeNodeActivateEvent)(nil),       // 339: volvoxgrid.v1.TreeNodeActivateEvent
+	(*TreeNodeContextMenuEvent)(nil),    // 340: volvoxgrid.v1.TreeNodeContextMenuEvent
+	(*BeforeScrollEvent)(nil),           // 341: volvoxgrid.v1.BeforeScrollEvent
+	(*AfterScrollEvent)(nil),            // 342: volvoxgrid.v1.AfterScrollEvent
+	(*ScrollTooltipEvent)(nil),          // 343: volvoxgrid.v1.ScrollTooltipEvent
+	(*BeforeUserResizeEvent)(nil),       // 344: volvoxgrid.v1.BeforeUserResizeEvent
+	(*AfterUserResizeEvent)(nil),        // 345: volvoxgrid.v1.AfterUserResizeEvent
+	(*AfterUserFreezeEvent)(nil),        // 346: volvoxgrid.v1.AfterUserFreezeEvent
+	(*BeforeMoveColumnEvent)(nil),       // 347: volvoxgrid.v1.BeforeMoveColumnEvent
+	(*AfterMoveColumnEvent)(nil),        // 348: volvoxgrid.v1.AfterMoveColumnEvent
+	(*BeforeMoveRowEvent)(nil),          // 349: volvoxgrid.v1.BeforeMoveRowEvent
+	(*AfterMoveRowEvent)(nil),           // 350: volvoxgrid.v1.AfterMoveRowEvent
+	(*BeforeMouseDownEvent)(nil),        // 351: volvoxgrid.v1.BeforeMouseDownEvent
+	(*MouseDownEvent)(nil),              // 352: volvoxgrid.v1.MouseDownEvent
+	(*MouseUpEvent)(nil),                // 353: volvoxgrid.v1.MouseUpEvent
+	(*MouseMoveEvent)(nil),              // 354: volvoxgrid.v1.MouseMoveEvent
+	(*ClickEvent)(nil),                  // 355: volvoxgrid.v1.ClickEvent
+	(*DblClickEvent)(nil),               // 356: volvoxgrid.v1.DblClickEvent
+	(*KeyDownEvent)(nil),                // 357: volvoxgrid.v1.KeyDownEvent
+	(*KeyPressEvent)(nil),               // 358: volvoxgrid.v1.KeyPressEvent
+	(*KeyUpEvent)(nil),                  // 359: volvoxgrid.v1.KeyUpEvent
+	(*CustomRenderCellEvent)(nil),       // 360: volvoxgrid.v1.CustomRenderCellEvent
+	(*DragStartEvent)(nil),              // 361: volvoxgrid.v1.DragStartEvent
+	(*DragOverEvent)(nil),               // 362: volvoxgrid.v1.DragOverEvent
+	(*DragDropEvent)(nil),               // 363: volvoxgrid.v1.DragDropEvent
+	(*DragCompleteEvent)(nil),           // 364: volvoxgrid.v1.DragCompleteEvent
+	(*TypeAheadStartedEvent)(nil),       // 365: volvoxgrid.v1.TypeAheadStartedEvent
+	(*TypeAheadEndedEvent)(nil),         // 366: volvoxgrid.v1.TypeAheadEndedEvent
+	(*DataRefreshingEvent)(nil),         // 367: volvoxgrid.v1.DataRefreshingEvent
+	(*DataRefreshedEvent)(nil),          // 368: volvoxgrid.v1.DataRefreshedEvent
+	(*FilterDataEvent)(nil),             // 369: volvoxgrid.v1.FilterDataEvent
+	(*PullToRefreshTriggeredEvent)(nil), // 370: volvoxgrid.v1.PullToRefreshTriggeredEvent
+	(*PullToRefreshCanceledEvent)(nil),  // 371: volvoxgrid.v1.PullToRefreshCanceledEvent
+	(*ErrorEvent)(nil),                  // 372: volvoxgrid.v1.ErrorEvent
+	(*BeforePageBreakEvent)(nil),        // 373: volvoxgrid.v1.BeforePageBreakEvent
+	(*StartPageEvent)(nil),              // 374: volvoxgrid.v1.StartPageEvent
+	(*GetHeaderRowEvent)(nil),           // 375: volvoxgrid.v1.GetHeaderRowEvent
 }
 var file_volvoxgrid_proto_depIdxs = []int32{
 	0,   // 0: volvoxgrid.v1.Border.style:type_name -> volvoxgrid.v1.BorderStyle
-	93,  // 1: volvoxgrid.v1.Borders.all:type_name -> volvoxgrid.v1.Border
-	93,  // 2: volvoxgrid.v1.Borders.top:type_name -> volvoxgrid.v1.Border
-	93,  // 3: volvoxgrid.v1.Borders.right:type_name -> volvoxgrid.v1.Border
-	93,  // 4: volvoxgrid.v1.Borders.bottom:type_name -> volvoxgrid.v1.Border
-	93,  // 5: volvoxgrid.v1.Borders.left:type_name -> volvoxgrid.v1.Border
+	94,  // 1: volvoxgrid.v1.Borders.all:type_name -> volvoxgrid.v1.Border
+	94,  // 2: volvoxgrid.v1.Borders.top:type_name -> volvoxgrid.v1.Border
+	94,  // 3: volvoxgrid.v1.Borders.right:type_name -> volvoxgrid.v1.Border
+	94,  // 4: volvoxgrid.v1.Borders.bottom:type_name -> volvoxgrid.v1.Border
+	94,  // 5: volvoxgrid.v1.Borders.left:type_name -> volvoxgrid.v1.Border
 	1,   // 6: volvoxgrid.v1.GridLines.style:type_name -> volvoxgrid.v1.GridLineStyle
 	2,   // 7: volvoxgrid.v1.GridLines.direction:type_name -> volvoxgrid.v1.GridLineDirection
-	5,   // 8: volvoxgrid.v1.TextRendering.mode:type_name -> volvoxgrid.v1.TextRenderMode
-	6,   // 9: volvoxgrid.v1.TextRendering.hinting:type_name -> volvoxgrid.v1.TextHintingMode
-	12,  // 10: volvoxgrid.v1.BarcodeEncodingOptions.check_digit:type_name -> volvoxgrid.v1.BarcodeCheckDigitMode
-	13,  // 11: volvoxgrid.v1.BarcodeEncodingOptions.text_encoding:type_name -> volvoxgrid.v1.BarcodeTextEncoding
-	14,  // 12: volvoxgrid.v1.BarcodeEncodingOptions.qr_ecc:type_name -> volvoxgrid.v1.BarcodeQrErrorCorrection
-	9,   // 13: volvoxgrid.v1.BarcodeRenderOptions.alignment:type_name -> volvoxgrid.v1.ImageAlignment
-	11,  // 14: volvoxgrid.v1.BarcodeCaptionOptions.position:type_name -> volvoxgrid.v1.BarcodeCaptionPosition
-	10,  // 15: volvoxgrid.v1.BarcodeData.symbology:type_name -> volvoxgrid.v1.BarcodeSymbology
-	99,  // 16: volvoxgrid.v1.BarcodeData.encoding:type_name -> volvoxgrid.v1.BarcodeEncodingOptions
-	100, // 17: volvoxgrid.v1.BarcodeData.render:type_name -> volvoxgrid.v1.BarcodeRenderOptions
-	101, // 18: volvoxgrid.v1.BarcodeData.caption:type_name -> volvoxgrid.v1.BarcodeCaptionOptions
-	107, // 19: volvoxgrid.v1.StructValue.fields:type_name -> volvoxgrid.v1.StructField
-	108, // 20: volvoxgrid.v1.StructField.value:type_name -> volvoxgrid.v1.ScalarValue
-	110, // 21: volvoxgrid.v1.RichText.runs:type_name -> volvoxgrid.v1.TextFormatRun
-	111, // 22: volvoxgrid.v1.TextFormatRun.style:type_name -> volvoxgrid.v1.TextRunStyle
-	91,  // 23: volvoxgrid.v1.TextRunStyle.font:type_name -> volvoxgrid.v1.Font
-	7,   // 24: volvoxgrid.v1.TextRunStyle.baseline:type_name -> volvoxgrid.v1.TextBaseline
-	31,  // 25: volvoxgrid.v1.EditorSpec.kind:type_name -> volvoxgrid.v1.EditorKind
-	32,  // 26: volvoxgrid.v1.EditorSpec.owner:type_name -> volvoxgrid.v1.EditorOwner
-	33,  // 27: volvoxgrid.v1.EditorSpec.presentation:type_name -> volvoxgrid.v1.EditorPresentation
-	34,  // 28: volvoxgrid.v1.EditorSpec.validation_mode:type_name -> volvoxgrid.v1.ValidationMode
-	35,  // 29: volvoxgrid.v1.EditorSpec.validation_trigger:type_name -> volvoxgrid.v1.ValidationTrigger
-	113, // 30: volvoxgrid.v1.EditorSpec.text:type_name -> volvoxgrid.v1.TextEditorParams
-	114, // 31: volvoxgrid.v1.EditorSpec.number:type_name -> volvoxgrid.v1.NumberEditorParams
-	115, // 32: volvoxgrid.v1.EditorSpec.checkbox:type_name -> volvoxgrid.v1.CheckboxEditorParams
-	118, // 33: volvoxgrid.v1.EditorSpec.list:type_name -> volvoxgrid.v1.ListEditorParams
-	116, // 34: volvoxgrid.v1.EditorSpec.date_time:type_name -> volvoxgrid.v1.DateTimeEditorParams
-	117, // 35: volvoxgrid.v1.EditorSpec.actions:type_name -> volvoxgrid.v1.EditorAction
-	106, // 36: volvoxgrid.v1.EditorSpec.custom_props:type_name -> volvoxgrid.v1.StructValue
-	36,  // 37: volvoxgrid.v1.TextEditorParams.input_type:type_name -> volvoxgrid.v1.InputType
-	37,  // 38: volvoxgrid.v1.EditorAction.role:type_name -> volvoxgrid.v1.ButtonRole
-	98,  // 39: volvoxgrid.v1.EditorAction.icon:type_name -> volvoxgrid.v1.ImageData
-	119, // 40: volvoxgrid.v1.ListEditorParams.static_items:type_name -> volvoxgrid.v1.ListItem
-	120, // 41: volvoxgrid.v1.ListEditorParams.data_source:type_name -> volvoxgrid.v1.ListDataSource
-	29,  // 42: volvoxgrid.v1.ListEditorParams.item_layout:type_name -> volvoxgrid.v1.DropdownItemLayout
-	105, // 43: volvoxgrid.v1.ListItem.value:type_name -> volvoxgrid.v1.CellValue
-	105, // 44: volvoxgrid.v1.EditorValue.value:type_name -> volvoxgrid.v1.CellValue
-	28,  // 45: volvoxgrid.v1.EditActivation.trigger:type_name -> volvoxgrid.v1.EditTrigger
-	30,  // 46: volvoxgrid.v1.EditActivation.tab_behavior:type_name -> volvoxgrid.v1.TabBehavior
-	46,  // 47: volvoxgrid.v1.ScrollBarConfig.show_h:type_name -> volvoxgrid.v1.ScrollBarMode
-	46,  // 48: volvoxgrid.v1.ScrollBarConfig.show_v:type_name -> volvoxgrid.v1.ScrollBarMode
-	47,  // 49: volvoxgrid.v1.ScrollBarConfig.appearance:type_name -> volvoxgrid.v1.ScrollBarAppearance
-	125, // 50: volvoxgrid.v1.ScrollBarConfig.colors:type_name -> volvoxgrid.v1.ScrollBarColors
-	91,  // 51: volvoxgrid.v1.RegionStyle.font:type_name -> volvoxgrid.v1.Font
-	95,  // 52: volvoxgrid.v1.RegionStyle.grid_lines:type_name -> volvoxgrid.v1.GridLines
-	4,   // 53: volvoxgrid.v1.RegionStyle.text_effect:type_name -> volvoxgrid.v1.TextEffect
-	96,  // 54: volvoxgrid.v1.RegionStyle.separator:type_name -> volvoxgrid.v1.Separator
-	92,  // 55: volvoxgrid.v1.RegionStyle.cell_padding:type_name -> volvoxgrid.v1.Padding
-	8,   // 56: volvoxgrid.v1.CellStyle.align:type_name -> volvoxgrid.v1.Align
-	91,  // 57: volvoxgrid.v1.CellStyle.font:type_name -> volvoxgrid.v1.Font
-	92,  // 58: volvoxgrid.v1.CellStyle.padding:type_name -> volvoxgrid.v1.Padding
-	94,  // 59: volvoxgrid.v1.CellStyle.borders:type_name -> volvoxgrid.v1.Borders
-	4,   // 60: volvoxgrid.v1.CellStyle.text_effect:type_name -> volvoxgrid.v1.TextEffect
-	94,  // 61: volvoxgrid.v1.HighlightStyle.borders:type_name -> volvoxgrid.v1.Borders
-	17,  // 62: volvoxgrid.v1.HighlightStyle.fill_handle:type_name -> volvoxgrid.v1.FillHandlePosition
-	130, // 63: volvoxgrid.v1.HeaderSeparator.height:type_name -> volvoxgrid.v1.HeaderMarkSize
-	130, // 64: volvoxgrid.v1.HeaderResizeHandle.height:type_name -> volvoxgrid.v1.HeaderMarkSize
-	131, // 65: volvoxgrid.v1.HeaderStyle.separator:type_name -> volvoxgrid.v1.HeaderSeparator
-	132, // 66: volvoxgrid.v1.HeaderStyle.resize_handle:type_name -> volvoxgrid.v1.HeaderResizeHandle
-	91,  // 67: volvoxgrid.v1.IconStyle.font:type_name -> volvoxgrid.v1.Font
-	66,  // 68: volvoxgrid.v1.IconStyle.align:type_name -> volvoxgrid.v1.IconAlign
-	135, // 69: volvoxgrid.v1.IconSlotStyles.sort_ascending:type_name -> volvoxgrid.v1.IconStyle
-	135, // 70: volvoxgrid.v1.IconSlotStyles.sort_descending:type_name -> volvoxgrid.v1.IconStyle
-	135, // 71: volvoxgrid.v1.IconSlotStyles.sort_none:type_name -> volvoxgrid.v1.IconStyle
-	135, // 72: volvoxgrid.v1.IconSlotStyles.tree_expanded:type_name -> volvoxgrid.v1.IconStyle
-	135, // 73: volvoxgrid.v1.IconSlotStyles.tree_collapsed:type_name -> volvoxgrid.v1.IconStyle
-	135, // 74: volvoxgrid.v1.IconSlotStyles.menu:type_name -> volvoxgrid.v1.IconStyle
-	135, // 75: volvoxgrid.v1.IconSlotStyles.filter:type_name -> volvoxgrid.v1.IconStyle
-	135, // 76: volvoxgrid.v1.IconSlotStyles.filter_active:type_name -> volvoxgrid.v1.IconStyle
-	135, // 77: volvoxgrid.v1.IconSlotStyles.columns:type_name -> volvoxgrid.v1.IconStyle
-	135, // 78: volvoxgrid.v1.IconSlotStyles.drag_handle:type_name -> volvoxgrid.v1.IconStyle
-	135, // 79: volvoxgrid.v1.IconSlotStyles.checkbox_checked:type_name -> volvoxgrid.v1.IconStyle
-	135, // 80: volvoxgrid.v1.IconSlotStyles.checkbox_unchecked:type_name -> volvoxgrid.v1.IconStyle
-	135, // 81: volvoxgrid.v1.IconSlotStyles.checkbox_indeterminate:type_name -> volvoxgrid.v1.IconStyle
-	98,  // 82: volvoxgrid.v1.IconPictures.sort_ascending:type_name -> volvoxgrid.v1.ImageData
-	98,  // 83: volvoxgrid.v1.IconPictures.sort_descending:type_name -> volvoxgrid.v1.ImageData
-	98,  // 84: volvoxgrid.v1.IconPictures.node_open:type_name -> volvoxgrid.v1.ImageData
-	98,  // 85: volvoxgrid.v1.IconPictures.node_closed:type_name -> volvoxgrid.v1.ImageData
-	98,  // 86: volvoxgrid.v1.IconPictures.checkbox_checked:type_name -> volvoxgrid.v1.ImageData
-	98,  // 87: volvoxgrid.v1.IconPictures.checkbox_unchecked:type_name -> volvoxgrid.v1.ImageData
-	98,  // 88: volvoxgrid.v1.IconPictures.checkbox_indeterminate:type_name -> volvoxgrid.v1.ImageData
-	134, // 89: volvoxgrid.v1.IconTheme.slots:type_name -> volvoxgrid.v1.IconSlots
-	135, // 90: volvoxgrid.v1.IconTheme.defaults:type_name -> volvoxgrid.v1.IconStyle
-	136, // 91: volvoxgrid.v1.IconTheme.overrides:type_name -> volvoxgrid.v1.IconSlotStyles
-	137, // 92: volvoxgrid.v1.IconTheme.pictures:type_name -> volvoxgrid.v1.IconPictures
-	129, // 93: volvoxgrid.v1.HoverConfig.row_style:type_name -> volvoxgrid.v1.HighlightStyle
-	129, // 94: volvoxgrid.v1.HoverConfig.column_style:type_name -> volvoxgrid.v1.HighlightStyle
-	129, // 95: volvoxgrid.v1.HoverConfig.cell_style:type_name -> volvoxgrid.v1.HighlightStyle
-	144, // 96: volvoxgrid.v1.GridConfig.layout:type_name -> volvoxgrid.v1.LayoutConfig
-	145, // 97: volvoxgrid.v1.GridConfig.style:type_name -> volvoxgrid.v1.StyleConfig
-	146, // 98: volvoxgrid.v1.GridConfig.selection:type_name -> volvoxgrid.v1.SelectionConfig
-	147, // 99: volvoxgrid.v1.GridConfig.editing:type_name -> volvoxgrid.v1.EditConfig
-	149, // 100: volvoxgrid.v1.GridConfig.scrolling:type_name -> volvoxgrid.v1.ScrollConfig
-	150, // 101: volvoxgrid.v1.GridConfig.outline:type_name -> volvoxgrid.v1.OutlineConfig
-	151, // 102: volvoxgrid.v1.GridConfig.span:type_name -> volvoxgrid.v1.SpanConfig
-	152, // 103: volvoxgrid.v1.GridConfig.interaction:type_name -> volvoxgrid.v1.InteractionConfig
-	153, // 104: volvoxgrid.v1.GridConfig.rendering:type_name -> volvoxgrid.v1.RenderConfig
-	165, // 105: volvoxgrid.v1.GridConfig.indicators:type_name -> volvoxgrid.v1.IndicatorsConfig
-	91,  // 106: volvoxgrid.v1.StyleConfig.font:type_name -> volvoxgrid.v1.Font
-	92,  // 107: volvoxgrid.v1.StyleConfig.cell_padding:type_name -> volvoxgrid.v1.Padding
-	4,   // 108: volvoxgrid.v1.StyleConfig.text_effect:type_name -> volvoxgrid.v1.TextEffect
-	95,  // 109: volvoxgrid.v1.StyleConfig.grid_lines:type_name -> volvoxgrid.v1.GridLines
-	127, // 110: volvoxgrid.v1.StyleConfig.fixed:type_name -> volvoxgrid.v1.RegionStyle
-	127, // 111: volvoxgrid.v1.StyleConfig.frozen:type_name -> volvoxgrid.v1.RegionStyle
-	133, // 112: volvoxgrid.v1.StyleConfig.header:type_name -> volvoxgrid.v1.HeaderStyle
-	3,   // 113: volvoxgrid.v1.StyleConfig.appearance:type_name -> volvoxgrid.v1.BorderAppearance
-	9,   // 114: volvoxgrid.v1.StyleConfig.background_image_align:type_name -> volvoxgrid.v1.ImageAlignment
-	97,  // 115: volvoxgrid.v1.StyleConfig.text_rendering:type_name -> volvoxgrid.v1.TextRendering
-	138, // 116: volvoxgrid.v1.StyleConfig.icons:type_name -> volvoxgrid.v1.IconTheme
-	56,  // 117: volvoxgrid.v1.StyleConfig.apply_scope:type_name -> volvoxgrid.v1.ApplyScope
-	55,  // 118: volvoxgrid.v1.StyleConfig.custom_render:type_name -> volvoxgrid.v1.CustomRenderMode
-	25,  // 119: volvoxgrid.v1.SelectionConfig.mode:type_name -> volvoxgrid.v1.SelectionMode
-	26,  // 120: volvoxgrid.v1.SelectionConfig.focus_border:type_name -> volvoxgrid.v1.FocusBorderStyle
-	27,  // 121: volvoxgrid.v1.SelectionConfig.visibility:type_name -> volvoxgrid.v1.SelectionVisibility
-	129, // 122: volvoxgrid.v1.SelectionConfig.style:type_name -> volvoxgrid.v1.HighlightStyle
-	139, // 123: volvoxgrid.v1.SelectionConfig.hover:type_name -> volvoxgrid.v1.HoverConfig
-	129, // 124: volvoxgrid.v1.SelectionConfig.indicator_row_style:type_name -> volvoxgrid.v1.HighlightStyle
-	129, // 125: volvoxgrid.v1.SelectionConfig.indicator_col_style:type_name -> volvoxgrid.v1.HighlightStyle
-	129, // 126: volvoxgrid.v1.SelectionConfig.active_cell_style:type_name -> volvoxgrid.v1.HighlightStyle
-	124, // 127: volvoxgrid.v1.EditConfig.activation:type_name -> volvoxgrid.v1.EditActivation
-	112, // 128: volvoxgrid.v1.EditConfig.default_editor:type_name -> volvoxgrid.v1.EditorSpec
-	76,  // 129: volvoxgrid.v1.EditConfig.compose_method:type_name -> volvoxgrid.v1.ComposeMethod
-	68,  // 130: volvoxgrid.v1.PullToRefreshConfig.theme:type_name -> volvoxgrid.v1.PullToRefreshTheme
-	126, // 131: volvoxgrid.v1.ScrollConfig.scroll_bar:type_name -> volvoxgrid.v1.ScrollBarConfig
-	45,  // 132: volvoxgrid.v1.ScrollConfig.scrollbars:type_name -> volvoxgrid.v1.ScrollBarsMode
-	148, // 133: volvoxgrid.v1.ScrollConfig.pull_to_refresh:type_name -> volvoxgrid.v1.PullToRefreshConfig
-	40,  // 134: volvoxgrid.v1.OutlineConfig.tree_indicator:type_name -> volvoxgrid.v1.TreeIndicatorStyle
-	41,  // 135: volvoxgrid.v1.OutlineConfig.group_total_position:type_name -> volvoxgrid.v1.GroupTotalPosition
-	43,  // 136: volvoxgrid.v1.SpanConfig.cell_span:type_name -> volvoxgrid.v1.CellSpanMode
-	43,  // 137: volvoxgrid.v1.SpanConfig.cell_span_fixed:type_name -> volvoxgrid.v1.CellSpanMode
-	44,  // 138: volvoxgrid.v1.SpanConfig.cell_span_compare:type_name -> volvoxgrid.v1.SpanCompareMode
-	44,  // 139: volvoxgrid.v1.SpanConfig.group_span_compare:type_name -> volvoxgrid.v1.SpanCompareMode
-	140, // 140: volvoxgrid.v1.InteractionConfig.resize:type_name -> volvoxgrid.v1.ResizePolicy
-	141, // 141: volvoxgrid.v1.InteractionConfig.freeze:type_name -> volvoxgrid.v1.FreezePolicy
-	51,  // 142: volvoxgrid.v1.InteractionConfig.type_ahead:type_name -> volvoxgrid.v1.TypeAheadMode
-	52,  // 143: volvoxgrid.v1.InteractionConfig.auto_size_mode:type_name -> volvoxgrid.v1.AutoSizeMode
-	53,  // 144: volvoxgrid.v1.InteractionConfig.drag_mode:type_name -> volvoxgrid.v1.DragMode
-	54,  // 145: volvoxgrid.v1.InteractionConfig.drop_mode:type_name -> volvoxgrid.v1.DropMode
-	142, // 146: volvoxgrid.v1.InteractionConfig.header_features:type_name -> volvoxgrid.v1.HeaderFeatures
-	57,  // 147: volvoxgrid.v1.RenderConfig.renderer_mode:type_name -> volvoxgrid.v1.RendererMode
-	58,  // 148: volvoxgrid.v1.RenderConfig.present_mode:type_name -> volvoxgrid.v1.PresentMode
-	59,  // 149: volvoxgrid.v1.RenderConfig.frame_pacing_mode:type_name -> volvoxgrid.v1.FramePacingMode
-	73,  // 150: volvoxgrid.v1.ColIndicatorCellModes.modes:type_name -> volvoxgrid.v1.ColIndicatorCellMode
-	72,  // 151: volvoxgrid.v1.RowIndicatorSlot.kind:type_name -> volvoxgrid.v1.RowIndicatorSlotKind
-	1,   // 152: volvoxgrid.v1.RowIndicatorConfig.grid_lines:type_name -> volvoxgrid.v1.GridLineStyle
-	155, // 153: volvoxgrid.v1.RowIndicatorConfig.slots:type_name -> volvoxgrid.v1.RowIndicatorSlot
-	154, // 154: volvoxgrid.v1.ColIndicatorCell.modes:type_name -> volvoxgrid.v1.ColIndicatorCellModes
-	1,   // 155: volvoxgrid.v1.ColIndicatorConfig.grid_lines:type_name -> volvoxgrid.v1.GridLineStyle
-	157, // 156: volvoxgrid.v1.ColIndicatorConfig.row_defs:type_name -> volvoxgrid.v1.ColIndicatorRowDef
-	158, // 157: volvoxgrid.v1.ColIndicatorConfig.cells:type_name -> volvoxgrid.v1.ColIndicatorCell
-	154, // 158: volvoxgrid.v1.ColIndicatorConfig.cell_modes:type_name -> volvoxgrid.v1.ColIndicatorCellModes
-	74,  // 159: volvoxgrid.v1.CornerIndicatorSlot.kind:type_name -> volvoxgrid.v1.CornerIndicatorSlotKind
-	160, // 160: volvoxgrid.v1.CornerIndicatorConfig.slots:type_name -> volvoxgrid.v1.CornerIndicatorSlot
-	70,  // 161: volvoxgrid.v1.GridEventTarget.kind:type_name -> volvoxgrid.v1.GridTargetKind
-	71,  // 162: volvoxgrid.v1.GridEventTarget.band:type_name -> volvoxgrid.v1.IndicatorBand
-	156, // 163: volvoxgrid.v1.IndicatorsConfig.row_start:type_name -> volvoxgrid.v1.RowIndicatorConfig
-	156, // 164: volvoxgrid.v1.IndicatorsConfig.row_end:type_name -> volvoxgrid.v1.RowIndicatorConfig
-	159, // 165: volvoxgrid.v1.IndicatorsConfig.col_top:type_name -> volvoxgrid.v1.ColIndicatorConfig
-	159, // 166: volvoxgrid.v1.IndicatorsConfig.col_bottom:type_name -> volvoxgrid.v1.ColIndicatorConfig
-	161, // 167: volvoxgrid.v1.IndicatorsConfig.corner_top_start:type_name -> volvoxgrid.v1.CornerIndicatorConfig
-	161, // 168: volvoxgrid.v1.IndicatorsConfig.corner_top_end:type_name -> volvoxgrid.v1.CornerIndicatorConfig
-	161, // 169: volvoxgrid.v1.IndicatorsConfig.corner_bottom_start:type_name -> volvoxgrid.v1.CornerIndicatorConfig
-	161, // 170: volvoxgrid.v1.IndicatorsConfig.corner_bottom_end:type_name -> volvoxgrid.v1.CornerIndicatorConfig
-	164, // 171: volvoxgrid.v1.IndicatorsConfig.focus:type_name -> volvoxgrid.v1.IndicatorFocusConfig
-	48,  // 172: volvoxgrid.v1.IndicatorsConfig.appearance:type_name -> volvoxgrid.v1.IndicatorAppearance
-	162, // 173: volvoxgrid.v1.IndicatorsConfig.colors:type_name -> volvoxgrid.v1.IndicatorColors
-	8,   // 174: volvoxgrid.v1.ColumnDef.align:type_name -> volvoxgrid.v1.Align
-	8,   // 175: volvoxgrid.v1.ColumnDef.fixed_align:type_name -> volvoxgrid.v1.Align
-	18,  // 176: volvoxgrid.v1.ColumnDef.data_type:type_name -> volvoxgrid.v1.ColumnDataType
-	38,  // 177: volvoxgrid.v1.ColumnDef.sort_order:type_name -> volvoxgrid.v1.SortOrder
-	39,  // 178: volvoxgrid.v1.ColumnDef.sort_type:type_name -> volvoxgrid.v1.SortType
-	112, // 179: volvoxgrid.v1.ColumnDef.editor:type_name -> volvoxgrid.v1.EditorSpec
-	98,  // 180: volvoxgrid.v1.ColumnDef.image_list:type_name -> volvoxgrid.v1.ImageData
-	50,  // 181: volvoxgrid.v1.ColumnDef.sticky:type_name -> volvoxgrid.v1.StickyEdge
-	92,  // 182: volvoxgrid.v1.ColumnDef.padding:type_name -> volvoxgrid.v1.Padding
-	92,  // 183: volvoxgrid.v1.ColumnDef.fixed_padding:type_name -> volvoxgrid.v1.Padding
-	19,  // 184: volvoxgrid.v1.ColumnDef.coercion_mode:type_name -> volvoxgrid.v1.CoercionMode
-	20,  // 185: volvoxgrid.v1.ColumnDef.error_mode:type_name -> volvoxgrid.v1.WriteErrorMode
-	21,  // 186: volvoxgrid.v1.ColumnDef.interaction:type_name -> volvoxgrid.v1.CellInteraction
-	166, // 187: volvoxgrid.v1.DefineColumnsRequest.columns:type_name -> volvoxgrid.v1.ColumnDef
-	166, // 188: volvoxgrid.v1.SchemaResponse.columns:type_name -> volvoxgrid.v1.ColumnDef
-	170, // 189: volvoxgrid.v1.RowDef.status:type_name -> volvoxgrid.v1.RowStatus
-	49,  // 190: volvoxgrid.v1.RowDef.pin:type_name -> volvoxgrid.v1.PinPosition
-	50,  // 191: volvoxgrid.v1.RowDef.sticky:type_name -> volvoxgrid.v1.StickyEdge
-	169, // 192: volvoxgrid.v1.DefineRowsRequest.rows:type_name -> volvoxgrid.v1.RowDef
-	105, // 193: volvoxgrid.v1.CellUpdate.value:type_name -> volvoxgrid.v1.CellValue
-	128, // 194: volvoxgrid.v1.CellUpdate.style:type_name -> volvoxgrid.v1.CellStyle
-	16,  // 195: volvoxgrid.v1.CellUpdate.checked:type_name -> volvoxgrid.v1.CheckedState
-	98,  // 196: volvoxgrid.v1.CellUpdate.picture:type_name -> volvoxgrid.v1.ImageData
-	9,   // 197: volvoxgrid.v1.CellUpdate.picture_align:type_name -> volvoxgrid.v1.ImageAlignment
-	98,  // 198: volvoxgrid.v1.CellUpdate.button_picture:type_name -> volvoxgrid.v1.ImageData
-	112, // 199: volvoxgrid.v1.CellUpdate.editor:type_name -> volvoxgrid.v1.EditorSpec
-	50,  // 200: volvoxgrid.v1.CellUpdate.sticky_row:type_name -> volvoxgrid.v1.StickyEdge
-	50,  // 201: volvoxgrid.v1.CellUpdate.sticky_col:type_name -> volvoxgrid.v1.StickyEdge
-	21,  // 202: volvoxgrid.v1.CellUpdate.interaction:type_name -> volvoxgrid.v1.CellInteraction
-	102, // 203: volvoxgrid.v1.CellUpdate.barcode:type_name -> volvoxgrid.v1.BarcodeData
-	109, // 204: volvoxgrid.v1.CellUpdate.rich_text:type_name -> volvoxgrid.v1.RichText
-	172, // 205: volvoxgrid.v1.UpdateCellsRequest.cells:type_name -> volvoxgrid.v1.CellUpdate
-	105, // 206: volvoxgrid.v1.CellData.value:type_name -> volvoxgrid.v1.CellValue
-	128, // 207: volvoxgrid.v1.CellData.style:type_name -> volvoxgrid.v1.CellStyle
-	16,  // 208: volvoxgrid.v1.CellData.checked:type_name -> volvoxgrid.v1.CheckedState
-	21,  // 209: volvoxgrid.v1.CellData.interaction:type_name -> volvoxgrid.v1.CellInteraction
-	102, // 210: volvoxgrid.v1.CellData.barcode:type_name -> volvoxgrid.v1.BarcodeData
-	15,  // 211: volvoxgrid.v1.CellData.barcode_status:type_name -> volvoxgrid.v1.BarcodeRenderStatus
-	109, // 212: volvoxgrid.v1.CellData.rich_text:type_name -> volvoxgrid.v1.RichText
-	175, // 213: volvoxgrid.v1.CellsResponse.cells:type_name -> volvoxgrid.v1.CellData
-	18,  // 214: volvoxgrid.v1.TypeViolation.expected:type_name -> volvoxgrid.v1.ColumnDataType
-	105, // 215: volvoxgrid.v1.TypeViolation.actual:type_name -> volvoxgrid.v1.CellValue
-	177, // 216: volvoxgrid.v1.WriteResult.violations:type_name -> volvoxgrid.v1.TypeViolation
-	105, // 217: volvoxgrid.v1.LoadTableRequest.values:type_name -> volvoxgrid.v1.CellValue
-	181, // 218: volvoxgrid.v1.LoadDataOptions.csv:type_name -> volvoxgrid.v1.CsvOptions
-	182, // 219: volvoxgrid.v1.LoadDataOptions.json:type_name -> volvoxgrid.v1.JsonOptions
-	22,  // 220: volvoxgrid.v1.LoadDataOptions.header_policy:type_name -> volvoxgrid.v1.HeaderPolicy
-	180, // 221: volvoxgrid.v1.LoadDataOptions.field_map:type_name -> volvoxgrid.v1.FieldMapping
-	23,  // 222: volvoxgrid.v1.LoadDataOptions.type_policy:type_name -> volvoxgrid.v1.TypePolicy
-	19,  // 223: volvoxgrid.v1.LoadDataOptions.coercion:type_name -> volvoxgrid.v1.CoercionMode
-	20,  // 224: volvoxgrid.v1.LoadDataOptions.error_mode:type_name -> volvoxgrid.v1.WriteErrorMode
-	183, // 225: volvoxgrid.v1.LoadDataRequest.options:type_name -> volvoxgrid.v1.LoadDataOptions
-	183, // 226: volvoxgrid.v1.AppendDataRequest.options:type_name -> volvoxgrid.v1.LoadDataOptions
-	24,  // 227: volvoxgrid.v1.LoadDataResult.status:type_name -> volvoxgrid.v1.LoadDataStatus
-	177, // 228: volvoxgrid.v1.LoadDataResult.violations:type_name -> volvoxgrid.v1.TypeViolation
-	166, // 229: volvoxgrid.v1.LoadDataResult.inferred_columns:type_name -> volvoxgrid.v1.ColumnDef
-	60,  // 230: volvoxgrid.v1.ClearRequest.scope:type_name -> volvoxgrid.v1.ClearScope
-	61,  // 231: volvoxgrid.v1.ClearRequest.region:type_name -> volvoxgrid.v1.ClearRegion
-	103, // 232: volvoxgrid.v1.SelectRequest.ranges:type_name -> volvoxgrid.v1.CellRange
-	103, // 233: volvoxgrid.v1.SelectionState.ranges:type_name -> volvoxgrid.v1.CellRange
-	103, // 234: volvoxgrid.v1.HighlightRegion.range:type_name -> volvoxgrid.v1.CellRange
-	129, // 235: volvoxgrid.v1.HighlightRegion.style:type_name -> volvoxgrid.v1.HighlightStyle
-	194, // 236: volvoxgrid.v1.EditSetHighlights.regions:type_name -> volvoxgrid.v1.HighlightRegion
-	197, // 237: volvoxgrid.v1.EditCommand.start:type_name -> volvoxgrid.v1.EditStart
-	199, // 238: volvoxgrid.v1.EditCommand.session:type_name -> volvoxgrid.v1.EditorSessionCommand
-	198, // 239: volvoxgrid.v1.EditCommand.get_state:type_name -> volvoxgrid.v1.EditGetState
-	83,  // 240: volvoxgrid.v1.EditStart.reason:type_name -> volvoxgrid.v1.EditStartReason
-	121, // 241: volvoxgrid.v1.EditStart.seed_value:type_name -> volvoxgrid.v1.EditorValue
-	200, // 242: volvoxgrid.v1.EditorSessionCommand.value_changed:type_name -> volvoxgrid.v1.EditorValueChanged
-	201, // 243: volvoxgrid.v1.EditorSessionCommand.selection_changed:type_name -> volvoxgrid.v1.TextSelectionChanged
-	202, // 244: volvoxgrid.v1.EditorSessionCommand.preedit_changed:type_name -> volvoxgrid.v1.EditorPreeditChanged
-	203, // 245: volvoxgrid.v1.EditorSessionCommand.commit:type_name -> volvoxgrid.v1.EditCommit
-	204, // 246: volvoxgrid.v1.EditorSessionCommand.cancel:type_name -> volvoxgrid.v1.EditCancel
-	205, // 247: volvoxgrid.v1.EditorSessionCommand.custom_action:type_name -> volvoxgrid.v1.CustomEditorAction
-	121, // 248: volvoxgrid.v1.EditorValueChanged.value:type_name -> volvoxgrid.v1.EditorValue
-	122, // 249: volvoxgrid.v1.TextSelectionChanged.selection:type_name -> volvoxgrid.v1.TextSelection
-	121, // 250: volvoxgrid.v1.EditCommit.value:type_name -> volvoxgrid.v1.EditorValue
-	106, // 251: volvoxgrid.v1.CustomEditorAction.payload:type_name -> volvoxgrid.v1.StructValue
-	104, // 252: volvoxgrid.v1.EditorSession.viewport_rect:type_name -> volvoxgrid.v1.Rect
-	112, // 253: volvoxgrid.v1.EditorSession.editor:type_name -> volvoxgrid.v1.EditorSpec
-	121, // 254: volvoxgrid.v1.EditorSession.value:type_name -> volvoxgrid.v1.EditorValue
-	122, // 255: volvoxgrid.v1.EditorSession.selection:type_name -> volvoxgrid.v1.TextSelection
-	77,  // 256: volvoxgrid.v1.EditorSession.ui_mode:type_name -> volvoxgrid.v1.EditUiMode
-	207, // 257: volvoxgrid.v1.EditorSession.capabilities:type_name -> volvoxgrid.v1.EditorCapabilities
-	83,  // 258: volvoxgrid.v1.EditorSession.reason:type_name -> volvoxgrid.v1.EditStartReason
-	123, // 259: volvoxgrid.v1.EditorSession.validation_errors:type_name -> volvoxgrid.v1.ValidationError
-	206, // 260: volvoxgrid.v1.EditState.session:type_name -> volvoxgrid.v1.EditorSession
-	38,  // 261: volvoxgrid.v1.SortColumn.order:type_name -> volvoxgrid.v1.SortOrder
-	39,  // 262: volvoxgrid.v1.SortColumn.type:type_name -> volvoxgrid.v1.SortType
-	209, // 263: volvoxgrid.v1.SortRequest.sort_columns:type_name -> volvoxgrid.v1.SortColumn
-	42,  // 264: volvoxgrid.v1.SubtotalRequest.aggregate:type_name -> volvoxgrid.v1.AggregateType
-	91,  // 265: volvoxgrid.v1.SubtotalRequest.font:type_name -> volvoxgrid.v1.Font
-	65,  // 266: volvoxgrid.v1.GetNodeRequest.relation:type_name -> volvoxgrid.v1.NodeRelation
-	218, // 267: volvoxgrid.v1.FindRequest.text_query:type_name -> volvoxgrid.v1.TextQuery
-	219, // 268: volvoxgrid.v1.FindRequest.regex_query:type_name -> volvoxgrid.v1.RegexQuery
-	42,  // 269: volvoxgrid.v1.AggregateRequest.aggregate:type_name -> volvoxgrid.v1.AggregateType
-	103, // 270: volvoxgrid.v1.MergeCellsRequest.range:type_name -> volvoxgrid.v1.CellRange
-	103, // 271: volvoxgrid.v1.UnmergeCellsRequest.range:type_name -> volvoxgrid.v1.CellRange
-	103, // 272: volvoxgrid.v1.MergedRegionsResponse.ranges:type_name -> volvoxgrid.v1.CellRange
-	229, // 273: volvoxgrid.v1.ClipboardCommand.copy:type_name -> volvoxgrid.v1.ClipboardCopy
-	230, // 274: volvoxgrid.v1.ClipboardCommand.cut:type_name -> volvoxgrid.v1.ClipboardCut
-	231, // 275: volvoxgrid.v1.ClipboardCommand.paste:type_name -> volvoxgrid.v1.ClipboardPaste
-	232, // 276: volvoxgrid.v1.ClipboardCommand.delete:type_name -> volvoxgrid.v1.ClipboardDelete
-	62,  // 277: volvoxgrid.v1.ExportRequest.format:type_name -> volvoxgrid.v1.ExportFormat
-	63,  // 278: volvoxgrid.v1.ExportRequest.scope:type_name -> volvoxgrid.v1.ExportScope
-	62,  // 279: volvoxgrid.v1.ExportResponse.format:type_name -> volvoxgrid.v1.ExportFormat
-	64,  // 280: volvoxgrid.v1.PrintRequest.orientation:type_name -> volvoxgrid.v1.PrintOrientation
-	238, // 281: volvoxgrid.v1.PrintResponse.pages:type_name -> volvoxgrid.v1.PrintPage
-	86,  // 282: volvoxgrid.v1.ArchiveRequest.action:type_name -> volvoxgrid.v1.ArchiveRequest.Action
-	143, // 283: volvoxgrid.v1.CreateRequest.config:type_name -> volvoxgrid.v1.GridConfig
-	143, // 284: volvoxgrid.v1.ConfigureRequest.config:type_name -> volvoxgrid.v1.GridConfig
-	79,  // 285: volvoxgrid.v1.GetDemoDataResponse.format:type_name -> volvoxgrid.v1.DemoDataFormat
-	193, // 286: volvoxgrid.v1.SelectResponse.selection:type_name -> volvoxgrid.v1.SelectionState
-	103, // 287: volvoxgrid.v1.MergeCellsResponse.merged:type_name -> volvoxgrid.v1.CellRange
-	288, // 288: volvoxgrid.v1.RenderInput.viewport:type_name -> volvoxgrid.v1.ViewportState
-	289, // 289: volvoxgrid.v1.RenderInput.pointer:type_name -> volvoxgrid.v1.PointerEvent
-	292, // 290: volvoxgrid.v1.RenderInput.key:type_name -> volvoxgrid.v1.KeyEvent
-	293, // 291: volvoxgrid.v1.RenderInput.buffer:type_name -> volvoxgrid.v1.BufferReady
-	290, // 292: volvoxgrid.v1.RenderInput.scroll:type_name -> volvoxgrid.v1.ScrollEvent
-	299, // 293: volvoxgrid.v1.RenderInput.event_decision:type_name -> volvoxgrid.v1.EventDecision
-	291, // 294: volvoxgrid.v1.RenderInput.zoom:type_name -> volvoxgrid.v1.ZoomEvent
-	298, // 295: volvoxgrid.v1.RenderInput.gpu_surface:type_name -> volvoxgrid.v1.GpuSurfaceReady
-	294, // 296: volvoxgrid.v1.RenderInput.terminal_input:type_name -> volvoxgrid.v1.TerminalInputBytes
-	295, // 297: volvoxgrid.v1.RenderInput.terminal_capabilities:type_name -> volvoxgrid.v1.TerminalCapabilities
-	296, // 298: volvoxgrid.v1.RenderInput.terminal_viewport:type_name -> volvoxgrid.v1.TerminalViewport
-	297, // 299: volvoxgrid.v1.RenderInput.terminal_command:type_name -> volvoxgrid.v1.TerminalCommand
-	285, // 300: volvoxgrid.v1.RenderInput.compare_response:type_name -> volvoxgrid.v1.CompareResponse
-	286, // 301: volvoxgrid.v1.RenderInput.edit_validation_response:type_name -> volvoxgrid.v1.EditValidationResponse
-	287, // 302: volvoxgrid.v1.RenderInput.editor_list_items_response:type_name -> volvoxgrid.v1.EditorListItemsResponse
-	123, // 303: volvoxgrid.v1.EditValidationResponse.errors:type_name -> volvoxgrid.v1.ValidationError
-	121, // 304: volvoxgrid.v1.EditValidationResponse.normalized_value:type_name -> volvoxgrid.v1.EditorValue
-	119, // 305: volvoxgrid.v1.EditorListItemsResponse.items:type_name -> volvoxgrid.v1.ListItem
-	87,  // 306: volvoxgrid.v1.PointerEvent.type:type_name -> volvoxgrid.v1.PointerEvent.Type
-	88,  // 307: volvoxgrid.v1.ZoomEvent.phase:type_name -> volvoxgrid.v1.ZoomEvent.Phase
-	89,  // 308: volvoxgrid.v1.KeyEvent.type:type_name -> volvoxgrid.v1.KeyEvent.Type
-	80,  // 309: volvoxgrid.v1.TerminalCapabilities.color_level:type_name -> volvoxgrid.v1.TerminalColorLevel
-	90,  // 310: volvoxgrid.v1.TerminalCommand.kind:type_name -> volvoxgrid.v1.TerminalCommand.Kind
-	301, // 311: volvoxgrid.v1.RenderOutput.frame_done:type_name -> volvoxgrid.v1.FrameDone
-	304, // 312: volvoxgrid.v1.RenderOutput.selection:type_name -> volvoxgrid.v1.SelectionUpdate
-	305, // 313: volvoxgrid.v1.RenderOutput.cursor:type_name -> volvoxgrid.v1.CursorChange
-	306, // 314: volvoxgrid.v1.RenderOutput.editor_started:type_name -> volvoxgrid.v1.EditorSessionStarted
-	307, // 315: volvoxgrid.v1.RenderOutput.editor_updated:type_name -> volvoxgrid.v1.EditorSessionUpdated
-	308, // 316: volvoxgrid.v1.RenderOutput.editor_ended:type_name -> volvoxgrid.v1.EditorSessionEnded
-	309, // 317: volvoxgrid.v1.RenderOutput.tooltip_request:type_name -> volvoxgrid.v1.TooltipRequest
-	302, // 318: volvoxgrid.v1.RenderOutput.gpu_frame_done:type_name -> volvoxgrid.v1.GpuFrameDone
-	303, // 319: volvoxgrid.v1.FrameDone.metrics:type_name -> volvoxgrid.v1.FrameMetrics
-	81,  // 320: volvoxgrid.v1.FrameDone.frame_kind:type_name -> volvoxgrid.v1.FrameKind
-	303, // 321: volvoxgrid.v1.GpuFrameDone.metrics:type_name -> volvoxgrid.v1.FrameMetrics
-	103, // 322: volvoxgrid.v1.SelectionUpdate.ranges:type_name -> volvoxgrid.v1.CellRange
-	82,  // 323: volvoxgrid.v1.CursorChange.cursor:type_name -> volvoxgrid.v1.CursorType
-	206, // 324: volvoxgrid.v1.EditorSessionStarted.session:type_name -> volvoxgrid.v1.EditorSession
-	85,  // 325: volvoxgrid.v1.EditorSessionUpdated.reason:type_name -> volvoxgrid.v1.EditorUpdateReason
-	104, // 326: volvoxgrid.v1.EditorSessionUpdated.viewport_rect:type_name -> volvoxgrid.v1.Rect
-	121, // 327: volvoxgrid.v1.EditorSessionUpdated.value:type_name -> volvoxgrid.v1.EditorValue
-	122, // 328: volvoxgrid.v1.EditorSessionUpdated.selection:type_name -> volvoxgrid.v1.TextSelection
-	123, // 329: volvoxgrid.v1.EditorSessionUpdated.validation_errors:type_name -> volvoxgrid.v1.ValidationError
-	106, // 330: volvoxgrid.v1.EditorSessionUpdated.custom_payload:type_name -> volvoxgrid.v1.StructValue
-	84,  // 331: volvoxgrid.v1.EditorSessionEnded.reason:type_name -> volvoxgrid.v1.EditEndReason
-	121, // 332: volvoxgrid.v1.EditorSessionEnded.committed_value:type_name -> volvoxgrid.v1.EditorValue
-	311, // 333: volvoxgrid.v1.GridEvent.cell_focus_changing:type_name -> volvoxgrid.v1.CellFocusChangingEvent
-	312, // 334: volvoxgrid.v1.GridEvent.cell_focus_changed:type_name -> volvoxgrid.v1.CellFocusChangedEvent
-	313, // 335: volvoxgrid.v1.GridEvent.selection_changing:type_name -> volvoxgrid.v1.SelectionChangingEvent
-	314, // 336: volvoxgrid.v1.GridEvent.selection_changed:type_name -> volvoxgrid.v1.SelectionChangedEvent
-	315, // 337: volvoxgrid.v1.GridEvent.enter_cell:type_name -> volvoxgrid.v1.EnterCellEvent
-	316, // 338: volvoxgrid.v1.GridEvent.leave_cell:type_name -> volvoxgrid.v1.LeaveCellEvent
-	317, // 339: volvoxgrid.v1.GridEvent.before_edit:type_name -> volvoxgrid.v1.BeforeEditEvent
-	318, // 340: volvoxgrid.v1.GridEvent.start_edit:type_name -> volvoxgrid.v1.StartEditEvent
-	319, // 341: volvoxgrid.v1.GridEvent.after_edit:type_name -> volvoxgrid.v1.AfterEditEvent
-	320, // 342: volvoxgrid.v1.GridEvent.cell_edit_validate:type_name -> volvoxgrid.v1.CellEditValidateEvent
-	321, // 343: volvoxgrid.v1.GridEvent.cell_edit_change:type_name -> volvoxgrid.v1.CellEditChangeEvent
-	322, // 344: volvoxgrid.v1.GridEvent.key_down_edit:type_name -> volvoxgrid.v1.KeyDownEditEvent
-	323, // 345: volvoxgrid.v1.GridEvent.key_press_edit:type_name -> volvoxgrid.v1.KeyPressEditEvent
-	324, // 346: volvoxgrid.v1.GridEvent.key_up_edit:type_name -> volvoxgrid.v1.KeyUpEditEvent
-	325, // 347: volvoxgrid.v1.GridEvent.edit_validation_request:type_name -> volvoxgrid.v1.EditValidationRequest
-	326, // 348: volvoxgrid.v1.GridEvent.editor_list_items_request:type_name -> volvoxgrid.v1.EditorListItemsRequest
-	327, // 349: volvoxgrid.v1.GridEvent.custom_editor_action:type_name -> volvoxgrid.v1.CustomEditorActionEvent
-	328, // 350: volvoxgrid.v1.GridEvent.cell_changed:type_name -> volvoxgrid.v1.CellChangedEvent
-	329, // 351: volvoxgrid.v1.GridEvent.row_status_change:type_name -> volvoxgrid.v1.RowStatusChangeEvent
-	330, // 352: volvoxgrid.v1.GridEvent.before_sort:type_name -> volvoxgrid.v1.BeforeSortEvent
-	331, // 353: volvoxgrid.v1.GridEvent.after_sort:type_name -> volvoxgrid.v1.AfterSortEvent
-	332, // 354: volvoxgrid.v1.GridEvent.compare:type_name -> volvoxgrid.v1.CompareEvent
-	333, // 355: volvoxgrid.v1.GridEvent.before_node_toggle:type_name -> volvoxgrid.v1.BeforeNodeToggleEvent
-	334, // 356: volvoxgrid.v1.GridEvent.after_node_toggle:type_name -> volvoxgrid.v1.AfterNodeToggleEvent
-	340, // 357: volvoxgrid.v1.GridEvent.before_scroll:type_name -> volvoxgrid.v1.BeforeScrollEvent
-	341, // 358: volvoxgrid.v1.GridEvent.after_scroll:type_name -> volvoxgrid.v1.AfterScrollEvent
-	342, // 359: volvoxgrid.v1.GridEvent.scroll_tooltip:type_name -> volvoxgrid.v1.ScrollTooltipEvent
-	343, // 360: volvoxgrid.v1.GridEvent.before_user_resize:type_name -> volvoxgrid.v1.BeforeUserResizeEvent
-	344, // 361: volvoxgrid.v1.GridEvent.after_user_resize:type_name -> volvoxgrid.v1.AfterUserResizeEvent
-	345, // 362: volvoxgrid.v1.GridEvent.after_user_freeze:type_name -> volvoxgrid.v1.AfterUserFreezeEvent
-	346, // 363: volvoxgrid.v1.GridEvent.before_move_column:type_name -> volvoxgrid.v1.BeforeMoveColumnEvent
-	347, // 364: volvoxgrid.v1.GridEvent.after_move_column:type_name -> volvoxgrid.v1.AfterMoveColumnEvent
-	348, // 365: volvoxgrid.v1.GridEvent.before_move_row:type_name -> volvoxgrid.v1.BeforeMoveRowEvent
-	349, // 366: volvoxgrid.v1.GridEvent.after_move_row:type_name -> volvoxgrid.v1.AfterMoveRowEvent
-	350, // 367: volvoxgrid.v1.GridEvent.before_mouse_down:type_name -> volvoxgrid.v1.BeforeMouseDownEvent
-	351, // 368: volvoxgrid.v1.GridEvent.mouse_down:type_name -> volvoxgrid.v1.MouseDownEvent
-	352, // 369: volvoxgrid.v1.GridEvent.mouse_up:type_name -> volvoxgrid.v1.MouseUpEvent
-	353, // 370: volvoxgrid.v1.GridEvent.mouse_move:type_name -> volvoxgrid.v1.MouseMoveEvent
-	354, // 371: volvoxgrid.v1.GridEvent.click:type_name -> volvoxgrid.v1.ClickEvent
-	355, // 372: volvoxgrid.v1.GridEvent.dbl_click:type_name -> volvoxgrid.v1.DblClickEvent
-	356, // 373: volvoxgrid.v1.GridEvent.key_down:type_name -> volvoxgrid.v1.KeyDownEvent
-	357, // 374: volvoxgrid.v1.GridEvent.key_press:type_name -> volvoxgrid.v1.KeyPressEvent
-	358, // 375: volvoxgrid.v1.GridEvent.key_up:type_name -> volvoxgrid.v1.KeyUpEvent
-	359, // 376: volvoxgrid.v1.GridEvent.custom_render_cell:type_name -> volvoxgrid.v1.CustomRenderCellEvent
-	360, // 377: volvoxgrid.v1.GridEvent.drag_start:type_name -> volvoxgrid.v1.DragStartEvent
-	361, // 378: volvoxgrid.v1.GridEvent.drag_over:type_name -> volvoxgrid.v1.DragOverEvent
-	362, // 379: volvoxgrid.v1.GridEvent.drag_drop:type_name -> volvoxgrid.v1.DragDropEvent
-	363, // 380: volvoxgrid.v1.GridEvent.drag_complete:type_name -> volvoxgrid.v1.DragCompleteEvent
-	364, // 381: volvoxgrid.v1.GridEvent.type_ahead_started:type_name -> volvoxgrid.v1.TypeAheadStartedEvent
-	365, // 382: volvoxgrid.v1.GridEvent.type_ahead_ended:type_name -> volvoxgrid.v1.TypeAheadEndedEvent
-	366, // 383: volvoxgrid.v1.GridEvent.data_refreshing:type_name -> volvoxgrid.v1.DataRefreshingEvent
-	367, // 384: volvoxgrid.v1.GridEvent.data_refreshed:type_name -> volvoxgrid.v1.DataRefreshedEvent
-	368, // 385: volvoxgrid.v1.GridEvent.filter_data:type_name -> volvoxgrid.v1.FilterDataEvent
-	371, // 386: volvoxgrid.v1.GridEvent.error:type_name -> volvoxgrid.v1.ErrorEvent
-	372, // 387: volvoxgrid.v1.GridEvent.before_page_break:type_name -> volvoxgrid.v1.BeforePageBreakEvent
-	373, // 388: volvoxgrid.v1.GridEvent.start_page:type_name -> volvoxgrid.v1.StartPageEvent
-	374, // 389: volvoxgrid.v1.GridEvent.get_header_row:type_name -> volvoxgrid.v1.GetHeaderRowEvent
-	369, // 390: volvoxgrid.v1.GridEvent.pull_to_refresh_triggered:type_name -> volvoxgrid.v1.PullToRefreshTriggeredEvent
-	370, // 391: volvoxgrid.v1.GridEvent.pull_to_refresh_canceled:type_name -> volvoxgrid.v1.PullToRefreshCanceledEvent
-	335, // 392: volvoxgrid.v1.GridEvent.tree_children_requested:type_name -> volvoxgrid.v1.TreeChildrenRequestedEvent
-	336, // 393: volvoxgrid.v1.GridEvent.before_tree_node_toggle:type_name -> volvoxgrid.v1.BeforeTreeNodeToggleEvent
-	337, // 394: volvoxgrid.v1.GridEvent.after_tree_node_toggle:type_name -> volvoxgrid.v1.AfterTreeNodeToggleEvent
-	338, // 395: volvoxgrid.v1.GridEvent.tree_node_activate:type_name -> volvoxgrid.v1.TreeNodeActivateEvent
-	339, // 396: volvoxgrid.v1.GridEvent.tree_node_context_menu:type_name -> volvoxgrid.v1.TreeNodeContextMenuEvent
-	103, // 397: volvoxgrid.v1.SelectionChangingEvent.old_ranges:type_name -> volvoxgrid.v1.CellRange
-	103, // 398: volvoxgrid.v1.SelectionChangingEvent.new_ranges:type_name -> volvoxgrid.v1.CellRange
-	103, // 399: volvoxgrid.v1.SelectionChangedEvent.old_ranges:type_name -> volvoxgrid.v1.CellRange
-	103, // 400: volvoxgrid.v1.SelectionChangedEvent.new_ranges:type_name -> volvoxgrid.v1.CellRange
-	163, // 401: volvoxgrid.v1.EnterCellEvent.target:type_name -> volvoxgrid.v1.GridEventTarget
-	163, // 402: volvoxgrid.v1.LeaveCellEvent.target:type_name -> volvoxgrid.v1.GridEventTarget
-	121, // 403: volvoxgrid.v1.EditValidationRequest.value:type_name -> volvoxgrid.v1.EditorValue
-	106, // 404: volvoxgrid.v1.CustomEditorActionEvent.payload:type_name -> volvoxgrid.v1.StructValue
-	170, // 405: volvoxgrid.v1.RowStatusChangeEvent.status:type_name -> volvoxgrid.v1.RowStatus
-	163, // 406: volvoxgrid.v1.BeforeMouseDownEvent.target:type_name -> volvoxgrid.v1.GridEventTarget
-	163, // 407: volvoxgrid.v1.MouseMoveEvent.target:type_name -> volvoxgrid.v1.GridEventTarget
-	67,  // 408: volvoxgrid.v1.ClickEvent.hit_area:type_name -> volvoxgrid.v1.CellHitArea
-	21,  // 409: volvoxgrid.v1.ClickEvent.interaction:type_name -> volvoxgrid.v1.CellInteraction
-	163, // 410: volvoxgrid.v1.ClickEvent.target:type_name -> volvoxgrid.v1.GridEventTarget
-	163, // 411: volvoxgrid.v1.DblClickEvent.target:type_name -> volvoxgrid.v1.GridEventTarget
-	128, // 412: volvoxgrid.v1.CustomRenderCellEvent.style:type_name -> volvoxgrid.v1.CellStyle
-	241, // 413: volvoxgrid.v1.VolvoxGridService.Create:input_type -> volvoxgrid.v1.CreateRequest
-	243, // 414: volvoxgrid.v1.VolvoxGridService.Destroy:input_type -> volvoxgrid.v1.DestroyRequest
-	256, // 415: volvoxgrid.v1.VolvoxGridService.Configure:input_type -> volvoxgrid.v1.ConfigureRequest
-	244, // 416: volvoxgrid.v1.VolvoxGridService.GetConfig:input_type -> volvoxgrid.v1.GetConfigRequest
-	257, // 417: volvoxgrid.v1.VolvoxGridService.LoadFontData:input_type -> volvoxgrid.v1.LoadFontDataRequest
-	167, // 418: volvoxgrid.v1.VolvoxGridService.DefineColumns:input_type -> volvoxgrid.v1.DefineColumnsRequest
-	245, // 419: volvoxgrid.v1.VolvoxGridService.GetSchema:input_type -> volvoxgrid.v1.GetSchemaRequest
-	171, // 420: volvoxgrid.v1.VolvoxGridService.DefineRows:input_type -> volvoxgrid.v1.DefineRowsRequest
-	188, // 421: volvoxgrid.v1.VolvoxGridService.InsertRows:input_type -> volvoxgrid.v1.InsertRowsRequest
-	189, // 422: volvoxgrid.v1.VolvoxGridService.RemoveRows:input_type -> volvoxgrid.v1.RemoveRowsRequest
-	190, // 423: volvoxgrid.v1.VolvoxGridService.MoveColumn:input_type -> volvoxgrid.v1.MoveColumnRequest
-	191, // 424: volvoxgrid.v1.VolvoxGridService.MoveRow:input_type -> volvoxgrid.v1.MoveRowRequest
-	173, // 425: volvoxgrid.v1.VolvoxGridService.UpdateCells:input_type -> volvoxgrid.v1.UpdateCellsRequest
-	174, // 426: volvoxgrid.v1.VolvoxGridService.GetCells:input_type -> volvoxgrid.v1.GetCellsRequest
-	179, // 427: volvoxgrid.v1.VolvoxGridService.LoadTable:input_type -> volvoxgrid.v1.LoadTableRequest
-	184, // 428: volvoxgrid.v1.VolvoxGridService.LoadData:input_type -> volvoxgrid.v1.LoadDataRequest
-	185, // 429: volvoxgrid.v1.VolvoxGridService.AppendData:input_type -> volvoxgrid.v1.AppendDataRequest
-	187, // 430: volvoxgrid.v1.VolvoxGridService.Clear:input_type -> volvoxgrid.v1.ClearRequest
-	192, // 431: volvoxgrid.v1.VolvoxGridService.Select:input_type -> volvoxgrid.v1.SelectRequest
-	246, // 432: volvoxgrid.v1.VolvoxGridService.GetSelection:input_type -> volvoxgrid.v1.GetSelectionRequest
-	252, // 433: volvoxgrid.v1.VolvoxGridService.ShowCell:input_type -> volvoxgrid.v1.ShowCellRequest
-	253, // 434: volvoxgrid.v1.VolvoxGridService.SetTopRow:input_type -> volvoxgrid.v1.SetRowRequest
-	254, // 435: volvoxgrid.v1.VolvoxGridService.SetLeftCol:input_type -> volvoxgrid.v1.SetColRequest
-	196, // 436: volvoxgrid.v1.VolvoxGridService.Edit:input_type -> volvoxgrid.v1.EditCommand
-	210, // 437: volvoxgrid.v1.VolvoxGridService.Sort:input_type -> volvoxgrid.v1.SortRequest
-	211, // 438: volvoxgrid.v1.VolvoxGridService.Subtotal:input_type -> volvoxgrid.v1.SubtotalRequest
-	213, // 439: volvoxgrid.v1.VolvoxGridService.AutoSize:input_type -> volvoxgrid.v1.AutoSizeRequest
-	214, // 440: volvoxgrid.v1.VolvoxGridService.Outline:input_type -> volvoxgrid.v1.OutlineRequest
-	215, // 441: volvoxgrid.v1.VolvoxGridService.GetNode:input_type -> volvoxgrid.v1.GetNodeRequest
-	217, // 442: volvoxgrid.v1.VolvoxGridService.Find:input_type -> volvoxgrid.v1.FindRequest
-	221, // 443: volvoxgrid.v1.VolvoxGridService.Aggregate:input_type -> volvoxgrid.v1.AggregateRequest
-	223, // 444: volvoxgrid.v1.VolvoxGridService.GetMergedRange:input_type -> volvoxgrid.v1.GetMergedRangeRequest
-	224, // 445: volvoxgrid.v1.VolvoxGridService.MergeCells:input_type -> volvoxgrid.v1.MergeCellsRequest
-	225, // 446: volvoxgrid.v1.VolvoxGridService.UnmergeCells:input_type -> volvoxgrid.v1.UnmergeCellsRequest
-	247, // 447: volvoxgrid.v1.VolvoxGridService.GetMergedRegions:input_type -> volvoxgrid.v1.GetMergedRegionsRequest
-	248, // 448: volvoxgrid.v1.VolvoxGridService.GetMemoryUsage:input_type -> volvoxgrid.v1.GetMemoryUsageRequest
-	228, // 449: volvoxgrid.v1.VolvoxGridService.Clipboard:input_type -> volvoxgrid.v1.ClipboardCommand
-	234, // 450: volvoxgrid.v1.VolvoxGridService.Export:input_type -> volvoxgrid.v1.ExportRequest
-	236, // 451: volvoxgrid.v1.VolvoxGridService.Print:input_type -> volvoxgrid.v1.PrintRequest
-	239, // 452: volvoxgrid.v1.VolvoxGridService.Archive:input_type -> volvoxgrid.v1.ArchiveRequest
-	251, // 453: volvoxgrid.v1.VolvoxGridService.ResizeViewport:input_type -> volvoxgrid.v1.ResizeViewportRequest
-	255, // 454: volvoxgrid.v1.VolvoxGridService.SetRedraw:input_type -> volvoxgrid.v1.SetRedrawRequest
-	249, // 455: volvoxgrid.v1.VolvoxGridService.Refresh:input_type -> volvoxgrid.v1.RefreshRequest
-	258, // 456: volvoxgrid.v1.VolvoxGridService.LoadDemo:input_type -> volvoxgrid.v1.LoadDemoRequest
-	259, // 457: volvoxgrid.v1.VolvoxGridService.GetDemoData:input_type -> volvoxgrid.v1.GetDemoDataRequest
-	284, // 458: volvoxgrid.v1.VolvoxGridService.RenderSession:input_type -> volvoxgrid.v1.RenderInput
-	250, // 459: volvoxgrid.v1.VolvoxGridService.EventStream:input_type -> volvoxgrid.v1.EventStreamRequest
-	242, // 460: volvoxgrid.v1.VolvoxGridService.Create:output_type -> volvoxgrid.v1.CreateResponse
-	261, // 461: volvoxgrid.v1.VolvoxGridService.Destroy:output_type -> volvoxgrid.v1.DestroyResponse
-	262, // 462: volvoxgrid.v1.VolvoxGridService.Configure:output_type -> volvoxgrid.v1.ConfigureResponse
-	143, // 463: volvoxgrid.v1.VolvoxGridService.GetConfig:output_type -> volvoxgrid.v1.GridConfig
-	263, // 464: volvoxgrid.v1.VolvoxGridService.LoadFontData:output_type -> volvoxgrid.v1.LoadFontDataResponse
-	264, // 465: volvoxgrid.v1.VolvoxGridService.DefineColumns:output_type -> volvoxgrid.v1.DefineColumnsResponse
-	168, // 466: volvoxgrid.v1.VolvoxGridService.GetSchema:output_type -> volvoxgrid.v1.SchemaResponse
-	265, // 467: volvoxgrid.v1.VolvoxGridService.DefineRows:output_type -> volvoxgrid.v1.DefineRowsResponse
-	266, // 468: volvoxgrid.v1.VolvoxGridService.InsertRows:output_type -> volvoxgrid.v1.InsertRowsResponse
-	267, // 469: volvoxgrid.v1.VolvoxGridService.RemoveRows:output_type -> volvoxgrid.v1.RemoveRowsResponse
-	268, // 470: volvoxgrid.v1.VolvoxGridService.MoveColumn:output_type -> volvoxgrid.v1.MoveColumnResponse
-	269, // 471: volvoxgrid.v1.VolvoxGridService.MoveRow:output_type -> volvoxgrid.v1.MoveRowResponse
-	178, // 472: volvoxgrid.v1.VolvoxGridService.UpdateCells:output_type -> volvoxgrid.v1.WriteResult
-	176, // 473: volvoxgrid.v1.VolvoxGridService.GetCells:output_type -> volvoxgrid.v1.CellsResponse
-	178, // 474: volvoxgrid.v1.VolvoxGridService.LoadTable:output_type -> volvoxgrid.v1.WriteResult
-	186, // 475: volvoxgrid.v1.VolvoxGridService.LoadData:output_type -> volvoxgrid.v1.LoadDataResult
-	186, // 476: volvoxgrid.v1.VolvoxGridService.AppendData:output_type -> volvoxgrid.v1.LoadDataResult
-	270, // 477: volvoxgrid.v1.VolvoxGridService.Clear:output_type -> volvoxgrid.v1.ClearResponse
-	271, // 478: volvoxgrid.v1.VolvoxGridService.Select:output_type -> volvoxgrid.v1.SelectResponse
-	193, // 479: volvoxgrid.v1.VolvoxGridService.GetSelection:output_type -> volvoxgrid.v1.SelectionState
-	272, // 480: volvoxgrid.v1.VolvoxGridService.ShowCell:output_type -> volvoxgrid.v1.ShowCellResponse
-	273, // 481: volvoxgrid.v1.VolvoxGridService.SetTopRow:output_type -> volvoxgrid.v1.SetTopRowResponse
-	274, // 482: volvoxgrid.v1.VolvoxGridService.SetLeftCol:output_type -> volvoxgrid.v1.SetLeftColResponse
-	208, // 483: volvoxgrid.v1.VolvoxGridService.Edit:output_type -> volvoxgrid.v1.EditState
-	275, // 484: volvoxgrid.v1.VolvoxGridService.Sort:output_type -> volvoxgrid.v1.SortResponse
-	212, // 485: volvoxgrid.v1.VolvoxGridService.Subtotal:output_type -> volvoxgrid.v1.SubtotalResult
-	276, // 486: volvoxgrid.v1.VolvoxGridService.AutoSize:output_type -> volvoxgrid.v1.AutoSizeResponse
-	277, // 487: volvoxgrid.v1.VolvoxGridService.Outline:output_type -> volvoxgrid.v1.OutlineResponse
-	216, // 488: volvoxgrid.v1.VolvoxGridService.GetNode:output_type -> volvoxgrid.v1.NodeInfo
-	220, // 489: volvoxgrid.v1.VolvoxGridService.Find:output_type -> volvoxgrid.v1.FindResponse
-	222, // 490: volvoxgrid.v1.VolvoxGridService.Aggregate:output_type -> volvoxgrid.v1.AggregateResponse
-	103, // 491: volvoxgrid.v1.VolvoxGridService.GetMergedRange:output_type -> volvoxgrid.v1.CellRange
-	278, // 492: volvoxgrid.v1.VolvoxGridService.MergeCells:output_type -> volvoxgrid.v1.MergeCellsResponse
-	279, // 493: volvoxgrid.v1.VolvoxGridService.UnmergeCells:output_type -> volvoxgrid.v1.UnmergeCellsResponse
-	226, // 494: volvoxgrid.v1.VolvoxGridService.GetMergedRegions:output_type -> volvoxgrid.v1.MergedRegionsResponse
-	227, // 495: volvoxgrid.v1.VolvoxGridService.GetMemoryUsage:output_type -> volvoxgrid.v1.MemoryUsageResponse
-	233, // 496: volvoxgrid.v1.VolvoxGridService.Clipboard:output_type -> volvoxgrid.v1.ClipboardResponse
-	235, // 497: volvoxgrid.v1.VolvoxGridService.Export:output_type -> volvoxgrid.v1.ExportResponse
-	237, // 498: volvoxgrid.v1.VolvoxGridService.Print:output_type -> volvoxgrid.v1.PrintResponse
-	240, // 499: volvoxgrid.v1.VolvoxGridService.Archive:output_type -> volvoxgrid.v1.ArchiveResponse
-	280, // 500: volvoxgrid.v1.VolvoxGridService.ResizeViewport:output_type -> volvoxgrid.v1.ResizeViewportResponse
-	281, // 501: volvoxgrid.v1.VolvoxGridService.SetRedraw:output_type -> volvoxgrid.v1.SetRedrawResponse
-	282, // 502: volvoxgrid.v1.VolvoxGridService.Refresh:output_type -> volvoxgrid.v1.RefreshResponse
-	283, // 503: volvoxgrid.v1.VolvoxGridService.LoadDemo:output_type -> volvoxgrid.v1.LoadDemoResponse
-	260, // 504: volvoxgrid.v1.VolvoxGridService.GetDemoData:output_type -> volvoxgrid.v1.GetDemoDataResponse
-	300, // 505: volvoxgrid.v1.VolvoxGridService.RenderSession:output_type -> volvoxgrid.v1.RenderOutput
-	310, // 506: volvoxgrid.v1.VolvoxGridService.EventStream:output_type -> volvoxgrid.v1.GridEvent
-	460, // [460:507] is the sub-list for method output_type
-	413, // [413:460] is the sub-list for method input_type
-	413, // [413:413] is the sub-list for extension type_name
-	413, // [413:413] is the sub-list for extension extendee
-	0,   // [0:413] is the sub-list for field type_name
+	6,   // 8: volvoxgrid.v1.TextRendering.mode:type_name -> volvoxgrid.v1.TextRenderMode
+	7,   // 9: volvoxgrid.v1.TextRendering.hinting:type_name -> volvoxgrid.v1.TextHintingMode
+	13,  // 10: volvoxgrid.v1.BarcodeEncodingOptions.check_digit:type_name -> volvoxgrid.v1.BarcodeCheckDigitMode
+	14,  // 11: volvoxgrid.v1.BarcodeEncodingOptions.text_encoding:type_name -> volvoxgrid.v1.BarcodeTextEncoding
+	15,  // 12: volvoxgrid.v1.BarcodeEncodingOptions.qr_ecc:type_name -> volvoxgrid.v1.BarcodeQrErrorCorrection
+	10,  // 13: volvoxgrid.v1.BarcodeRenderOptions.alignment:type_name -> volvoxgrid.v1.ImageAlignment
+	12,  // 14: volvoxgrid.v1.BarcodeCaptionOptions.position:type_name -> volvoxgrid.v1.BarcodeCaptionPosition
+	11,  // 15: volvoxgrid.v1.BarcodeData.symbology:type_name -> volvoxgrid.v1.BarcodeSymbology
+	100, // 16: volvoxgrid.v1.BarcodeData.encoding:type_name -> volvoxgrid.v1.BarcodeEncodingOptions
+	101, // 17: volvoxgrid.v1.BarcodeData.render:type_name -> volvoxgrid.v1.BarcodeRenderOptions
+	102, // 18: volvoxgrid.v1.BarcodeData.caption:type_name -> volvoxgrid.v1.BarcodeCaptionOptions
+	108, // 19: volvoxgrid.v1.StructValue.fields:type_name -> volvoxgrid.v1.StructField
+	109, // 20: volvoxgrid.v1.StructField.value:type_name -> volvoxgrid.v1.ScalarValue
+	111, // 21: volvoxgrid.v1.RichText.runs:type_name -> volvoxgrid.v1.TextFormatRun
+	112, // 22: volvoxgrid.v1.TextFormatRun.style:type_name -> volvoxgrid.v1.TextRunStyle
+	92,  // 23: volvoxgrid.v1.TextRunStyle.font:type_name -> volvoxgrid.v1.Font
+	8,   // 24: volvoxgrid.v1.TextRunStyle.baseline:type_name -> volvoxgrid.v1.TextBaseline
+	32,  // 25: volvoxgrid.v1.EditorSpec.kind:type_name -> volvoxgrid.v1.EditorKind
+	33,  // 26: volvoxgrid.v1.EditorSpec.owner:type_name -> volvoxgrid.v1.EditorOwner
+	34,  // 27: volvoxgrid.v1.EditorSpec.presentation:type_name -> volvoxgrid.v1.EditorPresentation
+	35,  // 28: volvoxgrid.v1.EditorSpec.validation_mode:type_name -> volvoxgrid.v1.ValidationMode
+	36,  // 29: volvoxgrid.v1.EditorSpec.validation_trigger:type_name -> volvoxgrid.v1.ValidationTrigger
+	114, // 30: volvoxgrid.v1.EditorSpec.text:type_name -> volvoxgrid.v1.TextEditorParams
+	115, // 31: volvoxgrid.v1.EditorSpec.number:type_name -> volvoxgrid.v1.NumberEditorParams
+	116, // 32: volvoxgrid.v1.EditorSpec.checkbox:type_name -> volvoxgrid.v1.CheckboxEditorParams
+	119, // 33: volvoxgrid.v1.EditorSpec.list:type_name -> volvoxgrid.v1.ListEditorParams
+	117, // 34: volvoxgrid.v1.EditorSpec.date_time:type_name -> volvoxgrid.v1.DateTimeEditorParams
+	118, // 35: volvoxgrid.v1.EditorSpec.actions:type_name -> volvoxgrid.v1.EditorAction
+	107, // 36: volvoxgrid.v1.EditorSpec.custom_props:type_name -> volvoxgrid.v1.StructValue
+	37,  // 37: volvoxgrid.v1.TextEditorParams.input_type:type_name -> volvoxgrid.v1.InputType
+	38,  // 38: volvoxgrid.v1.EditorAction.role:type_name -> volvoxgrid.v1.ButtonRole
+	99,  // 39: volvoxgrid.v1.EditorAction.icon:type_name -> volvoxgrid.v1.ImageData
+	120, // 40: volvoxgrid.v1.ListEditorParams.static_items:type_name -> volvoxgrid.v1.ListItem
+	121, // 41: volvoxgrid.v1.ListEditorParams.data_source:type_name -> volvoxgrid.v1.ListDataSource
+	30,  // 42: volvoxgrid.v1.ListEditorParams.item_layout:type_name -> volvoxgrid.v1.DropdownItemLayout
+	106, // 43: volvoxgrid.v1.ListItem.value:type_name -> volvoxgrid.v1.CellValue
+	106, // 44: volvoxgrid.v1.EditorValue.value:type_name -> volvoxgrid.v1.CellValue
+	29,  // 45: volvoxgrid.v1.EditActivation.trigger:type_name -> volvoxgrid.v1.EditTrigger
+	31,  // 46: volvoxgrid.v1.EditActivation.tab_behavior:type_name -> volvoxgrid.v1.TabBehavior
+	47,  // 47: volvoxgrid.v1.ScrollBarConfig.show_h:type_name -> volvoxgrid.v1.ScrollBarMode
+	47,  // 48: volvoxgrid.v1.ScrollBarConfig.show_v:type_name -> volvoxgrid.v1.ScrollBarMode
+	48,  // 49: volvoxgrid.v1.ScrollBarConfig.appearance:type_name -> volvoxgrid.v1.ScrollBarAppearance
+	126, // 50: volvoxgrid.v1.ScrollBarConfig.colors:type_name -> volvoxgrid.v1.ScrollBarColors
+	92,  // 51: volvoxgrid.v1.RegionStyle.font:type_name -> volvoxgrid.v1.Font
+	96,  // 52: volvoxgrid.v1.RegionStyle.grid_lines:type_name -> volvoxgrid.v1.GridLines
+	5,   // 53: volvoxgrid.v1.RegionStyle.text_effect:type_name -> volvoxgrid.v1.TextEffect
+	97,  // 54: volvoxgrid.v1.RegionStyle.separator:type_name -> volvoxgrid.v1.Separator
+	93,  // 55: volvoxgrid.v1.RegionStyle.cell_padding:type_name -> volvoxgrid.v1.Padding
+	9,   // 56: volvoxgrid.v1.CellStyle.align:type_name -> volvoxgrid.v1.Align
+	92,  // 57: volvoxgrid.v1.CellStyle.font:type_name -> volvoxgrid.v1.Font
+	93,  // 58: volvoxgrid.v1.CellStyle.padding:type_name -> volvoxgrid.v1.Padding
+	95,  // 59: volvoxgrid.v1.CellStyle.borders:type_name -> volvoxgrid.v1.Borders
+	5,   // 60: volvoxgrid.v1.CellStyle.text_effect:type_name -> volvoxgrid.v1.TextEffect
+	95,  // 61: volvoxgrid.v1.HighlightStyle.borders:type_name -> volvoxgrid.v1.Borders
+	18,  // 62: volvoxgrid.v1.HighlightStyle.fill_handle:type_name -> volvoxgrid.v1.FillHandlePosition
+	131, // 63: volvoxgrid.v1.HeaderSeparator.height:type_name -> volvoxgrid.v1.HeaderMarkSize
+	131, // 64: volvoxgrid.v1.HeaderResizeHandle.height:type_name -> volvoxgrid.v1.HeaderMarkSize
+	132, // 65: volvoxgrid.v1.HeaderStyle.separator:type_name -> volvoxgrid.v1.HeaderSeparator
+	133, // 66: volvoxgrid.v1.HeaderStyle.resize_handle:type_name -> volvoxgrid.v1.HeaderResizeHandle
+	92,  // 67: volvoxgrid.v1.IconStyle.font:type_name -> volvoxgrid.v1.Font
+	67,  // 68: volvoxgrid.v1.IconStyle.align:type_name -> volvoxgrid.v1.IconAlign
+	136, // 69: volvoxgrid.v1.IconSlotStyles.sort_ascending:type_name -> volvoxgrid.v1.IconStyle
+	136, // 70: volvoxgrid.v1.IconSlotStyles.sort_descending:type_name -> volvoxgrid.v1.IconStyle
+	136, // 71: volvoxgrid.v1.IconSlotStyles.sort_none:type_name -> volvoxgrid.v1.IconStyle
+	136, // 72: volvoxgrid.v1.IconSlotStyles.tree_expanded:type_name -> volvoxgrid.v1.IconStyle
+	136, // 73: volvoxgrid.v1.IconSlotStyles.tree_collapsed:type_name -> volvoxgrid.v1.IconStyle
+	136, // 74: volvoxgrid.v1.IconSlotStyles.menu:type_name -> volvoxgrid.v1.IconStyle
+	136, // 75: volvoxgrid.v1.IconSlotStyles.filter:type_name -> volvoxgrid.v1.IconStyle
+	136, // 76: volvoxgrid.v1.IconSlotStyles.filter_active:type_name -> volvoxgrid.v1.IconStyle
+	136, // 77: volvoxgrid.v1.IconSlotStyles.columns:type_name -> volvoxgrid.v1.IconStyle
+	136, // 78: volvoxgrid.v1.IconSlotStyles.drag_handle:type_name -> volvoxgrid.v1.IconStyle
+	136, // 79: volvoxgrid.v1.IconSlotStyles.checkbox_checked:type_name -> volvoxgrid.v1.IconStyle
+	136, // 80: volvoxgrid.v1.IconSlotStyles.checkbox_unchecked:type_name -> volvoxgrid.v1.IconStyle
+	136, // 81: volvoxgrid.v1.IconSlotStyles.checkbox_indeterminate:type_name -> volvoxgrid.v1.IconStyle
+	99,  // 82: volvoxgrid.v1.IconPictures.sort_ascending:type_name -> volvoxgrid.v1.ImageData
+	99,  // 83: volvoxgrid.v1.IconPictures.sort_descending:type_name -> volvoxgrid.v1.ImageData
+	99,  // 84: volvoxgrid.v1.IconPictures.node_open:type_name -> volvoxgrid.v1.ImageData
+	99,  // 85: volvoxgrid.v1.IconPictures.node_closed:type_name -> volvoxgrid.v1.ImageData
+	99,  // 86: volvoxgrid.v1.IconPictures.checkbox_checked:type_name -> volvoxgrid.v1.ImageData
+	99,  // 87: volvoxgrid.v1.IconPictures.checkbox_unchecked:type_name -> volvoxgrid.v1.ImageData
+	99,  // 88: volvoxgrid.v1.IconPictures.checkbox_indeterminate:type_name -> volvoxgrid.v1.ImageData
+	135, // 89: volvoxgrid.v1.IconTheme.slots:type_name -> volvoxgrid.v1.IconSlots
+	136, // 90: volvoxgrid.v1.IconTheme.defaults:type_name -> volvoxgrid.v1.IconStyle
+	137, // 91: volvoxgrid.v1.IconTheme.overrides:type_name -> volvoxgrid.v1.IconSlotStyles
+	138, // 92: volvoxgrid.v1.IconTheme.pictures:type_name -> volvoxgrid.v1.IconPictures
+	130, // 93: volvoxgrid.v1.HoverConfig.row_style:type_name -> volvoxgrid.v1.HighlightStyle
+	130, // 94: volvoxgrid.v1.HoverConfig.column_style:type_name -> volvoxgrid.v1.HighlightStyle
+	130, // 95: volvoxgrid.v1.HoverConfig.cell_style:type_name -> volvoxgrid.v1.HighlightStyle
+	145, // 96: volvoxgrid.v1.GridConfig.layout:type_name -> volvoxgrid.v1.LayoutConfig
+	146, // 97: volvoxgrid.v1.GridConfig.style:type_name -> volvoxgrid.v1.StyleConfig
+	147, // 98: volvoxgrid.v1.GridConfig.selection:type_name -> volvoxgrid.v1.SelectionConfig
+	148, // 99: volvoxgrid.v1.GridConfig.editing:type_name -> volvoxgrid.v1.EditConfig
+	150, // 100: volvoxgrid.v1.GridConfig.scrolling:type_name -> volvoxgrid.v1.ScrollConfig
+	151, // 101: volvoxgrid.v1.GridConfig.outline:type_name -> volvoxgrid.v1.OutlineConfig
+	152, // 102: volvoxgrid.v1.GridConfig.span:type_name -> volvoxgrid.v1.SpanConfig
+	153, // 103: volvoxgrid.v1.GridConfig.interaction:type_name -> volvoxgrid.v1.InteractionConfig
+	154, // 104: volvoxgrid.v1.GridConfig.rendering:type_name -> volvoxgrid.v1.RenderConfig
+	166, // 105: volvoxgrid.v1.GridConfig.indicators:type_name -> volvoxgrid.v1.IndicatorsConfig
+	4,   // 106: volvoxgrid.v1.GridConfig.theme_preset:type_name -> volvoxgrid.v1.ThemePreset
+	92,  // 107: volvoxgrid.v1.StyleConfig.font:type_name -> volvoxgrid.v1.Font
+	93,  // 108: volvoxgrid.v1.StyleConfig.cell_padding:type_name -> volvoxgrid.v1.Padding
+	5,   // 109: volvoxgrid.v1.StyleConfig.text_effect:type_name -> volvoxgrid.v1.TextEffect
+	96,  // 110: volvoxgrid.v1.StyleConfig.grid_lines:type_name -> volvoxgrid.v1.GridLines
+	128, // 111: volvoxgrid.v1.StyleConfig.fixed:type_name -> volvoxgrid.v1.RegionStyle
+	128, // 112: volvoxgrid.v1.StyleConfig.frozen:type_name -> volvoxgrid.v1.RegionStyle
+	134, // 113: volvoxgrid.v1.StyleConfig.header:type_name -> volvoxgrid.v1.HeaderStyle
+	3,   // 114: volvoxgrid.v1.StyleConfig.appearance:type_name -> volvoxgrid.v1.BorderAppearance
+	10,  // 115: volvoxgrid.v1.StyleConfig.background_image_align:type_name -> volvoxgrid.v1.ImageAlignment
+	98,  // 116: volvoxgrid.v1.StyleConfig.text_rendering:type_name -> volvoxgrid.v1.TextRendering
+	139, // 117: volvoxgrid.v1.StyleConfig.icons:type_name -> volvoxgrid.v1.IconTheme
+	57,  // 118: volvoxgrid.v1.StyleConfig.apply_scope:type_name -> volvoxgrid.v1.ApplyScope
+	56,  // 119: volvoxgrid.v1.StyleConfig.custom_render:type_name -> volvoxgrid.v1.CustomRenderMode
+	26,  // 120: volvoxgrid.v1.SelectionConfig.mode:type_name -> volvoxgrid.v1.SelectionMode
+	27,  // 121: volvoxgrid.v1.SelectionConfig.focus_border:type_name -> volvoxgrid.v1.FocusBorderStyle
+	28,  // 122: volvoxgrid.v1.SelectionConfig.visibility:type_name -> volvoxgrid.v1.SelectionVisibility
+	130, // 123: volvoxgrid.v1.SelectionConfig.style:type_name -> volvoxgrid.v1.HighlightStyle
+	140, // 124: volvoxgrid.v1.SelectionConfig.hover:type_name -> volvoxgrid.v1.HoverConfig
+	130, // 125: volvoxgrid.v1.SelectionConfig.indicator_row_style:type_name -> volvoxgrid.v1.HighlightStyle
+	130, // 126: volvoxgrid.v1.SelectionConfig.indicator_col_style:type_name -> volvoxgrid.v1.HighlightStyle
+	130, // 127: volvoxgrid.v1.SelectionConfig.active_cell_style:type_name -> volvoxgrid.v1.HighlightStyle
+	125, // 128: volvoxgrid.v1.EditConfig.activation:type_name -> volvoxgrid.v1.EditActivation
+	113, // 129: volvoxgrid.v1.EditConfig.default_editor:type_name -> volvoxgrid.v1.EditorSpec
+	77,  // 130: volvoxgrid.v1.EditConfig.compose_method:type_name -> volvoxgrid.v1.ComposeMethod
+	69,  // 131: volvoxgrid.v1.PullToRefreshConfig.theme:type_name -> volvoxgrid.v1.PullToRefreshTheme
+	127, // 132: volvoxgrid.v1.ScrollConfig.scroll_bar:type_name -> volvoxgrid.v1.ScrollBarConfig
+	46,  // 133: volvoxgrid.v1.ScrollConfig.scrollbars:type_name -> volvoxgrid.v1.ScrollBarsMode
+	149, // 134: volvoxgrid.v1.ScrollConfig.pull_to_refresh:type_name -> volvoxgrid.v1.PullToRefreshConfig
+	41,  // 135: volvoxgrid.v1.OutlineConfig.tree_indicator:type_name -> volvoxgrid.v1.TreeIndicatorStyle
+	42,  // 136: volvoxgrid.v1.OutlineConfig.group_total_position:type_name -> volvoxgrid.v1.GroupTotalPosition
+	44,  // 137: volvoxgrid.v1.SpanConfig.cell_span:type_name -> volvoxgrid.v1.CellSpanMode
+	44,  // 138: volvoxgrid.v1.SpanConfig.cell_span_fixed:type_name -> volvoxgrid.v1.CellSpanMode
+	45,  // 139: volvoxgrid.v1.SpanConfig.cell_span_compare:type_name -> volvoxgrid.v1.SpanCompareMode
+	45,  // 140: volvoxgrid.v1.SpanConfig.group_span_compare:type_name -> volvoxgrid.v1.SpanCompareMode
+	141, // 141: volvoxgrid.v1.InteractionConfig.resize:type_name -> volvoxgrid.v1.ResizePolicy
+	142, // 142: volvoxgrid.v1.InteractionConfig.freeze:type_name -> volvoxgrid.v1.FreezePolicy
+	52,  // 143: volvoxgrid.v1.InteractionConfig.type_ahead:type_name -> volvoxgrid.v1.TypeAheadMode
+	53,  // 144: volvoxgrid.v1.InteractionConfig.auto_size_mode:type_name -> volvoxgrid.v1.AutoSizeMode
+	54,  // 145: volvoxgrid.v1.InteractionConfig.drag_mode:type_name -> volvoxgrid.v1.DragMode
+	55,  // 146: volvoxgrid.v1.InteractionConfig.drop_mode:type_name -> volvoxgrid.v1.DropMode
+	143, // 147: volvoxgrid.v1.InteractionConfig.header_features:type_name -> volvoxgrid.v1.HeaderFeatures
+	58,  // 148: volvoxgrid.v1.RenderConfig.renderer_mode:type_name -> volvoxgrid.v1.RendererMode
+	59,  // 149: volvoxgrid.v1.RenderConfig.present_mode:type_name -> volvoxgrid.v1.PresentMode
+	60,  // 150: volvoxgrid.v1.RenderConfig.frame_pacing_mode:type_name -> volvoxgrid.v1.FramePacingMode
+	74,  // 151: volvoxgrid.v1.ColIndicatorCellModes.modes:type_name -> volvoxgrid.v1.ColIndicatorCellMode
+	73,  // 152: volvoxgrid.v1.RowIndicatorSlot.kind:type_name -> volvoxgrid.v1.RowIndicatorSlotKind
+	1,   // 153: volvoxgrid.v1.RowIndicatorConfig.grid_lines:type_name -> volvoxgrid.v1.GridLineStyle
+	156, // 154: volvoxgrid.v1.RowIndicatorConfig.slots:type_name -> volvoxgrid.v1.RowIndicatorSlot
+	155, // 155: volvoxgrid.v1.ColIndicatorCell.modes:type_name -> volvoxgrid.v1.ColIndicatorCellModes
+	1,   // 156: volvoxgrid.v1.ColIndicatorConfig.grid_lines:type_name -> volvoxgrid.v1.GridLineStyle
+	158, // 157: volvoxgrid.v1.ColIndicatorConfig.row_defs:type_name -> volvoxgrid.v1.ColIndicatorRowDef
+	159, // 158: volvoxgrid.v1.ColIndicatorConfig.cells:type_name -> volvoxgrid.v1.ColIndicatorCell
+	155, // 159: volvoxgrid.v1.ColIndicatorConfig.cell_modes:type_name -> volvoxgrid.v1.ColIndicatorCellModes
+	75,  // 160: volvoxgrid.v1.CornerIndicatorSlot.kind:type_name -> volvoxgrid.v1.CornerIndicatorSlotKind
+	161, // 161: volvoxgrid.v1.CornerIndicatorConfig.slots:type_name -> volvoxgrid.v1.CornerIndicatorSlot
+	71,  // 162: volvoxgrid.v1.GridEventTarget.kind:type_name -> volvoxgrid.v1.GridTargetKind
+	72,  // 163: volvoxgrid.v1.GridEventTarget.band:type_name -> volvoxgrid.v1.IndicatorBand
+	157, // 164: volvoxgrid.v1.IndicatorsConfig.row_start:type_name -> volvoxgrid.v1.RowIndicatorConfig
+	157, // 165: volvoxgrid.v1.IndicatorsConfig.row_end:type_name -> volvoxgrid.v1.RowIndicatorConfig
+	160, // 166: volvoxgrid.v1.IndicatorsConfig.col_top:type_name -> volvoxgrid.v1.ColIndicatorConfig
+	160, // 167: volvoxgrid.v1.IndicatorsConfig.col_bottom:type_name -> volvoxgrid.v1.ColIndicatorConfig
+	162, // 168: volvoxgrid.v1.IndicatorsConfig.corner_top_start:type_name -> volvoxgrid.v1.CornerIndicatorConfig
+	162, // 169: volvoxgrid.v1.IndicatorsConfig.corner_top_end:type_name -> volvoxgrid.v1.CornerIndicatorConfig
+	162, // 170: volvoxgrid.v1.IndicatorsConfig.corner_bottom_start:type_name -> volvoxgrid.v1.CornerIndicatorConfig
+	162, // 171: volvoxgrid.v1.IndicatorsConfig.corner_bottom_end:type_name -> volvoxgrid.v1.CornerIndicatorConfig
+	165, // 172: volvoxgrid.v1.IndicatorsConfig.focus:type_name -> volvoxgrid.v1.IndicatorFocusConfig
+	49,  // 173: volvoxgrid.v1.IndicatorsConfig.appearance:type_name -> volvoxgrid.v1.IndicatorAppearance
+	163, // 174: volvoxgrid.v1.IndicatorsConfig.colors:type_name -> volvoxgrid.v1.IndicatorColors
+	9,   // 175: volvoxgrid.v1.ColumnDef.align:type_name -> volvoxgrid.v1.Align
+	9,   // 176: volvoxgrid.v1.ColumnDef.fixed_align:type_name -> volvoxgrid.v1.Align
+	19,  // 177: volvoxgrid.v1.ColumnDef.data_type:type_name -> volvoxgrid.v1.ColumnDataType
+	39,  // 178: volvoxgrid.v1.ColumnDef.sort_order:type_name -> volvoxgrid.v1.SortOrder
+	40,  // 179: volvoxgrid.v1.ColumnDef.sort_type:type_name -> volvoxgrid.v1.SortType
+	113, // 180: volvoxgrid.v1.ColumnDef.editor:type_name -> volvoxgrid.v1.EditorSpec
+	99,  // 181: volvoxgrid.v1.ColumnDef.image_list:type_name -> volvoxgrid.v1.ImageData
+	51,  // 182: volvoxgrid.v1.ColumnDef.sticky:type_name -> volvoxgrid.v1.StickyEdge
+	93,  // 183: volvoxgrid.v1.ColumnDef.padding:type_name -> volvoxgrid.v1.Padding
+	93,  // 184: volvoxgrid.v1.ColumnDef.fixed_padding:type_name -> volvoxgrid.v1.Padding
+	20,  // 185: volvoxgrid.v1.ColumnDef.coercion_mode:type_name -> volvoxgrid.v1.CoercionMode
+	21,  // 186: volvoxgrid.v1.ColumnDef.error_mode:type_name -> volvoxgrid.v1.WriteErrorMode
+	22,  // 187: volvoxgrid.v1.ColumnDef.interaction:type_name -> volvoxgrid.v1.CellInteraction
+	167, // 188: volvoxgrid.v1.DefineColumnsRequest.columns:type_name -> volvoxgrid.v1.ColumnDef
+	167, // 189: volvoxgrid.v1.SchemaResponse.columns:type_name -> volvoxgrid.v1.ColumnDef
+	171, // 190: volvoxgrid.v1.RowDef.status:type_name -> volvoxgrid.v1.RowStatus
+	50,  // 191: volvoxgrid.v1.RowDef.pin:type_name -> volvoxgrid.v1.PinPosition
+	51,  // 192: volvoxgrid.v1.RowDef.sticky:type_name -> volvoxgrid.v1.StickyEdge
+	170, // 193: volvoxgrid.v1.DefineRowsRequest.rows:type_name -> volvoxgrid.v1.RowDef
+	106, // 194: volvoxgrid.v1.CellUpdate.value:type_name -> volvoxgrid.v1.CellValue
+	129, // 195: volvoxgrid.v1.CellUpdate.style:type_name -> volvoxgrid.v1.CellStyle
+	17,  // 196: volvoxgrid.v1.CellUpdate.checked:type_name -> volvoxgrid.v1.CheckedState
+	99,  // 197: volvoxgrid.v1.CellUpdate.picture:type_name -> volvoxgrid.v1.ImageData
+	10,  // 198: volvoxgrid.v1.CellUpdate.picture_align:type_name -> volvoxgrid.v1.ImageAlignment
+	99,  // 199: volvoxgrid.v1.CellUpdate.button_picture:type_name -> volvoxgrid.v1.ImageData
+	113, // 200: volvoxgrid.v1.CellUpdate.editor:type_name -> volvoxgrid.v1.EditorSpec
+	51,  // 201: volvoxgrid.v1.CellUpdate.sticky_row:type_name -> volvoxgrid.v1.StickyEdge
+	51,  // 202: volvoxgrid.v1.CellUpdate.sticky_col:type_name -> volvoxgrid.v1.StickyEdge
+	22,  // 203: volvoxgrid.v1.CellUpdate.interaction:type_name -> volvoxgrid.v1.CellInteraction
+	103, // 204: volvoxgrid.v1.CellUpdate.barcode:type_name -> volvoxgrid.v1.BarcodeData
+	110, // 205: volvoxgrid.v1.CellUpdate.rich_text:type_name -> volvoxgrid.v1.RichText
+	173, // 206: volvoxgrid.v1.UpdateCellsRequest.cells:type_name -> volvoxgrid.v1.CellUpdate
+	106, // 207: volvoxgrid.v1.CellData.value:type_name -> volvoxgrid.v1.CellValue
+	129, // 208: volvoxgrid.v1.CellData.style:type_name -> volvoxgrid.v1.CellStyle
+	17,  // 209: volvoxgrid.v1.CellData.checked:type_name -> volvoxgrid.v1.CheckedState
+	22,  // 210: volvoxgrid.v1.CellData.interaction:type_name -> volvoxgrid.v1.CellInteraction
+	103, // 211: volvoxgrid.v1.CellData.barcode:type_name -> volvoxgrid.v1.BarcodeData
+	16,  // 212: volvoxgrid.v1.CellData.barcode_status:type_name -> volvoxgrid.v1.BarcodeRenderStatus
+	110, // 213: volvoxgrid.v1.CellData.rich_text:type_name -> volvoxgrid.v1.RichText
+	176, // 214: volvoxgrid.v1.CellsResponse.cells:type_name -> volvoxgrid.v1.CellData
+	19,  // 215: volvoxgrid.v1.TypeViolation.expected:type_name -> volvoxgrid.v1.ColumnDataType
+	106, // 216: volvoxgrid.v1.TypeViolation.actual:type_name -> volvoxgrid.v1.CellValue
+	178, // 217: volvoxgrid.v1.WriteResult.violations:type_name -> volvoxgrid.v1.TypeViolation
+	106, // 218: volvoxgrid.v1.LoadTableRequest.values:type_name -> volvoxgrid.v1.CellValue
+	182, // 219: volvoxgrid.v1.LoadDataOptions.csv:type_name -> volvoxgrid.v1.CsvOptions
+	183, // 220: volvoxgrid.v1.LoadDataOptions.json:type_name -> volvoxgrid.v1.JsonOptions
+	23,  // 221: volvoxgrid.v1.LoadDataOptions.header_policy:type_name -> volvoxgrid.v1.HeaderPolicy
+	181, // 222: volvoxgrid.v1.LoadDataOptions.field_map:type_name -> volvoxgrid.v1.FieldMapping
+	24,  // 223: volvoxgrid.v1.LoadDataOptions.type_policy:type_name -> volvoxgrid.v1.TypePolicy
+	20,  // 224: volvoxgrid.v1.LoadDataOptions.coercion:type_name -> volvoxgrid.v1.CoercionMode
+	21,  // 225: volvoxgrid.v1.LoadDataOptions.error_mode:type_name -> volvoxgrid.v1.WriteErrorMode
+	184, // 226: volvoxgrid.v1.LoadDataRequest.options:type_name -> volvoxgrid.v1.LoadDataOptions
+	184, // 227: volvoxgrid.v1.AppendDataRequest.options:type_name -> volvoxgrid.v1.LoadDataOptions
+	25,  // 228: volvoxgrid.v1.LoadDataResult.status:type_name -> volvoxgrid.v1.LoadDataStatus
+	178, // 229: volvoxgrid.v1.LoadDataResult.violations:type_name -> volvoxgrid.v1.TypeViolation
+	167, // 230: volvoxgrid.v1.LoadDataResult.inferred_columns:type_name -> volvoxgrid.v1.ColumnDef
+	61,  // 231: volvoxgrid.v1.ClearRequest.scope:type_name -> volvoxgrid.v1.ClearScope
+	62,  // 232: volvoxgrid.v1.ClearRequest.region:type_name -> volvoxgrid.v1.ClearRegion
+	104, // 233: volvoxgrid.v1.SelectRequest.ranges:type_name -> volvoxgrid.v1.CellRange
+	104, // 234: volvoxgrid.v1.SelectionState.ranges:type_name -> volvoxgrid.v1.CellRange
+	104, // 235: volvoxgrid.v1.HighlightRegion.range:type_name -> volvoxgrid.v1.CellRange
+	130, // 236: volvoxgrid.v1.HighlightRegion.style:type_name -> volvoxgrid.v1.HighlightStyle
+	195, // 237: volvoxgrid.v1.EditSetHighlights.regions:type_name -> volvoxgrid.v1.HighlightRegion
+	198, // 238: volvoxgrid.v1.EditCommand.start:type_name -> volvoxgrid.v1.EditStart
+	200, // 239: volvoxgrid.v1.EditCommand.session:type_name -> volvoxgrid.v1.EditorSessionCommand
+	199, // 240: volvoxgrid.v1.EditCommand.get_state:type_name -> volvoxgrid.v1.EditGetState
+	84,  // 241: volvoxgrid.v1.EditStart.reason:type_name -> volvoxgrid.v1.EditStartReason
+	122, // 242: volvoxgrid.v1.EditStart.seed_value:type_name -> volvoxgrid.v1.EditorValue
+	201, // 243: volvoxgrid.v1.EditorSessionCommand.value_changed:type_name -> volvoxgrid.v1.EditorValueChanged
+	202, // 244: volvoxgrid.v1.EditorSessionCommand.selection_changed:type_name -> volvoxgrid.v1.TextSelectionChanged
+	203, // 245: volvoxgrid.v1.EditorSessionCommand.preedit_changed:type_name -> volvoxgrid.v1.EditorPreeditChanged
+	204, // 246: volvoxgrid.v1.EditorSessionCommand.commit:type_name -> volvoxgrid.v1.EditCommit
+	205, // 247: volvoxgrid.v1.EditorSessionCommand.cancel:type_name -> volvoxgrid.v1.EditCancel
+	206, // 248: volvoxgrid.v1.EditorSessionCommand.custom_action:type_name -> volvoxgrid.v1.CustomEditorAction
+	122, // 249: volvoxgrid.v1.EditorValueChanged.value:type_name -> volvoxgrid.v1.EditorValue
+	123, // 250: volvoxgrid.v1.TextSelectionChanged.selection:type_name -> volvoxgrid.v1.TextSelection
+	122, // 251: volvoxgrid.v1.EditCommit.value:type_name -> volvoxgrid.v1.EditorValue
+	107, // 252: volvoxgrid.v1.CustomEditorAction.payload:type_name -> volvoxgrid.v1.StructValue
+	105, // 253: volvoxgrid.v1.EditorSession.viewport_rect:type_name -> volvoxgrid.v1.Rect
+	113, // 254: volvoxgrid.v1.EditorSession.editor:type_name -> volvoxgrid.v1.EditorSpec
+	122, // 255: volvoxgrid.v1.EditorSession.value:type_name -> volvoxgrid.v1.EditorValue
+	123, // 256: volvoxgrid.v1.EditorSession.selection:type_name -> volvoxgrid.v1.TextSelection
+	78,  // 257: volvoxgrid.v1.EditorSession.ui_mode:type_name -> volvoxgrid.v1.EditUiMode
+	208, // 258: volvoxgrid.v1.EditorSession.capabilities:type_name -> volvoxgrid.v1.EditorCapabilities
+	84,  // 259: volvoxgrid.v1.EditorSession.reason:type_name -> volvoxgrid.v1.EditStartReason
+	124, // 260: volvoxgrid.v1.EditorSession.validation_errors:type_name -> volvoxgrid.v1.ValidationError
+	207, // 261: volvoxgrid.v1.EditState.session:type_name -> volvoxgrid.v1.EditorSession
+	39,  // 262: volvoxgrid.v1.SortColumn.order:type_name -> volvoxgrid.v1.SortOrder
+	40,  // 263: volvoxgrid.v1.SortColumn.type:type_name -> volvoxgrid.v1.SortType
+	210, // 264: volvoxgrid.v1.SortRequest.sort_columns:type_name -> volvoxgrid.v1.SortColumn
+	43,  // 265: volvoxgrid.v1.SubtotalRequest.aggregate:type_name -> volvoxgrid.v1.AggregateType
+	92,  // 266: volvoxgrid.v1.SubtotalRequest.font:type_name -> volvoxgrid.v1.Font
+	66,  // 267: volvoxgrid.v1.GetNodeRequest.relation:type_name -> volvoxgrid.v1.NodeRelation
+	219, // 268: volvoxgrid.v1.FindRequest.text_query:type_name -> volvoxgrid.v1.TextQuery
+	220, // 269: volvoxgrid.v1.FindRequest.regex_query:type_name -> volvoxgrid.v1.RegexQuery
+	43,  // 270: volvoxgrid.v1.AggregateRequest.aggregate:type_name -> volvoxgrid.v1.AggregateType
+	104, // 271: volvoxgrid.v1.MergeCellsRequest.range:type_name -> volvoxgrid.v1.CellRange
+	104, // 272: volvoxgrid.v1.UnmergeCellsRequest.range:type_name -> volvoxgrid.v1.CellRange
+	104, // 273: volvoxgrid.v1.MergedRegionsResponse.ranges:type_name -> volvoxgrid.v1.CellRange
+	230, // 274: volvoxgrid.v1.ClipboardCommand.copy:type_name -> volvoxgrid.v1.ClipboardCopy
+	231, // 275: volvoxgrid.v1.ClipboardCommand.cut:type_name -> volvoxgrid.v1.ClipboardCut
+	232, // 276: volvoxgrid.v1.ClipboardCommand.paste:type_name -> volvoxgrid.v1.ClipboardPaste
+	233, // 277: volvoxgrid.v1.ClipboardCommand.delete:type_name -> volvoxgrid.v1.ClipboardDelete
+	63,  // 278: volvoxgrid.v1.ExportRequest.format:type_name -> volvoxgrid.v1.ExportFormat
+	64,  // 279: volvoxgrid.v1.ExportRequest.scope:type_name -> volvoxgrid.v1.ExportScope
+	63,  // 280: volvoxgrid.v1.ExportResponse.format:type_name -> volvoxgrid.v1.ExportFormat
+	65,  // 281: volvoxgrid.v1.PrintRequest.orientation:type_name -> volvoxgrid.v1.PrintOrientation
+	239, // 282: volvoxgrid.v1.PrintResponse.pages:type_name -> volvoxgrid.v1.PrintPage
+	87,  // 283: volvoxgrid.v1.ArchiveRequest.action:type_name -> volvoxgrid.v1.ArchiveRequest.Action
+	144, // 284: volvoxgrid.v1.CreateRequest.config:type_name -> volvoxgrid.v1.GridConfig
+	144, // 285: volvoxgrid.v1.ConfigureRequest.config:type_name -> volvoxgrid.v1.GridConfig
+	80,  // 286: volvoxgrid.v1.GetDemoDataResponse.format:type_name -> volvoxgrid.v1.DemoDataFormat
+	194, // 287: volvoxgrid.v1.SelectResponse.selection:type_name -> volvoxgrid.v1.SelectionState
+	104, // 288: volvoxgrid.v1.MergeCellsResponse.merged:type_name -> volvoxgrid.v1.CellRange
+	289, // 289: volvoxgrid.v1.RenderInput.viewport:type_name -> volvoxgrid.v1.ViewportState
+	290, // 290: volvoxgrid.v1.RenderInput.pointer:type_name -> volvoxgrid.v1.PointerEvent
+	293, // 291: volvoxgrid.v1.RenderInput.key:type_name -> volvoxgrid.v1.KeyEvent
+	294, // 292: volvoxgrid.v1.RenderInput.buffer:type_name -> volvoxgrid.v1.BufferReady
+	291, // 293: volvoxgrid.v1.RenderInput.scroll:type_name -> volvoxgrid.v1.ScrollEvent
+	300, // 294: volvoxgrid.v1.RenderInput.event_decision:type_name -> volvoxgrid.v1.EventDecision
+	292, // 295: volvoxgrid.v1.RenderInput.zoom:type_name -> volvoxgrid.v1.ZoomEvent
+	299, // 296: volvoxgrid.v1.RenderInput.gpu_surface:type_name -> volvoxgrid.v1.GpuSurfaceReady
+	295, // 297: volvoxgrid.v1.RenderInput.terminal_input:type_name -> volvoxgrid.v1.TerminalInputBytes
+	296, // 298: volvoxgrid.v1.RenderInput.terminal_capabilities:type_name -> volvoxgrid.v1.TerminalCapabilities
+	297, // 299: volvoxgrid.v1.RenderInput.terminal_viewport:type_name -> volvoxgrid.v1.TerminalViewport
+	298, // 300: volvoxgrid.v1.RenderInput.terminal_command:type_name -> volvoxgrid.v1.TerminalCommand
+	286, // 301: volvoxgrid.v1.RenderInput.compare_response:type_name -> volvoxgrid.v1.CompareResponse
+	287, // 302: volvoxgrid.v1.RenderInput.edit_validation_response:type_name -> volvoxgrid.v1.EditValidationResponse
+	288, // 303: volvoxgrid.v1.RenderInput.editor_list_items_response:type_name -> volvoxgrid.v1.EditorListItemsResponse
+	124, // 304: volvoxgrid.v1.EditValidationResponse.errors:type_name -> volvoxgrid.v1.ValidationError
+	122, // 305: volvoxgrid.v1.EditValidationResponse.normalized_value:type_name -> volvoxgrid.v1.EditorValue
+	120, // 306: volvoxgrid.v1.EditorListItemsResponse.items:type_name -> volvoxgrid.v1.ListItem
+	88,  // 307: volvoxgrid.v1.PointerEvent.type:type_name -> volvoxgrid.v1.PointerEvent.Type
+	89,  // 308: volvoxgrid.v1.ZoomEvent.phase:type_name -> volvoxgrid.v1.ZoomEvent.Phase
+	90,  // 309: volvoxgrid.v1.KeyEvent.type:type_name -> volvoxgrid.v1.KeyEvent.Type
+	81,  // 310: volvoxgrid.v1.TerminalCapabilities.color_level:type_name -> volvoxgrid.v1.TerminalColorLevel
+	91,  // 311: volvoxgrid.v1.TerminalCommand.kind:type_name -> volvoxgrid.v1.TerminalCommand.Kind
+	302, // 312: volvoxgrid.v1.RenderOutput.frame_done:type_name -> volvoxgrid.v1.FrameDone
+	305, // 313: volvoxgrid.v1.RenderOutput.selection:type_name -> volvoxgrid.v1.SelectionUpdate
+	306, // 314: volvoxgrid.v1.RenderOutput.cursor:type_name -> volvoxgrid.v1.CursorChange
+	307, // 315: volvoxgrid.v1.RenderOutput.editor_started:type_name -> volvoxgrid.v1.EditorSessionStarted
+	308, // 316: volvoxgrid.v1.RenderOutput.editor_updated:type_name -> volvoxgrid.v1.EditorSessionUpdated
+	309, // 317: volvoxgrid.v1.RenderOutput.editor_ended:type_name -> volvoxgrid.v1.EditorSessionEnded
+	310, // 318: volvoxgrid.v1.RenderOutput.tooltip_request:type_name -> volvoxgrid.v1.TooltipRequest
+	303, // 319: volvoxgrid.v1.RenderOutput.gpu_frame_done:type_name -> volvoxgrid.v1.GpuFrameDone
+	304, // 320: volvoxgrid.v1.FrameDone.metrics:type_name -> volvoxgrid.v1.FrameMetrics
+	82,  // 321: volvoxgrid.v1.FrameDone.frame_kind:type_name -> volvoxgrid.v1.FrameKind
+	304, // 322: volvoxgrid.v1.GpuFrameDone.metrics:type_name -> volvoxgrid.v1.FrameMetrics
+	104, // 323: volvoxgrid.v1.SelectionUpdate.ranges:type_name -> volvoxgrid.v1.CellRange
+	83,  // 324: volvoxgrid.v1.CursorChange.cursor:type_name -> volvoxgrid.v1.CursorType
+	207, // 325: volvoxgrid.v1.EditorSessionStarted.session:type_name -> volvoxgrid.v1.EditorSession
+	86,  // 326: volvoxgrid.v1.EditorSessionUpdated.reason:type_name -> volvoxgrid.v1.EditorUpdateReason
+	105, // 327: volvoxgrid.v1.EditorSessionUpdated.viewport_rect:type_name -> volvoxgrid.v1.Rect
+	122, // 328: volvoxgrid.v1.EditorSessionUpdated.value:type_name -> volvoxgrid.v1.EditorValue
+	123, // 329: volvoxgrid.v1.EditorSessionUpdated.selection:type_name -> volvoxgrid.v1.TextSelection
+	124, // 330: volvoxgrid.v1.EditorSessionUpdated.validation_errors:type_name -> volvoxgrid.v1.ValidationError
+	107, // 331: volvoxgrid.v1.EditorSessionUpdated.custom_payload:type_name -> volvoxgrid.v1.StructValue
+	85,  // 332: volvoxgrid.v1.EditorSessionEnded.reason:type_name -> volvoxgrid.v1.EditEndReason
+	122, // 333: volvoxgrid.v1.EditorSessionEnded.committed_value:type_name -> volvoxgrid.v1.EditorValue
+	312, // 334: volvoxgrid.v1.GridEvent.cell_focus_changing:type_name -> volvoxgrid.v1.CellFocusChangingEvent
+	313, // 335: volvoxgrid.v1.GridEvent.cell_focus_changed:type_name -> volvoxgrid.v1.CellFocusChangedEvent
+	314, // 336: volvoxgrid.v1.GridEvent.selection_changing:type_name -> volvoxgrid.v1.SelectionChangingEvent
+	315, // 337: volvoxgrid.v1.GridEvent.selection_changed:type_name -> volvoxgrid.v1.SelectionChangedEvent
+	316, // 338: volvoxgrid.v1.GridEvent.enter_cell:type_name -> volvoxgrid.v1.EnterCellEvent
+	317, // 339: volvoxgrid.v1.GridEvent.leave_cell:type_name -> volvoxgrid.v1.LeaveCellEvent
+	318, // 340: volvoxgrid.v1.GridEvent.before_edit:type_name -> volvoxgrid.v1.BeforeEditEvent
+	319, // 341: volvoxgrid.v1.GridEvent.start_edit:type_name -> volvoxgrid.v1.StartEditEvent
+	320, // 342: volvoxgrid.v1.GridEvent.after_edit:type_name -> volvoxgrid.v1.AfterEditEvent
+	321, // 343: volvoxgrid.v1.GridEvent.cell_edit_validate:type_name -> volvoxgrid.v1.CellEditValidateEvent
+	322, // 344: volvoxgrid.v1.GridEvent.cell_edit_change:type_name -> volvoxgrid.v1.CellEditChangeEvent
+	323, // 345: volvoxgrid.v1.GridEvent.key_down_edit:type_name -> volvoxgrid.v1.KeyDownEditEvent
+	324, // 346: volvoxgrid.v1.GridEvent.key_press_edit:type_name -> volvoxgrid.v1.KeyPressEditEvent
+	325, // 347: volvoxgrid.v1.GridEvent.key_up_edit:type_name -> volvoxgrid.v1.KeyUpEditEvent
+	326, // 348: volvoxgrid.v1.GridEvent.edit_validation_request:type_name -> volvoxgrid.v1.EditValidationRequest
+	327, // 349: volvoxgrid.v1.GridEvent.editor_list_items_request:type_name -> volvoxgrid.v1.EditorListItemsRequest
+	328, // 350: volvoxgrid.v1.GridEvent.custom_editor_action:type_name -> volvoxgrid.v1.CustomEditorActionEvent
+	329, // 351: volvoxgrid.v1.GridEvent.cell_changed:type_name -> volvoxgrid.v1.CellChangedEvent
+	330, // 352: volvoxgrid.v1.GridEvent.row_status_change:type_name -> volvoxgrid.v1.RowStatusChangeEvent
+	331, // 353: volvoxgrid.v1.GridEvent.before_sort:type_name -> volvoxgrid.v1.BeforeSortEvent
+	332, // 354: volvoxgrid.v1.GridEvent.after_sort:type_name -> volvoxgrid.v1.AfterSortEvent
+	333, // 355: volvoxgrid.v1.GridEvent.compare:type_name -> volvoxgrid.v1.CompareEvent
+	334, // 356: volvoxgrid.v1.GridEvent.before_node_toggle:type_name -> volvoxgrid.v1.BeforeNodeToggleEvent
+	335, // 357: volvoxgrid.v1.GridEvent.after_node_toggle:type_name -> volvoxgrid.v1.AfterNodeToggleEvent
+	341, // 358: volvoxgrid.v1.GridEvent.before_scroll:type_name -> volvoxgrid.v1.BeforeScrollEvent
+	342, // 359: volvoxgrid.v1.GridEvent.after_scroll:type_name -> volvoxgrid.v1.AfterScrollEvent
+	343, // 360: volvoxgrid.v1.GridEvent.scroll_tooltip:type_name -> volvoxgrid.v1.ScrollTooltipEvent
+	344, // 361: volvoxgrid.v1.GridEvent.before_user_resize:type_name -> volvoxgrid.v1.BeforeUserResizeEvent
+	345, // 362: volvoxgrid.v1.GridEvent.after_user_resize:type_name -> volvoxgrid.v1.AfterUserResizeEvent
+	346, // 363: volvoxgrid.v1.GridEvent.after_user_freeze:type_name -> volvoxgrid.v1.AfterUserFreezeEvent
+	347, // 364: volvoxgrid.v1.GridEvent.before_move_column:type_name -> volvoxgrid.v1.BeforeMoveColumnEvent
+	348, // 365: volvoxgrid.v1.GridEvent.after_move_column:type_name -> volvoxgrid.v1.AfterMoveColumnEvent
+	349, // 366: volvoxgrid.v1.GridEvent.before_move_row:type_name -> volvoxgrid.v1.BeforeMoveRowEvent
+	350, // 367: volvoxgrid.v1.GridEvent.after_move_row:type_name -> volvoxgrid.v1.AfterMoveRowEvent
+	351, // 368: volvoxgrid.v1.GridEvent.before_mouse_down:type_name -> volvoxgrid.v1.BeforeMouseDownEvent
+	352, // 369: volvoxgrid.v1.GridEvent.mouse_down:type_name -> volvoxgrid.v1.MouseDownEvent
+	353, // 370: volvoxgrid.v1.GridEvent.mouse_up:type_name -> volvoxgrid.v1.MouseUpEvent
+	354, // 371: volvoxgrid.v1.GridEvent.mouse_move:type_name -> volvoxgrid.v1.MouseMoveEvent
+	355, // 372: volvoxgrid.v1.GridEvent.click:type_name -> volvoxgrid.v1.ClickEvent
+	356, // 373: volvoxgrid.v1.GridEvent.dbl_click:type_name -> volvoxgrid.v1.DblClickEvent
+	357, // 374: volvoxgrid.v1.GridEvent.key_down:type_name -> volvoxgrid.v1.KeyDownEvent
+	358, // 375: volvoxgrid.v1.GridEvent.key_press:type_name -> volvoxgrid.v1.KeyPressEvent
+	359, // 376: volvoxgrid.v1.GridEvent.key_up:type_name -> volvoxgrid.v1.KeyUpEvent
+	360, // 377: volvoxgrid.v1.GridEvent.custom_render_cell:type_name -> volvoxgrid.v1.CustomRenderCellEvent
+	361, // 378: volvoxgrid.v1.GridEvent.drag_start:type_name -> volvoxgrid.v1.DragStartEvent
+	362, // 379: volvoxgrid.v1.GridEvent.drag_over:type_name -> volvoxgrid.v1.DragOverEvent
+	363, // 380: volvoxgrid.v1.GridEvent.drag_drop:type_name -> volvoxgrid.v1.DragDropEvent
+	364, // 381: volvoxgrid.v1.GridEvent.drag_complete:type_name -> volvoxgrid.v1.DragCompleteEvent
+	365, // 382: volvoxgrid.v1.GridEvent.type_ahead_started:type_name -> volvoxgrid.v1.TypeAheadStartedEvent
+	366, // 383: volvoxgrid.v1.GridEvent.type_ahead_ended:type_name -> volvoxgrid.v1.TypeAheadEndedEvent
+	367, // 384: volvoxgrid.v1.GridEvent.data_refreshing:type_name -> volvoxgrid.v1.DataRefreshingEvent
+	368, // 385: volvoxgrid.v1.GridEvent.data_refreshed:type_name -> volvoxgrid.v1.DataRefreshedEvent
+	369, // 386: volvoxgrid.v1.GridEvent.filter_data:type_name -> volvoxgrid.v1.FilterDataEvent
+	372, // 387: volvoxgrid.v1.GridEvent.error:type_name -> volvoxgrid.v1.ErrorEvent
+	373, // 388: volvoxgrid.v1.GridEvent.before_page_break:type_name -> volvoxgrid.v1.BeforePageBreakEvent
+	374, // 389: volvoxgrid.v1.GridEvent.start_page:type_name -> volvoxgrid.v1.StartPageEvent
+	375, // 390: volvoxgrid.v1.GridEvent.get_header_row:type_name -> volvoxgrid.v1.GetHeaderRowEvent
+	370, // 391: volvoxgrid.v1.GridEvent.pull_to_refresh_triggered:type_name -> volvoxgrid.v1.PullToRefreshTriggeredEvent
+	371, // 392: volvoxgrid.v1.GridEvent.pull_to_refresh_canceled:type_name -> volvoxgrid.v1.PullToRefreshCanceledEvent
+	336, // 393: volvoxgrid.v1.GridEvent.tree_children_requested:type_name -> volvoxgrid.v1.TreeChildrenRequestedEvent
+	337, // 394: volvoxgrid.v1.GridEvent.before_tree_node_toggle:type_name -> volvoxgrid.v1.BeforeTreeNodeToggleEvent
+	338, // 395: volvoxgrid.v1.GridEvent.after_tree_node_toggle:type_name -> volvoxgrid.v1.AfterTreeNodeToggleEvent
+	339, // 396: volvoxgrid.v1.GridEvent.tree_node_activate:type_name -> volvoxgrid.v1.TreeNodeActivateEvent
+	340, // 397: volvoxgrid.v1.GridEvent.tree_node_context_menu:type_name -> volvoxgrid.v1.TreeNodeContextMenuEvent
+	104, // 398: volvoxgrid.v1.SelectionChangingEvent.old_ranges:type_name -> volvoxgrid.v1.CellRange
+	104, // 399: volvoxgrid.v1.SelectionChangingEvent.new_ranges:type_name -> volvoxgrid.v1.CellRange
+	104, // 400: volvoxgrid.v1.SelectionChangedEvent.old_ranges:type_name -> volvoxgrid.v1.CellRange
+	104, // 401: volvoxgrid.v1.SelectionChangedEvent.new_ranges:type_name -> volvoxgrid.v1.CellRange
+	164, // 402: volvoxgrid.v1.EnterCellEvent.target:type_name -> volvoxgrid.v1.GridEventTarget
+	164, // 403: volvoxgrid.v1.LeaveCellEvent.target:type_name -> volvoxgrid.v1.GridEventTarget
+	122, // 404: volvoxgrid.v1.EditValidationRequest.value:type_name -> volvoxgrid.v1.EditorValue
+	107, // 405: volvoxgrid.v1.CustomEditorActionEvent.payload:type_name -> volvoxgrid.v1.StructValue
+	171, // 406: volvoxgrid.v1.RowStatusChangeEvent.status:type_name -> volvoxgrid.v1.RowStatus
+	164, // 407: volvoxgrid.v1.BeforeMouseDownEvent.target:type_name -> volvoxgrid.v1.GridEventTarget
+	164, // 408: volvoxgrid.v1.MouseMoveEvent.target:type_name -> volvoxgrid.v1.GridEventTarget
+	68,  // 409: volvoxgrid.v1.ClickEvent.hit_area:type_name -> volvoxgrid.v1.CellHitArea
+	22,  // 410: volvoxgrid.v1.ClickEvent.interaction:type_name -> volvoxgrid.v1.CellInteraction
+	164, // 411: volvoxgrid.v1.ClickEvent.target:type_name -> volvoxgrid.v1.GridEventTarget
+	164, // 412: volvoxgrid.v1.DblClickEvent.target:type_name -> volvoxgrid.v1.GridEventTarget
+	129, // 413: volvoxgrid.v1.CustomRenderCellEvent.style:type_name -> volvoxgrid.v1.CellStyle
+	242, // 414: volvoxgrid.v1.VolvoxGridService.Create:input_type -> volvoxgrid.v1.CreateRequest
+	244, // 415: volvoxgrid.v1.VolvoxGridService.Destroy:input_type -> volvoxgrid.v1.DestroyRequest
+	257, // 416: volvoxgrid.v1.VolvoxGridService.Configure:input_type -> volvoxgrid.v1.ConfigureRequest
+	245, // 417: volvoxgrid.v1.VolvoxGridService.GetConfig:input_type -> volvoxgrid.v1.GetConfigRequest
+	258, // 418: volvoxgrid.v1.VolvoxGridService.LoadFontData:input_type -> volvoxgrid.v1.LoadFontDataRequest
+	168, // 419: volvoxgrid.v1.VolvoxGridService.DefineColumns:input_type -> volvoxgrid.v1.DefineColumnsRequest
+	246, // 420: volvoxgrid.v1.VolvoxGridService.GetSchema:input_type -> volvoxgrid.v1.GetSchemaRequest
+	172, // 421: volvoxgrid.v1.VolvoxGridService.DefineRows:input_type -> volvoxgrid.v1.DefineRowsRequest
+	189, // 422: volvoxgrid.v1.VolvoxGridService.InsertRows:input_type -> volvoxgrid.v1.InsertRowsRequest
+	190, // 423: volvoxgrid.v1.VolvoxGridService.RemoveRows:input_type -> volvoxgrid.v1.RemoveRowsRequest
+	191, // 424: volvoxgrid.v1.VolvoxGridService.MoveColumn:input_type -> volvoxgrid.v1.MoveColumnRequest
+	192, // 425: volvoxgrid.v1.VolvoxGridService.MoveRow:input_type -> volvoxgrid.v1.MoveRowRequest
+	174, // 426: volvoxgrid.v1.VolvoxGridService.UpdateCells:input_type -> volvoxgrid.v1.UpdateCellsRequest
+	175, // 427: volvoxgrid.v1.VolvoxGridService.GetCells:input_type -> volvoxgrid.v1.GetCellsRequest
+	180, // 428: volvoxgrid.v1.VolvoxGridService.LoadTable:input_type -> volvoxgrid.v1.LoadTableRequest
+	185, // 429: volvoxgrid.v1.VolvoxGridService.LoadData:input_type -> volvoxgrid.v1.LoadDataRequest
+	186, // 430: volvoxgrid.v1.VolvoxGridService.AppendData:input_type -> volvoxgrid.v1.AppendDataRequest
+	188, // 431: volvoxgrid.v1.VolvoxGridService.Clear:input_type -> volvoxgrid.v1.ClearRequest
+	193, // 432: volvoxgrid.v1.VolvoxGridService.Select:input_type -> volvoxgrid.v1.SelectRequest
+	247, // 433: volvoxgrid.v1.VolvoxGridService.GetSelection:input_type -> volvoxgrid.v1.GetSelectionRequest
+	253, // 434: volvoxgrid.v1.VolvoxGridService.ShowCell:input_type -> volvoxgrid.v1.ShowCellRequest
+	254, // 435: volvoxgrid.v1.VolvoxGridService.SetTopRow:input_type -> volvoxgrid.v1.SetRowRequest
+	255, // 436: volvoxgrid.v1.VolvoxGridService.SetLeftCol:input_type -> volvoxgrid.v1.SetColRequest
+	197, // 437: volvoxgrid.v1.VolvoxGridService.Edit:input_type -> volvoxgrid.v1.EditCommand
+	211, // 438: volvoxgrid.v1.VolvoxGridService.Sort:input_type -> volvoxgrid.v1.SortRequest
+	212, // 439: volvoxgrid.v1.VolvoxGridService.Subtotal:input_type -> volvoxgrid.v1.SubtotalRequest
+	214, // 440: volvoxgrid.v1.VolvoxGridService.AutoSize:input_type -> volvoxgrid.v1.AutoSizeRequest
+	215, // 441: volvoxgrid.v1.VolvoxGridService.Outline:input_type -> volvoxgrid.v1.OutlineRequest
+	216, // 442: volvoxgrid.v1.VolvoxGridService.GetNode:input_type -> volvoxgrid.v1.GetNodeRequest
+	218, // 443: volvoxgrid.v1.VolvoxGridService.Find:input_type -> volvoxgrid.v1.FindRequest
+	222, // 444: volvoxgrid.v1.VolvoxGridService.Aggregate:input_type -> volvoxgrid.v1.AggregateRequest
+	224, // 445: volvoxgrid.v1.VolvoxGridService.GetMergedRange:input_type -> volvoxgrid.v1.GetMergedRangeRequest
+	225, // 446: volvoxgrid.v1.VolvoxGridService.MergeCells:input_type -> volvoxgrid.v1.MergeCellsRequest
+	226, // 447: volvoxgrid.v1.VolvoxGridService.UnmergeCells:input_type -> volvoxgrid.v1.UnmergeCellsRequest
+	248, // 448: volvoxgrid.v1.VolvoxGridService.GetMergedRegions:input_type -> volvoxgrid.v1.GetMergedRegionsRequest
+	249, // 449: volvoxgrid.v1.VolvoxGridService.GetMemoryUsage:input_type -> volvoxgrid.v1.GetMemoryUsageRequest
+	229, // 450: volvoxgrid.v1.VolvoxGridService.Clipboard:input_type -> volvoxgrid.v1.ClipboardCommand
+	235, // 451: volvoxgrid.v1.VolvoxGridService.Export:input_type -> volvoxgrid.v1.ExportRequest
+	237, // 452: volvoxgrid.v1.VolvoxGridService.Print:input_type -> volvoxgrid.v1.PrintRequest
+	240, // 453: volvoxgrid.v1.VolvoxGridService.Archive:input_type -> volvoxgrid.v1.ArchiveRequest
+	252, // 454: volvoxgrid.v1.VolvoxGridService.ResizeViewport:input_type -> volvoxgrid.v1.ResizeViewportRequest
+	256, // 455: volvoxgrid.v1.VolvoxGridService.SetRedraw:input_type -> volvoxgrid.v1.SetRedrawRequest
+	250, // 456: volvoxgrid.v1.VolvoxGridService.Refresh:input_type -> volvoxgrid.v1.RefreshRequest
+	259, // 457: volvoxgrid.v1.VolvoxGridService.LoadDemo:input_type -> volvoxgrid.v1.LoadDemoRequest
+	260, // 458: volvoxgrid.v1.VolvoxGridService.GetDemoData:input_type -> volvoxgrid.v1.GetDemoDataRequest
+	285, // 459: volvoxgrid.v1.VolvoxGridService.RenderSession:input_type -> volvoxgrid.v1.RenderInput
+	251, // 460: volvoxgrid.v1.VolvoxGridService.EventStream:input_type -> volvoxgrid.v1.EventStreamRequest
+	243, // 461: volvoxgrid.v1.VolvoxGridService.Create:output_type -> volvoxgrid.v1.CreateResponse
+	262, // 462: volvoxgrid.v1.VolvoxGridService.Destroy:output_type -> volvoxgrid.v1.DestroyResponse
+	263, // 463: volvoxgrid.v1.VolvoxGridService.Configure:output_type -> volvoxgrid.v1.ConfigureResponse
+	144, // 464: volvoxgrid.v1.VolvoxGridService.GetConfig:output_type -> volvoxgrid.v1.GridConfig
+	264, // 465: volvoxgrid.v1.VolvoxGridService.LoadFontData:output_type -> volvoxgrid.v1.LoadFontDataResponse
+	265, // 466: volvoxgrid.v1.VolvoxGridService.DefineColumns:output_type -> volvoxgrid.v1.DefineColumnsResponse
+	169, // 467: volvoxgrid.v1.VolvoxGridService.GetSchema:output_type -> volvoxgrid.v1.SchemaResponse
+	266, // 468: volvoxgrid.v1.VolvoxGridService.DefineRows:output_type -> volvoxgrid.v1.DefineRowsResponse
+	267, // 469: volvoxgrid.v1.VolvoxGridService.InsertRows:output_type -> volvoxgrid.v1.InsertRowsResponse
+	268, // 470: volvoxgrid.v1.VolvoxGridService.RemoveRows:output_type -> volvoxgrid.v1.RemoveRowsResponse
+	269, // 471: volvoxgrid.v1.VolvoxGridService.MoveColumn:output_type -> volvoxgrid.v1.MoveColumnResponse
+	270, // 472: volvoxgrid.v1.VolvoxGridService.MoveRow:output_type -> volvoxgrid.v1.MoveRowResponse
+	179, // 473: volvoxgrid.v1.VolvoxGridService.UpdateCells:output_type -> volvoxgrid.v1.WriteResult
+	177, // 474: volvoxgrid.v1.VolvoxGridService.GetCells:output_type -> volvoxgrid.v1.CellsResponse
+	179, // 475: volvoxgrid.v1.VolvoxGridService.LoadTable:output_type -> volvoxgrid.v1.WriteResult
+	187, // 476: volvoxgrid.v1.VolvoxGridService.LoadData:output_type -> volvoxgrid.v1.LoadDataResult
+	187, // 477: volvoxgrid.v1.VolvoxGridService.AppendData:output_type -> volvoxgrid.v1.LoadDataResult
+	271, // 478: volvoxgrid.v1.VolvoxGridService.Clear:output_type -> volvoxgrid.v1.ClearResponse
+	272, // 479: volvoxgrid.v1.VolvoxGridService.Select:output_type -> volvoxgrid.v1.SelectResponse
+	194, // 480: volvoxgrid.v1.VolvoxGridService.GetSelection:output_type -> volvoxgrid.v1.SelectionState
+	273, // 481: volvoxgrid.v1.VolvoxGridService.ShowCell:output_type -> volvoxgrid.v1.ShowCellResponse
+	274, // 482: volvoxgrid.v1.VolvoxGridService.SetTopRow:output_type -> volvoxgrid.v1.SetTopRowResponse
+	275, // 483: volvoxgrid.v1.VolvoxGridService.SetLeftCol:output_type -> volvoxgrid.v1.SetLeftColResponse
+	209, // 484: volvoxgrid.v1.VolvoxGridService.Edit:output_type -> volvoxgrid.v1.EditState
+	276, // 485: volvoxgrid.v1.VolvoxGridService.Sort:output_type -> volvoxgrid.v1.SortResponse
+	213, // 486: volvoxgrid.v1.VolvoxGridService.Subtotal:output_type -> volvoxgrid.v1.SubtotalResult
+	277, // 487: volvoxgrid.v1.VolvoxGridService.AutoSize:output_type -> volvoxgrid.v1.AutoSizeResponse
+	278, // 488: volvoxgrid.v1.VolvoxGridService.Outline:output_type -> volvoxgrid.v1.OutlineResponse
+	217, // 489: volvoxgrid.v1.VolvoxGridService.GetNode:output_type -> volvoxgrid.v1.NodeInfo
+	221, // 490: volvoxgrid.v1.VolvoxGridService.Find:output_type -> volvoxgrid.v1.FindResponse
+	223, // 491: volvoxgrid.v1.VolvoxGridService.Aggregate:output_type -> volvoxgrid.v1.AggregateResponse
+	104, // 492: volvoxgrid.v1.VolvoxGridService.GetMergedRange:output_type -> volvoxgrid.v1.CellRange
+	279, // 493: volvoxgrid.v1.VolvoxGridService.MergeCells:output_type -> volvoxgrid.v1.MergeCellsResponse
+	280, // 494: volvoxgrid.v1.VolvoxGridService.UnmergeCells:output_type -> volvoxgrid.v1.UnmergeCellsResponse
+	227, // 495: volvoxgrid.v1.VolvoxGridService.GetMergedRegions:output_type -> volvoxgrid.v1.MergedRegionsResponse
+	228, // 496: volvoxgrid.v1.VolvoxGridService.GetMemoryUsage:output_type -> volvoxgrid.v1.MemoryUsageResponse
+	234, // 497: volvoxgrid.v1.VolvoxGridService.Clipboard:output_type -> volvoxgrid.v1.ClipboardResponse
+	236, // 498: volvoxgrid.v1.VolvoxGridService.Export:output_type -> volvoxgrid.v1.ExportResponse
+	238, // 499: volvoxgrid.v1.VolvoxGridService.Print:output_type -> volvoxgrid.v1.PrintResponse
+	241, // 500: volvoxgrid.v1.VolvoxGridService.Archive:output_type -> volvoxgrid.v1.ArchiveResponse
+	281, // 501: volvoxgrid.v1.VolvoxGridService.ResizeViewport:output_type -> volvoxgrid.v1.ResizeViewportResponse
+	282, // 502: volvoxgrid.v1.VolvoxGridService.SetRedraw:output_type -> volvoxgrid.v1.SetRedrawResponse
+	283, // 503: volvoxgrid.v1.VolvoxGridService.Refresh:output_type -> volvoxgrid.v1.RefreshResponse
+	284, // 504: volvoxgrid.v1.VolvoxGridService.LoadDemo:output_type -> volvoxgrid.v1.LoadDemoResponse
+	261, // 505: volvoxgrid.v1.VolvoxGridService.GetDemoData:output_type -> volvoxgrid.v1.GetDemoDataResponse
+	301, // 506: volvoxgrid.v1.VolvoxGridService.RenderSession:output_type -> volvoxgrid.v1.RenderOutput
+	311, // 507: volvoxgrid.v1.VolvoxGridService.EventStream:output_type -> volvoxgrid.v1.GridEvent
+	461, // [461:508] is the sub-list for method output_type
+	414, // [414:461] is the sub-list for method input_type
+	414, // [414:414] is the sub-list for extension type_name
+	414, // [414:414] is the sub-list for extension extendee
+	0,   // [0:414] is the sub-list for field type_name
 }
 
 func init() { file_volvoxgrid_proto_init() }
@@ -30154,6 +30259,7 @@ func file_volvoxgrid_proto_init() {
 	file_volvoxgrid_proto_msgTypes[49].OneofWrappers = []any{}
 	file_volvoxgrid_proto_msgTypes[50].OneofWrappers = []any{}
 	file_volvoxgrid_proto_msgTypes[51].OneofWrappers = []any{}
+	file_volvoxgrid_proto_msgTypes[52].OneofWrappers = []any{}
 	file_volvoxgrid_proto_msgTypes[53].OneofWrappers = []any{}
 	file_volvoxgrid_proto_msgTypes[54].OneofWrappers = []any{}
 	file_volvoxgrid_proto_msgTypes[55].OneofWrappers = []any{}
@@ -30320,7 +30426,7 @@ func file_volvoxgrid_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_volvoxgrid_proto_rawDesc), len(file_volvoxgrid_proto_rawDesc)),
-			NumEnums:      91,
+			NumEnums:      92,
 			NumMessages:   284,
 			NumExtensions: 0,
 			NumServices:   1,

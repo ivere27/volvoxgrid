@@ -97,6 +97,12 @@ namespace VolvoxGrid.DotNet.Internal
             return GridConfig.ParseFrom(response);
         }
 
+        public SchemaResponse GetSchema(long gridId)
+        {
+            byte[] response = InvokeUnary(GetSchemaMethod, new GetSchemaRequest { GridId = gridId }.ToByteArray());
+            return SchemaResponse.ParseFrom(response);
+        }
+
         public void DefineColumns(long gridId, IList<ColumnDef> columns)
         {
             var req = new DefineColumnsRequest { GridId = gridId };

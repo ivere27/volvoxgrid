@@ -1293,6 +1293,15 @@ export enum TextRenderMode {
   TEXT_RENDER_SUBPIXEL = 2,
   TEXT_RENDER_MONO = 3,
 }
+export enum ThemePreset {
+  THEME_NONE = 0,
+  THEME_CLASSIC = 1,
+  THEME_LIGHT = 2,
+  THEME_DARK = 3,
+  THEME_HIGH_CONTRAST = 4,
+  THEME_MONOKAI = 5,
+  THEME_AMBER = 6,
+}
 export enum TreeIndicatorStyle {
   TREE_INDICATOR_NONE = 0,
   TREE_INDICATOR_ARROWS = 1,
@@ -2107,6 +2116,7 @@ export const GridConfigFields = {
   "rendering": 9,
   "version": 10,
   "indicators": 11,
+  "theme_preset": 12,
 } as const;
 export const GridEventFields = {
   "grid_id": 1,
@@ -11551,6 +11561,15 @@ export class GridConfig implements LiteMessage {
       kind: "message" as ProtoKind,
       messageType: "IndicatorsConfig",
     },
+    {
+      no: 12,
+      name: "theme_preset",
+      jsonName: "themePreset",
+      prop: "themePreset",
+      kind: "enum" as ProtoKind,
+      optional: true,
+      enumType: ThemePreset,
+    },
   ];
   layout?: LayoutConfig;
   style?: StyleConfig;
@@ -11563,6 +11582,7 @@ export class GridConfig implements LiteMessage {
   rendering?: RenderConfig;
   version: string = "";
   indicators?: IndicatorsConfig;
+  themePreset: ThemePreset = 0;
 
   constructor(init?: Partial<GridConfig>) {
     initMessage(this, GridConfig.fields, init as Record<string, unknown> | undefined);

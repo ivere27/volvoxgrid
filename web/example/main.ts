@@ -42,6 +42,7 @@ import {
   CellUpdateFields,
   CellValueFields,
   ColIndicatorCellMode,
+  ColIndicatorCellModesFields,
   ColIndicatorConfigFields,
   ColumnDefFields,
   ColumnDataType,
@@ -50,41 +51,30 @@ import {
   CornerIndicatorSlotFields,
   DefineColumnsRequestFields,
   DefineRowsRequestFields,
-  EditActivationFields,
-  EditConfigFields,
   EditTrigger,
   EditorKind,
   EditorOwner,
   EditorPresentation,
   EditorSpecFields,
   EditorUpdateReason,
-  FillHandlePosition,
   FocusBorderStyle,
   FontFields,
   FreezePolicyFields,
   GridConfigFields,
-  GridLinesFields,
   GridLineStyle,
   GroupTotalPosition,
   HeaderFeaturesFields,
-  HeaderResizeHandleFields,
-  HeaderSeparatorFields,
-  HeaderStyleFields,
-  HighlightStyleFields,
   HoverConfigFields,
   ImageAlignment,
   IndicatorAppearance,
   IndicatorsConfigFields,
   InteractionConfigFields,
-  LayoutConfigFields,
   ListEditorParamsFields,
   ListItemFields,
   LoadDataStatus,
-  NumberEditorParamsFields,
   OutlineConfigFields,
   PaddingFields,
   PresentMode,
-  RegionStyleFields,
   RenderLayerBit,
   RendererMode,
   ResizePolicyFields,
@@ -93,17 +83,15 @@ import {
   RowIndicatorConfigFields,
   RowIndicatorSlotKind,
   RowIndicatorSlotFields,
-  ScrollConfigFields,
   ScrollBarsMode,
   SelectionConfigFields,
   SelectionMode,
   SelectionVisibility,
   SpanConfigFields,
   SpanCompareMode,
-  StyleConfigFields,
-  TabBehavior,
   TextBaseline,
   TextFormatRunFields,
+  ThemePreset,
   TreeIndicatorStyle,
   TextRunStyleFields,
   UpdateCellsRequestFields,
@@ -127,19 +115,58 @@ type DoomTouchActionCode = "ControlLeft" | "Space" | "Enter";
 
 const STRESS_ROWS = 1_000_000;
 const STRESS_COLS = 12;
-const SALES_COLS = 10;
 const HIERARCHY_COLS = 8;
 const BARCODE_COLS = 6;
 const SALES_STATUS_ITEMS = "Active|Pending|Shipped|Returned|Cancelled";
+const DEFAULT_ROW_INDICATOR_WIDTH = 40;
+const DEFAULT_COL_INDICATOR_BAND_ROWS = 1;
+const DEFAULT_FLING_IMPULSE_GAIN = 220.0;
+const DEFAULT_FLING_FRICTION = 0.9;
+const SALES_HEADER_ROW_HEIGHT = 28;
+const SALES_GRAND_TOTAL_BACK_COLOR = 0xFFEEF2FF;
+const SALES_QUARTER_SUBTOTAL_BACK_COLOR = 0xFFF5F3FF;
+const SALES_REGION_SUBTOTAL_BACK_COLOR = 0xFFF8F7FF;
+const SALES_MARGIN_PROGRESS_COLOR = 0xFF818CF8;
 const HIERARCHY_NAME_COL = 0;
 const HIERARCHY_TYPE_COL = 1;
+const HIERARCHY_SIZE_COL = 2;
+const HIERARCHY_MODIFIED_COL = 3;
+const HIERARCHY_PERMISSIONS_COL = 4;
 const HIERARCHY_DETAILS_COL = 5;
 const HIERARCHY_ACTION_COL = 6;
 const HIERARCHY_ICON_COL = 7;
+const HIERARCHY_NAME_COL_WIDTH = 260;
+const HIERARCHY_TYPE_COL_WIDTH = 80;
+const HIERARCHY_SIZE_COL_WIDTH = 80;
+const HIERARCHY_MODIFIED_COL_WIDTH = 120;
+const HIERARCHY_PERMISSIONS_COL_WIDTH = 100;
+const HIERARCHY_DETAILS_COL_WIDTH = 180;
+const HIERARCHY_ACTION_COL_WIDTH = 92;
+const HIERARCHY_ICON_COL_WIDTH = 24;
+const HIERARCHY_TREE_COLOR = 0xFFA8A29E;
+const HIERARCHY_FOLDER_TEXT_COLOR = 0xFF92400E;
+const HIERARCHY_ACTION_TEXT_COLOR = 0xFF2563EB;
+const HIERARCHY_OUTLINE_INDENT = 20;
+const HIERARCHY_MIN_OUTLINE_INDICATOR_WIDTH = 56;
+const HIERARCHY_NAME_EXPANDER_WIDTH = 280;
+const HIERARCHY_HEADER_BAND_ROWS = 1;
 const HIERARCHY_FOLDER_ICON = "\uE2C7";
+const HIERARCHY_SHORT_DATE_FORMAT = "short date";
 enum NodeChildrenState {
   NODE_LEAF = 1,
   NODE_CHILDREN_LOADED = 4,
+}
+enum SalesColumn {
+  Quarter,
+  Region,
+  Category,
+  Product,
+  Sales,
+  Cost,
+  Margin,
+  Flag,
+  Status,
+  Notes,
 }
 const NodeCellUpdateFields = {
   node_id: 1,
@@ -171,6 +198,10 @@ const ICON_SLOT_TREE_EXPANDED = 4;
 const ICON_SLOT_TREE_COLLAPSED = 5;
 const PB_TEXT_ENCODER = new TextEncoder();
 const PB_TEXT_DECODER = new TextDecoder();
+const PB_WIRE_VARINT = 0;
+const PB_WIRE_FIXED64 = 1;
+const PB_WIRE_LENGTH_DELIMITED = 2;
+const PB_WIRE_FIXED32 = 5;
 const HOVER_NONE = 0;
 const HOVER_ROW = 1;
 const HOVER_COLUMN = 2;
@@ -204,22 +235,23 @@ const SALES_COLUMN_SETUP = [
   { caption: "Region", key: "Region", align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, span: true },
   { caption: "Category", key: "Category", align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, span: false },
   { caption: "Product", key: "Product", align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, span: false },
-  { caption: "Sales", key: "Sales", align: Align.ALIGN_RIGHT_CENTER, dataType: ColumnDataType.COLUMN_DATA_CURRENCY, format: "$#,##0", dropdownItems: undefined, numberEditor: { min: 0 }, span: false },
-  { caption: "Cost", key: "Cost", align: Align.ALIGN_RIGHT_CENTER, dataType: ColumnDataType.COLUMN_DATA_CURRENCY, format: "$#,##0", dropdownItems: undefined, numberEditor: { min: 0 }, span: false },
-  { caption: "Margin%", key: "Margin", align: Align.ALIGN_CENTER_CENTER, dataType: ColumnDataType.COLUMN_DATA_NUMBER, format: undefined, dropdownItems: undefined, numberEditor: { min: 0, max: 100 }, span: false },
+  { caption: "Sales", key: "Sales", align: Align.ALIGN_RIGHT_CENTER, dataType: ColumnDataType.COLUMN_DATA_CURRENCY, format: "$#,##0", dropdownItems: undefined, span: false },
+  { caption: "Cost", key: "Cost", align: Align.ALIGN_RIGHT_CENTER, dataType: ColumnDataType.COLUMN_DATA_CURRENCY, format: "$#,##0", dropdownItems: undefined, span: false },
+  { caption: "Margin%", key: "Margin", align: Align.ALIGN_CENTER_CENTER, dataType: ColumnDataType.COLUMN_DATA_NUMBER, format: undefined, dropdownItems: undefined, progressColor: SALES_MARGIN_PROGRESS_COLOR, span: false },
   { caption: "Flag", key: "Flag", align: Align.ALIGN_CENTER_CENTER, dataType: ColumnDataType.COLUMN_DATA_BOOLEAN, format: undefined, dropdownItems: undefined, span: false },
   { caption: "Status", key: "Status", align: undefined, dataType: undefined, format: undefined, dropdownItems: SALES_STATUS_ITEMS, span: false },
   { caption: "Notes", key: "Notes", align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, span: false },
 ] as const;
+const SALES_COLS = SALES_COLUMN_SETUP.length;
 const HIERARCHY_COLUMN_SETUP = [
-  { caption: "Name", key: "Name", width: 260, align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined, hidden: true },
-  { caption: "Type", key: "Type", width: 80, align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined },
-  { caption: "Size", key: "Size", width: 80, align: Align.ALIGN_RIGHT_CENTER, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined },
-  { caption: "Modified", key: "Modified", width: 120, align: undefined, dataType: ColumnDataType.COLUMN_DATA_DATE, format: "short date", dropdownItems: undefined, interaction: undefined },
-  { caption: "Permissions", key: "Permissions", width: 100, align: Align.ALIGN_CENTER_CENTER, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined },
-  { caption: "Details", key: "Details", width: 180, align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined },
-  { caption: "Action", key: "Action", width: 92, align: Align.ALIGN_CENTER_CENTER, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: CellInteraction.CELL_INTERACTION_TEXT_LINK },
-  { caption: "Icon", key: "Icon", width: 24, align: Align.ALIGN_CENTER_CENTER, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined, hidden: true },
+  { caption: "Name", key: "Name", width: HIERARCHY_NAME_COL_WIDTH, align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined, hidden: true },
+  { caption: "Type", key: "Type", width: HIERARCHY_TYPE_COL_WIDTH, align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined },
+  { caption: "Size", key: "Size", width: HIERARCHY_SIZE_COL_WIDTH, align: Align.ALIGN_RIGHT_CENTER, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined },
+  { caption: "Modified", key: "Modified", width: HIERARCHY_MODIFIED_COL_WIDTH, align: undefined, dataType: ColumnDataType.COLUMN_DATA_DATE, format: HIERARCHY_SHORT_DATE_FORMAT, dropdownItems: undefined, interaction: undefined },
+  { caption: "Permissions", key: "Permissions", width: HIERARCHY_PERMISSIONS_COL_WIDTH, align: Align.ALIGN_CENTER_CENTER, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined },
+  { caption: "Details", key: "Details", width: HIERARCHY_DETAILS_COL_WIDTH, align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined },
+  { caption: "Action", key: "Action", width: HIERARCHY_ACTION_COL_WIDTH, align: Align.ALIGN_CENTER_CENTER, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: CellInteraction.CELL_INTERACTION_TEXT_LINK },
+  { caption: "Icon", key: "Icon", width: HIERARCHY_ICON_COL_WIDTH, align: Align.ALIGN_CENTER_CENTER, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined, hidden: true },
 ] as const;
 const BARCODE_COLUMN_SETUP = [
   { caption: "Symbology", key: "Symbology", align: Align.ALIGN_CENTER_CENTER },
@@ -236,12 +268,8 @@ type DemoColumnSetup = {
   align?: number;
   dataType?: number;
   format?: string;
+  progressColor?: number;
   dropdownItems?: string;
-  numberEditor?: {
-    min?: number;
-    max?: number;
-    nullable?: boolean;
-  };
   interaction?: number;
   hidden?: boolean;
   span?: boolean;
@@ -813,7 +841,7 @@ function pbEncodeTag(field: number, wireType: number): number[] {
 
 function pbEncodeMessageField(field: number, payload: Uint8Array): number[] {
   return [
-    ...pbEncodeTag(field, 2),
+    ...pbEncodeTag(field, PB_WIRE_LENGTH_DELIMITED),
     ...pbEncodeVarint(BigInt(payload.length)),
     ...payload,
   ];
@@ -831,30 +859,30 @@ function pbEncodeInt32(value: number): number[] {
 function pbEncodeStringField(field: number, value: string): number[] {
   const bytes = PB_TEXT_ENCODER.encode(value);
   return [
-    ...pbEncodeTag(field, 2),
+    ...pbEncodeTag(field, PB_WIRE_LENGTH_DELIMITED),
     ...pbEncodeVarint(BigInt(bytes.length)),
     ...bytes,
   ];
 }
 
 function pbEncodeInt32Field(field: number, value: number): number[] {
-  return [...pbEncodeTag(field, 0), ...pbEncodeInt32(value)];
+  return [...pbEncodeTag(field, PB_WIRE_VARINT), ...pbEncodeInt32(value)];
 }
 
 function pbEncodeUint32Field(field: number, value: number): number[] {
-  return [...pbEncodeTag(field, 0), ...pbEncodeVarint(BigInt(value >>> 0))];
+  return [...pbEncodeTag(field, PB_WIRE_VARINT), ...pbEncodeVarint(BigInt(value >>> 0))];
 }
 
 function pbEncodeFloatField(field: number, value: number): number[] {
   const buf = new ArrayBuffer(4);
   new DataView(buf).setFloat32(0, value, true);
-  return [...pbEncodeTag(field, 5), ...Array.from(new Uint8Array(buf))];
+  return [...pbEncodeTag(field, PB_WIRE_FIXED32), ...Array.from(new Uint8Array(buf))];
 }
 
 function pbEncodeDoubleField(field: number, value: number): number[] {
   const buf = new ArrayBuffer(8);
   new DataView(buf).setFloat64(0, value, true);
-  return [...pbEncodeTag(field, 1), ...Array.from(new Uint8Array(buf))];
+  return [...pbEncodeTag(field, PB_WIRE_FIXED64), ...Array.from(new Uint8Array(buf))];
 }
 
 function pbEncodeBorder(style: number, color: number): Uint8Array {
@@ -1222,11 +1250,11 @@ function pbEncodeHierarchyTreeNode(
       nodeId: row.Id,
       col: HIERARCHY_TYPE_COL,
       text: row.Type,
-      style: row.Type === "Folder" ? { foreground: 0xFF92400E } : undefined,
+      style: row.Type === "Folder" ? { foreground: HIERARCHY_FOLDER_TEXT_COLOR } : undefined,
     }),
-    pbEncodeTreeNodeCell({ nodeId: row.Id, col: 2, text: row.Size }),
-    pbEncodeTreeNodeCell({ nodeId: row.Id, col: 3, text: row.Modified }),
-    pbEncodeTreeNodeCell({ nodeId: row.Id, col: 4, text: row.Permissions }),
+    pbEncodeTreeNodeCell({ nodeId: row.Id, col: HIERARCHY_SIZE_COL, text: row.Size }),
+    pbEncodeTreeNodeCell({ nodeId: row.Id, col: HIERARCHY_MODIFIED_COL, text: row.Modified }),
+    pbEncodeTreeNodeCell({ nodeId: row.Id, col: HIERARCHY_PERMISSIONS_COL, text: row.Permissions }),
     pbEncodeTreeNodeCell({
       nodeId: row.Id,
       col: HIERARCHY_DETAILS_COL,
@@ -1237,7 +1265,7 @@ function pbEncodeHierarchyTreeNode(
       nodeId: row.Id,
       col: HIERARCHY_ACTION_COL,
       text: row.Action,
-      style: { foreground: 0xFF2563EB },
+      style: { foreground: HIERARCHY_ACTION_TEXT_COLOR },
     }),
     pbEncodeTreeNodeCell({
       nodeId: row.Id,
@@ -1269,66 +1297,6 @@ function pbEncodeHierarchyLoadTreeRequest(
   return new Uint8Array(out);
 }
 
-function pbEncodeGridLinesPayload(color: number): Uint8Array {
-  const out: number[] = [];
-  out.push(...pbEncodeInt32Field(GridLinesFields.style, GridLineStyle.GRIDLINE_SOLID));
-  out.push(...pbEncodeUint32Field(GridLinesFields.color, color));
-  return new Uint8Array(out);
-}
-
-function pbEncodeRegionStylePayload(background: number, foreground: number, gridColor: number): Uint8Array {
-  const out: number[] = [];
-  out.push(...pbEncodeUint32Field(RegionStyleFields.background, background));
-  out.push(...pbEncodeUint32Field(RegionStyleFields.foreground, foreground));
-  out.push(...pbEncodeMessageField(RegionStyleFields.grid_lines, pbEncodeGridLinesPayload(gridColor)));
-  return new Uint8Array(out);
-}
-
-function pbEncodeHeaderStylePayload(color: number): Uint8Array {
-  const separator: number[] = [];
-  separator.push(...pbEncodeTag(HeaderSeparatorFields.enabled, 0), ...pbEncodeBool(true));
-  separator.push(...pbEncodeUint32Field(HeaderSeparatorFields.color, color));
-  separator.push(...pbEncodeInt32Field(HeaderSeparatorFields.width, 1));
-
-  const resizeHandle: number[] = [];
-  resizeHandle.push(...pbEncodeTag(HeaderResizeHandleFields.enabled, 0), ...pbEncodeBool(true));
-  resizeHandle.push(...pbEncodeUint32Field(HeaderResizeHandleFields.color, color));
-  resizeHandle.push(...pbEncodeInt32Field(HeaderResizeHandleFields.width, 1));
-  resizeHandle.push(...pbEncodeInt32Field(HeaderResizeHandleFields.hit_width, 6));
-
-  const out: number[] = [];
-  out.push(...pbEncodeMessageField(HeaderStyleFields.separator, new Uint8Array(separator)));
-  out.push(...pbEncodeMessageField(HeaderStyleFields.resize_handle, new Uint8Array(resizeHandle)));
-  return new Uint8Array(out);
-}
-
-function pbEncodeHighlightStylePayload(options: {
-  background?: number;
-  foreground?: number;
-  borderStyle?: number;
-  borderColor?: number;
-  fillHandle?: number;
-  fillHandleColor?: number;
-}): Uint8Array {
-  const out: number[] = [];
-  if (options.background != null) {
-    out.push(...pbEncodeUint32Field(HighlightStyleFields.background, options.background));
-  }
-  if (options.foreground != null) {
-    out.push(...pbEncodeUint32Field(HighlightStyleFields.foreground, options.foreground));
-  }
-  if (options.borderStyle != null && options.borderColor != null) {
-    out.push(...pbEncodeMessageField(HighlightStyleFields.borders, pbEncodeBordersAll(options.borderStyle, options.borderColor)));
-  }
-  if (options.fillHandle != null) {
-    out.push(...pbEncodeInt32Field(HighlightStyleFields.fill_handle, options.fillHandle));
-  }
-  if (options.fillHandleColor != null) {
-    out.push(...pbEncodeUint32Field(HighlightStyleFields.fill_handle_color, options.fillHandleColor));
-  }
-  return new Uint8Array(out);
-}
-
 function pbEncodeColumnDef(
   index: number,
   setup: DemoColumnSetup,
@@ -1348,11 +1316,12 @@ function pbEncodeColumnDef(
   if (setup.format != null) {
     out.push(...pbEncodeStringField(ColumnDefFields.format, setup.format));
   }
+  if (setup.progressColor != null) {
+    out.push(...pbEncodeUint32Field(ColumnDefFields.progress_color, setup.progressColor));
+  }
   out.push(...pbEncodeStringField(ColumnDefFields.key, setup.key));
   if (setup.dropdownItems != null) {
     out.push(...pbEncodeMessageField(ColumnDefFields.editor, pbEncodeDropdownEditorFromLabels(setup.dropdownItems)));
-  } else if (setup.numberEditor != null) {
-    out.push(...pbEncodeMessageField(ColumnDefFields.editor, pbEncodeNumberEditor(setup.numberEditor)));
   }
   if (setup.hidden != null) {
     out.push(...pbEncodeTag(ColumnDefFields.hidden, 0), ...pbEncodeBool(setup.hidden));
@@ -1389,34 +1358,6 @@ function pbEncodeDropdownEditorFromLabels(items: string): Uint8Array {
   editor.push(...pbEncodeInt32Field(EditorSpecFields.owner, EditorOwner.EDITOR_OWNER_ENGINE));
   editor.push(...pbEncodeInt32Field(EditorSpecFields.presentation, EditorPresentation.EDITOR_CANVAS));
   editor.push(...pbEncodeMessageField(EditorSpecFields.list, new Uint8Array(list)));
-  return new Uint8Array(editor);
-}
-
-function pbEncodeNumberEditor(options: { min?: number; max?: number; nullable?: boolean }): Uint8Array {
-  const number: number[] = [];
-  if (options.min != null) {
-    number.push(...pbEncodeDoubleField(NumberEditorParamsFields.min, options.min));
-  }
-  if (options.max != null) {
-    number.push(...pbEncodeDoubleField(NumberEditorParamsFields.max, options.max));
-  }
-  if (options.nullable === true) {
-    number.push(...pbEncodeTag(NumberEditorParamsFields.nullable, 0), ...pbEncodeBool(true));
-  }
-
-  const editor: number[] = [];
-  editor.push(...pbEncodeInt32Field(EditorSpecFields.kind, EditorKind.EDITOR_NUMBER));
-  editor.push(...pbEncodeInt32Field(EditorSpecFields.owner, EditorOwner.EDITOR_OWNER_HOST_NATIVE));
-  editor.push(...pbEncodeInt32Field(EditorSpecFields.presentation, EditorPresentation.EDITOR_INLINE));
-  editor.push(...pbEncodeMessageField(EditorSpecFields.number, new Uint8Array(number)));
-  return new Uint8Array(editor);
-}
-
-function defaultHostTextEditor(): Uint8Array {
-  const editor: number[] = [];
-  editor.push(...pbEncodeInt32Field(EditorSpecFields.kind, EditorKind.EDITOR_TEXT));
-  editor.push(...pbEncodeInt32Field(EditorSpecFields.owner, EditorOwner.EDITOR_OWNER_HOST_NATIVE));
-  editor.push(...pbEncodeInt32Field(EditorSpecFields.presentation, EditorPresentation.EDITOR_INLINE));
   return new Uint8Array(editor);
 }
 
@@ -1474,11 +1415,11 @@ function pbEncodeDefineRowsRequest(
 
 function hierarchyOutlineWidth(maxOutlineDepth: number): number {
   const buttonCount = Math.max(1, maxOutlineDepth + 1);
-  return Math.max(56, buttonCount * 20);
+  return Math.max(HIERARCHY_MIN_OUTLINE_INDICATOR_WIDTH, buttonCount * HIERARCHY_OUTLINE_INDENT);
 }
 
 function hierarchyExpanderWidth(maxOutlineDepth: number): number {
-  return hierarchyOutlineWidth(maxOutlineDepth) + 280;
+  return hierarchyOutlineWidth(maxOutlineDepth) + HIERARCHY_NAME_EXPANDER_WIDTH;
 }
 
 function applyHierarchyIconTheme(wasmModule: WasmModule, id: number): void {
@@ -1510,63 +1451,11 @@ function applyHierarchyIconTheme(wasmModule: WasmModule, id: number): void {
 function pbEncodeHierarchyOutlineConfig(maxOutlineDepth: number, maxOutlineLevel: number): Uint8Array {
   const outlineWidth = hierarchyOutlineWidth(maxOutlineDepth);
   const expanderWidth = hierarchyExpanderWidth(maxOutlineDepth);
-  const layout: number[] = [];
-  layout.push(...pbEncodeInt32Field(LayoutConfigFields.fixed_rows, 0));
-
-  const style: number[] = [];
-  style.push(...pbEncodeUint32Field(StyleConfigFields.background, 0xFFFFFFFF));
-  style.push(...pbEncodeUint32Field(StyleConfigFields.foreground, 0xFF1C1917));
-  style.push(...pbEncodeUint32Field(StyleConfigFields.alternate_background, 0xFFF5F5F4));
-  style.push(...pbEncodeUint32Field(StyleConfigFields.progress_color, 0xFFF59E0B));
-  style.push(...pbEncodeMessageField(StyleConfigFields.grid_lines, pbEncodeGridLinesPayload(0xFFE7E5E4)));
-  style.push(...pbEncodeMessageField(StyleConfigFields.fixed, pbEncodeRegionStylePayload(0xFFF5F5F4, 0xFF44403C, 0xFFD6D3D1)));
-  style.push(...pbEncodeMessageField(StyleConfigFields.frozen, pbEncodeRegionStylePayload(0xFFFFFFFF, 0xFF1C1917, 0xFFD6D3D1)));
-  style.push(...pbEncodeMessageField(StyleConfigFields.header, pbEncodeHeaderStylePayload(0xFFD6D3D1)));
-  style.push(...pbEncodeUint32Field(StyleConfigFields.sheet_background, 0xFFFAFAF9));
-  style.push(...pbEncodeUint32Field(StyleConfigFields.sheet_border, 0xFFD6D3D1));
-
-  const selectionStyle = pbEncodeHighlightStylePayload({
-    background: 0xFFD97706,
-    foreground: 0xFFFFFFFF,
-    fillHandle: FillHandlePosition.FILL_HANDLE_NONE,
-    fillHandleColor: 0xFFF59E0B,
-  });
-  const activeCellStyle = pbEncodeHighlightStylePayload({
-    background: 0x22000000,
-    foreground: 0xFFFFFFFF,
-    borderStyle: BorderStyle.BORDER_THICK,
-    borderColor: 0xFFF59E0B,
-  });
-  const hover: number[] = [];
-  hover.push(...pbEncodeTag(HoverConfigFields.cell, 0), ...pbEncodeBool(true));
-  hover.push(...pbEncodeMessageField(HoverConfigFields.cell_style, pbEncodeHighlightStylePayload({
-    background: 0x1AD97706,
-    borderStyle: BorderStyle.BORDER_THIN,
-    borderColor: 0xFFF59E0B,
-  })));
-  const selection: number[] = [];
-  selection.push(...pbEncodeInt32Field(SelectionConfigFields.mode, SelectionMode.SELECTION_FREE));
-  selection.push(...pbEncodeMessageField(SelectionConfigFields.style, selectionStyle));
-  selection.push(...pbEncodeMessageField(SelectionConfigFields.hover, new Uint8Array(hover)));
-  selection.push(...pbEncodeMessageField(SelectionConfigFields.active_cell_style, activeCellStyle));
-
-  const editing: number[] = [];
-  const activation: number[] = [];
-  activation.push(...pbEncodeInt32Field(EditActivationFields.trigger, EditTrigger.EDIT_TRIGGER_NONE));
-  activation.push(...pbEncodeInt32Field(EditActivationFields.tab_behavior, TabBehavior.TAB_CELLS));
-  editing.push(...pbEncodeMessageField(EditConfigFields.activation, new Uint8Array(activation)));
-  editing.push(...pbEncodeMessageField(EditConfigFields.default_editor, defaultHostTextEditor()));
-
-  const scrolling: number[] = [];
-  scrolling.push(...pbEncodeInt32Field(ScrollConfigFields.scrollbars, ScrollBarsMode.SCROLLBAR_BOTH));
-  scrolling.push(...pbEncodeTag(ScrollConfigFields.fling_enabled, 0), ...pbEncodeBool(true));
-  scrolling.push(...pbEncodeFloatField(ScrollConfigFields.fling_impulse_gain, 220.0));
-  scrolling.push(...pbEncodeFloatField(ScrollConfigFields.fling_friction, 0.9));
 
   const outline: number[] = [];
-  outline.push(...pbEncodeInt32Field(OutlineConfigFields.tree_indicator, TreeIndicatorStyle.TREE_INDICATOR_CONNECTORS_LEAF));
-  outline.push(...pbEncodeUint32Field(OutlineConfigFields.tree_color, 0xFFA8A29E));
-  outline.push(...pbEncodeInt32Field(OutlineConfigFields.indicator_indent, 20));
+  outline.push(...pbEncodeInt32Field(OutlineConfigFields.tree_indicator, TreeIndicatorStyle.TREE_INDICATOR_ARROWS_LEAF));
+  outline.push(...pbEncodeUint32Field(OutlineConfigFields.tree_color, HIERARCHY_TREE_COLOR));
+  outline.push(...pbEncodeInt32Field(OutlineConfigFields.indicator_indent, HIERARCHY_OUTLINE_INDENT));
   outline.push(...pbEncodeInt32Field(OutlineConfigFields.max_levels, Math.max(0, maxOutlineLevel)));
   outline.push(...pbEncodeTag(OutlineConfigFields.show_level_buttons, 0), ...pbEncodeBool(true));
   outline.push(...pbEncodeInt32Field(OutlineConfigFields.label_column, HIERARCHY_NAME_COL));
@@ -1590,21 +1479,15 @@ function pbEncodeHierarchyOutlineConfig(maxOutlineDepth: number, maxOutlineLevel
 
   const colTop: number[] = [];
   colTop.push(...pbEncodeTag(ColIndicatorConfigFields.visible, 0), ...pbEncodeBool(true));
-  colTop.push(...pbEncodeInt32Field(ColIndicatorConfigFields.band_rows, 1));
+  colTop.push(...pbEncodeInt32Field(ColIndicatorConfigFields.band_rows, HIERARCHY_HEADER_BAND_ROWS));
   const colTopModes: number[] = [];
-  colTopModes.push(...pbEncodeInt32Field(1, ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT));
+  colTopModes.push(...pbEncodeInt32Field(ColIndicatorCellModesFields.modes, ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT));
   colTop.push(...pbEncodeMessageField(ColIndicatorConfigFields.cell_modes, new Uint8Array(colTopModes)));
-  colTop.push(...pbEncodeUint32Field(ColIndicatorConfigFields.background, 0xFFFAFAF9));
-  colTop.push(...pbEncodeUint32Field(ColIndicatorConfigFields.foreground, 0xFF1C1917));
-  colTop.push(...pbEncodeUint32Field(ColIndicatorConfigFields.grid_color, 0xFFD6D3D1));
   colTop.push(...pbEncodeTag(ColIndicatorConfigFields.allow_resize, 0), ...pbEncodeBool(true));
   const rowStart: number[] = [];
   rowStart.push(...pbEncodeTag(RowIndicatorConfigFields.visible, 0), ...pbEncodeBool(true));
   rowStart.push(...pbEncodeInt32Field(RowIndicatorConfigFields.width, expanderWidth));
-  rowStart.push(...pbEncodeUint32Field(RowIndicatorConfigFields.background, 0xFFFAFAF9));
-  rowStart.push(...pbEncodeUint32Field(RowIndicatorConfigFields.foreground, 0xFF57534E));
-  rowStart.push(...pbEncodeUint32Field(RowIndicatorConfigFields.grid_color, 0xFFD6D3D1));
-  rowStart.push(...pbEncodeTag(RowIndicatorConfigFields.auto_size, 0), ...pbEncodeBool(true));
+  rowStart.push(...pbEncodeTag(RowIndicatorConfigFields.auto_size, 0), ...pbEncodeBool(false));
   rowStart.push(...pbEncodeTag(RowIndicatorConfigFields.allow_resize, 0), ...pbEncodeBool(true));
   const expanderSlot: number[] = [];
   expanderSlot.push(...pbEncodeInt32Field(RowIndicatorSlotFields.kind, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_EXPANDER));
@@ -1613,8 +1496,6 @@ function pbEncodeHierarchyOutlineConfig(maxOutlineDepth: number, maxOutlineLevel
   rowStart.push(...pbEncodeMessageField(RowIndicatorConfigFields.slots, new Uint8Array(expanderSlot)));
   const cornerTopStart: number[] = [];
   cornerTopStart.push(...pbEncodeTag(CornerIndicatorConfigFields.visible, 0), ...pbEncodeBool(true));
-  cornerTopStart.push(...pbEncodeUint32Field(CornerIndicatorConfigFields.background, 0xFFFAFAF9));
-  cornerTopStart.push(...pbEncodeUint32Field(CornerIndicatorConfigFields.foreground, 0xFF57534E));
   const outlineLevelsSlot: number[] = [];
   outlineLevelsSlot.push(...pbEncodeInt32Field(CornerIndicatorSlotFields.kind, CornerIndicatorSlotKind.CORNER_SLOT_OUTLINE_LEVELS));
   outlineLevelsSlot.push(...pbEncodeInt32Field(CornerIndicatorSlotFields.width, outlineWidth));
@@ -1626,11 +1507,7 @@ function pbEncodeHierarchyOutlineConfig(maxOutlineDepth: number, maxOutlineLevel
   indicators.push(...pbEncodeMessageField(IndicatorsConfigFields.corner_top_start, new Uint8Array(cornerTopStart)));
   indicators.push(...pbEncodeInt32Field(IndicatorsConfigFields.appearance, IndicatorAppearance.INDICATOR_APPEARANCE_MODERN));
   const gridConfig: number[] = [];
-  gridConfig.push(...pbEncodeMessageField(GridConfigFields.layout, new Uint8Array(layout)));
-  gridConfig.push(...pbEncodeMessageField(GridConfigFields.style, new Uint8Array(style)));
-  gridConfig.push(...pbEncodeMessageField(GridConfigFields.selection, new Uint8Array(selection)));
-  gridConfig.push(...pbEncodeMessageField(GridConfigFields.editing, new Uint8Array(editing)));
-  gridConfig.push(...pbEncodeMessageField(GridConfigFields.scrolling, new Uint8Array(scrolling)));
+  gridConfig.push(...pbEncodeInt32Field(GridConfigFields.theme_preset, ThemePreset.THEME_AMBER));
   gridConfig.push(...pbEncodeMessageField(GridConfigFields.outline, new Uint8Array(outline)));
   gridConfig.push(...pbEncodeMessageField(GridConfigFields.interaction, new Uint8Array(interaction)));
   gridConfig.push(...pbEncodeMessageField(GridConfigFields.indicators, new Uint8Array(indicators)));
@@ -1638,139 +1515,35 @@ function pbEncodeHierarchyOutlineConfig(maxOutlineDepth: number, maxOutlineLevel
 }
 
 function pbEncodeSalesDemoConfig(): Uint8Array {
-  const layout: number[] = [];
-  layout.push(...pbEncodeInt32Field(LayoutConfigFields.fixed_rows, 0));
-  layout.push(...pbEncodeTag(LayoutConfigFields.extend_last_col, 0), ...pbEncodeBool(true));
-
-  const style: number[] = [];
-  style.push(...pbEncodeUint32Field(StyleConfigFields.background, 0xFFFFFFFF));
-  style.push(...pbEncodeUint32Field(StyleConfigFields.foreground, 0xFF111827));
-  style.push(...pbEncodeUint32Field(StyleConfigFields.alternate_background, 0xFFF9FAFB));
-  style.push(...pbEncodeUint32Field(StyleConfigFields.progress_color, 0xFF818CF8));
-  style.push(...pbEncodeMessageField(StyleConfigFields.grid_lines, pbEncodeGridLinesPayload(0xFFE5E7EB)));
-  style.push(...pbEncodeMessageField(StyleConfigFields.fixed, pbEncodeRegionStylePayload(0xFFF3F4F6, 0xFF374151, 0xFFD1D5DB)));
-  style.push(...pbEncodeMessageField(StyleConfigFields.frozen, pbEncodeRegionStylePayload(0xFFFFFFFF, 0xFF111827, 0xFFD1D5DB)));
-  style.push(...pbEncodeMessageField(StyleConfigFields.header, pbEncodeHeaderStylePayload(0xFFD1D5DB)));
-  style.push(...pbEncodeUint32Field(StyleConfigFields.sheet_background, 0xFFFAFAFB));
-  style.push(...pbEncodeUint32Field(StyleConfigFields.sheet_border, 0xFFD1D5DB));
-
-  const selectionStyle = pbEncodeHighlightStylePayload({
-    background: 0xFF6366F1,
-    foreground: 0xFFFFFFFF,
-    fillHandle: FillHandlePosition.FILL_HANDLE_NONE,
-    fillHandleColor: 0xFF818CF8,
-  });
-  const activeCellStyle = pbEncodeHighlightStylePayload({
-    background: 0x22000000,
-    foreground: 0xFFFFFFFF,
-    borderStyle: BorderStyle.BORDER_THICK,
-    borderColor: 0xFF818CF8,
-  });
-  const hover: number[] = [];
-  hover.push(...pbEncodeTag(HoverConfigFields.row, 0), ...pbEncodeBool(true));
-  hover.push(...pbEncodeTag(HoverConfigFields.column, 0), ...pbEncodeBool(true));
-  hover.push(...pbEncodeTag(HoverConfigFields.cell, 0), ...pbEncodeBool(true));
-  hover.push(...pbEncodeMessageField(HoverConfigFields.row_style, pbEncodeHighlightStylePayload({ background: 0x106366F1 })));
-  hover.push(...pbEncodeMessageField(HoverConfigFields.column_style, pbEncodeHighlightStylePayload({ background: 0x106366F1 })));
-  hover.push(...pbEncodeMessageField(HoverConfigFields.cell_style, pbEncodeHighlightStylePayload({
-    background: 0x1E818CF8,
-    borderStyle: BorderStyle.BORDER_THIN,
-    borderColor: 0xFF818CF8,
-  })));
-  const selection: number[] = [];
-  selection.push(...pbEncodeInt32Field(SelectionConfigFields.mode, SelectionMode.SELECTION_FREE));
-  selection.push(...pbEncodeMessageField(SelectionConfigFields.style, selectionStyle));
-  selection.push(...pbEncodeMessageField(SelectionConfigFields.hover, new Uint8Array(hover)));
-  selection.push(...pbEncodeMessageField(SelectionConfigFields.active_cell_style, activeCellStyle));
-
-  const editing: number[] = [];
-  const activation: number[] = [];
-  activation.push(...pbEncodeInt32Field(EditActivationFields.trigger, EditTrigger.EDIT_TRIGGER_NONE));
-  activation.push(...pbEncodeInt32Field(EditActivationFields.tab_behavior, TabBehavior.TAB_CELLS));
-  editing.push(...pbEncodeMessageField(EditConfigFields.activation, new Uint8Array(activation)));
-  editing.push(...pbEncodeMessageField(EditConfigFields.default_editor, defaultHostTextEditor()));
-
-  const scrolling: number[] = [];
-  scrolling.push(...pbEncodeInt32Field(ScrollConfigFields.scrollbars, ScrollBarsMode.SCROLLBAR_BOTH));
-  scrolling.push(...pbEncodeTag(ScrollConfigFields.fling_enabled, 0), ...pbEncodeBool(true));
-  scrolling.push(...pbEncodeFloatField(ScrollConfigFields.fling_impulse_gain, 220.0));
-  scrolling.push(...pbEncodeFloatField(ScrollConfigFields.fling_friction, 0.9));
-
   const outline: number[] = [];
   outline.push(...pbEncodeInt32Field(OutlineConfigFields.tree_indicator, TreeIndicatorStyle.TREE_INDICATOR_NONE));
   outline.push(...pbEncodeInt32Field(OutlineConfigFields.group_total_position, GroupTotalPosition.GROUP_TOTAL_BELOW));
   outline.push(...pbEncodeTag(OutlineConfigFields.multi_totals, 0), ...pbEncodeBool(true));
-  outline.push(...pbEncodeUint32Field(OutlineConfigFields.tree_color, 0xFF9CA3AF));
-
-  const span: number[] = [];
-  span.push(...pbEncodeInt32Field(SpanConfigFields.cell_span, CellSpanMode.CELL_SPAN_BY_ROW));
-  span.push(...pbEncodeInt32Field(SpanConfigFields.cell_span_fixed, CellSpanMode.CELL_SPAN_NONE));
-  span.push(...pbEncodeInt32Field(SpanConfigFields.cell_span_compare, SpanCompareMode.SPAN_COMPARE_NO_CASE));
-
-  const resize: number[] = [];
-  resize.push(...pbEncodeTag(ResizePolicyFields.columns, 0), ...pbEncodeBool(true));
-  resize.push(...pbEncodeTag(ResizePolicyFields.rows, 0), ...pbEncodeBool(true));
-  const freeze: number[] = [];
-  freeze.push(...pbEncodeTag(FreezePolicyFields.columns, 0), ...pbEncodeBool(true));
-  freeze.push(...pbEncodeTag(FreezePolicyFields.rows, 0), ...pbEncodeBool(true));
-  const headerFeatures: number[] = [];
-  headerFeatures.push(...pbEncodeTag(HeaderFeaturesFields.sort, 0), ...pbEncodeBool(true));
-  headerFeatures.push(...pbEncodeTag(HeaderFeaturesFields.reorder, 0), ...pbEncodeBool(true));
-  headerFeatures.push(...pbEncodeTag(HeaderFeaturesFields.chooser, 0), ...pbEncodeBool(false));
-  const interaction: number[] = [];
-  interaction.push(...pbEncodeMessageField(InteractionConfigFields.resize, new Uint8Array(resize)));
-  interaction.push(...pbEncodeMessageField(InteractionConfigFields.freeze, new Uint8Array(freeze)));
-  interaction.push(...pbEncodeTag(InteractionConfigFields.auto_size_mouse, 0), ...pbEncodeBool(true));
-  interaction.push(...pbEncodeMessageField(InteractionConfigFields.header_features, new Uint8Array(headerFeatures)));
 
   const rowStart: number[] = [];
   rowStart.push(...pbEncodeTag(RowIndicatorConfigFields.visible, 0), ...pbEncodeBool(true));
-  rowStart.push(...pbEncodeInt32Field(RowIndicatorConfigFields.width, 40));
-  rowStart.push(...pbEncodeUint32Field(RowIndicatorConfigFields.background, 0xFFF9FAFB));
-  rowStart.push(...pbEncodeUint32Field(RowIndicatorConfigFields.foreground, 0xFF6B7280));
-  rowStart.push(...pbEncodeUint32Field(RowIndicatorConfigFields.grid_color, 0xFFD1D5DB));
-  rowStart.push(...pbEncodeTag(RowIndicatorConfigFields.allow_resize, 0), ...pbEncodeBool(true));
+  rowStart.push(...pbEncodeInt32Field(RowIndicatorConfigFields.width, DEFAULT_ROW_INDICATOR_WIDTH));
   const rowNumberSlot: number[] = [];
   rowNumberSlot.push(...pbEncodeInt32Field(RowIndicatorSlotFields.kind, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NUMBERS));
-  rowNumberSlot.push(...pbEncodeInt32Field(RowIndicatorSlotFields.width, 40));
+  rowNumberSlot.push(...pbEncodeInt32Field(RowIndicatorSlotFields.width, DEFAULT_ROW_INDICATOR_WIDTH));
   rowNumberSlot.push(...pbEncodeTag(RowIndicatorSlotFields.visible, 0), ...pbEncodeBool(true));
   rowStart.push(...pbEncodeMessageField(RowIndicatorConfigFields.slots, new Uint8Array(rowNumberSlot)));
   const colTop: number[] = [];
   colTop.push(...pbEncodeTag(ColIndicatorConfigFields.visible, 0), ...pbEncodeBool(true));
-  colTop.push(...pbEncodeInt32Field(ColIndicatorConfigFields.default_row_height, 28));
-  colTop.push(...pbEncodeInt32Field(ColIndicatorConfigFields.band_rows, 1));
+  colTop.push(...pbEncodeInt32Field(ColIndicatorConfigFields.default_row_height, SALES_HEADER_ROW_HEIGHT));
+  colTop.push(...pbEncodeInt32Field(ColIndicatorConfigFields.band_rows, DEFAULT_COL_INDICATOR_BAND_ROWS));
   const colTopModes: number[] = [];
-  colTopModes.push(...pbEncodeInt32Field(1, ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT));
-  colTopModes.push(...pbEncodeInt32Field(1, ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH));
+  colTopModes.push(...pbEncodeInt32Field(ColIndicatorCellModesFields.modes, ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT));
+  colTopModes.push(...pbEncodeInt32Field(ColIndicatorCellModesFields.modes, ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH));
   colTop.push(...pbEncodeMessageField(ColIndicatorConfigFields.cell_modes, new Uint8Array(colTopModes)));
-  colTop.push(...pbEncodeUint32Field(ColIndicatorConfigFields.background, 0xFFF9FAFB));
-  colTop.push(...pbEncodeUint32Field(ColIndicatorConfigFields.foreground, 0xFF111827));
-  colTop.push(...pbEncodeUint32Field(ColIndicatorConfigFields.grid_color, 0xFFD1D5DB));
-  colTop.push(...pbEncodeTag(ColIndicatorConfigFields.allow_resize, 0), ...pbEncodeBool(true));
   const indicators: number[] = [];
   indicators.push(...pbEncodeMessageField(IndicatorsConfigFields.row_start, new Uint8Array(rowStart)));
   indicators.push(...pbEncodeMessageField(IndicatorsConfigFields.col_top, new Uint8Array(colTop)));
   const gridConfig: number[] = [];
-  gridConfig.push(...pbEncodeMessageField(GridConfigFields.layout, new Uint8Array(layout)));
-  gridConfig.push(...pbEncodeMessageField(GridConfigFields.style, new Uint8Array(style)));
-  gridConfig.push(...pbEncodeMessageField(GridConfigFields.selection, new Uint8Array(selection)));
-  gridConfig.push(...pbEncodeMessageField(GridConfigFields.editing, new Uint8Array(editing)));
-  gridConfig.push(...pbEncodeMessageField(GridConfigFields.scrolling, new Uint8Array(scrolling)));
+  gridConfig.push(...pbEncodeInt32Field(GridConfigFields.theme_preset, ThemePreset.THEME_LIGHT));
   gridConfig.push(...pbEncodeMessageField(GridConfigFields.outline, new Uint8Array(outline)));
-  gridConfig.push(...pbEncodeMessageField(GridConfigFields.span, new Uint8Array(span)));
-  gridConfig.push(...pbEncodeMessageField(GridConfigFields.interaction, new Uint8Array(interaction)));
   gridConfig.push(...pbEncodeMessageField(GridConfigFields.indicators, new Uint8Array(indicators)));
   return new Uint8Array(gridConfig);
-}
-
-function applySalesSubtotalDecorations(grid: VolvoxGrid, subtotalRows: readonly number[]): void {
-  const uniqueRows = [...new Set(subtotalRows)].sort((a, b) => a - b);
-  for (const row of uniqueRows) {
-    const node = grid.getNode(row);
-    if (node != null && node.level <= 0) {
-      grid.mergeCells(row, 0, row, 1);
-    }
-  }
 }
 
 function setupSalesJsonDemo(grid: VolvoxGrid, wasmModule: WasmModule, id: number): void {
@@ -1793,25 +1566,23 @@ function setupSalesJsonDemo(grid: VolvoxGrid, wasmModule: WasmModule, id: number
     if (result.status === LoadDataStatus.LOAD_FAILED) {
       throw new Error("LoadData failed for embedded sales demo");
     }
-    wasmModule.volvox_grid_define_columns_pb(pbEncodeDefineColumnsRequest(id, SALES_COLUMN_SETUP));
+    grid.themePreset = ThemePreset.THEME_LIGHT;
+    grid.showRowIndicator = true;
     if (typeof wasmModule.volvox_grid_configure === "function") {
       wasmModule.volvox_grid_configure(gridHandle, pbEncodeSalesDemoConfig());
     }
     grid.selectionMode = SelectionMode.SELECTION_FREE;
-    grid.setHeaderFeatures({ sort: true, reorder: true, chooser: false });
-    grid.setColFormat(4, "$#,##0");
-    grid.setColFormat(5, "$#,##0");
-    grid.setColProgressColor(6, 0xFF818CF8);
-    grid.setColDropdown(8, dropdownFromLabels(SALES_STATUS_ITEMS));
-    grid.flingImpulseGain = 220.0;
-    grid.flingFriction = 0.9;
-    grid.subtotal(AggregateType.AGG_CLEAR, 0, 0, "", 0, 0, false);
-    applySalesSubtotalDecorations(grid, grid.subtotal(AggregateType.AGG_SUM, -1, 4, "Grand Total", 0xFFEEF2FF, 0xFF111827, true).rows);
-    applySalesSubtotalDecorations(grid, grid.subtotal(AggregateType.AGG_SUM, 0, 4, "", 0xFFF5F3FF, 0xFF111827, true).rows);
-    applySalesSubtotalDecorations(grid, grid.subtotal(AggregateType.AGG_SUM, 1, 4, "", 0xFFF8F7FF, 0xFF111827, true).rows);
-    applySalesSubtotalDecorations(grid, grid.subtotal(AggregateType.AGG_SUM, -1, 5, "Grand Total", 0xFFEEF2FF, 0xFF111827, true).rows);
-    applySalesSubtotalDecorations(grid, grid.subtotal(AggregateType.AGG_SUM, 0, 5, "", 0xFFF5F3FF, 0xFF111827, true).rows);
-    applySalesSubtotalDecorations(grid, grid.subtotal(AggregateType.AGG_SUM, 1, 5, "", 0xFFF8F7FF, 0xFF111827, true).rows);
+    grid.setColDropdown(SalesColumn.Status, dropdownFromLabels(SALES_STATUS_ITEMS));
+    grid.addSubtotals(
+      [SalesColumn.Sales, SalesColumn.Cost],
+      [
+        { caption: "Grand Total", backColor: SALES_GRAND_TOTAL_BACK_COLOR },
+        { groupCol: SalesColumn.Quarter, backColor: SALES_QUARTER_SUBTOTAL_BACK_COLOR },
+        { groupCol: SalesColumn.Region, backColor: SALES_REGION_SUBTOTAL_BACK_COLOR },
+      ],
+      { mergeColFrom: SalesColumn.Quarter, mergeColTo: SalesColumn.Region },
+    );
+    grid.autoSize(SalesColumn.Sales, SalesColumn.Cost);
     grid.invalidate();
   } finally {
     if (id !== prevId) {
@@ -1856,8 +1627,8 @@ function setupHierarchyJsonDemo(grid: VolvoxGrid, wasmModule: WasmModule, id: nu
 
     grid.selectionMode = SelectionMode.SELECTION_FREE;
     grid.setHeaderFeatures({ sort: false, reorder: false, chooser: false });
-    grid.flingImpulseGain = 220.0;
-    grid.flingFriction = 0.9;
+    grid.flingImpulseGain = DEFAULT_FLING_IMPULSE_GAIN;
+    grid.flingFriction = DEFAULT_FLING_FRICTION;
     grid.editable = false;
     grid.invalidate();
   } finally {
@@ -2156,8 +1927,8 @@ function setupBarcodesJsonDemo(grid: VolvoxGrid, wasmModule: WasmModule, id: num
 
     grid.selectionMode = SelectionMode.SELECTION_FREE;
     grid.setHeaderFeatures({ sort: true, reorder: true, chooser: false });
-    grid.flingImpulseGain = 220.0;
-    grid.flingFriction = 0.9;
+    grid.flingImpulseGain = DEFAULT_FLING_IMPULSE_GAIN;
+    grid.flingFriction = DEFAULT_FLING_FRICTION;
     grid.invalidate();
   } finally {
     if (id !== prevId) {

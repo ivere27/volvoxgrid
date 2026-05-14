@@ -11736,13 +11736,14 @@ mod tests {
         dropdown_glyph_metrics, dropdown_layer_needed, editor_caret_span, encode_linear_barcode,
         linear_barcode_preview_rect, normalized_code128_payload, parse_progress_percent,
         picture_layer_needed, progress_layer_needed, render_fast_scroll, render_grid,
-        show_dropdown_button_for_cell, sort_arrow_box_size, BarcodeDrawRect, CellKey,
-        RenderContext, RenderCtxCacheKey, RenderCtxCached, VisibleRange,
+        resolve_alignment, show_dropdown_button_for_cell, sort_arrow_box_size, BarcodeDrawRect,
+        CellKey, RenderContext, RenderCtxCacheKey, RenderCtxCached, VisibleRange,
         DEFAULT_BARCODE_SIZE_WARNING_COLOR, TEXT_LINE_HEIGHT_FACTOR,
     };
     use crate::canvas_cpu::CpuCanvas;
     use crate::edit::{editor_line_index_for_char, editor_visual_lines};
     use crate::grid::VolvoxGrid;
+    use crate::style::CellStylePatch;
     use crate::text::TextRenderer;
     use std::sync::{Arc, Mutex};
 
@@ -13503,6 +13504,17 @@ mod tests {
         assert_eq!(text_cell.meta.alignment, pb::Align::RightCenter as i32);
         assert_eq!(text_cell.vis_rect.w, 140);
         assert_eq!(text_cell.orig_rect.w, 140);
+    }
+
+    #[test]
+    fn general_alignment_centers_boolean_data_cells() {
+        let mut grid = VolvoxGrid::new(1, 120, 40, 1, 1, 0, 0);
+        grid.columns[0].data_type = pb::ColumnDataType::ColumnDataBoolean as i32;
+        grid.columns[0].alignment = pb::Align::General as i32;
+
+        let alignment = resolve_alignment(&grid, 0, 0, &CellStylePatch::default(), "");
+
+        assert_eq!(alignment, pb::Align::CenterCenter as i32);
     }
 
     #[test]

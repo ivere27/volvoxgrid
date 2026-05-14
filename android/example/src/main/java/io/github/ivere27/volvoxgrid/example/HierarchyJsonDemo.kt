@@ -1,9 +1,6 @@
 package io.github.ivere27.volvoxgrid.example
 
 import io.github.ivere27.volvoxgrid.Align
-import io.github.ivere27.volvoxgrid.Border
-import io.github.ivere27.volvoxgrid.BorderStyle
-import io.github.ivere27.volvoxgrid.Borders
 import io.github.ivere27.volvoxgrid.CellInteraction
 import io.github.ivere27.volvoxgrid.CellStyle
 import io.github.ivere27.volvoxgrid.ColIndicatorCellMode
@@ -18,17 +15,9 @@ import io.github.ivere27.volvoxgrid.DefineColumnsRequest
 import io.github.ivere27.volvoxgrid.EditActivation
 import io.github.ivere27.volvoxgrid.EditConfig
 import io.github.ivere27.volvoxgrid.EditTrigger
-import io.github.ivere27.volvoxgrid.FillHandlePosition
 import io.github.ivere27.volvoxgrid.Font
 import io.github.ivere27.volvoxgrid.GridConfig
-import io.github.ivere27.volvoxgrid.GridLineStyle
-import io.github.ivere27.volvoxgrid.GridLines
-import io.github.ivere27.volvoxgrid.HeaderResizeHandle
-import io.github.ivere27.volvoxgrid.HeaderSeparator
-import io.github.ivere27.volvoxgrid.HeaderStyle
 import io.github.ivere27.volvoxgrid.HeaderFeatures
-import io.github.ivere27.volvoxgrid.HighlightStyle
-import io.github.ivere27.volvoxgrid.HoverConfig
 import io.github.ivere27.volvoxgrid.IndicatorsConfig
 import io.github.ivere27.volvoxgrid.IndicatorAppearance
 import io.github.ivere27.volvoxgrid.InteractionConfig
@@ -36,16 +25,13 @@ import io.github.ivere27.volvoxgrid.LayoutConfig
 import io.github.ivere27.volvoxgrid.LoadDataOptions
 import io.github.ivere27.volvoxgrid.LoadDataStatus
 import io.github.ivere27.volvoxgrid.OutlineConfig
-import io.github.ivere27.volvoxgrid.RegionStyle
 import io.github.ivere27.volvoxgrid.ResizePolicy
 import io.github.ivere27.volvoxgrid.RowIndicatorConfig
 import io.github.ivere27.volvoxgrid.RowIndicatorSlot
 import io.github.ivere27.volvoxgrid.RowIndicatorSlotKind
-import io.github.ivere27.volvoxgrid.ScrollBarsMode
-import io.github.ivere27.volvoxgrid.ScrollConfig
 import io.github.ivere27.volvoxgrid.SelectionConfig
 import io.github.ivere27.volvoxgrid.SelectionMode
-import io.github.ivere27.volvoxgrid.StyleConfig
+import io.github.ivere27.volvoxgrid.ThemePreset
 import io.github.ivere27.volvoxgrid.TreeIndicatorStyle
 import io.github.ivere27.volvoxgrid.VolvoxGridController
 import org.json.JSONArray
@@ -53,28 +39,36 @@ import org.json.JSONObject
 
 object HierarchyJsonDemo {
     private const val NAME_COLUMN_INDEX = 0
+    private const val SIZE_COLUMN_INDEX = 2
+    private const val MODIFIED_COLUMN_INDEX = 3
+    private const val PERMISSIONS_COLUMN_INDEX = 4
     const val ACTION_COLUMN_INDEX = 5
 
-    private val widths = intArrayOf(260, 80, 80, 120, 100, 92)
+    private const val NAME_COLUMN_WIDTH = 260
+    private const val TYPE_COLUMN_WIDTH = 80
+    private const val SIZE_COLUMN_WIDTH = 80
+    private const val MODIFIED_COLUMN_WIDTH = 120
+    private const val PERMISSIONS_COLUMN_WIDTH = 100
+    private const val ACTION_COLUMN_WIDTH = 92
+    private const val SHORT_DATE_FORMAT = "short date"
+
+    private val widths = intArrayOf(
+        NAME_COLUMN_WIDTH,
+        TYPE_COLUMN_WIDTH,
+        SIZE_COLUMN_WIDTH,
+        MODIFIED_COLUMN_WIDTH,
+        PERMISSIONS_COLUMN_WIDTH,
+        ACTION_COLUMN_WIDTH
+    )
     private val captions = arrayOf("Name", "Type", "Size", "Modified", "Permissions", "Action")
     private val keys = arrayOf("Name", "Type", "Size", "Modified", "Permissions", "Action")
-    private const val BODY_BG = 0xFFFFFFFF.toInt()
-    private const val BODY_FG = 0xFF1C1917.toInt()
-    private const val CANVAS_BG = 0xFFFAFAF9.toInt()
-    private const val ALT_ROW_BG = 0xFFF5F5F4.toInt()
-    private const val FIXED_BG = 0xFFF5F5F4.toInt()
-    private const val FIXED_FG = 0xFF44403C.toInt()
-    private const val GRID_COLOR = 0xFFE7E5E4.toInt()
-    private const val FIXED_GRID_COLOR = 0xFFD6D3D1.toInt()
-    private const val HEADER_BG = 0xFFFAFAF9.toInt()
-    private const val HEADER_FG = 0xFF1C1917.toInt()
-    private const val ACCENT = 0xFFF59E0B.toInt()
     private const val TREE_COLOR = 0xFFA8A29E.toInt()
-    private const val SELECTION_BG = 0xFFD97706.toInt()
-    private const val SELECTION_FG = 0xFFFFFFFF.toInt()
-    private const val HOVER_CELL_BG = 0x1AD97706
+    private const val FOLDER_TEXT_COLOR = 0xFF92400E.toInt()
+    private const val ACTION_TEXT_COLOR = 0xFF2563EB.toInt()
     private const val OUTLINE_INDENT = 20
     private const val MIN_OUTLINE_INDICATOR_WIDTH = 56
+    private const val NAME_EXPANDER_WIDTH = 280
+    private const val HEADER_BAND_ROWS = 1
     private const val HEADER_ROW_HEIGHT = 44
 
     fun load(controller: VolvoxGridController) {
@@ -95,10 +89,10 @@ object HierarchyJsonDemo {
         controller.configure(hierarchyThemeConfig(maxOutlineDepth(levels), maxOutlineLevel(levels)))
 
         val actionStyle = CellStyle.newBuilder()
-            .setForeground(0xFF2563EB.toInt())
+            .setForeground(ACTION_TEXT_COLOR)
             .build()
         val folderStyle = CellStyle.newBuilder()
-            .setForeground(0xFF92400E.toInt())
+            .setForeground(FOLDER_TEXT_COLOR)
             .setFont(Font.newBuilder().setBold(true).build())
             .build()
 
@@ -113,7 +107,7 @@ object HierarchyJsonDemo {
                 actionStyle
             )
             if (isFolder) {
-                controller.setCellStyleRange(row, 0, row, 0, folderStyle)
+                controller.setCellStyleRange(row, NAME_COLUMN_INDEX, row, NAME_COLUMN_INDEX, folderStyle)
             }
         }
     }
@@ -127,12 +121,12 @@ object HierarchyJsonDemo {
                 .setKey(keys[col])
                 .setWidth(widths[col])
             when (col) {
-                2 -> def.align = Align.ALIGN_RIGHT_CENTER
-                3 -> {
+                SIZE_COLUMN_INDEX -> def.align = Align.ALIGN_RIGHT_CENTER
+                MODIFIED_COLUMN_INDEX -> {
                     def.dataType = ColumnDataType.COLUMN_DATA_DATE
-                    def.format = "short date"
+                    def.format = SHORT_DATE_FORMAT
                 }
-                4, ACTION_COLUMN_INDEX -> def.align = Align.ALIGN_CENTER_CENTER
+                PERMISSIONS_COLUMN_INDEX, ACTION_COLUMN_INDEX -> def.align = Align.ALIGN_CENTER_CENTER
             }
             if (col == ACTION_COLUMN_INDEX) {
                 def.interaction = CellInteraction.CELL_INTERACTION_TEXT_LINK
@@ -205,124 +199,22 @@ object HierarchyJsonDemo {
     }
 
     private fun expanderIndicatorWidth(maxOutlineDepth: Int): Int {
-        return outlineIndicatorWidth(maxOutlineDepth) + 280
+        return outlineIndicatorWidth(maxOutlineDepth) + NAME_EXPANDER_WIDTH
     }
 
     private fun hierarchyThemeConfig(maxOutlineDepth: Int, maxOutlineLevel: Int): GridConfig {
         val outlineWidth = outlineIndicatorWidth(maxOutlineDepth)
         val expanderWidth = expanderIndicatorWidth(maxOutlineDepth)
         return GridConfig.newBuilder()
+            .setThemePreset(ThemePreset.THEME_AMBER)
             .setLayout(
                 LayoutConfig.newBuilder()
                     .setFixedRows(0)
                     .build()
             )
-            .setStyle(
-                StyleConfig.newBuilder()
-                    .setBackground(BODY_BG)
-                    .setForeground(BODY_FG)
-                    .setAlternateBackground(ALT_ROW_BG)
-                    .setProgressColor(ACCENT)
-                    .setSheetBackground(CANVAS_BG)
-                    .setSheetBorder(FIXED_GRID_COLOR)
-                    .setGridLines(
-                        GridLines.newBuilder()
-                            .setStyle(GridLineStyle.GRIDLINE_SOLID)
-                            .setColor(GRID_COLOR)
-                            .build()
-                    )
-                    .setFixed(
-                        RegionStyle.newBuilder()
-                            .setBackground(FIXED_BG)
-                            .setForeground(FIXED_FG)
-                            .setGridLines(
-                                GridLines.newBuilder()
-                                    .setStyle(GridLineStyle.GRIDLINE_SOLID)
-                                    .setColor(FIXED_GRID_COLOR)
-                                    .build()
-                            )
-                            .build()
-                    )
-                    .setFrozen(
-                        RegionStyle.newBuilder()
-                            .setBackground(BODY_BG)
-                            .setForeground(BODY_FG)
-                            .setGridLines(
-                                GridLines.newBuilder()
-                                    .setStyle(GridLineStyle.GRIDLINE_SOLID)
-                                    .setColor(FIXED_GRID_COLOR)
-                                    .build()
-                            )
-                            .build()
-                    )
-                    .setHeader(
-                        HeaderStyle.newBuilder()
-                            .setSeparator(
-                                HeaderSeparator.newBuilder()
-                                    .setEnabled(true)
-                                    .setColor(FIXED_GRID_COLOR)
-                                    .setWidth(1)
-                                    .build()
-                            )
-                            .setResizeHandle(
-                                HeaderResizeHandle.newBuilder()
-                                    .setEnabled(true)
-                                    .setColor(FIXED_GRID_COLOR)
-                                    .setWidth(1)
-                                    .setHitWidth(6)
-                                    .build()
-                            )
-                            .build()
-                    )
-                    .build()
-            )
             .setSelection(
                 SelectionConfig.newBuilder()
                     .setMode(SelectionMode.SELECTION_FREE)
-                    .setStyle(
-                        HighlightStyle.newBuilder()
-                            .setBackground(SELECTION_BG)
-                            .setForeground(SELECTION_FG)
-                            .setFillHandle(FillHandlePosition.FILL_HANDLE_NONE)
-                            .setFillHandleColor(ACCENT)
-                            .build()
-                    )
-                    .setActiveCellStyle(
-                        HighlightStyle.newBuilder()
-                            .setBackground(0x22000000)
-                            .setForeground(SELECTION_FG)
-                            .setBorders(
-                                Borders.newBuilder()
-                                    .setAll(
-                                        Border.newBuilder()
-                                            .setStyle(BorderStyle.BORDER_THICK)
-                                            .setColor(ACCENT)
-                                            .build()
-                                    )
-                                    .build()
-                            )
-                            .build()
-                    )
-                    .setHover(
-                        HoverConfig.newBuilder()
-                            .setCell(true)
-                            .setCellStyle(
-                                HighlightStyle.newBuilder()
-                                    .setBackground(HOVER_CELL_BG)
-                                    .setBorders(
-                                        Borders.newBuilder()
-                                            .setAll(
-                                                Border.newBuilder()
-                                                    .setStyle(BorderStyle.BORDER_THIN)
-                                                    .setColor(ACCENT)
-                                                    .build()
-                                            )
-                                            .build()
-                                    )
-                                    .build()
-                            )
-                            .build()
-                    )
                     .build()
             )
             .setEditing(
@@ -330,14 +222,6 @@ object HierarchyJsonDemo {
                     .setActivation(EditActivation.newBuilder()
                         .setTrigger(EditTrigger.EDIT_TRIGGER_NONE)
                         .build())
-                    .build()
-            )
-            .setScrolling(
-                ScrollConfig.newBuilder()
-                    .setScrollbars(ScrollBarsMode.SCROLLBAR_BOTH)
-                    .setFlingEnabled(true)
-                    .setFlingImpulseGain(220f)
-                    .setFlingFriction(0.9f)
                     .build()
             )
             .setOutline(
@@ -374,9 +258,6 @@ object HierarchyJsonDemo {
                         RowIndicatorConfig.newBuilder()
                             .setVisible(true)
                             .setWidth(expanderWidth)
-                            .setBackground(HEADER_BG)
-                            .setForeground(FIXED_FG)
-                            .setGridColor(FIXED_GRID_COLOR)
                             .setAutoSize(false)
                             .setAllowResize(true)
                             .addSlots(
@@ -391,8 +272,6 @@ object HierarchyJsonDemo {
                     .setCornerTopStart(
                         CornerIndicatorConfig.newBuilder()
                             .setVisible(true)
-                            .setBackground(HEADER_BG)
-                            .setForeground(FIXED_FG)
                             .addSlots(
                                 CornerIndicatorSlot.newBuilder()
                                     .setKind(CornerIndicatorSlotKind.CORNER_SLOT_OUTLINE_LEVELS)
@@ -406,15 +285,12 @@ object HierarchyJsonDemo {
                         ColIndicatorConfig.newBuilder()
                             .setVisible(true)
                             .setDefaultRowHeight(HEADER_ROW_HEIGHT)
-                            .setBandRows(1)
+                            .setBandRows(HEADER_BAND_ROWS)
                             .setCellModes(
                                 ColIndicatorCellModes.newBuilder()
                                     .addModes(ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT)
                                     .build()
                             )
-                            .setBackground(HEADER_BG)
-                            .setForeground(HEADER_FG)
-                            .setGridColor(FIXED_GRID_COLOR)
                             .setAllowResize(true)
                             .build()
                     )

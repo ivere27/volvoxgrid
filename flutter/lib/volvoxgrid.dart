@@ -301,7 +301,8 @@ class VolvoxGridWidget extends StatefulWidget {
   State<VolvoxGridWidget> createState() => _VolvoxGridWidgetState();
 }
 
-class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
+class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
+    with WidgetsBindingObserver {
   late final AppLifecycleListener _lifecycleListener;
 
   static const bool _flingOverrideEnabled = bool.fromEnvironment(
@@ -374,6 +375,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
   Int64 _editStateVersion = Int64.ZERO;
   bool _editCommitReplayActive = false;
   _DeferredPointerCompletion? _deferredPointerCompletionAfterEditCommit;
+  double _lastViewInsetBottom = 0.0;
 
   final TextEditingController _editTextController = TextEditingController();
   final FocusNode _editFocusNode = FocusNode();
@@ -459,6 +461,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
       onPause: _onPause,
       onResume: _onResume,
     );
+    WidgetsBinding.instance.addObserver(this);
     HardwareKeyboard.instance.addHandler(_handleHardwareKeyEvent);
     _imeProxyController.addListener(_handleImeProxyChanged);
     widget.controller.addListener(_onControllerChanged);
@@ -556,6 +559,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _lifecycleListener.dispose();
     _longPressTimer?.cancel();
     _imeProxyRevealTimer?.cancel();
@@ -571,6 +575,29 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     _gridFocusNode.dispose();
     _safeDisposeImage(_currentImage);
     super.dispose();
+  }
+
+  double _currentViewInsetBottom() {
+    if (!mounted) {
+      return _lastViewInsetBottom;
+    }
+    final view = View.maybeOf(context);
+    return view?.viewInsets.bottom ?? _lastViewInsetBottom;
+  }
+
+  @override
+  void didChangeMetrics() {
+    super.didChangeMetrics();
+    final previousBottom = _lastViewInsetBottom;
+    final nextBottom = _currentViewInsetBottom();
+    _lastViewInsetBottom = nextBottom;
+    if (_isMobilePlatform &&
+        _editing &&
+        _editFocusNode.hasFocus &&
+        previousBottom > 0 &&
+        nextBottom <= 0) {
+      _cancelEdit();
+    }
   }
 
   void _safeDisposeImage(ui.Image? image) {
@@ -1790,13 +1817,23 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     return _editorValueText(req.session.value);
   }
 
+  TextInputType _numberKeyboardTypeForEditor(pb.EditorSpec editor) {
+    final signed = !editor.hasNumber() ||
+        !editor.number.hasMin() ||
+        editor.number.min < 0.0;
+    return TextInputType.numberWithOptions(decimal: true, signed: signed);
+  }
+
   TextInputType _keyboardTypeForEditor(pb.EditorSpec editor) {
+    if (editor.kind == pb.EditorKind.EDITOR_NUMBER) {
+      return _numberKeyboardTypeForEditor(editor);
+    }
     if (!editor.hasText()) {
       return TextInputType.text;
     }
     switch (editor.text.inputType) {
       case pb.InputType.INPUT_TYPE_NUMBER:
-        return TextInputType.number;
+        return _numberKeyboardTypeForEditor(editor);
       case pb.InputType.INPUT_TYPE_EMAIL:
         return TextInputType.emailAddress;
       case pb.InputType.INPUT_TYPE_URL:
@@ -2447,20 +2484,65 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     unawaited(_commitActiveEdit());
   }
 
-  Future<void> _cancelActiveEdit() async {
+  bool get _hasActiveEditSession =>
+      _editing ||
+      _deferredEditorSessionStart != null ||
+      _imeProxySessionActive ||
+      _deferOverlayWhileImeProxyActive;
+
+  Future<void> _cancelActiveEditInternal({
+    bool requestIdleInputFocus = true,
+  }) async {
+    _imeProxyRevealTimer?.cancel();
+    _imeProxyRevealTimer = null;
+    final pending = _deferredEditorSessionStart;
+    final sessionId = pending?.hasSession() == true
+        ? pending!.session.sessionId
+        : _editSessionId;
+    final stateVersion = pending?.hasSession() == true
+        ? pending!.session.stateVersion
+        : _editStateVersion;
+    _deferredEditorSessionStart = null;
+    _deferOverlayWhileImeProxyActive = false;
+    _imeProxySessionActive = false;
+    _imeProxyCommittedText = '';
+    _suppressedPlainProxyText = null;
+    _clearImeProxyValue();
     await widget.controller.cancelEdit(
-      sessionId: _editSessionId,
-      stateVersion: _editStateVersion,
+      sessionId: sessionId,
+      stateVersion: stateVersion,
     );
     if (!mounted) {
       return;
     }
-    _closeLocalEditOverlay();
+    if (_editing) {
+      _closeLocalEditOverlay(requestIdleInputFocus: requestIdleInputFocus);
+    } else {
+      setState(() {
+        _editOverlayPendingReveal = false;
+        _editSessionToken += 1;
+        _editSessionId = Int64.ZERO;
+        _editStateVersion = Int64.ZERO;
+      });
+      if (requestIdleInputFocus) {
+        _requestIdleInputFocus();
+      }
+    }
     _requestRender();
   }
 
+  Future<void> _cancelActiveEdit() => _cancelActiveEditInternal();
+
   void _cancelEdit() {
     unawaited(_cancelActiveEdit());
+  }
+
+  Future<bool> _handleRouteWillPop() async {
+    if (!_hasActiveEditSession) {
+      return true;
+    }
+    await _cancelActiveEditInternal(requestIdleInputFocus: false);
+    return false;
   }
 
   bool _isPointerWithinActiveEditOverlay(Offset localPosition) {
@@ -3197,8 +3279,9 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
       return const Center(child: CircularProgressIndicator());
     }
     _syncEventStreamSubscription();
+    _lastViewInsetBottom = _currentViewInsetBottom();
 
-    return LayoutBuilder(
+    final grid = LayoutBuilder(
       builder: (context, constraints) {
         final mediaDpr = MediaQuery.maybeOf(context)?.devicePixelRatio;
         final dpr = (mediaDpr != null && mediaDpr.isFinite && mediaDpr > 0)
@@ -3370,6 +3453,14 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
           ),
         );
       },
+    );
+
+    // Keep WillPopScope while the package supports Flutter 3.10.
+    // PopScope would require raising the minimum Flutter SDK.
+    // ignore: deprecated_member_use
+    return WillPopScope(
+      onWillPop: _handleRouteWillPop,
+      child: grid,
     );
   }
 }

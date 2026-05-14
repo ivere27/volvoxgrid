@@ -298,6 +298,36 @@ enum BorderAppearance {
   BORDER_APPEARANCE_SUBTLE = 2;
 }
 
+// Built-in visual themes. Each preset is a complete look — when applied via
+// GridConfig.theme_preset it sets StyleConfig (cell/fixed/header colors,
+// alternate row, sheet, grid lines, border appearance), SelectionConfig
+// visual fields (selection/hover/active cell/indicator row+col styles),
+// ScrollBarConfig (appearance + colors), and IndicatorsConfig (appearance +
+// colors). Other fields (modes, sizes, visibility, behavior toggles) are
+// left untouched.
+//
+// Resolution: inside a single Configure() call, the engine first applies the
+// preset's baked palette, then merges any explicit GridConfig fields. Explicit
+// fields always win. The preset itself is not stored — GetConfig() returns
+// the resolved values.
+enum ThemePreset {
+  THEME_NONE          = 0;  // no-op — leave existing style fields alone
+  THEME_CLASSIC       = 1;  // legacy datagrid look: raised borders,
+                            //   gray fixed cells, classic scrollbar/indicator,
+                            //   system-blue selection.
+  THEME_LIGHT         = 2;  // clean modern light: flat borders, soft gray
+                            //   header (#F9FAFB), indigo accent (#6366F1),
+                            //   overlay scrollbar, modern indicator.
+  THEME_DARK          = 3;  // clean modern dark: flat borders, #1E1E1E body,
+                            //   blue accent (#569CD6), modern scrollbar.
+  THEME_HIGH_CONTRAST = 4;  // accessibility: pure black/white/yellow palette,
+                            //   classic scrollbar+indicator (thick, solid).
+  THEME_MONOKAI       = 5;  // editor-style dark: #272822 body, pink/cyan/olive
+                            //   accents, flat borders.
+  THEME_AMBER         = 6;  // warm light theme: stone neutrals, amber accent
+                            //   (#F59E0B), amber selection (#D97706).
+}
+
 enum TextEffect {
   TEXT_EFFECT_NONE         = 0;
   TEXT_EFFECT_EMBOSS       = 1;
@@ -1274,6 +1304,11 @@ message GridConfig {
   RenderConfig      rendering   = 9;
   string            version     = 10;
   IndicatorsConfig  indicators  = 11;
+
+  // Apply a built-in visual theme before the other fields in this Configure()
+  // call. See ThemePreset for resolution rules. Not stored — GetConfig()
+  // returns the resolved style/selection/scrolling/indicators.
+  optional ThemePreset theme_preset = 12;
 }
 
 // ── Layout ──

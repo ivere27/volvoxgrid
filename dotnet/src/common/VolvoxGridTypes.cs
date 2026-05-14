@@ -130,6 +130,17 @@ namespace VolvoxGrid.DotNet
         Below = 1,
     }
 
+    public enum VolvoxGridThemePreset
+    {
+        None = 0,
+        Classic = 1,
+        Light = 2,
+        Dark = 3,
+        HighContrast = 4,
+        Monokai = 5,
+        Amber = 6,
+    }
+
     public enum VolvoxGridAggregateType
     {
         None = 0,
@@ -307,6 +318,21 @@ namespace VolvoxGrid.DotNet
             Alignment = VolvoxGridAlign.General;
             DataType = VolvoxGridColumnDataType.String;
             Interaction = VolvoxGridCellInteraction.Unspecified;
+        }
+    }
+
+    public sealed class VolvoxGridSubtotalLevel
+    {
+        public int? GroupCol { get; set; }
+        public string Caption { get; set; }
+        public uint BackColor { get; set; }
+        public uint ForeColor { get; set; }
+
+        public VolvoxGridSubtotalLevel()
+        {
+            Caption = string.Empty;
+            BackColor = 0xFFEEF2FFu;
+            ForeColor = 0xFF111827u;
         }
     }
 

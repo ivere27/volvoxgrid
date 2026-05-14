@@ -64,6 +64,90 @@ EditorSpec _defaultHostTextEditorSpec() {
     ..presentation = EditorPresentation.EDITOR_INLINE;
 }
 
+EditorSpec _defaultEngineTextEditorSpec() {
+  return EditorSpec()
+    ..kind = EditorKind.EDITOR_TEXT
+    ..owner = EditorOwner.EDITOR_OWNER_ENGINE
+    ..presentation = EditorPresentation.EDITOR_CANVAS;
+}
+
+EditorSpec _defaultHostNumberEditorSpec({required bool nullable}) {
+  return EditorSpec()
+    ..kind = EditorKind.EDITOR_NUMBER
+    ..owner = EditorOwner.EDITOR_OWNER_HOST_NATIVE
+    ..presentation = EditorPresentation.EDITOR_INLINE
+    ..number = (NumberEditorParams()..nullable = nullable);
+}
+
+EditorSpec _defaultEngineCheckboxEditorSpec() {
+  return EditorSpec()
+    ..kind = EditorKind.EDITOR_CHECKBOX
+    ..owner = EditorOwner.EDITOR_OWNER_ENGINE
+    ..presentation = EditorPresentation.EDITOR_CANVAS
+    ..checkbox = (CheckboxEditorParams()..threeState = false);
+}
+
+ColumnDef _applyDefaultEditorForColumn(
+  ColumnDef column, [
+  Set<int> columnsWithEditors = const <int>{},
+]) {
+  if (column.hasEditor() ||
+      !column.hasDataType() ||
+      columnsWithEditors.contains(column.index)) {
+    return column;
+  }
+  final editor = switch (column.dataType) {
+    ColumnDataType.COLUMN_DATA_STRING => _defaultHostTextEditorSpec(),
+    ColumnDataType.COLUMN_DATA_NUMBER ||
+    ColumnDataType.COLUMN_DATA_CURRENCY =>
+      _defaultHostNumberEditorSpec(
+        nullable: column.hasNullable() ? column.nullable : true,
+      ),
+    ColumnDataType.COLUMN_DATA_BOOLEAN => _defaultEngineCheckboxEditorSpec(),
+    _ => null,
+  };
+  if (editor == null) {
+    return column;
+  }
+  return column.deepCopy()..editor = editor;
+}
+
+DefineColumnsRequest _applyDefaultEditorsForColumns(
+  DefineColumnsRequest request,
+  Set<int> columnsWithEditors,
+) {
+  final prepared = request.deepCopy();
+  prepared.columns
+    ..clear()
+    ..addAll(request.columns.map(
+        (column) => _applyDefaultEditorForColumn(column, columnsWithEditors)));
+  return prepared;
+}
+
+DefineColumnsRequest _defaultEditorsForInferredColumns(
+  Int64 gridId,
+  Iterable<ColumnDef> inferredColumns,
+  Set<int> columnsWithEditors,
+) {
+  final request = DefineColumnsRequest()..gridId = gridId;
+  for (final column in inferredColumns) {
+    if (!column.hasDataType() || columnsWithEditors.contains(column.index)) {
+      continue;
+    }
+    final def = ColumnDef()
+      ..index = column.index
+      ..dataType = column.dataType;
+    if (column.hasNullable()) {
+      def.nullable = column.nullable;
+    }
+    final prepared = _applyDefaultEditorForColumn(def);
+    if (prepared.hasEditor()) {
+      request.columns.add(prepared);
+    }
+  }
+  return request;
+}
+
 /// Simple row/col/text entry used by [setCells] batch operations.
 class CellTextEntry {
   final int row;
@@ -88,18 +172,44 @@ RowIndicatorSlot _rowIndicatorSlot(RowIndicatorSlotKind kind, int width) =>
       ..width = width
       ..visible = true;
 
+const int _defaultRowIndicatorWidth = 40;
+const int _defaultColIndicatorBandRows = 1;
+const double _defaultFlingImpulseGain = 220.0;
+const double _defaultFlingFriction = 0.9;
+const int _defaultSubtotalBackColor = 0xFFEEF2FF;
+const int _defaultSubtotalForeColor = 0xFF111827;
+const int _subtotalNoGroupColumn = -1;
+const int _subtotalNoMergeColumn = -1;
+const int _subtotalMinValidMergeColumn = 0;
+const int _subtotalClearColumn = 0;
+const int _subtotalClearColor = 0;
+
+/// A subtotal grouping level used by [VolvoxGridController.addSubtotals].
+class VolvoxGridSubtotalLevel {
+  final int? groupCol;
+  final String caption;
+  final int backColor;
+  final int foreColor;
+
+  const VolvoxGridSubtotalLevel({
+    this.groupCol,
+    this.caption = '',
+    this.backColor = _defaultSubtotalBackColor,
+    this.foreColor = _defaultSubtotalForeColor,
+  });
+}
+
 IndicatorsConfig _defaultIndicatorsConfig() => IndicatorsConfig()
   ..rowStart = (RowIndicatorConfig()
     ..visible = false
-    ..width = 35
-    ..autoSize = true
-    ..slots.addAll([
-      _rowIndicatorSlot(RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CURRENT, 18),
-      _rowIndicatorSlot(RowIndicatorSlotKind.ROW_INDICATOR_SLOT_SELECTION, 17),
-    ]))
+    ..width = _defaultRowIndicatorWidth
+    ..slots.add(_rowIndicatorSlot(
+      RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NUMBERS,
+      _defaultRowIndicatorWidth,
+    )))
   ..colTop = (ColIndicatorConfig()
     ..visible = true
-    ..bandRows = 1
+    ..bandRows = _defaultColIndicatorBandRows
     ..cellModes = _colIndicatorCellModes([
       ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT,
       ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH,
@@ -141,6 +251,7 @@ class VolvoxGridController extends ChangeNotifier {
   int? _gpuTextureId;
   int? _gpuSurfaceHandle;
   String? _gpuBackend;
+  ThemePreset _themePreset = ThemePreset.THEME_NONE;
 
   /// The native grid id. Zero until [create] completes.
   Int64 get gridId => _gridId;
@@ -156,6 +267,11 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// The backend string used for the active GPU texture ('gles' or 'vulkan').
   String? get gpuBackend => _gpuBackend;
+
+  /// Last theme preset requested through this controller.
+  ///
+  /// Manual style changes do not round-trip back into this cached value.
+  ThemePreset get themePreset => _themePreset;
 
   DestroyRequest get _destroyRequest => DestroyRequest()..gridId = _gridId;
   GetConfigRequest get _getConfigRequest =>
@@ -187,8 +303,25 @@ class VolvoxGridController extends ChangeNotifier {
       ..config = (GridConfig()
         ..layout = (LayoutConfig()
           ..rows = rows
-          ..cols = cols)
-        ..editing = (EditConfig()..defaultEditor = _defaultHostTextEditorSpec())
+          ..cols = cols
+          ..extendLastCol = true)
+        ..scrolling = (ScrollConfig()
+          ..scrollbars = ScrollBarsMode.SCROLLBAR_BOTH
+          ..fastScroll = true
+          ..flingImpulseGain = _defaultFlingImpulseGain
+          ..flingFriction = _defaultFlingFriction)
+        ..editing =
+            (EditConfig()..defaultEditor = _defaultEngineTextEditorSpec())
+        ..span = (SpanConfig()..cellSpan = CellSpanMode.CELL_SPAN_ADJACENT)
+        ..interaction = (InteractionConfig()
+          ..resize = (ResizePolicy()
+            ..columns = true
+            ..rows = true
+            ..uniform = false)
+          ..headerFeatures = (HeaderFeatures()
+            ..sort = true
+            ..reorder = true
+            ..chooser = false))
         ..indicators = _defaultIndicatorsConfig());
     final response = await VolvoxGridService.Create(req);
     _gridId = response.gridId;
@@ -217,11 +350,26 @@ class VolvoxGridController extends ChangeNotifier {
     await VolvoxGridService.Configure(ConfigureRequest()
       ..gridId = _gridId
       ..config = config);
+    if (config.hasThemePreset()) {
+      _themePreset = config.themePreset;
+    }
     notifyListeners();
   }
 
   Future<GridConfig> getConfig() {
     return VolvoxGridService.GetConfig(_getConfigRequest);
+  }
+
+  Future<SchemaResponse> getSchema() {
+    return VolvoxGridService.GetSchema(GetSchemaRequest()..gridId = _gridId);
+  }
+
+  Future<Set<int>> _columnsWithExistingEditors() async {
+    final schema = await getSchema();
+    return schema.columns
+        .where((column) => column.hasEditor())
+        .map((column) => column.index)
+        .toSet();
   }
 
   Future<void> _configure(GridConfig config) => configure(config);
@@ -403,7 +551,10 @@ class VolvoxGridController extends ChangeNotifier {
   }
 
   Future<void> defineColumns(DefineColumnsRequest request) async {
-    await VolvoxGridService.DefineColumns(request..gridId = _gridId);
+    final prepared = _applyDefaultEditorsForColumns(
+        request, await _columnsWithExistingEditors())
+      ..gridId = _gridId;
+    await VolvoxGridService.DefineColumns(prepared);
     notifyListeners();
   }
 
@@ -847,6 +998,11 @@ class VolvoxGridController extends ChangeNotifier {
       ..interaction = (InteractionConfig()..headerFeatures = features));
   }
 
+  /// Apply a built-in visual theme preset.
+  Future<void> setThemePreset(ThemePreset preset) async {
+    await _configure(GridConfig()..themePreset = preset);
+  }
+
   // ── Subtotals ─────────────────────────────────────────────────────────────
 
   /// Insert subtotal rows grouping on [groupOnCol] and aggregating
@@ -876,6 +1032,71 @@ class VolvoxGridController extends ChangeNotifier {
     final result = await VolvoxGridService.Subtotal(req);
     notifyListeners();
     return result;
+  }
+
+  /// Add subtotals for multiple aggregate columns and grouping levels.
+  Future<void> addSubtotals(
+    Iterable<int> amountCols,
+    Iterable<VolvoxGridSubtotalLevel> levels, {
+    AggregateType aggregate = AggregateType.AGG_SUM,
+    bool clearExisting = true,
+    int mergeColFrom = _subtotalNoMergeColumn,
+    int mergeColTo = _subtotalNoMergeColumn,
+  }) async {
+    final amountList = amountCols.toList();
+    final levelList = levels.toList();
+    if (!isCreated || amountList.isEmpty || levelList.isEmpty) return;
+
+    await withRedrawSuspended(() async {
+      if (amountList.length > 1) {
+        await _configure(
+            GridConfig()..outline = (OutlineConfig()..multiTotals = true));
+      }
+      if (clearExisting) {
+        await subtotal(
+          AggregateType.AGG_CLEAR,
+          groupOnCol: _subtotalClearColumn,
+          aggregateCol: _subtotalClearColumn,
+          caption: '',
+          backColor: _subtotalClearColor,
+          foreColor: _subtotalClearColor,
+          addOutline: false,
+        );
+      }
+      final wantMerge = mergeColFrom >= _subtotalMinValidMergeColumn &&
+          mergeColTo >= mergeColFrom;
+      for (final level in levelList) {
+        final groupIndex = level.groupCol ?? _subtotalNoGroupColumn;
+        for (final col in amountList) {
+          final result = await subtotal(
+            aggregate,
+            groupOnCol: groupIndex,
+            aggregateCol: col,
+            caption: level.caption,
+            backColor: level.backColor,
+            foreColor: level.foreColor,
+            addOutline: true,
+          );
+          if (wantMerge) {
+            await _mergeSubtotalLevelZero(result, mergeColFrom, mergeColTo);
+          }
+        }
+      }
+    });
+  }
+
+  Future<void> _mergeSubtotalLevelZero(
+    SubtotalResult result,
+    int colFrom,
+    int colTo,
+  ) async {
+    final rows = result.rows.toSet().toList()..sort();
+    for (final row in rows) {
+      final node = await getNode(row);
+      if (node.level <= 0) {
+        await mergeCells(row, colFrom, row, colTo);
+      }
+    }
   }
 
   // ── Outline ───────────────────────────────────────────────────────────────
@@ -1142,8 +1363,7 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Set the data type for a column (string, number, date, etc.).
   Future<void> setColDataType(int col, ColumnDataType dataType) async {
-    await VolvoxGridService.DefineColumns(DefineColumnsRequest()
-      ..gridId = _gridId
+    await defineColumns(DefineColumnsRequest()
       ..columns.add(ColumnDef()
         ..index = col
         ..dataType = dataType));
@@ -1315,6 +1535,9 @@ class VolvoxGridController extends ChangeNotifier {
       request.options = options;
     }
     final result = await VolvoxGridService.LoadData(request);
+    if (result.status != LoadDataStatus.LOAD_FAILED) {
+      await _applyDefaultEditorsForInferredColumns(result.inferredColumns);
+    }
     notifyListeners();
     return result;
   }
@@ -1331,8 +1554,34 @@ class VolvoxGridController extends ChangeNotifier {
       request.options = options;
     }
     final result = await VolvoxGridService.AppendData(request);
+    if (result.status != LoadDataStatus.LOAD_FAILED) {
+      await _applyDefaultEditorsForInferredColumns(result.inferredColumns);
+    }
     notifyListeners();
     return result;
+  }
+
+  Future<void> _applyDefaultEditorsForInferredColumns(
+    Iterable<ColumnDef> columns,
+  ) async {
+    final inferred = columns.toList(growable: false);
+    if (inferred.isEmpty) {
+      return;
+    }
+    final schema = await getSchema();
+    final columnsWithEditors = schema.columns
+        .where((column) => column.hasEditor())
+        .map((column) => column.index)
+        .toSet();
+    final request = _defaultEditorsForInferredColumns(
+      _gridId,
+      inferred,
+      columnsWithEditors,
+    );
+    if (request.columns.isEmpty) {
+      return;
+    }
+    await VolvoxGridService.DefineColumns(request);
   }
 
   /// Render printable pages.

@@ -36,6 +36,12 @@ namespace VolvoxGrid.DotNet
             return _client.GetConfig(_gridId);
         }
 
+        public SchemaResponse GetSchema()
+        {
+            EnsureNotDisposed();
+            return _client.GetSchema(_gridId);
+        }
+
         public void Configure(GridConfig config)
         {
             EnsureNotDisposed();

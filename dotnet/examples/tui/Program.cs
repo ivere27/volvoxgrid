@@ -346,6 +346,7 @@ namespace VolvoxGrid.DotNet.TuiSample
             return FinalizeTuiConfig(
                 new GridConfig
                 {
+                    ThemePreset = ThemePreset.THEME_AMBER,
                     Selection = new SelectionConfig
                     {
                         Mode = SelectionMode.SELECTION_FREE,

@@ -281,6 +281,7 @@ fn load_data_impl(
 
     let mut preview = build_preview_grid(grid, final_rows, final_cols);
     apply_created_columns(&mut preview, &created_defs);
+    apply_inferred_column_types(&mut preview, &inferred_by_target);
     apply_request_modes(&mut preview, final_cols, opts.coercion, opts.error_mode);
     let preview_result = preview.write_cells(&updates, false);
     if opts.atomic && preview_result.rejected_count > 0 {
@@ -311,6 +312,7 @@ fn load_data_impl(
         grid.clear_barcode_presence_tracking();
     }
     apply_created_columns(grid, &created_defs);
+    apply_inferred_column_types(grid, &inferred_by_target);
     apply_request_modes(grid, final_cols, opts.coercion, opts.error_mode);
     let write_result = grid.write_cells(&updates, false);
     restore_request_modes(grid, &restore_modes);
@@ -322,7 +324,18 @@ fn load_data_impl(
     grid.pull_to_refresh_reveal_px = 0.0;
     grid.pull_to_refresh_target_reveal_px = 0.0;
 
+    // Snapshot widths the caller set before loading so auto_resize_all() does
+    // not clobber them. New columns created by this load are not in the
+    // snapshot and still get content-based widths.
+    let preset_widths: Vec<(i32, i32)> = grid
+        .col_widths
+        .iter()
+        .map(|(&c, &w)| (c, w))
+        .collect();
     grid.auto_resize_all();
+    for (col, width) in preset_widths {
+        grid.col_widths.insert(col, width);
+    }
 
     pb::LoadDataResult {
         status: if write_result.rejected_count > 0 {
@@ -1372,6 +1385,17 @@ fn apply_created_columns(grid: &mut VolvoxGrid, created_defs: &BTreeMap<i32, pb:
     grid.define_columns(&defs);
 }
 
+fn apply_inferred_column_types(grid: &mut VolvoxGrid, inferred_by_target: &HashMap<i32, i32>) {
+    for (&target, &inferred_type) in inferred_by_target {
+        let Some(column) = grid.columns.get_mut(target as usize) else {
+            continue;
+        };
+        if normalize_data_type(column.data_type) == pb::ColumnDataType::ColumnDataString as i32 {
+            column.data_type = normalize_data_type(inferred_type);
+        }
+    }
+}
+
 fn apply_request_modes(grid: &mut VolvoxGrid, cols: i32, coercion: i32, error_mode: i32) {
     let limit = cols.max(0).min(grid.columns.len() as i32) as usize;
     for column in grid.columns.iter_mut().take(limit) {
@@ -1830,6 +1854,39 @@ mod tests {
         );
 
         assert_eq!(result.status, pb::LoadDataStatus::LoadOk as i32);
+        assert_eq!(
+            grid.cells.get(0, 0).map(|cell| cell.checked()),
+            Some(pb::CheckedState::CheckedChecked as i32)
+        );
+        assert_eq!(
+            grid.cells.get(1, 0).map(|cell| cell.checked()),
+            Some(pb::CheckedState::CheckedUnchecked as i32)
+        );
+    }
+
+    #[test]
+    fn load_data_infers_existing_string_column_boolean_before_write() {
+        let mut grid = new_grid();
+        grid.set_cols(1);
+        grid.define_columns(&[pb::ColumnDef {
+            index: 0,
+            key: Some("flag".to_string()),
+            caption: Some("Flag".to_string()),
+            ..Default::default()
+        }]);
+
+        let result = load_data(
+            &mut grid,
+            br#"[{"flag":true},{"flag":false}]"#,
+            Some(&json_options()),
+        );
+
+        assert_eq!(result.status, pb::LoadDataStatus::LoadOk as i32);
+        assert_eq!(
+            grid.columns[0].data_type,
+            pb::ColumnDataType::ColumnDataBoolean as i32
+        );
+        assert_eq!(grid.columns[0].alignment, pb::Align::General as i32);
         assert_eq!(
             grid.cells.get(0, 0).map(|cell| cell.checked()),
             Some(pb::CheckedState::CheckedChecked as i32)

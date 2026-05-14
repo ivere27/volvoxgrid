@@ -41,7 +41,62 @@ const DEMO_BARCODES: &str = "barcodes";
 const SALES_DEMO_COLS: i32 = 10;
 const HIERARCHY_DEMO_COLS: i32 = 7;
 const BARCODE_DEMO_COLS: i32 = 5;
+const SALES_QUARTER_COL: i32 = 0;
+const SALES_REGION_COL: i32 = 1;
+const SALES_CATEGORY_COL: i32 = 2;
+const SALES_PRODUCT_COL: i32 = 3;
+const SALES_AMOUNT_COL: i32 = 4;
+const SALES_COST_COL: i32 = 5;
+const SALES_MARGIN_COL: i32 = 6;
+const SALES_FLAG_COL: i32 = 7;
+const SALES_STATUS_COL: i32 = 8;
+const SALES_NOTES_COL: i32 = 9;
+const SALES_QUARTER_COL_WIDTH: i32 = 40;
+const SALES_REGION_COL_WIDTH: i32 = 80;
+const SALES_CATEGORY_COL_WIDTH: i32 = 100;
+const SALES_PRODUCT_COL_WIDTH: i32 = 120;
+const SALES_MONEY_COL_WIDTH: i32 = 90;
+const SALES_MARGIN_COL_WIDTH: i32 = 70;
+const SALES_FLAG_COL_WIDTH: i32 = 56;
+const SALES_STATUS_COL_WIDTH: i32 = 80;
+const SALES_NOTES_COL_WIDTH: i32 = 140;
+const SALES_CURRENCY_FORMAT: &str = "$#,##0";
+const SALES_MARGIN_MAX: f64 = 100.0;
+const SALES_MARGIN_PROGRESS_COLOR: u32 = 0xFF818CF8;
+const SALES_GRAND_TOTAL_GROUP_COL: i32 = -1;
+const SALES_GRAND_TOTAL_CAPTION: &str = "Grand Total";
+const SALES_GRAND_TOTAL_BACK_COLOR: u32 = 0xFFEEF2FF;
+const SALES_QUARTER_SUBTOTAL_BACK_COLOR: u32 = 0xFFF5F3FF;
+const SALES_REGION_SUBTOTAL_BACK_COLOR: u32 = 0xFFF8F7FF;
+const SALES_SUBTOTAL_FORE_COLOR: u32 = 0xFF111827;
 const HIERARCHY_NAME_COL: i32 = 0;
+const HIERARCHY_TYPE_COL: i32 = 1;
+const HIERARCHY_SIZE_COL: i32 = 2;
+const HIERARCHY_MODIFIED_COL: i32 = 3;
+const HIERARCHY_PERMISSIONS_COL: i32 = 4;
+const HIERARCHY_DETAILS_COL: i32 = 5;
+const HIERARCHY_ACTION_COL: i32 = 6;
+const HIERARCHY_NAME_COL_WIDTH: i32 = 260;
+const HIERARCHY_TYPE_COL_WIDTH: i32 = 80;
+const HIERARCHY_SIZE_COL_WIDTH: i32 = 80;
+const HIERARCHY_MODIFIED_COL_WIDTH: i32 = 120;
+const HIERARCHY_PERMISSIONS_COL_WIDTH: i32 = 100;
+const HIERARCHY_DETAILS_COL_WIDTH: i32 = 180;
+const HIERARCHY_ACTION_COL_WIDTH: i32 = 92;
+const HIERARCHY_SHORT_DATE_FORMAT: &str = "short date";
+const HIERARCHY_TREE_COLOR: u32 = 0xFFA8A29E;
+const HIERARCHY_FOLDER_TEXT_COLOR: u32 = 0xFF92400E;
+const HIERARCHY_ACTION_TEXT_COLOR: u32 = 0xFF2563EB;
+const HIERARCHY_OUTLINE_INDENT: i32 = 20;
+const HIERARCHY_MIN_OUTLINE_INDICATOR_WIDTH: i32 = 56;
+const HIERARCHY_NAME_EXPANDER_WIDTH: i32 = 280;
+const HIERARCHY_HEADER_ROW_HEIGHT: i32 = 28;
+const HIERARCHY_HEADER_BAND_ROWS: i32 = 1;
+const DEFAULT_ROW_INDICATOR_WIDTH: i32 = 40;
+const DEFAULT_COL_INDICATOR_BAND_ROWS: i32 = 1;
+const DEFAULT_FLING_IMPULSE_GAIN: f32 = 220.0;
+const DEFAULT_FLING_FRICTION: f32 = 0.9;
+const SALES_HEADER_ROW_HEIGHT: i32 = 28;
 const SALES_STATUS_ITEMS: &str = "Active|Pending|Shipped|Returned|Cancelled";
 const SELECTION_MODE_LABELS: [&str; 5] = ["Free", "ByRow", "ByCol", "Listbox", "MultiRange"];
 const FRAME_PACING_LABELS: [&str; 4] = ["Auto", "Platform", "Unlimited", "Fixed"];
@@ -226,6 +281,32 @@ struct BarcodeDemoPlan {
     row_height: i32,
     options_text: &'static str,
 }
+
+#[derive(Clone, Copy)]
+struct SalesSubtotalLevel {
+    group_col: i32,
+    caption: &'static str,
+    back_color: u32,
+}
+
+const SALES_SUBTOTAL_AMOUNT_COLS: [i32; 2] = [SALES_AMOUNT_COL, SALES_COST_COL];
+const SALES_SUBTOTAL_LEVELS: [SalesSubtotalLevel; 3] = [
+    SalesSubtotalLevel {
+        group_col: SALES_GRAND_TOTAL_GROUP_COL,
+        caption: SALES_GRAND_TOTAL_CAPTION,
+        back_color: SALES_GRAND_TOTAL_BACK_COLOR,
+    },
+    SalesSubtotalLevel {
+        group_col: SALES_QUARTER_COL,
+        caption: "",
+        back_color: SALES_QUARTER_SUBTOTAL_BACK_COLOR,
+    },
+    SalesSubtotalLevel {
+        group_col: SALES_REGION_COL,
+        caption: "",
+        back_color: SALES_REGION_SUBTOTAL_BACK_COLOR,
+    },
+];
 
 #[derive(Serialize)]
 struct HierarchyLoadRow<'a> {
@@ -2547,113 +2628,11 @@ fn apply_host_runtime_config(state: &State, grid_id: i64) -> Result<(), String> 
     Ok(())
 }
 
-fn sales_highlight_style(
-    background: u32,
-    foreground: Option<u32>,
-    border_style: Option<i32>,
-    border_color: Option<u32>,
-) -> pb::HighlightStyle {
-    pb::HighlightStyle {
-        background: Some(background),
-        foreground,
-        borders: match (border_style, border_color) {
-            (Some(style), Some(color)) => Some(pb::Borders {
-                all: Some(pb::Border {
-                    style: Some(style),
-                    color: Some(color),
-                }),
-                ..Default::default()
-            }),
-            _ => None,
-        },
-        ..Default::default()
-    }
-}
-
 fn sales_theme_config() -> pb::GridConfig {
     pb::GridConfig {
-        layout: Some(pb::LayoutConfig {
-            fixed_rows: Some(0),
-            ..Default::default()
-        }),
-        style: Some(pb::StyleConfig {
-            background: Some(0xFFFFFFFF),
-            foreground: Some(0xFF111827),
-            alternate_background: Some(0xFFF9FAFB),
-            progress_color: Some(0xFF818CF8),
-            sheet_background: Some(0xFFFAFAFB),
-            sheet_border: Some(0xFFD1D5DB),
-            grid_lines: Some(pb::GridLines {
-                style: Some(pb::GridLineStyle::GridlineSolid as i32),
-                color: Some(0xFFE5E7EB),
-                ..Default::default()
-            }),
-            fixed: Some(pb::RegionStyle {
-                background: Some(0xFFF3F4F6),
-                foreground: Some(0xFF374151),
-                grid_lines: Some(pb::GridLines {
-                    style: Some(pb::GridLineStyle::GridlineSolid as i32),
-                    color: Some(0xFFD1D5DB),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            }),
-            frozen: Some(pb::RegionStyle {
-                background: Some(0xFFFFFFFF),
-                foreground: Some(0xFF111827),
-                grid_lines: Some(pb::GridLines {
-                    style: Some(pb::GridLineStyle::GridlineSolid as i32),
-                    color: Some(0xFFD1D5DB),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            }),
-            header: Some(pb::HeaderStyle {
-                separator: Some(pb::HeaderSeparator {
-                    enabled: Some(true),
-                    color: Some(0xFFD1D5DB),
-                    width: Some(1),
-                    ..Default::default()
-                }),
-                resize_handle: Some(pb::HeaderResizeHandle {
-                    enabled: Some(true),
-                    color: Some(0xFFD1D5DB),
-                    width: Some(1),
-                    hit_width: Some(6),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            }),
-            ..Default::default()
-        }),
+        theme_preset: Some(pb::ThemePreset::ThemeLight as i32),
         selection: Some(pb::SelectionConfig {
             mode: Some(pb::SelectionMode::SelectionFree as i32),
-            style: Some(pb::HighlightStyle {
-                background: Some(0xFF6366F1),
-                foreground: Some(0xFFFFFFFF),
-                fill_handle: Some(pb::FillHandlePosition::FillHandleNone as i32),
-                fill_handle_color: Some(0xFF818CF8),
-                ..Default::default()
-            }),
-            active_cell_style: Some(sales_highlight_style(
-                0x22000000,
-                Some(0xFFFFFFFF),
-                Some(pb::BorderStyle::BorderThick as i32),
-                Some(0xFF818CF8),
-            )),
-            hover: Some(pb::HoverConfig {
-                row: Some(true),
-                column: Some(true),
-                cell: Some(true),
-                row_style: Some(sales_highlight_style(0x106366F1, None, None, None)),
-                column_style: Some(sales_highlight_style(0x106366F1, None, None, None)),
-                cell_style: Some(sales_highlight_style(
-                    0x1E818CF8,
-                    None,
-                    Some(pb::BorderStyle::BorderThin as i32),
-                    Some(0xFF818CF8),
-                )),
-            }),
             ..Default::default()
         }),
         editing: Some(edit_config(
@@ -2663,13 +2642,12 @@ fn sales_theme_config() -> pb::GridConfig {
         scrolling: Some(pb::ScrollConfig {
             scrollbars: Some(pb::ScrollBarsMode::ScrollbarBoth as i32),
             fling_enabled: Some(true),
-            fling_impulse_gain: Some(220.0),
-            fling_friction: Some(0.9),
+            fling_impulse_gain: Some(DEFAULT_FLING_IMPULSE_GAIN),
+            fling_friction: Some(DEFAULT_FLING_FRICTION),
             ..Default::default()
         }),
         outline: Some(pb::OutlineConfig {
             tree_indicator: Some(pb::TreeIndicatorStyle::TreeIndicatorNone as i32),
-            tree_color: Some(0xFF9CA3AF),
             group_total_position: Some(pb::GroupTotalPosition::GroupTotalBelow as i32),
             multi_totals: Some(true),
             ..Default::default()
@@ -2702,32 +2680,26 @@ fn sales_theme_config() -> pb::GridConfig {
         indicators: Some(pb::IndicatorsConfig {
             row_start: Some(pb::RowIndicatorConfig {
                 visible: Some(true),
-                width: Some(40),
+                width: Some(DEFAULT_ROW_INDICATOR_WIDTH),
                 slots: vec![pb::RowIndicatorSlot {
                     kind: Some(pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers as i32),
-                    width: Some(40),
+                    width: Some(DEFAULT_ROW_INDICATOR_WIDTH),
                     visible: Some(true),
                     ..Default::default()
                 }],
-                background: Some(0xFFF9FAFB),
-                foreground: Some(0xFF6B7280),
-                grid_color: Some(0xFFD1D5DB),
                 allow_resize: Some(true),
                 ..Default::default()
             }),
             col_top: Some(pb::ColIndicatorConfig {
                 visible: Some(true),
-                default_row_height: Some(28),
-                band_rows: Some(1),
+                default_row_height: Some(SALES_HEADER_ROW_HEIGHT),
+                band_rows: Some(DEFAULT_COL_INDICATOR_BAND_ROWS),
                 cell_modes: Some(pb::ColIndicatorCellModes {
                     modes: vec![
                         pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as i32,
                         pb::ColIndicatorCellMode::ColIndicatorCellSortGlyph as i32,
                     ],
                 }),
-                background: Some(0xFFF9FAFB),
-                foreground: Some(0xFF111827),
-                grid_color: Some(0xFFD1D5DB),
                 allow_resize: Some(true),
                 ..Default::default()
             }),
@@ -2738,92 +2710,19 @@ fn sales_theme_config() -> pb::GridConfig {
 }
 
 fn hierarchy_theme_config(max_outline_depth: i32, max_outline_level: i32) -> pb::GridConfig {
-    const OUTLINE_INDENT: i32 = 20;
-    const MIN_OUTLINE_INDICATOR_WIDTH: i32 = 56;
     let max_outline_depth = max_outline_depth.max(0);
-    let outline_width = MIN_OUTLINE_INDICATOR_WIDTH.max((max_outline_depth + 1) * OUTLINE_INDENT);
-    let expander_width = outline_width + 280;
+    let outline_width = HIERARCHY_MIN_OUTLINE_INDICATOR_WIDTH
+        .max((max_outline_depth + 1) * HIERARCHY_OUTLINE_INDENT);
+    let expander_width = outline_width + HIERARCHY_NAME_EXPANDER_WIDTH;
 
     pb::GridConfig {
+        theme_preset: Some(pb::ThemePreset::ThemeAmber as i32),
         layout: Some(pb::LayoutConfig {
             fixed_rows: Some(0),
             ..Default::default()
         }),
-        style: Some(pb::StyleConfig {
-            background: Some(0xFFFFFFFF),
-            foreground: Some(0xFF1C1917),
-            alternate_background: Some(0xFFF5F5F4),
-            progress_color: Some(0xFFF59E0B),
-            sheet_background: Some(0xFFFAFAF9),
-            sheet_border: Some(0xFFD6D3D1),
-            grid_lines: Some(pb::GridLines {
-                style: Some(pb::GridLineStyle::GridlineSolid as i32),
-                color: Some(0xFFE7E5E4),
-                ..Default::default()
-            }),
-            fixed: Some(pb::RegionStyle {
-                background: Some(0xFFF5F5F4),
-                foreground: Some(0xFF44403C),
-                grid_lines: Some(pb::GridLines {
-                    style: Some(pb::GridLineStyle::GridlineSolid as i32),
-                    color: Some(0xFFD6D3D1),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            }),
-            frozen: Some(pb::RegionStyle {
-                background: Some(0xFFFFFFFF),
-                foreground: Some(0xFF1C1917),
-                grid_lines: Some(pb::GridLines {
-                    style: Some(pb::GridLineStyle::GridlineSolid as i32),
-                    color: Some(0xFFD6D3D1),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            }),
-            header: Some(pb::HeaderStyle {
-                separator: Some(pb::HeaderSeparator {
-                    enabled: Some(true),
-                    color: Some(0xFFD6D3D1),
-                    width: Some(1),
-                    ..Default::default()
-                }),
-                resize_handle: Some(pb::HeaderResizeHandle {
-                    enabled: Some(true),
-                    color: Some(0xFFD6D3D1),
-                    width: Some(1),
-                    hit_width: Some(6),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            }),
-            ..Default::default()
-        }),
         selection: Some(pb::SelectionConfig {
             mode: Some(pb::SelectionMode::SelectionFree as i32),
-            style: Some(pb::HighlightStyle {
-                background: Some(0xFFD97706),
-                foreground: Some(0xFFFFFFFF),
-                fill_handle: Some(pb::FillHandlePosition::FillHandleNone as i32),
-                fill_handle_color: Some(0xFFF59E0B),
-                ..Default::default()
-            }),
-            active_cell_style: Some(sales_highlight_style(
-                0x22000000,
-                Some(0xFFFFFFFF),
-                Some(pb::BorderStyle::BorderThick as i32),
-                Some(0xFFF59E0B),
-            )),
-            hover: Some(pb::HoverConfig {
-                cell: Some(true),
-                cell_style: Some(sales_highlight_style(
-                    0x1AD97706,
-                    None,
-                    Some(pb::BorderStyle::BorderThin as i32),
-                    Some(0xFFF59E0B),
-                )),
-                ..Default::default()
-            }),
             ..Default::default()
         }),
         editing: Some(edit_config(
@@ -2833,17 +2732,17 @@ fn hierarchy_theme_config(max_outline_depth: i32, max_outline_level: i32) -> pb:
         scrolling: Some(pb::ScrollConfig {
             scrollbars: Some(pb::ScrollBarsMode::ScrollbarBoth as i32),
             fling_enabled: Some(true),
-            fling_impulse_gain: Some(220.0),
-            fling_friction: Some(0.9),
+            fling_impulse_gain: Some(DEFAULT_FLING_IMPULSE_GAIN),
+            fling_friction: Some(DEFAULT_FLING_FRICTION),
             ..Default::default()
         }),
         outline: Some(pb::OutlineConfig {
             tree_indicator: Some(pb::TreeIndicatorStyle::TreeIndicatorArrowsLeaf as i32),
-            indicator_indent: Some(OUTLINE_INDENT),
+            indicator_indent: Some(HIERARCHY_OUTLINE_INDENT),
             max_levels: Some(max_outline_level.max(0)),
             show_level_buttons: Some(true),
             label_column: Some(HIERARCHY_NAME_COL),
-            tree_color: Some(0xFFA8A29E),
+            tree_color: Some(HIERARCHY_TREE_COLOR),
             ..Default::default()
         }),
         interaction: Some(pb::InteractionConfig {
@@ -2869,9 +2768,6 @@ fn hierarchy_theme_config(max_outline_depth: i32, max_outline_level: i32) -> pb:
             row_start: Some(pb::RowIndicatorConfig {
                 visible: Some(true),
                 width: Some(expander_width),
-                background: Some(0xFFFAFAF9),
-                foreground: Some(0xFF44403C),
-                grid_color: Some(0xFFD6D3D1),
                 auto_size: Some(false),
                 allow_resize: Some(true),
                 slots: vec![pb::RowIndicatorSlot {
@@ -2884,8 +2780,6 @@ fn hierarchy_theme_config(max_outline_depth: i32, max_outline_level: i32) -> pb:
             }),
             corner_top_start: Some(pb::CornerIndicatorConfig {
                 visible: Some(true),
-                background: Some(0xFFFAFAF9),
-                foreground: Some(0xFF44403C),
                 slots: vec![pb::CornerIndicatorSlot {
                     kind: Some(pb::CornerIndicatorSlotKind::CornerSlotOutlineLevels as i32),
                     width: Some(outline_width),
@@ -2896,14 +2790,11 @@ fn hierarchy_theme_config(max_outline_depth: i32, max_outline_level: i32) -> pb:
             }),
             col_top: Some(pb::ColIndicatorConfig {
                 visible: Some(true),
-                default_row_height: Some(28),
-                band_rows: Some(1),
+                default_row_height: Some(HIERARCHY_HEADER_ROW_HEIGHT),
+                band_rows: Some(HIERARCHY_HEADER_BAND_ROWS),
                 cell_modes: Some(pb::ColIndicatorCellModes {
                     modes: vec![pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as i32],
                 }),
-                background: Some(0xFFFAFAF9),
-                foreground: Some(0xFF1C1917),
-                grid_color: Some(0xFFD6D3D1),
                 allow_resize: Some(true),
                 ..Default::default()
             }),
@@ -2929,70 +2820,70 @@ fn load_sales_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Result<()
         grid_id,
         vec![
             pb::ColumnDef {
-                index: 0,
-                width: Some(40),
+                index: SALES_QUARTER_COL,
+                width: Some(SALES_QUARTER_COL_WIDTH),
                 caption: Some("Q".to_string()),
                 key: Some("Q".to_string()),
                 align: Some(pb::Align::CenterCenter as i32),
                 ..Default::default()
             },
             pb::ColumnDef {
-                index: 1,
-                width: Some(80),
+                index: SALES_REGION_COL,
+                width: Some(SALES_REGION_COL_WIDTH),
                 caption: Some("Region".to_string()),
                 key: Some("Region".to_string()),
                 ..Default::default()
             },
             pb::ColumnDef {
-                index: 2,
-                width: Some(100),
+                index: SALES_CATEGORY_COL,
+                width: Some(SALES_CATEGORY_COL_WIDTH),
                 caption: Some("Category".to_string()),
                 key: Some("Category".to_string()),
                 ..Default::default()
             },
             pb::ColumnDef {
-                index: 3,
-                width: Some(120),
+                index: SALES_PRODUCT_COL,
+                width: Some(SALES_PRODUCT_COL_WIDTH),
                 caption: Some("Product".to_string()),
                 key: Some("Product".to_string()),
                 ..Default::default()
             },
             pb::ColumnDef {
-                index: 4,
-                width: Some(90),
+                index: SALES_AMOUNT_COL,
+                width: Some(SALES_MONEY_COL_WIDTH),
                 caption: Some("Sales".to_string()),
                 key: Some("Sales".to_string()),
                 align: Some(pb::Align::RightCenter as i32),
                 data_type: Some(pb::ColumnDataType::ColumnDataCurrency as i32),
-                format: Some("$#,##0".to_string()),
+                format: Some(SALES_CURRENCY_FORMAT.to_string()),
                 editor: Some(number_editor(0.0, None)),
                 ..Default::default()
             },
             pb::ColumnDef {
-                index: 5,
-                width: Some(90),
+                index: SALES_COST_COL,
+                width: Some(SALES_MONEY_COL_WIDTH),
                 caption: Some("Cost".to_string()),
                 key: Some("Cost".to_string()),
                 align: Some(pb::Align::RightCenter as i32),
                 data_type: Some(pb::ColumnDataType::ColumnDataCurrency as i32),
-                format: Some("$#,##0".to_string()),
+                format: Some(SALES_CURRENCY_FORMAT.to_string()),
                 editor: Some(number_editor(0.0, None)),
                 ..Default::default()
             },
             pb::ColumnDef {
-                index: 6,
-                width: Some(70),
+                index: SALES_MARGIN_COL,
+                width: Some(SALES_MARGIN_COL_WIDTH),
                 caption: Some("Margin%".to_string()),
                 key: Some("Margin".to_string()),
                 align: Some(pb::Align::CenterCenter as i32),
                 data_type: Some(pb::ColumnDataType::ColumnDataNumber as i32),
-                progress_color: Some(0xFF818CF8),
-                editor: Some(number_editor(0.0, Some(100.0))),
+                progress_color: Some(SALES_MARGIN_PROGRESS_COLOR),
+                editor: Some(number_editor(0.0, Some(SALES_MARGIN_MAX))),
                 ..Default::default()
             },
             pb::ColumnDef {
-                index: 7,
-                width: Some(56),
+                index: SALES_FLAG_COL,
+                width: Some(SALES_FLAG_COL_WIDTH),
                 caption: Some("Flag".to_string()),
                 key: Some("Flag".to_string()),
                 align: Some(pb::Align::CenterCenter as i32),
@@ -3000,16 +2891,16 @@ fn load_sales_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Result<()
                 ..Default::default()
             },
             pb::ColumnDef {
-                index: 8,
-                width: Some(80),
+                index: SALES_STATUS_COL,
+                width: Some(SALES_STATUS_COL_WIDTH),
                 caption: Some("Status".to_string()),
                 key: Some("Status".to_string()),
                 editor: Some(dropdown_from_labels(SALES_STATUS_ITEMS)),
                 ..Default::default()
             },
             pb::ColumnDef {
-                index: 9,
-                width: Some(140),
+                index: SALES_NOTES_COL,
+                width: Some(SALES_NOTES_COL_WIDTH),
                 caption: Some("Notes".to_string()),
                 key: Some("Notes".to_string()),
                 ..Default::default()
@@ -3031,135 +2922,83 @@ fn load_sales_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Result<()
         grid_id,
         vec![
             pb::ColumnDef {
-                index: 7,
+                index: SALES_FLAG_COL,
                 align: Some(pb::Align::CenterCenter as i32),
                 data_type: Some(pb::ColumnDataType::ColumnDataBoolean as i32),
                 ..Default::default()
             },
             pb::ColumnDef {
-                index: 8,
+                index: SALES_STATUS_COL,
                 editor: Some(dropdown_from_labels(SALES_STATUS_ITEMS)),
                 ..Default::default()
             },
         ],
     )?;
     client.configure(grid_id, sales_theme_config())?;
-
-    client.subtotal(grid_id, pb::AggregateType::AggClear, 0, 0, "", 0, 0, false)?;
-    apply_sales_subtotal_decorations(
-        client,
-        grid_id,
-        &client.subtotal(
-            grid_id,
-            pb::AggregateType::AggSum,
-            -1,
-            4,
-            "Grand Total",
-            0xFFEEF2FF,
-            0xFF111827,
-            true,
-        )?,
-    )?;
-    apply_sales_subtotal_decorations(
-        client,
-        grid_id,
-        &client.subtotal(
-            grid_id,
-            pb::AggregateType::AggSum,
-            0,
-            4,
-            "",
-            0xFFF5F3FF,
-            0xFF111827,
-            true,
-        )?,
-    )?;
-    apply_sales_subtotal_decorations(
-        client,
-        grid_id,
-        &client.subtotal(
-            grid_id,
-            pb::AggregateType::AggSum,
-            1,
-            4,
-            "",
-            0xFFF8F7FF,
-            0xFF111827,
-            true,
-        )?,
-    )?;
-    apply_sales_subtotal_decorations(
-        client,
-        grid_id,
-        &client.subtotal(
-            grid_id,
-            pb::AggregateType::AggSum,
-            -1,
-            5,
-            "Grand Total",
-            0xFFEEF2FF,
-            0xFF111827,
-            true,
-        )?,
-    )?;
-    apply_sales_subtotal_decorations(
-        client,
-        grid_id,
-        &client.subtotal(
-            grid_id,
-            pb::AggregateType::AggSum,
-            0,
-            5,
-            "",
-            0xFFF5F3FF,
-            0xFF111827,
-            true,
-        )?,
-    )?;
-    apply_sales_subtotal_decorations(
-        client,
-        grid_id,
-        &client.subtotal(
-            grid_id,
-            pb::AggregateType::AggSum,
-            1,
-            5,
-            "",
-            0xFFF8F7FF,
-            0xFF111827,
-            true,
-        )?,
-    )?;
+    add_sales_subtotals(client, grid_id)?;
     Ok(())
 }
 
-fn apply_sales_subtotal_decorations(
-    client: &VolvoxServiceClient,
-    grid_id: i64,
-    result: &pb::SubtotalResult,
-) -> Result<(), String> {
+fn add_sales_subtotals(client: &VolvoxServiceClient, grid_id: i64) -> Result<(), String> {
+    client.subtotal(
+        grid_id,
+        pb::AggregateType::AggClear,
+        SALES_QUARTER_COL,
+        SALES_AMOUNT_COL,
+        "",
+        0,
+        0,
+        false,
+    )?;
+    define_sales_merge_columns(client, grid_id)?;
+
+    for amount_col in SALES_SUBTOTAL_AMOUNT_COLS {
+        for level in SALES_SUBTOTAL_LEVELS {
+            let result = client.subtotal(
+                grid_id,
+                pb::AggregateType::AggSum,
+                level.group_col,
+                amount_col,
+                level.caption,
+                level.back_color,
+                SALES_SUBTOTAL_FORE_COLOR,
+                true,
+            )?;
+            merge_sales_subtotal_rows(client, grid_id, &result)?;
+        }
+    }
+    Ok(())
+}
+
+fn define_sales_merge_columns(client: &VolvoxServiceClient, grid_id: i64) -> Result<(), String> {
     client.define_columns(
         grid_id,
         vec![
             pb::ColumnDef {
-                index: 0,
+                index: SALES_QUARTER_COL,
                 span: Some(true),
                 ..Default::default()
             },
             pb::ColumnDef {
-                index: 1,
+                index: SALES_REGION_COL,
                 span: Some(true),
                 ..Default::default()
             },
         ],
-    )?;
+    )
+}
 
+fn merge_sales_subtotal_rows(
+    client: &VolvoxServiceClient,
+    grid_id: i64,
+    result: &pb::SubtotalResult,
+) -> Result<(), String> {
     let mut unique_rows = result.rows.clone();
     unique_rows.sort_unstable();
     unique_rows.dedup();
     for row in unique_rows {
         if client.get_node(grid_id, row)?.level <= 0 {
-            client.merge_cells(grid_id, row, 0, row, 1)?;
+            client.merge_cells(grid_id, row, SALES_QUARTER_COL, row, SALES_REGION_COL)?;
         }
     }
     Ok(())
@@ -3199,54 +3038,54 @@ fn load_hierarchy_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Resul
         vec![
             pb::ColumnDef {
                 index: HIERARCHY_NAME_COL,
-                width: Some(260),
+                width: Some(HIERARCHY_NAME_COL_WIDTH),
                 caption: Some("Name".to_string()),
                 key: Some("Name".to_string()),
                 hidden: Some(true),
                 ..Default::default()
             },
             pb::ColumnDef {
-                index: 1,
-                width: Some(80),
+                index: HIERARCHY_TYPE_COL,
+                width: Some(HIERARCHY_TYPE_COL_WIDTH),
                 caption: Some("Type".to_string()),
                 key: Some("Type".to_string()),
                 ..Default::default()
             },
             pb::ColumnDef {
-                index: 2,
-                width: Some(80),
+                index: HIERARCHY_SIZE_COL,
+                width: Some(HIERARCHY_SIZE_COL_WIDTH),
                 caption: Some("Size".to_string()),
                 key: Some("Size".to_string()),
                 align: Some(pb::Align::RightCenter as i32),
                 ..Default::default()
             },
             pb::ColumnDef {
-                index: 3,
-                width: Some(120),
+                index: HIERARCHY_MODIFIED_COL,
+                width: Some(HIERARCHY_MODIFIED_COL_WIDTH),
                 caption: Some("Modified".to_string()),
                 key: Some("Modified".to_string()),
                 data_type: Some(pb::ColumnDataType::ColumnDataDate as i32),
-                format: Some("short date".to_string()),
+                format: Some(HIERARCHY_SHORT_DATE_FORMAT.to_string()),
                 ..Default::default()
             },
             pb::ColumnDef {
-                index: 4,
-                width: Some(100),
+                index: HIERARCHY_PERMISSIONS_COL,
+                width: Some(HIERARCHY_PERMISSIONS_COL_WIDTH),
                 caption: Some("Permissions".to_string()),
                 key: Some("Permissions".to_string()),
                 align: Some(pb::Align::CenterCenter as i32),
                 ..Default::default()
             },
             pb::ColumnDef {
-                index: 5,
-                width: Some(180),
+                index: HIERARCHY_DETAILS_COL,
+                width: Some(HIERARCHY_DETAILS_COL_WIDTH),
                 caption: Some("Details".to_string()),
                 key: Some("Details".to_string()),
                 ..Default::default()
             },
             pb::ColumnDef {
-                index: 6,
-                width: Some(92),
+                index: HIERARCHY_ACTION_COL,
+                width: Some(HIERARCHY_ACTION_COL_WIDTH),
                 caption: Some("Action".to_string()),
                 key: Some("Action".to_string()),
                 align: Some(pb::Align::CenterCenter as i32),
@@ -3298,11 +3137,11 @@ fn load_hierarchy_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Resul
     )?;
 
     let action_style = pb::CellStyle {
-        foreground: Some(0xFF2563EB),
+        foreground: Some(HIERARCHY_ACTION_TEXT_COLOR),
         ..Default::default()
     };
     let folder_style = pb::CellStyle {
-        foreground: Some(0xFF92400E),
+        foreground: Some(HIERARCHY_FOLDER_TEXT_COLOR),
         font: Some(pb::Font {
             bold: Some(true),
             ..Default::default()
@@ -3313,14 +3152,14 @@ fn load_hierarchy_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Resul
     for (index, row) in rows.iter().enumerate() {
         cells.push(pb::CellUpdate {
             row: index as i32,
-            col: 5,
+            col: HIERARCHY_ACTION_COL,
             style: Some(action_style.clone()),
             ..Default::default()
         });
         if row.kind == "Folder" {
             cells.push(pb::CellUpdate {
                 row: index as i32,
-                col: 0,
+                col: HIERARCHY_NAME_COL,
                 style: Some(folder_style.clone()),
                 ..Default::default()
             });
@@ -4575,7 +4414,7 @@ fn is_hierarchy_action_text_click(state: &State, event: &pb::GridEvent) -> bool 
     match event.event.as_ref() {
         Some(pb::grid_event::Event::Click(click)) => {
             click.row >= 0
-                && click.col == 5
+                && click.col == HIERARCHY_ACTION_COL
                 && click.hit_area == pb::CellHitArea::HitText as i32
                 && click.interaction == pb::CellInteraction::TextLink as i32
         }

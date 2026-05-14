@@ -85,12 +85,6 @@ namespace VolvoxGrid.DotNet.ConsoleSample
                         Editing = new EditConfig
                         {
                             Activation = new EditActivation { Trigger = EditTrigger.EDIT_TRIGGER_KEY_CLICK },
-                            DefaultEditor = new EditorSpec
-                            {
-                                Kind = EditorKind.EDITOR_TEXT,
-                                Owner = EditorOwner.EDITOR_OWNER_HOST_NATIVE,
-                                Presentation = EditorPresentation.EDITOR_INLINE,
-                            },
                         },
                     });
                 grid.DefineColumns(BuildColumns());

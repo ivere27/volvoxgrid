@@ -354,6 +354,21 @@ class VolvoxGridView @JvmOverloads constructor(
         fun onEditCancel(row: Int, col: Int)
     }
 
+    private class GridEditText(
+        context: Context,
+        private val onBackPressed: () -> Boolean,
+    ) : EditText(context) {
+        override fun onKeyPreIme(keyCode: Int, event: AndroidKeyEvent): Boolean {
+            if (keyCode == AndroidKeyEvent.KEYCODE_BACK) {
+                if (event.action == AndroidKeyEvent.ACTION_UP) {
+                    onBackPressed()
+                }
+                return true
+            }
+            return super.onKeyPreIme(keyCode, event)
+        }
+    }
+
     enum class ContextMenuTrigger {
         LONG_PRESS,
         SECONDARY_CLICK,
@@ -788,15 +803,10 @@ class VolvoxGridView @JvmOverloads constructor(
                 .setViewportWidth(w)
                 .setViewportHeight(h)
                 .setScale(scale)
-                .setConfig(GridConfig.newBuilder()
-                    .setLayout(LayoutConfig.newBuilder()
-                        .setRows(rows)
-                        .setCols(cols)
-                        .build())
+                .setConfig(defaultGridConfigBuilder(rows, cols)
                     .setRendering(RenderConfig.newBuilder()
                         .setFramePacingMode(FramePacingMode.FRAME_PACING_MODE_PLATFORM)
                         .build())
-                    .setIndicators(defaultIndicatorsConfig())
                     .build())
                 .build()
         )
@@ -904,6 +914,51 @@ class VolvoxGridView @JvmOverloads constructor(
     override fun createController(): VolvoxGridController {
         val client = ffiClient ?: throw IllegalStateException("VolvoxGridView not initialized")
         return VolvoxGridController(client, gridId)
+    }
+
+    /**
+     * Cancels the active edit session, including any visible host-native editor.
+     *
+     * Returns true when a session was active or pending and the back/cancel event
+     * was consumed.
+     */
+    fun cancelActiveEdit(): Boolean {
+        val pending = pendingEditorStarted
+        if (pending != null) {
+            pendingEditorStarted = null
+            deferOverlayWhileImeActive = false
+            val session = pending.session
+            editingRow = session.row
+            editingCol = session.col
+            activeEditorSessionId = session.sessionId
+            activeEditorStateVersion = session.stateVersion
+            cancelEdit(session.row, session.col)
+            return true
+        }
+        if (editOverlay != null || activeEditorSessionId != 0L || editingRow >= 0 || editingCol >= 0) {
+            val row = editingRow
+            val col = editingCol
+            if (row >= 0 && col >= 0) {
+                cancelEdit(row, col)
+            } else {
+                try {
+                    val state = ffiClient?.Edit(
+                        EditCommand.newBuilder()
+                            .setGridId(gridId)
+                            .setSession(
+                                editorSessionCommandBuilder()
+                                    .setCancel(EditCancel.newBuilder().build())
+                                    .build()
+                            )
+                            .build()
+                    )
+                    updateEditorSessionFromState(state)
+                } catch (_: FfiError) {}
+                dismissEditOverlay()
+            }
+            return true
+        }
+        return false
     }
 
     /**
@@ -2329,7 +2384,24 @@ class VolvoxGridView @JvmOverloads constructor(
     // Edit Overlay
     // =========================================================================
 
+    private fun androidNumberInputTypeForEditor(editor: EditorSpec): Int {
+        val minAllowsNegative = !editor.hasNumber() ||
+            !editor.number.hasMin() ||
+            editor.number.min < 0.0
+        val signedFlag = if (minAllowsNegative) {
+            InputType.TYPE_NUMBER_FLAG_SIGNED
+        } else {
+            0
+        }
+        return InputType.TYPE_CLASS_NUMBER or
+            InputType.TYPE_NUMBER_FLAG_DECIMAL or
+            signedFlag
+    }
+
     private fun androidInputTypeForEditor(editor: EditorSpec): Int {
+        if (editor.kind == EditorKind.EDITOR_NUMBER) {
+            return androidNumberInputTypeForEditor(editor)
+        }
         if (!editor.hasText()) {
             return InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
         }
@@ -2340,9 +2412,7 @@ class VolvoxGridView @JvmOverloads constructor(
         }
         return when (editor.text.inputType) {
             io.github.ivere27.volvoxgrid.InputType.INPUT_TYPE_NUMBER ->
-                InputType.TYPE_CLASS_NUMBER or
-                    InputType.TYPE_NUMBER_FLAG_DECIMAL or
-                    InputType.TYPE_NUMBER_FLAG_SIGNED
+                androidNumberInputTypeForEditor(editor)
             io.github.ivere27.volvoxgrid.InputType.INPUT_TYPE_EMAIL ->
                 InputType.TYPE_CLASS_TEXT or
                     InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS or
@@ -2414,7 +2484,7 @@ class VolvoxGridView @JvmOverloads constructor(
             // Resolve the effective style for the edited cell.
             val cellStyle = resolveEditCellStyle(session.row, session.col)
 
-            val editText = EditText(context).apply {
+            val editText = GridEditText(context) { cancelActiveEdit() }.apply {
                 inputType = androidInputTypeForEditor(session.editor)
                 val allowNewlines = session.editor.hasText() && session.editor.text.allowNewlines
                 setSingleLine(!allowNewlines)

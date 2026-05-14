@@ -849,6 +849,17 @@ namespace Volvoxgrid.V1
         TEXT_RENDER_MONO = 3,
     }
 
+    public enum ThemePreset
+    {
+        THEME_NONE = 0,
+        THEME_CLASSIC = 1,
+        THEME_LIGHT = 2,
+        THEME_DARK = 3,
+        THEME_HIGH_CONTRAST = 4,
+        THEME_MONOKAI = 5,
+        THEME_AMBER = 6,
+    }
+
     public enum TreeIndicatorStyle
     {
         TREE_INDICATOR_NONE = 0,
@@ -7308,6 +7319,9 @@ namespace Volvoxgrid.V1
         public RenderConfig Rendering { get; set; }
         public string Version { get; set; } = "";
         public IndicatorsConfig Indicators { get; set; }
+        private ThemePreset? _themePreset;
+        public ThemePreset ThemePreset { get { return _themePreset.GetValueOrDefault(); } set { _themePreset = value; } }
+        public bool HasThemePreset { get { return _themePreset.HasValue; } }
 
         // ── Serialization ──
 
@@ -7325,6 +7339,8 @@ namespace Volvoxgrid.V1
             if (Rendering != null) w.WriteMessageBytes(9, Rendering.ToByteArray());
             if (Version != null && Version.Length > 0) w.WriteString(10, Version);
             if (Indicators != null) w.WriteMessageBytes(11, Indicators.ToByteArray());
+            if (_themePreset.HasValue)
+                w.WriteInt32(12, (int)_themePreset.Value);
             return w.ToArray();
         }
 
@@ -7353,6 +7369,7 @@ namespace Volvoxgrid.V1
                     case 9: msg.Rendering = RenderConfig.ParseFrom(r.ReadLengthDelimited()); break;
                     case 10: msg.Version = r.ReadString(); break;
                     case 11: msg.Indicators = IndicatorsConfig.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 12: msg.ThemePreset = (ThemePreset)r.ReadInt32(); break;
                     default: r.SkipField(wire); break;
                 }
             }

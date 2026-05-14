@@ -11,8 +11,26 @@ import io.github.ivere27.volvoxgrid.common.VolvoxGridRowIndicatorConfig as Commo
 import io.github.ivere27.volvoxgrid.common.VolvoxGridRowIndicatorSlot as CommonRowIndicatorSlot
 import io.github.ivere27.volvoxgrid.common.VolvoxGridRowIndicatorSlotKind as CommonRowIndicatorSlotKind
 
-private const val DEFAULT_ROW_INDICATOR_WIDTH_PX = 35
+private const val DEFAULT_ROW_INDICATOR_WIDTH_PX = 40
 private const val DEFAULT_COL_INDICATOR_BAND_ROWS = 1
+private const val DEFAULT_FLING_IMPULSE_GAIN = 220f
+private const val DEFAULT_FLING_FRICTION = 0.9f
+private const val DEFAULT_SUBTOTAL_BACK_COLOR = 0xFFEEF2FFL
+private const val DEFAULT_SUBTOTAL_FORE_COLOR = 0xFF111827L
+private const val DEFAULT_SUBTOTAL_COMMAND_BACK_COLOR = 0xFFE0E0E0L
+private const val DEFAULT_SUBTOTAL_COMMAND_FORE_COLOR = 0xFF000000L
+private const val SUBTOTAL_NO_GROUP_COLUMN = -1
+private const val SUBTOTAL_NO_MERGE_COLUMN = -1
+private const val SUBTOTAL_MIN_VALID_MERGE_COLUMN = 0
+private const val SUBTOTAL_CLEAR_COLUMN = 0
+private const val SUBTOTAL_CLEAR_COLOR = 0L
+
+data class VolvoxGridSubtotalLevel(
+    val groupCol: Int? = null,
+    val caption: String = "",
+    val backColor: Long = DEFAULT_SUBTOTAL_BACK_COLOR,
+    val foreColor: Long = DEFAULT_SUBTOTAL_FORE_COLOR,
+)
 
 private val DEFAULT_COL_INDICATOR_MODES = listOf(
     ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT,
@@ -28,8 +46,10 @@ private fun rowIndicatorSlot(kind: RowIndicatorSlotKind, width: Int): RowIndicat
 
 private fun defaultRowIndicatorSlots(): List<RowIndicatorSlot> =
     listOf(
-        rowIndicatorSlot(RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CURRENT, 18),
-        rowIndicatorSlot(RowIndicatorSlotKind.ROW_INDICATOR_SLOT_SELECTION, 17),
+        rowIndicatorSlot(
+            RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NUMBERS,
+            DEFAULT_ROW_INDICATOR_WIDTH_PX,
+        ),
     )
 
 private fun columnIndicatorCellModes(modes: Iterable<CommonColumnIndicatorCellMode>): ColIndicatorCellModes =
@@ -152,6 +172,53 @@ internal fun defaultIndicatorsConfig(): IndicatorsConfig =
         .setColTop(defaultColIndicatorTopConfig())
         .build()
 
+internal fun defaultGridConfigBuilder(rows: Int, cols: Int): GridConfig.Builder =
+    GridConfig.newBuilder()
+        .setLayout(
+            LayoutConfig.newBuilder()
+                .setRows(rows)
+                .setCols(cols)
+                .setExtendLastCol(true)
+                .build()
+        )
+        .setScrolling(
+            ScrollConfig.newBuilder()
+                .setScrollbars(ScrollBarsMode.SCROLLBAR_BOTH)
+                .setFastScroll(true)
+                .setFlingImpulseGain(DEFAULT_FLING_IMPULSE_GAIN)
+                .setFlingFriction(DEFAULT_FLING_FRICTION)
+                .build()
+        )
+        .setSpan(
+            SpanConfig.newBuilder()
+                .setCellSpan(CellSpanMode.CELL_SPAN_ADJACENT)
+                .build()
+        )
+        .setInteraction(
+            InteractionConfig.newBuilder()
+                .setResize(
+                    ResizePolicy.newBuilder()
+                        .setColumns(true)
+                        .setRows(true)
+                        .setUniform(false)
+                        .build()
+                )
+                .setHeaderFeatures(
+                    HeaderFeatures.newBuilder()
+                        .setSort(true)
+                        .setReorder(true)
+                        .setChooser(false)
+                        .build()
+                )
+                .build()
+        )
+        .setEditing(
+            EditConfig.newBuilder()
+                .setDefaultEditor(defaultEngineTextEditorSpec())
+                .build()
+        )
+        .setIndicators(defaultIndicatorsConfig())
+
 private fun renderLayerFlag(layer: Int): Long {
     require(layer in 0 until java.lang.Long.SIZE) {
         "render layer bit out of range: $layer"
@@ -181,6 +248,83 @@ private fun defaultHostTextEditorSpec(): EditorSpec =
         .setPresentation(EditorPresentation.EDITOR_INLINE)
         .build()
 
+private fun defaultEngineTextEditorSpec(): EditorSpec =
+    EditorSpec.newBuilder()
+        .setKind(EditorKind.EDITOR_TEXT)
+        .setOwner(EditorOwner.EDITOR_OWNER_ENGINE)
+        .setPresentation(EditorPresentation.EDITOR_CANVAS)
+        .build()
+
+private fun defaultHostNumberEditorSpec(nullable: Boolean): EditorSpec =
+    EditorSpec.newBuilder()
+        .setKind(EditorKind.EDITOR_NUMBER)
+        .setOwner(EditorOwner.EDITOR_OWNER_HOST_NATIVE)
+        .setPresentation(EditorPresentation.EDITOR_INLINE)
+        .setNumber(NumberEditorParams.newBuilder().setNullable(nullable).build())
+        .build()
+
+private fun defaultEngineCheckboxEditorSpec(): EditorSpec =
+    EditorSpec.newBuilder()
+        .setKind(EditorKind.EDITOR_CHECKBOX)
+        .setOwner(EditorOwner.EDITOR_OWNER_ENGINE)
+        .setPresentation(EditorPresentation.EDITOR_CANVAS)
+        .setCheckbox(CheckboxEditorParams.newBuilder().setThreeState(false).build())
+        .build()
+
+private fun applyAndroidDefaultEditor(
+    def: ColumnDef,
+    columnsWithEditors: Set<Int> = emptySet()
+): ColumnDef {
+    if (def.hasEditor() || !def.hasDataType() || columnsWithEditors.contains(def.index)) {
+        return def
+    }
+    val editor = when (def.dataType) {
+        ColumnDataType.COLUMN_DATA_STRING -> defaultHostTextEditorSpec()
+        ColumnDataType.COLUMN_DATA_BOOLEAN -> defaultEngineCheckboxEditorSpec()
+        ColumnDataType.COLUMN_DATA_NUMBER,
+        ColumnDataType.COLUMN_DATA_CURRENCY -> defaultHostNumberEditorSpec(
+            nullable = if (def.hasNullable()) def.nullable else true
+        )
+        else -> return def
+    }
+    return def.toBuilder().setEditor(editor).build()
+}
+
+private fun applyAndroidDefaultEditors(
+    request: DefineColumnsRequest,
+    columnsWithEditors: Set<Int> = emptySet()
+): DefineColumnsRequest {
+    val builder = request.toBuilder().clearColumns()
+    for (def in request.columnsList) {
+        builder.addColumns(applyAndroidDefaultEditor(def, columnsWithEditors))
+    }
+    return builder.build()
+}
+
+private fun defaultEditorsForInferredColumns(
+    gridId: Long,
+    inferredColumns: Iterable<ColumnDef>,
+    columnsWithEditors: Set<Int>
+): DefineColumnsRequest {
+    val builder = DefineColumnsRequest.newBuilder().setGridId(gridId)
+    for (column in inferredColumns) {
+        if (!column.hasDataType() || columnsWithEditors.contains(column.index)) {
+            continue
+        }
+        val def = ColumnDef.newBuilder()
+            .setIndex(column.index)
+            .setDataType(column.dataType)
+        if (column.hasNullable()) {
+            def.setNullable(column.nullable)
+        }
+        val prepared = applyAndroidDefaultEditor(def.build())
+        if (prepared.hasEditor()) {
+            builder.addColumns(prepared)
+        }
+    }
+    return builder.build()
+}
+
 /**
  * High-level Kotlin API wrapping the VolvoxGrid FFI calls.
  *
@@ -200,6 +344,20 @@ class VolvoxGridController(
     private val service: VolvoxGridServiceFfi,
     private val gridId: Long
 ) : VolvoxGridControllerContract {
+    private var themePresetValue: ThemePreset = ThemePreset.THEME_NONE
+
+    /**
+     * Last theme preset requested through this controller; manual style changes
+     * do not round-trip back into this cached value.
+     */
+    var themePreset: ThemePreset
+        get() = themePresetValue
+        set(value) {
+            configure(GridConfig.newBuilder()
+                .setThemePreset(value)
+                .build())
+        }
+
     companion object {
         fun create(
             service: VolvoxGridServiceFfi,
@@ -214,24 +372,12 @@ class VolvoxGridController(
                 .setViewportHeight(viewportHeight)
                 .setScale(scale)
                 .setConfig(
-                    GridConfig.newBuilder()
-                        .setLayout(
-                            LayoutConfig.newBuilder()
-                                .setRows(rows)
-                                .setCols(cols)
-                                .build()
-                        )
+                    defaultGridConfigBuilder(rows, cols)
                         .setRendering(
                             RenderConfig.newBuilder()
                                 .setFramePacingMode(FramePacingMode.FRAME_PACING_MODE_PLATFORM)
                                 .build()
                         )
-                        .setEditing(
-                            EditConfig.newBuilder()
-                                .setDefaultEditor(defaultHostTextEditorSpec())
-                                .build()
-                        )
-                        .setIndicators(defaultIndicatorsConfig())
                         .build()
                 )
                 .build()
@@ -317,11 +463,28 @@ class VolvoxGridController(
                 .setConfig(config)
                 .build()
         )
+        if (config.hasThemePreset()) {
+            themePresetValue = config.themePreset
+        }
     }
 
     fun getConfig(): GridConfig {
         return service.GetConfig(getConfigRequest())
     }
+
+    fun getSchema(): SchemaResponse {
+        return service.GetSchema(
+            GetSchemaRequest.newBuilder()
+                .setGridId(gridId)
+                .build()
+        )
+    }
+
+    private fun columnsWithExistingEditors(): Set<Int> =
+        getSchema().columnsList
+            .filter { it.hasEditor() }
+            .map { it.index }
+            .toSet()
 
     fun destroy() {
         service.Destroy(destroyRequest())
@@ -631,7 +794,12 @@ class VolvoxGridController(
     }
 
     fun defineColumns(request: DefineColumnsRequest) {
-        service.DefineColumns(request.toBuilder().setGridId(gridId).build())
+        service.DefineColumns(
+            applyAndroidDefaultEditors(request, columnsWithExistingEditors())
+                .toBuilder()
+                .setGridId(gridId)
+                .build()
+        )
     }
 
     fun defineRows(request: DefineRowsRequest) {
@@ -989,8 +1157,8 @@ class VolvoxGridController(
         groupOnCol: Int,
         aggregateCol: Int,
         caption: String = "",
-        backColor: Long = 0xFFE0E0E0.toLong(),
-        foreColor: Long = 0xFF000000.toLong(),
+        backColor: Long = DEFAULT_SUBTOTAL_COMMAND_BACK_COLOR,
+        foreColor: Long = DEFAULT_SUBTOTAL_COMMAND_FORE_COLOR,
         addOutline: Boolean = true,
         font: Font? = null
     ): SubtotalResult {
@@ -1007,6 +1175,65 @@ class VolvoxGridController(
             builder.font = font
         }
         return service.Subtotal(builder.build())
+    }
+
+    fun addSubtotals(
+        amountCols: Iterable<Int>,
+        levels: Iterable<VolvoxGridSubtotalLevel>,
+        aggregate: AggregateType = AggregateType.AGG_SUM,
+        clearExisting: Boolean = true,
+        mergeColFrom: Int = SUBTOTAL_NO_MERGE_COLUMN,
+        mergeColTo: Int = SUBTOTAL_NO_MERGE_COLUMN,
+    ) {
+        val amountList = amountCols.toList()
+        val levelList = levels.toList()
+        if (amountList.isEmpty() || levelList.isEmpty()) return
+
+        withRedrawSuspended {
+            if (amountList.size > 1) {
+                configure(GridConfig.newBuilder()
+                    .setOutline(OutlineConfig.newBuilder().setMultiTotals(true).build())
+                    .build())
+            }
+            if (clearExisting) {
+                subtotal(
+                    AggregateType.AGG_CLEAR,
+                    SUBTOTAL_CLEAR_COLUMN,
+                    SUBTOTAL_CLEAR_COLUMN,
+                    "",
+                    SUBTOTAL_CLEAR_COLOR,
+                    SUBTOTAL_CLEAR_COLOR,
+                    false,
+                )
+            }
+            val wantMerge =
+                mergeColFrom >= SUBTOTAL_MIN_VALID_MERGE_COLUMN && mergeColTo >= mergeColFrom
+            for (level in levelList) {
+                val groupIndex = level.groupCol ?: SUBTOTAL_NO_GROUP_COLUMN
+                for (col in amountList) {
+                    val result = subtotal(
+                        aggregate,
+                        groupIndex,
+                        col,
+                        level.caption,
+                        level.backColor,
+                        level.foreColor,
+                        true,
+                    )
+                    if (wantMerge) {
+                        mergeSubtotalLevelZero(result, mergeColFrom, mergeColTo)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun mergeSubtotalLevelZero(result: SubtotalResult, colFrom: Int, colTo: Int) {
+        for (row in result.rowsList.distinct().sorted()) {
+            if (getNode(row).level <= 0) {
+                mergeCells(row, colFrom, row, colTo)
+            }
+        }
     }
 
     fun setTreeIndicator(style: TreeIndicatorStyle) {
@@ -1222,9 +1449,8 @@ class VolvoxGridController(
     }
 
     fun setColDataType(col: Int, dataType: ColumnDataType) {
-        service.DefineColumns(
+        defineColumns(
             DefineColumnsRequest.newBuilder()
-                .setGridId(gridId)
                 .addColumns(ColumnDef.newBuilder()
                     .setIndex(col)
                     .setDataType(dataType)
@@ -1378,7 +1604,7 @@ class VolvoxGridController(
             .build())
     }
 
-    fun setFontFallbackEnabled(enabled: Boolean) {
+    override fun setFontFallbackEnabled(enabled: Boolean) {
         configure(GridConfig.newBuilder()
             .setRendering(RenderConfig.newBuilder().setFontFallbackEnabled(enabled).build())
             .build())
@@ -1402,7 +1628,7 @@ class VolvoxGridController(
         return getConfig().rendering.scrollBlit
     }
 
-    fun fontFallbackEnabled(): Boolean {
+    override fun fontFallbackEnabled(): Boolean {
         val rendering = getConfig().rendering
         return !rendering.hasFontFallbackEnabled() || rendering.fontFallbackEnabled
     }
@@ -1656,7 +1882,11 @@ class VolvoxGridController(
         if (options != null) {
             builder.setOptions(options)
         }
-        return service.LoadData(builder.build())
+        val result = service.LoadData(builder.build())
+        if (result.status != LoadDataStatus.LOAD_FAILED) {
+            applyDefaultEditorsForInferredColumns(result.inferredColumnsList)
+        }
+        return result
     }
 
     fun appendData(data: ByteArray, options: LoadDataOptions? = null): LoadDataResult {
@@ -1666,7 +1896,26 @@ class VolvoxGridController(
         if (options != null) {
             builder.setOptions(options)
         }
-        return service.AppendData(builder.build())
+        val result = service.AppendData(builder.build())
+        if (result.status != LoadDataStatus.LOAD_FAILED) {
+            applyDefaultEditorsForInferredColumns(result.inferredColumnsList)
+        }
+        return result
+    }
+
+    private fun applyDefaultEditorsForInferredColumns(columns: List<ColumnDef>) {
+        if (columns.isEmpty()) {
+            return
+        }
+        val columnsWithEditors = getSchema().columnsList
+            .filter { it.hasEditor() }
+            .map { it.index }
+            .toSet()
+        val request = defaultEditorsForInferredColumns(gridId, columns, columnsWithEditors)
+        if (request.columnsCount == 0) {
+            return
+        }
+        service.DefineColumns(request)
     }
 
     fun printGrid(

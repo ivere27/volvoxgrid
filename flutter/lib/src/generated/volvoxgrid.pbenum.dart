@@ -114,6 +114,64 @@ class BorderAppearance extends $pb.ProtobufEnum {
   const BorderAppearance._(super.value, super.name);
 }
 
+/// Built-in visual themes. Each preset is a complete look — when applied via
+/// GridConfig.theme_preset it sets StyleConfig (cell/fixed/header colors,
+/// alternate row, sheet, grid lines, border appearance), SelectionConfig
+/// visual fields (selection/hover/active cell/indicator row+col styles),
+/// ScrollBarConfig (appearance + colors), and IndicatorsConfig (appearance +
+/// colors). Other fields (modes, sizes, visibility, behavior toggles) are
+/// left untouched.
+///
+/// Resolution: inside a single Configure() call, the engine first applies the
+/// preset's baked palette, then merges any explicit GridConfig fields. Explicit
+/// fields always win. The preset itself is not stored — GetConfig() returns
+/// the resolved values.
+class ThemePreset extends $pb.ProtobufEnum {
+  static const ThemePreset THEME_NONE =
+      ThemePreset._(0, _omitEnumNames ? '' : 'THEME_NONE');
+  static const ThemePreset THEME_CLASSIC =
+      ThemePreset._(1, _omitEnumNames ? '' : 'THEME_CLASSIC');
+
+  /// gray fixed cells, classic scrollbar/indicator,
+  /// system-blue selection.
+  static const ThemePreset THEME_LIGHT =
+      ThemePreset._(2, _omitEnumNames ? '' : 'THEME_LIGHT');
+
+  /// header (#F9FAFB), indigo accent (#6366F1),
+  /// overlay scrollbar, modern indicator.
+  static const ThemePreset THEME_DARK =
+      ThemePreset._(3, _omitEnumNames ? '' : 'THEME_DARK');
+
+  /// blue accent (#569CD6), modern scrollbar.
+  static const ThemePreset THEME_HIGH_CONTRAST =
+      ThemePreset._(4, _omitEnumNames ? '' : 'THEME_HIGH_CONTRAST');
+
+  /// classic scrollbar+indicator (thick, solid).
+  static const ThemePreset THEME_MONOKAI =
+      ThemePreset._(5, _omitEnumNames ? '' : 'THEME_MONOKAI');
+
+  /// accents, flat borders.
+  static const ThemePreset THEME_AMBER =
+      ThemePreset._(6, _omitEnumNames ? '' : 'THEME_AMBER');
+
+  static const $core.List<ThemePreset> values = <ThemePreset>[
+    THEME_NONE,
+    THEME_CLASSIC,
+    THEME_LIGHT,
+    THEME_DARK,
+    THEME_HIGH_CONTRAST,
+    THEME_MONOKAI,
+    THEME_AMBER,
+  ];
+
+  static final $core.List<ThemePreset?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 6);
+  static ThemePreset? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const ThemePreset._(super.value, super.name);
+}
+
 class TextEffect extends $pb.ProtobufEnum {
   static const TextEffect TEXT_EFFECT_NONE =
       TextEffect._(0, _omitEnumNames ? '' : 'TEXT_EFFECT_NONE');

@@ -1138,6 +1138,15 @@ fn cell_value_data_to_proto(value: &CellValueData, fallback_text: &str) -> v1::C
 impl VolvoxGrid {
     /// Apply a partial `GridConfig`. Only set sub-messages are dispatched.
     pub fn apply_config(&mut self, config: &v1::GridConfig) {
+        if let Some(preset_value) = config.theme_preset {
+            let preset = v1::ThemePreset::try_from(preset_value)
+                .unwrap_or(v1::ThemePreset::ThemeNone);
+            if preset != v1::ThemePreset::ThemeNone {
+                let mut palette = crate::theme::palette_for(preset);
+                palette.theme_preset = None;
+                self.apply_config(&palette);
+            }
+        }
         if let Some(rc) = &config.rendering {
             if let Some(renderer_mode) = rc.renderer_mode {
                 self.set_renderer_mode(renderer_mode);
@@ -1189,6 +1198,7 @@ impl VolvoxGrid {
             rendering: Some(self.get_render_config()),
             indicators: Some(self.get_indicator_bands_config()),
             version: Self::version().to_string(),
+            theme_preset: None,
         }
     }
 

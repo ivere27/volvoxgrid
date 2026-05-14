@@ -13,7 +13,6 @@ import io.github.ivere27.volvoxgrid.DestroyRequest;
 import io.github.ivere27.volvoxgrid.EditCancel;
 import io.github.ivere27.volvoxgrid.EditCommand;
 import io.github.ivere27.volvoxgrid.EditCommit;
-import io.github.ivere27.volvoxgrid.EditConfig;
 import io.github.ivere27.volvoxgrid.EditGetState;
 import io.github.ivere27.volvoxgrid.EditUiMode;
 import io.github.ivere27.volvoxgrid.EditorKind;
@@ -619,24 +618,12 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         int h = resolveViewportHeight();
         float scale = resolveScale();
 
-        GridConfig config = GridConfig.newBuilder()
-            .setLayout(
-                LayoutConfig.newBuilder()
-                    .setRows(rows)
-                    .setCols(cols)
-                    .build()
-            )
-            .setIndicators(VolvoxGridDesktopController.defaultIndicatorsConfig())
+        GridConfig config = VolvoxGridDesktopController.defaultGridConfigBuilder(rows, cols)
             .setRendering(
                 RenderConfig.newBuilder()
                     .setRendererMode(RendererMode.RENDERER_CPU)
                     .setFramePacingMode(FramePacingMode.FRAME_PACING_MODE_PLATFORM)
                     .setTargetFrameRateHz(AUTO_FALLBACK_FRAME_RATE_HZ)
-                    .build()
-            )
-            .setEditing(
-                EditConfig.newBuilder()
-                    .setDefaultEditor(defaultHostTextEditor())
                     .build()
             )
             .build();
@@ -1254,14 +1241,6 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
             }
         }
         schedulePendingHostEditOverlayStartClear();
-    }
-
-    private static EditorSpec defaultHostTextEditor() {
-        return EditorSpec.newBuilder()
-            .setKind(EditorKind.EDITOR_TEXT)
-            .setOwner(EditorOwner.EDITOR_OWNER_HOST_NATIVE)
-            .setPresentation(EditorPresentation.EDITOR_INLINE)
-            .build();
     }
 
     private static boolean isTextEditableSession(EditState state) {

@@ -6,10 +6,19 @@
  * HTML canvas, and event forwarding.
  */
 import {
+  AggregateType,
   ArchiveRequest_Action,
   CellValueFields,
+  CheckboxEditorParamsFields,
   ClearScope,
+  CellSpanMode,
+  ColIndicatorCellMode,
+  ColIndicatorCellModesFields,
+  ColIndicatorConfigFields,
+  ColumnDataType,
+  ColumnDefFields,
   DropdownItemLayout,
+  EditTrigger,
   EditConfigFields,
   EditEndReason,
   EditorKind,
@@ -24,14 +33,29 @@ import {
   EditorValueFields,
   GridEventFields,
   GridConfigFields,
+  HeaderFeaturesFields,
+  IndicatorsConfigFields,
+  InteractionConfigFields,
+  LayoutConfigFields,
   ListEditorParamsFields,
   ListItemFields,
+  LoadDataStatus,
+  NumberEditorParamsFields,
+  OutlineConfigFields,
   RenderLayerBit,
   RenderOutputFields,
+  ResizePolicyFields,
+  RowIndicatorConfigFields,
+  RowIndicatorSlotKind,
+  RowIndicatorSlotFields,
+  ScrollBarsMode,
+  ScrollConfigFields,
+  SpanConfigFields,
+  ThemePreset,
   ValidationErrorFields,
 } from "./generated/volvoxgrid_ffi.js";
 
-export { DropdownItemLayout } from "./generated/volvoxgrid_ffi.js";
+export { DropdownItemLayout, ThemePreset } from "./generated/volvoxgrid_ffi.js";
 
 /**
  * Options for the data-first `new VolvoxGrid(host, options)` form.
@@ -515,6 +539,20 @@ export interface VolvoxGridSubtotalResult {
   rows: number[];
 }
 
+export interface VolvoxGridSubtotalLevel {
+  groupCol?: number | null;
+  caption?: string;
+  backColor?: number;
+  foreColor?: number;
+}
+
+export interface VolvoxGridAddSubtotalsOptions {
+  aggregate?: number;
+  clearExisting?: boolean;
+  mergeColFrom?: number;
+  mergeColTo?: number;
+}
+
 type ResolvedHeaderSeparatorStyle = {
   enabled: boolean;
   colorArgb: number;
@@ -606,6 +644,23 @@ const GRID_EVENT_BEFORE_SORT = GridEventFields["before_sort"];
 const STREAM_STATUS_DATA = 0;
 const STREAM_STATUS_EOF = 1;
 const STREAM_STATUS_PENDING = 2;
+const PB_WIRE_VARINT = 0;
+const PB_WIRE_LENGTH_DELIMITED = 2;
+const PB_WIRE_FIXED32 = 5;
+const DEFAULT_ROW_INDICATOR_WIDTH = 40;
+const DEFAULT_COL_INDICATOR_BAND_ROWS = 1;
+const DEFAULT_FLING_IMPULSE_GAIN = 220.0;
+const DEFAULT_FLING_FRICTION = 0.9;
+const DEFAULT_SUBTOTAL_BACK_COLOR = 0xFFEEF2FF;
+const DEFAULT_SUBTOTAL_FORE_COLOR = 0xFF111827;
+const SUBTOTAL_NO_GROUP_COLUMN = -1;
+const SUBTOTAL_NO_MERGE_COLUMN = -1;
+const SUBTOTAL_MIN_VALID_MERGE_COLUMN = 0;
+const SUBTOTAL_CLEAR_COLUMN = 0;
+const SUBTOTAL_CLEAR_COLOR = 0;
+const WASM_TRUE = 1;
+const HOST_DROPDOWN_OVERLAY_DISABLED = 0;
+const DEFAULT_FONT_SIZE_CSS_PX = 11.0;
 type StreamHandle = number | bigint;
 
 function decodeSignedStatus(statusByte: number): number {
@@ -873,7 +928,7 @@ function pbEncodeBool(value: boolean): number[] {
 function pbEncodeStringField(field: number, value: string): number[] {
   const data = PB_TEXT_ENCODER.encode(value);
   return [
-    ...pbEncodeTag(field, 2),
+    ...pbEncodeTag(field, PB_WIRE_LENGTH_DELIMITED),
     ...pbEncodeVarint(BigInt(data.length)),
     ...data,
   ];
@@ -881,7 +936,7 @@ function pbEncodeStringField(field: number, value: string): number[] {
 
 function pbEncodeMessageField(field: number, payload: Uint8Array): number[] {
   return [
-    ...pbEncodeTag(field, 2),
+    ...pbEncodeTag(field, PB_WIRE_LENGTH_DELIMITED),
     ...pbEncodeVarint(BigInt(payload.length)),
     ...payload,
   ];
@@ -944,9 +999,85 @@ function pbEncodeHostTextEditor(): Uint8Array {
   return new Uint8Array(out);
 }
 
-function pbEncodeDefaultHostTextEditConfig(): Uint8Array {
+function pbEncodeEngineTextEditor(): Uint8Array {
+  const out: number[] = [];
+  out.push(...pbEncodeTag(EditorSpecFields.kind, 0), ...pbEncodeInt32(EditorKind.EDITOR_TEXT));
+  out.push(...pbEncodeTag(EditorSpecFields.owner, 0), ...pbEncodeInt32(EditorOwner.EDITOR_OWNER_ENGINE));
+  out.push(...pbEncodeTag(EditorSpecFields.presentation, 0), ...pbEncodeInt32(EditorPresentation.EDITOR_CANVAS));
+  return new Uint8Array(out);
+}
+
+function pbEncodeHostNumberEditor(nullable: boolean): Uint8Array {
+  const number: number[] = [];
+  number.push(...pbEncodeTag(NumberEditorParamsFields.nullable, 0), ...pbEncodeBool(nullable));
+
+  const out: number[] = [];
+  out.push(...pbEncodeTag(EditorSpecFields.kind, 0), ...pbEncodeInt32(EditorKind.EDITOR_NUMBER));
+  out.push(...pbEncodeTag(EditorSpecFields.owner, 0), ...pbEncodeInt32(EditorOwner.EDITOR_OWNER_HOST_NATIVE));
+  out.push(...pbEncodeTag(EditorSpecFields.presentation, 0), ...pbEncodeInt32(EditorPresentation.EDITOR_INLINE));
+  out.push(...pbEncodeMessageField(EditorSpecFields.number, new Uint8Array(number)));
+  return new Uint8Array(out);
+}
+
+function pbEncodeEngineCheckboxEditor(): Uint8Array {
+  const checkbox: number[] = [];
+  checkbox.push(...pbEncodeTag(CheckboxEditorParamsFields.three_state, 0), ...pbEncodeBool(false));
+
+  const out: number[] = [];
+  out.push(...pbEncodeTag(EditorSpecFields.kind, 0), ...pbEncodeInt32(EditorKind.EDITOR_CHECKBOX));
+  out.push(...pbEncodeTag(EditorSpecFields.owner, 0), ...pbEncodeInt32(EditorOwner.EDITOR_OWNER_ENGINE));
+  out.push(...pbEncodeTag(EditorSpecFields.presentation, 0), ...pbEncodeInt32(EditorPresentation.EDITOR_CANVAS));
+  out.push(...pbEncodeMessageField(EditorSpecFields.checkbox, new Uint8Array(checkbox)));
+  return new Uint8Array(out);
+}
+
+function pbEncodeDefaultEditorForDataType(dataType: number, nullable?: boolean): Uint8Array | null {
+  switch (dataType) {
+    case ColumnDataType.COLUMN_DATA_STRING:
+      return pbEncodeHostTextEditor();
+    case ColumnDataType.COLUMN_DATA_NUMBER:
+    case ColumnDataType.COLUMN_DATA_CURRENCY:
+      return pbEncodeHostNumberEditor(nullable ?? true);
+    case ColumnDataType.COLUMN_DATA_BOOLEAN:
+      return pbEncodeEngineCheckboxEditor();
+    default:
+      return null;
+  }
+}
+
+function pbEncodeColumnWithDefaultEditor(
+  index: number,
+  dataType: number,
+  nullable?: boolean,
+  includeDefaultEditor: boolean = true,
+): Uint8Array {
+  const out: number[] = [];
+  out.push(...pbEncodeTag(ColumnDefFields.index, 0), ...pbEncodeInt32(index));
+  out.push(...pbEncodeTag(ColumnDefFields.data_type, 0), ...pbEncodeInt32(dataType));
+  if (nullable != null) {
+    out.push(...pbEncodeTag(ColumnDefFields.nullable, 0), ...pbEncodeBool(nullable));
+  }
+  if (includeDefaultEditor) {
+    const editor = pbEncodeDefaultEditorForDataType(dataType, nullable);
+    if (editor != null) {
+      out.push(...pbEncodeMessageField(ColumnDefFields.editor, editor));
+    }
+  }
+  return new Uint8Array(out);
+}
+
+function pbEncodeDefineColumnsRequest(gridId: number, columns: Uint8Array[]): Uint8Array {
+  const out: number[] = [];
+  out.push(...pbEncodeTag(1, 0), ...pbEncodeInt64(BigInt(Math.trunc(gridId))));
+  for (const column of columns) {
+    out.push(...pbEncodeMessageField(2, column));
+  }
+  return new Uint8Array(out);
+}
+
+function pbEncodeDefaultEngineTextEditConfig(): Uint8Array {
   const editing: number[] = [];
-  editing.push(...pbEncodeMessageField(EditConfigFields.default_editor, pbEncodeHostTextEditor()));
+  editing.push(...pbEncodeMessageField(EditConfigFields.default_editor, pbEncodeEngineTextEditor()));
   const gridConfig: number[] = [];
   gridConfig.push(...pbEncodeMessageField(GridConfigFields.editing, new Uint8Array(editing)));
   return new Uint8Array(gridConfig);
@@ -1093,16 +1224,16 @@ function pbEncodeRowIndicatorStartConfig(config: VolvoxGridRowIndicatorConfig): 
   const rowConfig: number[] = [];
   if (config.visible != null) rowConfig.push(...pbEncodeTag(1, 0), ...pbEncodeBool(config.visible));
   if (config.width != null) rowConfig.push(...pbEncodeTag(2, 0), ...pbEncodeInt32(config.width));
-  if (config.background != null) rowConfig.push(...pbEncodeUint32Field(4, config.background));
-  if (config.foreground != null) rowConfig.push(...pbEncodeUint32Field(5, config.foreground));
-  if (config.gridLines != null) rowConfig.push(...pbEncodeTag(6, 0), ...pbEncodeInt32(config.gridLines));
-  if (config.gridColor != null) rowConfig.push(...pbEncodeUint32Field(7, config.gridColor));
-  if (config.autoSize != null) rowConfig.push(...pbEncodeTag(8, 0), ...pbEncodeBool(config.autoSize));
-  if (config.allowResize != null) rowConfig.push(...pbEncodeTag(9, 0), ...pbEncodeBool(config.allowResize));
-  if (config.allowSelect != null) rowConfig.push(...pbEncodeTag(10, 0), ...pbEncodeBool(config.allowSelect));
-  if (config.allowReorder != null) rowConfig.push(...pbEncodeTag(11, 0), ...pbEncodeBool(config.allowReorder));
+  if (config.background != null) rowConfig.push(...pbEncodeUint32Field(3, config.background));
+  if (config.foreground != null) rowConfig.push(...pbEncodeUint32Field(4, config.foreground));
+  if (config.gridLines != null) rowConfig.push(...pbEncodeTag(5, 0), ...pbEncodeInt32(config.gridLines));
+  if (config.gridColor != null) rowConfig.push(...pbEncodeUint32Field(6, config.gridColor));
+  if (config.autoSize != null) rowConfig.push(...pbEncodeTag(7, 0), ...pbEncodeBool(config.autoSize));
+  if (config.allowResize != null) rowConfig.push(...pbEncodeTag(8, 0), ...pbEncodeBool(config.allowResize));
+  if (config.allowSelect != null) rowConfig.push(...pbEncodeTag(9, 0), ...pbEncodeBool(config.allowSelect));
+  if (config.allowReorder != null) rowConfig.push(...pbEncodeTag(10, 0), ...pbEncodeBool(config.allowReorder));
   for (const slot of config.slots ?? []) {
-    rowConfig.push(...pbEncodeMessageField(12, pbEncodeRowIndicatorSlotConfig(slot)));
+    rowConfig.push(...pbEncodeMessageField(11, pbEncodeRowIndicatorSlotConfig(slot)));
   }
 
   const indicatorsConfig: number[] = [];
@@ -1122,16 +1253,16 @@ function pbEncodeColumnIndicatorTopConfig(config: VolvoxGridColumnIndicatorConfi
     for (const mode of config.cellModes) {
       modes.push(...pbEncodeTag(1, 0), ...pbEncodeInt32(Math.max(0, Math.trunc(mode))));
     }
-    colConfig.push(...pbEncodeMessageField(15, new Uint8Array(modes)));
+    colConfig.push(...pbEncodeMessageField(14, new Uint8Array(modes)));
   }
-  if (config.background != null) colConfig.push(...pbEncodeUint32Field(5, config.background));
-  if (config.foreground != null) colConfig.push(...pbEncodeUint32Field(6, config.foreground));
-  if (config.gridLines != null) colConfig.push(...pbEncodeTag(7, 0), ...pbEncodeInt32(config.gridLines));
-  if (config.gridColor != null) colConfig.push(...pbEncodeUint32Field(8, config.gridColor));
-  if (config.autoSize != null) colConfig.push(...pbEncodeTag(9, 0), ...pbEncodeBool(config.autoSize));
-  if (config.allowResize != null) colConfig.push(...pbEncodeTag(10, 0), ...pbEncodeBool(config.allowResize));
-  if (config.allowReorder != null) colConfig.push(...pbEncodeTag(11, 0), ...pbEncodeBool(config.allowReorder));
-  if (config.allowMenu != null) colConfig.push(...pbEncodeTag(12, 0), ...pbEncodeBool(config.allowMenu));
+  if (config.background != null) colConfig.push(...pbEncodeUint32Field(4, config.background));
+  if (config.foreground != null) colConfig.push(...pbEncodeUint32Field(5, config.foreground));
+  if (config.gridLines != null) colConfig.push(...pbEncodeTag(6, 0), ...pbEncodeInt32(config.gridLines));
+  if (config.gridColor != null) colConfig.push(...pbEncodeUint32Field(7, config.gridColor));
+  if (config.autoSize != null) colConfig.push(...pbEncodeTag(8, 0), ...pbEncodeBool(config.autoSize));
+  if (config.allowResize != null) colConfig.push(...pbEncodeTag(9, 0), ...pbEncodeBool(config.allowResize));
+  if (config.allowReorder != null) colConfig.push(...pbEncodeTag(10, 0), ...pbEncodeBool(config.allowReorder));
+  if (config.allowMenu != null) colConfig.push(...pbEncodeTag(11, 0), ...pbEncodeBool(config.allowMenu));
 
   const indicatorsConfig: number[] = [];
   indicatorsConfig.push(...pbEncodeMessageField(3, new Uint8Array(colConfig)));
@@ -1141,13 +1272,21 @@ function pbEncodeColumnIndicatorTopConfig(config: VolvoxGridColumnIndicatorConfi
 }
 
 function pbEncodeUint32Field(field: number, value: number): number[] {
-  return [...pbEncodeTag(field, 0), ...pbEncodeVarint(BigInt(value >>> 0))];
+  return [...pbEncodeTag(field, PB_WIRE_VARINT), ...pbEncodeVarint(BigInt(value >>> 0))];
+}
+
+function pbEncodeInt32Field(field: number, value: number): number[] {
+  return [...pbEncodeTag(field, PB_WIRE_VARINT), ...pbEncodeInt32(value)];
+}
+
+function pbEncodeBoolField(field: number, value: boolean): number[] {
+  return [...pbEncodeTag(field, PB_WIRE_VARINT), ...pbEncodeBool(value)];
 }
 
 function pbEncodeFloatField(field: number, value: number): number[] {
   const buf = new ArrayBuffer(4);
   new DataView(buf).setFloat32(0, value, true);
-  return [...pbEncodeTag(field, 5), ...Array.from(new Uint8Array(buf))];
+  return [...pbEncodeTag(field, PB_WIRE_FIXED32), ...Array.from(new Uint8Array(buf))];
 }
 
 function pbEncodeFont(font: VolvoxGridFont): Uint8Array {
@@ -1310,6 +1449,73 @@ function pbEncodeFreezePolicyConfig(policy: VolvoxGridFreezePolicy): Uint8Array 
   interaction.push(...pbEncodeMessageField(2, new Uint8Array(freeze)));
   const gridConfig: number[] = [];
   gridConfig.push(...pbEncodeMessageField(8, new Uint8Array(interaction)));
+  return new Uint8Array(gridConfig);
+}
+
+function pbEncodeThemePresetConfig(preset: number): Uint8Array {
+  const gridConfig: number[] = [];
+  gridConfig.push(...pbEncodeInt32Field(GridConfigFields.theme_preset, Math.trunc(preset)));
+  return new Uint8Array(gridConfig);
+}
+
+function pbEncodeOutlineMultiTotalsConfig(enabled: boolean): Uint8Array {
+  const outline: number[] = [];
+  outline.push(...pbEncodeBoolField(OutlineConfigFields.multi_totals, enabled));
+  const gridConfig: number[] = [];
+  gridConfig.push(...pbEncodeMessageField(GridConfigFields.outline, new Uint8Array(outline)));
+  return new Uint8Array(gridConfig);
+}
+
+function pbEncodeDefaultPresentationConfig(): Uint8Array {
+  const layout: number[] = [];
+  layout.push(...pbEncodeBoolField(LayoutConfigFields.extend_last_col, true));
+
+  const scrolling: number[] = [];
+  scrolling.push(...pbEncodeInt32Field(ScrollConfigFields.scrollbars, ScrollBarsMode.SCROLLBAR_BOTH));
+  scrolling.push(...pbEncodeBoolField(ScrollConfigFields.fast_scroll, true));
+  scrolling.push(...pbEncodeFloatField(ScrollConfigFields.fling_impulse_gain, DEFAULT_FLING_IMPULSE_GAIN));
+  scrolling.push(...pbEncodeFloatField(ScrollConfigFields.fling_friction, DEFAULT_FLING_FRICTION));
+
+  const span: number[] = [];
+  span.push(...pbEncodeInt32Field(SpanConfigFields.cell_span, CellSpanMode.CELL_SPAN_ADJACENT));
+
+  const resize: number[] = [];
+  resize.push(...pbEncodeBoolField(ResizePolicyFields.columns, true));
+  resize.push(...pbEncodeBoolField(ResizePolicyFields.rows, true));
+  resize.push(...pbEncodeBoolField(ResizePolicyFields.uniform, false));
+  const headerFeatures: number[] = [];
+  headerFeatures.push(...pbEncodeBoolField(HeaderFeaturesFields.sort, true));
+  headerFeatures.push(...pbEncodeBoolField(HeaderFeaturesFields.reorder, true));
+  headerFeatures.push(...pbEncodeBoolField(HeaderFeaturesFields.chooser, false));
+  const interaction: number[] = [];
+  interaction.push(...pbEncodeMessageField(InteractionConfigFields.resize, new Uint8Array(resize)));
+  interaction.push(...pbEncodeMessageField(InteractionConfigFields.header_features, new Uint8Array(headerFeatures)));
+
+  const rowStart: number[] = [];
+  rowStart.push(...pbEncodeBoolField(RowIndicatorConfigFields.visible, false));
+  rowStart.push(...pbEncodeInt32Field(RowIndicatorConfigFields.width, DEFAULT_ROW_INDICATOR_WIDTH));
+  const rowNumberSlot: number[] = [];
+  rowNumberSlot.push(...pbEncodeInt32Field(RowIndicatorSlotFields.kind, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NUMBERS));
+  rowNumberSlot.push(...pbEncodeInt32Field(RowIndicatorSlotFields.width, DEFAULT_ROW_INDICATOR_WIDTH));
+  rowNumberSlot.push(...pbEncodeBoolField(RowIndicatorSlotFields.visible, true));
+  rowStart.push(...pbEncodeMessageField(RowIndicatorConfigFields.slots, new Uint8Array(rowNumberSlot)));
+  const colTop: number[] = [];
+  colTop.push(...pbEncodeBoolField(ColIndicatorConfigFields.visible, true));
+  colTop.push(...pbEncodeInt32Field(ColIndicatorConfigFields.band_rows, DEFAULT_COL_INDICATOR_BAND_ROWS));
+  const colTopModes: number[] = [];
+  colTopModes.push(...pbEncodeInt32Field(ColIndicatorCellModesFields.modes, ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT));
+  colTopModes.push(...pbEncodeInt32Field(ColIndicatorCellModesFields.modes, ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH));
+  colTop.push(...pbEncodeMessageField(ColIndicatorConfigFields.cell_modes, new Uint8Array(colTopModes)));
+  const indicators: number[] = [];
+  indicators.push(...pbEncodeMessageField(IndicatorsConfigFields.row_start, new Uint8Array(rowStart)));
+  indicators.push(...pbEncodeMessageField(IndicatorsConfigFields.col_top, new Uint8Array(colTop)));
+
+  const gridConfig: number[] = [];
+  gridConfig.push(...pbEncodeMessageField(GridConfigFields.layout, new Uint8Array(layout)));
+  gridConfig.push(...pbEncodeMessageField(GridConfigFields.scrolling, new Uint8Array(scrolling)));
+  gridConfig.push(...pbEncodeMessageField(GridConfigFields.span, new Uint8Array(span)));
+  gridConfig.push(...pbEncodeMessageField(GridConfigFields.interaction, new Uint8Array(interaction)));
+  gridConfig.push(...pbEncodeMessageField(GridConfigFields.indicators, new Uint8Array(indicators)));
   return new Uint8Array(gridConfig);
 }
 
@@ -1923,7 +2129,7 @@ function pbDecodeDropdown(data: Uint8Array): VolvoxGridDropdown {
     offset = tag.next;
     const field = Number(tag.value >> 3n);
     const wire = Number(tag.value & 0x7n);
-    if (field === 1 && wire === 2) {
+    if (field === ListEditorParamsFields.static_items && wire === 2) {
       const len = pbReadVarint(data, offset);
       const n = Number(len.value);
       const start = len.next;
@@ -1932,25 +2138,60 @@ function pbDecodeDropdown(data: Uint8Array): VolvoxGridDropdown {
       offset = end;
       continue;
     }
-    if (field === 2 && wire === 0) {
+    if (field === ListEditorParamsFields.allow_custom_value && wire === 0) {
       const value = pbReadVarint(data, offset);
       dropdown.allowCustomValue = value.value !== 0n;
       offset = value.next;
       continue;
     }
-    if (field === 3 && wire === 0) {
+    if (field === ListEditorParamsFields.item_layout && wire === 0) {
       const value = pbReadVarint(data, offset);
       dropdown.itemLayout = pbAsInt32(value.value);
       offset = value.next;
       continue;
     }
-    if (field === 4 && wire === 0) {
+    if (field === ListEditorParamsFields.searchable && wire === 0) {
       const value = pbReadVarint(data, offset);
       dropdown.searchable = value.value !== 0n;
       offset = value.next;
       continue;
     }
     offset = pbSkipField(data, offset, wire);
+  }
+  return dropdown;
+}
+
+function pbDecodeDropdownEditor(data: Uint8Array): VolvoxGridDropdown | null {
+  let offset = 0;
+  let kind: number | undefined;
+  let dropdown: VolvoxGridDropdown | null = null;
+  while (offset < data.length) {
+    const tag = pbReadVarint(data, offset);
+    offset = tag.next;
+    const field = Number(tag.value >> 3n);
+    const wire = Number(tag.value & 0x7n);
+    if (field === EditorSpecFields.kind && wire === 0) {
+      const value = pbReadVarint(data, offset);
+      kind = pbAsInt32(value.value);
+      offset = value.next;
+      continue;
+    }
+    if (field === EditorSpecFields.list && wire === 2) {
+      const len = pbReadVarint(data, offset);
+      const n = Number(len.value);
+      const start = len.next;
+      const end = Math.min(data.length, start + n);
+      dropdown = pbDecodeDropdown(data.slice(start, end));
+      offset = end;
+      continue;
+    }
+    offset = pbSkipField(data, offset, wire);
+  }
+  if (dropdown == null) {
+    return null;
+  }
+  if (kind === EditorKind.EDITOR_COMBO && dropdown.allowCustomValue == null) {
+    dropdown.allowCustomValue = true;
   }
   return dropdown;
 }
@@ -2596,21 +2837,21 @@ function pbDecodeLoadDataColumn(data: Uint8Array): VolvoxGridLoadDataColumn | nu
       const value = pbReadVarint(data, offset);
       offset = value.next;
       const n = pbAsInt32(value.value);
-      if (field === 1) column.index = n;
-      else if (field === 2) column.width = n;
-      else if (field === 3) column.minWidth = n;
-      else if (field === 4) column.maxWidth = n;
-      else if (field === 6) column.align = n;
-      else if (field === 7) column.fixedAlign = n;
-      else if (field === 8) column.dataType = n;
-      else if (field === 11) column.sortOrder = n;
-      else if (field === 12) column.sortType = n;
-      else if (field === 15) column.indent = n;
-      else if (field === 16) column.hidden = n !== 0;
-      else if (field === 17) column.span = n !== 0;
-      else if (field === 23) column.nullable = n !== 0;
-      else if (field === 24) column.coercionMode = n;
-      else if (field === 25) column.errorMode = n;
+      if (field === ColumnDefFields.index) column.index = n;
+      else if (field === ColumnDefFields.width) column.width = n;
+      else if (field === ColumnDefFields.min_width) column.minWidth = n;
+      else if (field === ColumnDefFields.max_width) column.maxWidth = n;
+      else if (field === ColumnDefFields.align) column.align = n;
+      else if (field === ColumnDefFields.fixed_align) column.fixedAlign = n;
+      else if (field === ColumnDefFields.data_type) column.dataType = n;
+      else if (field === ColumnDefFields.sort_order) column.sortOrder = n;
+      else if (field === ColumnDefFields.sort_type) column.sortType = n;
+      else if (field === ColumnDefFields.indent) column.indent = n;
+      else if (field === ColumnDefFields.hidden) column.hidden = n !== 0;
+      else if (field === ColumnDefFields.span) column.span = n !== 0;
+      else if (field === ColumnDefFields.nullable) column.nullable = n !== 0;
+      else if (field === ColumnDefFields.coercion_mode) column.coercionMode = n;
+      else if (field === ColumnDefFields.error_mode) column.errorMode = n;
       else continue;
       seenField = true;
       continue;
@@ -2620,19 +2861,20 @@ function pbDecodeLoadDataColumn(data: Uint8Array): VolvoxGridLoadDataColumn | nu
       const n = Number(len.value);
       if (Number.isFinite(n) && n >= 0) {
         const end = Math.min(data.length, len.next + n);
-        if (field === 13) {
-          const dropdown = pbDecodeDropdown(data.slice(len.next, end));
-          column.dropdown = dropdown;
-          column.dropdownItems = dropdownToLegacyItems(dropdown);
+        if (field === ColumnDefFields.editor) {
+          const dropdown = pbDecodeDropdownEditor(data.slice(len.next, end));
+          if (dropdown != null) {
+            column.dropdown = dropdown;
+            column.dropdownItems = dropdownToLegacyItems(dropdown);
+          }
           offset = end;
           seenField = true;
           continue;
         }
         const value = PB_TEXT_DECODER.decode(data.slice(len.next, end));
-        if (field === 5) column.caption = value;
-        else if (field === 9) column.format = value;
-        else if (field === 10) column.key = value;
-        else if (field === 14) column.editMask = value;
+        if (field === ColumnDefFields.caption) column.caption = value;
+        else if (field === ColumnDefFields.format) column.format = value;
+        else if (field === ColumnDefFields.key) column.key = value;
         else {
           offset = pbSkipField(data, offset, wire);
           continue;
@@ -2645,6 +2887,57 @@ function pbDecodeLoadDataColumn(data: Uint8Array): VolvoxGridLoadDataColumn | nu
     offset = pbSkipField(data, offset, wire);
   }
   return seenField ? column : null;
+}
+
+function pbDecodeColumnEditorPresence(data: Uint8Array): { index?: number; hasEditor: boolean } {
+  let offset = 0;
+  let index: number | undefined;
+  let hasEditor = false;
+  while (offset < data.length) {
+    const tag = pbReadVarint(data, offset);
+    offset = tag.next;
+    const field = Number(tag.value >> 3n);
+    const wire = Number(tag.value & 0x7n);
+    if (field === ColumnDefFields.index && wire === 0) {
+      const value = pbReadVarint(data, offset);
+      offset = value.next;
+      index = pbAsInt32(value.value);
+      continue;
+    }
+    if (field === ColumnDefFields.editor && wire === 2) {
+      hasEditor = true;
+    }
+    offset = pbSkipField(data, offset, wire);
+  }
+  return { index, hasEditor };
+}
+
+function pbDecodeSchemaColumnsWithEditors(data: Uint8Array): Set<number> {
+  const columns = new Set<number>();
+  let offset = 0;
+  while (offset < data.length) {
+    const tag = pbReadVarint(data, offset);
+    offset = tag.next;
+    const field = Number(tag.value >> 3n);
+    const wire = Number(tag.value & 0x7n);
+    if (field === 1 && wire === 2) {
+      const len = pbReadVarint(data, offset);
+      offset = len.next;
+      const n = Number(len.value);
+      if (!Number.isFinite(n) || n < 0) {
+        return columns;
+      }
+      const end = Math.min(data.length, offset + n);
+      const column = pbDecodeColumnEditorPresence(data.subarray(offset, end));
+      if (column.index != null && column.hasEditor) {
+        columns.add(column.index);
+      }
+      offset = end;
+      continue;
+    }
+    offset = pbSkipField(data, offset, wire);
+  }
+  return columns;
 }
 
 function pbDecodeLoadDataResult(data: Uint8Array): VolvoxGridLoadDataResult {
@@ -2910,6 +3203,7 @@ export class VolvoxGrid {
   private selectionVisibilityValue: number = 1;
   private focusBorderValue: number = 0;
   private cellSpanModeValue: number = 0;
+  private themePresetValue: ThemePreset = ThemePreset.THEME_NONE;
   private editTriggerValue: number = 2;
   private tabBehaviorValue: number = 1;
   private scrollBarsValue: number = 3;
@@ -3171,28 +3465,31 @@ export class VolvoxGrid {
 
     // Web host defaults aligned with desktop-like behavior.
     if (typeof this.wasm.set_edit_trigger === "function") {
-      this.wasm.set_edit_trigger(this.gridId, 2);
+      this.wasm.set_edit_trigger(this.gridId, EditTrigger.EDIT_TRIGGER_KEY_CLICK);
     } else {
-      this.wasm.set_editable_mode(this.gridId, 2);
+      this.wasm.set_editable_mode(this.gridId, EditTrigger.EDIT_TRIGGER_KEY_CLICK);
     }
     if (typeof this.wasm.set_host_dropdown_overlay === "function") {
-      this.wasm.set_host_dropdown_overlay(this.gridId, 0);
+      this.wasm.set_host_dropdown_overlay(this.gridId, HOST_DROPDOWN_OVERLAY_DISABLED);
     } else {
-      this.wasm.set_host_combo_overlay(this.gridId, 0);
+      this.wasm.set_host_combo_overlay(this.gridId, HOST_DROPDOWN_OVERLAY_DISABLED);
     } // engine renders the combo dropdown instead of a host overlay
-    this.applyProtoConfig(pbEncodeDefaultHostTextEditConfig(), "DefaultHostTextEditor");
-    this.wasm.set_fling_enabled(this.gridId, 1); // inertial scroll
+    this.applyProtoConfig(pbEncodeDefaultEngineTextEditConfig(), "DefaultEngineTextEditor");
+    this.applyProtoConfig(pbEncodeDefaultPresentationConfig(), "default presentation config");
+    this.cellSpanModeValue = CellSpanMode.CELL_SPAN_ADJACENT;
+    this.scrollBarsValue = ScrollBarsMode.SCROLLBAR_BOTH;
+    this.wasm.set_fling_enabled(this.gridId, WASM_TRUE); // inertial scroll
     if (typeof this.wasm.set_fast_scroll_enabled === "function") {
       this.wasm.set_fast_scroll_enabled(this.gridId, true);
     }
     if (typeof this.wasm.set_font_size === "function") {
-      this.wasm.set_font_size(this.gridId, 11.0 * this.dpr);
+      this.wasm.set_font_size(this.gridId, DEFAULT_FONT_SIZE_CSS_PX * this.dpr);
     }
     if (typeof this.wasm.set_fling_impulse_gain === "function") {
-      this.wasm.set_fling_impulse_gain(this.gridId, 220.0);
+      this.wasm.set_fling_impulse_gain(this.gridId, DEFAULT_FLING_IMPULSE_GAIN);
     }
     if (typeof this.wasm.set_fling_friction === "function") {
-      this.wasm.set_fling_friction(this.gridId, 0.9);
+      this.wasm.set_fling_friction(this.gridId, DEFAULT_FLING_FRICTION);
     }
 
     this.ensureZoomBaseForGrid(this.gridId);
@@ -3226,6 +3523,22 @@ export class VolvoxGrid {
   /** Engine-side grid ID for direct WASM calls. */
   get id(): number {
     return this.gridId;
+  }
+
+  /** Last requested theme preset; manual style changes are not reflected here. */
+  get themePreset(): ThemePreset {
+    return this.themePresetValue;
+  }
+
+  set themePreset(preset: ThemePreset) {
+    const next = Math.trunc(Number(preset)) as ThemePreset;
+    this.applyProtoConfig(pbEncodeThemePresetConfig(next), "ThemePreset");
+    this.themePresetValue = next;
+    this.dirty = true;
+  }
+
+  setThemePreset(preset: ThemePreset): void {
+    this.themePreset = preset;
   }
 
   syncCursorFromEngine(): void {
@@ -3564,6 +3877,9 @@ export class VolvoxGrid {
     }
 
     const result = pbDecodeLoadDataResult(response);
+    if (result.status !== LoadDataStatus.LOAD_FAILED) {
+      this.applyDefaultEditorsForInferredColumns(result.inferredColumns);
+    }
     this.dirty = true;
     return result;
   }
@@ -3590,6 +3906,9 @@ export class VolvoxGrid {
     }
 
     const result = pbDecodeLoadDataResult(response);
+    if (result.status !== LoadDataStatus.LOAD_FAILED) {
+      this.applyDefaultEditorsForInferredColumns(result.inferredColumns);
+    }
     this.dirty = true;
     return result;
   }
@@ -4780,6 +5099,58 @@ export class VolvoxGrid {
     return this.getIconSlots();
   }
 
+  private defineColumnsWithDefaultEditors(columns: Uint8Array[], requireTypedApi = false): void {
+    if (columns.length === 0) {
+      return;
+    }
+    if (typeof this.wasm.volvox_grid_define_columns_pb !== "function") {
+      if (requireTypedApi) {
+        throw new Error("Typed editor API is not available in this VolvoxGrid runtime");
+      }
+      return;
+    }
+    this.wasm.volvox_grid_define_columns_pb(pbEncodeDefineColumnsRequest(this.gridId, columns));
+    this.dirty = true;
+  }
+
+  private columnsWithExplicitEditors(): Set<number> {
+    if (typeof this.wasm.volvox_grid_get_schema !== "function") {
+      return new Set<number>();
+    }
+    try {
+      return pbDecodeSchemaColumnsWithEditors(
+        this.wasm.volvox_grid_get_schema(BigInt(this.gridId)) as Uint8Array,
+      );
+    } catch {
+      return new Set<number>();
+    }
+  }
+
+  private applyDefaultEditorsForInferredColumns(columns: ReadonlyArray<VolvoxGridLoadDataColumn>): void {
+    const defs: Uint8Array[] = [];
+    const columnsWithEditors = this.columnsWithExplicitEditors();
+    for (const column of columns) {
+      if (column.index == null || column.dataType == null) {
+        continue;
+      }
+      if (columnsWithEditors.has(column.index)) {
+        continue;
+      }
+      if (pbEncodeDefaultEditorForDataType(column.dataType, column.nullable) == null) {
+        continue;
+      }
+      defs.push(pbEncodeColumnWithDefaultEditor(column.index, column.dataType, column.nullable));
+    }
+    this.defineColumnsWithDefaultEditors(defs);
+  }
+
+  setColDataType(col: number, dataType: number, nullable?: boolean): void {
+    const hasExistingEditor = this.columnsWithExplicitEditors().has(col);
+    this.defineColumnsWithDefaultEditors([
+      pbEncodeColumnWithDefaultEditor(col, dataType, nullable, !hasExistingEditor),
+    ], true);
+  }
+
   setColDropdown(col: number, dropdown: VolvoxGridDropdown): void {
     if (typeof this.wasm.volvox_grid_define_columns_pb !== "function") {
       throw new Error("Typed editor API is not available in this VolvoxGrid runtime");
@@ -5404,6 +5775,67 @@ export class VolvoxGrid {
       return { rows: [] };
     }
     return pbDecodeSubtotalResult(response);
+  }
+
+  addSubtotals(
+    amountCols: readonly number[],
+    levels: readonly VolvoxGridSubtotalLevel[],
+    options: VolvoxGridAddSubtotalsOptions = {},
+  ): void {
+    if (amountCols.length === 0 || levels.length === 0) {
+      return;
+    }
+    const aggregate = options.aggregate ?? AggregateType.AGG_SUM;
+    const clearExisting = options.clearExisting ?? true;
+    const mergeColFrom = options.mergeColFrom ?? SUBTOTAL_NO_MERGE_COLUMN;
+    const mergeColTo = options.mergeColTo ?? SUBTOTAL_NO_MERGE_COLUMN;
+    if (clearExisting) {
+      this.subtotal(
+        AggregateType.AGG_CLEAR,
+        SUBTOTAL_CLEAR_COLUMN,
+        SUBTOTAL_CLEAR_COLUMN,
+        "",
+        SUBTOTAL_CLEAR_COLOR,
+        SUBTOTAL_CLEAR_COLOR,
+        false,
+      );
+    }
+    if (amountCols.length > 1) {
+      this.applyProtoConfig(pbEncodeOutlineMultiTotalsConfig(true), "subtotal multi totals");
+    }
+    const wantMerge = mergeColFrom >= SUBTOTAL_MIN_VALID_MERGE_COLUMN && mergeColTo >= mergeColFrom;
+    for (const level of levels) {
+      const groupIndex = level.groupCol ?? SUBTOTAL_NO_GROUP_COLUMN;
+      for (const col of amountCols) {
+        const result = this.subtotal(
+          aggregate,
+          groupIndex,
+          col,
+          level.caption ?? "",
+          level.backColor ?? DEFAULT_SUBTOTAL_BACK_COLOR,
+          level.foreColor ?? DEFAULT_SUBTOTAL_FORE_COLOR,
+          true,
+        );
+        if (wantMerge) {
+          this.mergeSubtotalLevelZero(result, mergeColFrom, mergeColTo);
+        }
+      }
+    }
+    this.dirty = true;
+  }
+
+  private mergeSubtotalLevelZero(
+    result: VolvoxGridSubtotalResult,
+    colFrom: number,
+    colTo: number,
+  ): void {
+    const uniqueRows = [...new Set(result.rows)].sort((a, b) => a - b);
+    for (const row of uniqueRows) {
+      const node = this.getNode(row);
+      if (node != null && node.level <= 0) {
+        this.mergeCells(row, colFrom, row, colTo);
+      }
+    }
   }
 
   /** Expand/collapse tree rows to [level]. */

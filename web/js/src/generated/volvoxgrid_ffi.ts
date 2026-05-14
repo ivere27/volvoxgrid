@@ -630,6 +630,15 @@ export enum TextRenderMode {
   TEXT_RENDER_SUBPIXEL = 2,
   TEXT_RENDER_MONO = 3,
 }
+export enum ThemePreset {
+  THEME_NONE = 0,
+  THEME_CLASSIC = 1,
+  THEME_LIGHT = 2,
+  THEME_DARK = 3,
+  THEME_HIGH_CONTRAST = 4,
+  THEME_MONOKAI = 5,
+  THEME_AMBER = 6,
+}
 export enum TreeIndicatorStyle {
   TREE_INDICATOR_NONE = 0,
   TREE_INDICATOR_ARROWS = 1,
@@ -1444,6 +1453,7 @@ export const GridConfigFields = {
   "rendering": 9,
   "version": 10,
   "indicators": 11,
+  "theme_preset": 12,
 } as const;
 export const GridEventFields = {
   "grid_id": 1,

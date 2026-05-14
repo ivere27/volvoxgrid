@@ -15,6 +15,7 @@ import android.widget.ScrollView
 import android.widget.Spinner
 import android.widget.Switch
 import android.widget.TextView
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.PopupMenu
@@ -84,6 +85,16 @@ class MainActivity : AppCompatActivity() {
         spRendererMode = findViewById(R.id.spRendererMode)
         swDebug = findViewById(R.id.swDebug)
         spTextCache = findViewById(R.id.spTextCache)
+
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (gridView.cancelActiveEdit()) {
+                    return
+                }
+                isEnabled = false
+                onBackPressedDispatcher.onBackPressed()
+            }
+        })
 
         val modeAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, rendererModeOptions)
         modeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)

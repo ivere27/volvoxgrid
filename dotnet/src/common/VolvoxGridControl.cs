@@ -56,12 +56,13 @@ namespace VolvoxGrid.DotNet
             return new CornerIndicatorSlot { Kind = kind, Width = width, Visible = true };
         }
 
+        private const int DefaultRowIndicatorWidth = 40;
+
         private static List<RowIndicatorSlot> DefaultRowIndicatorSlots()
         {
             return new List<RowIndicatorSlot>
             {
-                RowIndicatorSlot(RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CURRENT, 18),
-                RowIndicatorSlot(RowIndicatorSlotKind.ROW_INDICATOR_SLOT_SELECTION, 17),
+                RowIndicatorSlot(RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NUMBERS, DefaultRowIndicatorWidth),
             };
         }
 
@@ -88,7 +89,7 @@ namespace VolvoxGrid.DotNet
 
             _config = new GridConfig();
             EnsureEditActivation().Trigger = (EditTrigger)VolvoxGridEditTrigger.KeyClick;
-            EnsureEditConfig().DefaultEditor = DefaultHostTextEditorSpec();
+            EnsureEditConfig().DefaultEditor = DefaultEngineTextEditorSpec();
             EnsureSelectionConfig().Mode = (Volvoxgrid.V1.SelectionMode)VolvoxGridSelectionMode.Free;
             EnsureSelectionConfig().Visibility = (Volvoxgrid.V1.SelectionVisibility)VolvoxGridSelectionVisibility.Always;
             EnsureSelectionConfig().Allow = true;
@@ -96,14 +97,20 @@ namespace VolvoxGrid.DotNet
             EnsureScrollConfig().Scrollbars = (ScrollBarsMode)VolvoxGridScrollBarsMode.Both;
             EnsureScrollConfig().FlingEnabled = false;
             EnsureScrollConfig().FastScroll = true;
+            EnsureScrollConfig().FlingImpulseGain = 220.0f;
+            EnsureScrollConfig().FlingFriction = 0.9f;
             EnsureRenderConfig().RendererMode = (RendererMode)VolvoxGridRendererMode.Auto;
             EnsureRenderConfig().FramePacingMode = (Volvoxgrid.V1.FramePacingMode)VolvoxFramePacingMode.Platform;
             EnsureRenderConfig().TargetFrameRateHz = 30;
+            EnsureInteractionConfig().Resize = new Volvoxgrid.V1.ResizePolicy { Columns = true, Rows = true, Uniform = false };
+            EnsureInteractionConfig().HeaderFeatures = new Volvoxgrid.V1.HeaderFeatures { Sort = true, Reorder = true, Chooser = false };
+            EnsureSpanConfig().CellSpan = (Volvoxgrid.V1.CellSpanMode)VolvoxGridCellSpanMode.Adjacent;
+            EnsureLayoutConfig().ExtendLastCol = true;
             EnsureColIndicatorTopConfig().Visible = true;
             EnsureColIndicatorTopConfig().BandRows = 1;
             EnsureColIndicatorTopConfig().CellModes = DefaultColIndicatorCellModes();
             EnsureRowIndicatorStartConfig().Visible = false;
-            EnsureRowIndicatorStartConfig().Width = 35;
+            EnsureRowIndicatorStartConfig().Width = DefaultRowIndicatorWidth;
             EnsureRowIndicatorStartConfig().Slots.AddRange(DefaultRowIndicatorSlots());
             _hostTextRenderer = new GdiTextRendererBridge();
 
@@ -592,6 +599,24 @@ namespace VolvoxGrid.DotNet
                 if (!cfg.HasScrollbars || cfg.Scrollbars != mapped)
                 {
                     cfg.Scrollbars = mapped;
+                    ApplyEngineConfig();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets or applies the last requested theme preset. Manual style changes
+        /// do not round-trip back into this cached config value.
+        /// </summary>
+        public VolvoxGridThemePreset ThemePreset
+        {
+            get { return _config.HasThemePreset ? (VolvoxGridThemePreset)_config.ThemePreset : VolvoxGridThemePreset.None; }
+            set
+            {
+                var mapped = (Volvoxgrid.V1.ThemePreset)value;
+                if (!_config.HasThemePreset || _config.ThemePreset != mapped)
+                {
+                    _config.ThemePreset = mapped;
                     ApplyEngineConfig();
                 }
             }
@@ -1673,7 +1698,8 @@ namespace VolvoxGrid.DotNet
             uint? progressColor = null,
             bool? span = null,
             VolvoxGridStickyEdge? sticky = null,
-            ListEditorParams dropdown = null)
+            ListEditorParams dropdown = null,
+            string caption = null)
         {
             if (!EnsureEngine()) return;
             try
@@ -1688,12 +1714,16 @@ namespace VolvoxGrid.DotNet
                 if (interaction.HasValue) def.Interaction = (CellInteraction)interaction.Value;
                 if (format != null) def.Format = format;
                 if (!string.IsNullOrEmpty(key)) def.Key = key;
+                if (caption != null) def.Caption = caption;
                 if (dropdown != null) def.Editor = ListEditorSpec(dropdown);
                 if (progressColor.HasValue) def.ProgressColor = progressColor.Value;
                 if (span.HasValue) def.Span = span.Value;
                 if (sticky.HasValue) def.Sticky = (StickyEdge)sticky.Value;
 
-                _client.DefineColumns(_gridId, new[] { def });
+                var columnsWithEditors = def.Editor == null && def.HasDataType
+                    ? ColumnsWithExistingEditors()
+                    : null;
+                _client.DefineColumns(_gridId, new[] { ApplyHostEditorDefault(def, columnsWithEditors) });
                 if (index >= 0 && index < _columns.Count)
                 {
                     var col = _columns[index];
@@ -1706,6 +1736,7 @@ namespace VolvoxGrid.DotNet
                     if (dataType.HasValue) col.DataType = dataType.Value;
                     if (interaction.HasValue) col.Interaction = interaction.Value;
                     if (format != null) col.Format = format;
+                    if (caption != null) col.Caption = caption;
                     if (progressColor.HasValue) col.ProgressColor = progressColor.Value;
                 }
                 _renderHost.RequestFrame();
@@ -1871,6 +1902,117 @@ namespace VolvoxGrid.DotNet
                 Owner = EditorOwner.EDITOR_OWNER_HOST_NATIVE,
                 Presentation = EditorPresentation.EDITOR_INLINE,
             };
+        }
+
+        private static EditorSpec DefaultEngineTextEditorSpec()
+        {
+            return new EditorSpec
+            {
+                Kind = EditorKind.EDITOR_TEXT,
+                Owner = EditorOwner.EDITOR_OWNER_ENGINE,
+                Presentation = EditorPresentation.EDITOR_CANVAS,
+            };
+        }
+
+        private static EditorSpec DefaultHostNumberEditorSpec(bool nullable)
+        {
+            return new EditorSpec
+            {
+                Kind = EditorKind.EDITOR_NUMBER,
+                Owner = EditorOwner.EDITOR_OWNER_HOST_NATIVE,
+                Presentation = EditorPresentation.EDITOR_INLINE,
+                Number = new NumberEditorParams { Nullable = nullable },
+            };
+        }
+
+        private static EditorSpec DefaultEngineCheckboxEditorSpec()
+        {
+            return new EditorSpec
+            {
+                Kind = EditorKind.EDITOR_CHECKBOX,
+                Owner = EditorOwner.EDITOR_OWNER_ENGINE,
+                Presentation = EditorPresentation.EDITOR_CANVAS,
+                Checkbox = new CheckboxEditorParams { ThreeState = false },
+            };
+        }
+
+        private static ColumnDef ApplyHostEditorDefault(ColumnDef def)
+        {
+            return ApplyHostEditorDefault(def, null);
+        }
+
+        private static ColumnDef ApplyHostEditorDefault(ColumnDef def, ISet<int> columnsWithEditors)
+        {
+            if (def == null || def.Editor != null || !def.HasDataType) return def;
+            if (columnsWithEditors != null && columnsWithEditors.Contains(def.Index)) return def;
+            var next = ColumnDef.ParseFrom(def.ToByteArray());
+            switch (next.DataType)
+            {
+                case ColumnDataType.COLUMN_DATA_STRING:
+                    next.Editor = DefaultHostTextEditorSpec();
+                    break;
+                case ColumnDataType.COLUMN_DATA_NUMBER:
+                case ColumnDataType.COLUMN_DATA_CURRENCY:
+                    next.Editor = DefaultHostNumberEditorSpec(next.HasNullable ? next.Nullable : true);
+                    break;
+                case ColumnDataType.COLUMN_DATA_BOOLEAN:
+                    next.Editor = DefaultEngineCheckboxEditorSpec();
+                    break;
+            }
+            return next;
+        }
+
+        private HashSet<int> ColumnsWithExistingEditors()
+        {
+            var columns = new HashSet<int>();
+            if (_client == null || _gridId == 0) return columns;
+            try
+            {
+                var schema = _client.GetSchema(_gridId);
+                foreach (var column in schema == null ? new List<ColumnDef>() : schema.Columns)
+                {
+                    if (column != null && column.Editor != null)
+                    {
+                        columns.Add(column.Index);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _lastError = ex.Message;
+            }
+            return columns;
+        }
+
+        private static List<ColumnDef> ApplyHostEditorDefaults(IEnumerable<ColumnDef> columns)
+        {
+            return (columns ?? Enumerable.Empty<ColumnDef>())
+                .Select(ApplyHostEditorDefault)
+                .Where(c => c != null)
+                .ToList();
+        }
+
+        private void ApplyHostEditorDefaultsForInferredColumns(LoadDataResult result)
+        {
+            if (result == null || result.InferredColumns == null || result.InferredColumns.Count == 0) return;
+            var columnsWithEditors = new HashSet<int>(
+                (_client.GetSchema(_gridId).Columns ?? new List<ColumnDef>())
+                    .Where(c => c != null && c.Editor != null)
+                    .Select(c => c.Index));
+            var defs = new List<ColumnDef>();
+            foreach (var column in result.InferredColumns)
+            {
+                if (column == null || !column.HasDataType || columnsWithEditors.Contains(column.Index)) continue;
+                var def = new ColumnDef
+                {
+                    Index = column.Index,
+                    DataType = column.DataType,
+                };
+                if (column.HasNullable) def.Nullable = column.Nullable;
+                var prepared = ApplyHostEditorDefault(def);
+                if (prepared != null && prepared.Editor != null) defs.Add(prepared);
+            }
+            if (defs.Count > 0) _client.DefineColumns(_gridId, defs);
         }
 
         public void SetCellCheckedState(int row, int col, VolvoxGridCheckedState state)
@@ -2253,6 +2395,67 @@ namespace VolvoxGrid.DotNet
             return result;
         }
 
+        public void AddSubtotals(
+            IList<int> amountCols,
+            IList<VolvoxGridSubtotalLevel> levels,
+            VolvoxGridAggregateType aggregate = VolvoxGridAggregateType.Sum,
+            bool clearExisting = true,
+            int mergeColFrom = -1,
+            int mergeColTo = -1)
+        {
+            if (amountCols == null || levels == null) return;
+            if (_client == null || _gridId == 0) return;
+
+            WithRedrawSuspended(delegate
+            {
+                if (amountCols.Count > 1)
+                {
+                    EnsureOutlineConfig().MultiTotals = true;
+                    _client.ConfigureGrid(_gridId, new GridConfig { Outline = new OutlineConfig { MultiTotals = true } });
+                }
+                if (clearExisting)
+                {
+                    Subtotal(VolvoxGridAggregateType.Clear, 0, 0, "", 0, 0, false);
+                }
+                bool wantMerge = mergeColFrom >= 0 && mergeColTo >= mergeColFrom;
+                foreach (var level in levels)
+                {
+                    if (level == null) continue;
+                    int groupIndex = level.GroupCol.HasValue ? level.GroupCol.Value : -1;
+                    foreach (var col in amountCols)
+                    {
+                        var result = Subtotal(
+                            aggregate,
+                            groupIndex,
+                            col,
+                            level.Caption ?? string.Empty,
+                            level.BackColor,
+                            level.ForeColor,
+                            true);
+                        if (wantMerge)
+                        {
+                            MergeSubtotalLevelZero(result, mergeColFrom, mergeColTo);
+                        }
+                    }
+                }
+            }, true);
+        }
+
+        private void MergeSubtotalLevelZero(SubtotalResult result, int colFrom, int colTo)
+        {
+            if (result == null || result.Rows == null) return;
+            var seen = new HashSet<int>();
+            foreach (int row in result.Rows)
+            {
+                if (!seen.Add(row)) continue;
+                var node = GetNode(row);
+                if (node != null && node.Level <= 0)
+                {
+                    MergeCells(row, colFrom, row, colTo);
+                }
+            }
+        }
+
         public new void AutoSize(int colFrom = 0, int colTo = -1, bool equal = false, int maxWidth = 0)
         {
             if (_client == null || _gridId == 0) return;
@@ -2466,7 +2669,8 @@ namespace VolvoxGrid.DotNet
             if (!EnsureEngine()) return;
             try
             {
-                _client.LoadData(_gridId, data ?? new byte[0]);
+                var result = _client.LoadData(_gridId, data ?? new byte[0], null);
+                if (result.Status != LoadDataStatus.LOAD_FAILED) ApplyHostEditorDefaultsForInferredColumns(result);
                 _engineManagedData = true;
                 _tableModel = null;
                 SyncRowCountFromEngine();
@@ -2481,7 +2685,8 @@ namespace VolvoxGrid.DotNet
             if (!EnsureEngine()) return;
             try
             {
-                _client.AppendData(_gridId, data ?? new byte[0]);
+                var result = _client.AppendData(_gridId, data ?? new byte[0], null);
+                if (result.Status != LoadDataStatus.LOAD_FAILED) ApplyHostEditorDefaultsForInferredColumns(result);
                 _engineManagedData = true;
                 _tableModel = null;
                 SyncRowCountFromEngine();
@@ -2660,7 +2865,7 @@ namespace VolvoxGrid.DotNet
             {
                 _tableModel = _mapper.Materialize(ResolveDataSource(_dataSource), _columns.Count == 0 ? null : BuildColumnDefinitions());
                 if (_columns.Count == 0 && _tableModel.Columns.Count > 0) PopulateColumnsFromModel(_tableModel.Columns);
-                _client.DefineColumns(_gridId, _tableModel.Columns);
+                _client.DefineColumns(_gridId, ApplyHostEditorDefaults(_tableModel.Columns));
                 _client.LoadTable(_gridId, _tableModel.RowCount, _tableModel.ColumnCount, _tableModel.FlatValues, true);
                 _client.Sort(_gridId, BuildSortColumns());
                 if (_tableModel.RowCount > 0) SelectCell(0, 0, false);
@@ -2960,7 +3165,7 @@ namespace VolvoxGrid.DotNet
             }
         }
 
-        private List<ColumnDef> BuildColumnDefinitions() => _columns.Select((c, i) => new ColumnDef { Index = i, Key = c.FieldName, Caption = c.Caption, Width = c.Width, Hidden = !c.Visible, SortOrder = (Volvoxgrid.V1.SortOrder)c.SortDirection, SortType = (SortType)c.SortType, Align = (Align)c.Alignment, DataType = (ColumnDataType)c.DataType, Interaction = (CellInteraction)c.Interaction, Format = c.Format, ProgressColor = c.ProgressColor, Editor = c.Editor }).ToList();
+        private List<ColumnDef> BuildColumnDefinitions() => ApplyHostEditorDefaults(_columns.Select((c, i) => new ColumnDef { Index = i, Key = c.FieldName, Caption = c.Caption, Width = c.Width, Hidden = !c.Visible, SortOrder = (Volvoxgrid.V1.SortOrder)c.SortDirection, SortType = (SortType)c.SortType, Align = (Align)c.Alignment, DataType = (ColumnDataType)c.DataType, Interaction = (CellInteraction)c.Interaction, Format = c.Format, ProgressColor = c.ProgressColor, Editor = c.Editor }));
 
         private List<SortColumn> BuildSortColumns() => _columns.Select((c, i) => new { c, i }).Where(x => x.c.SortDirection != VolvoxGridSortDirection.None).Select(x => new SortColumn { Col = x.i, Order = (Volvoxgrid.V1.SortOrder)x.c.SortDirection, Type = (SortType)x.c.SortType }).ToList();
 

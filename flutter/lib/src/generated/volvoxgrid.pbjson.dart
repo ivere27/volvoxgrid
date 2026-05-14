@@ -80,6 +80,26 @@ final $typed_data.Uint8List borderAppearanceDescriptor = $convert.base64Decode(
     'ChBCb3JkZXJBcHBlYXJhbmNlEhoKFkJPUkRFUl9BUFBFQVJBTkNFX0ZMQVQQABIcChhCT1JERV'
     'JfQVBQRUFSQU5DRV9SQUlTRUQQARIcChhCT1JERVJfQVBQRUFSQU5DRV9TVUJUTEUQAg==');
 
+@$core.Deprecated('Use themePresetDescriptor instead')
+const ThemePreset$json = {
+  '1': 'ThemePreset',
+  '2': [
+    {'1': 'THEME_NONE', '2': 0},
+    {'1': 'THEME_CLASSIC', '2': 1},
+    {'1': 'THEME_LIGHT', '2': 2},
+    {'1': 'THEME_DARK', '2': 3},
+    {'1': 'THEME_HIGH_CONTRAST', '2': 4},
+    {'1': 'THEME_MONOKAI', '2': 5},
+    {'1': 'THEME_AMBER', '2': 6},
+  ],
+};
+
+/// Descriptor for `ThemePreset`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List themePresetDescriptor = $convert.base64Decode(
+    'CgtUaGVtZVByZXNldBIOCgpUSEVNRV9OT05FEAASEQoNVEhFTUVfQ0xBU1NJQxABEg8KC1RIRU'
+    '1FX0xJR0hUEAISDgoKVEhFTUVfREFSSxADEhcKE1RIRU1FX0hJR0hfQ09OVFJBU1QQBBIRCg1U'
+    'SEVNRV9NT05PS0FJEAUSDwoLVEhFTUVfQU1CRVIQBg==');
+
 @$core.Deprecated('Use textEffectDescriptor instead')
 const TextEffect$json = {
   '1': 'TextEffect',
@@ -4127,6 +4147,19 @@ const GridConfig$json = {
       '6': '.volvoxgrid.v1.IndicatorsConfig',
       '10': 'indicators'
     },
+    {
+      '1': 'theme_preset',
+      '3': 12,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.ThemePreset',
+      '9': 0,
+      '10': 'themePreset',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_theme_preset'},
   ],
 };
 
@@ -4142,8 +4175,9 @@ final $typed_data.Uint8List gridConfigDescriptor = $convert.base64Decode(
     'NwYW4SQgoLaW50ZXJhY3Rpb24YCCABKAsyIC52b2x2b3hncmlkLnYxLkludGVyYWN0aW9uQ29u'
     'ZmlnUgtpbnRlcmFjdGlvbhI5CglyZW5kZXJpbmcYCSABKAsyGy52b2x2b3hncmlkLnYxLlJlbm'
     'RlckNvbmZpZ1IJcmVuZGVyaW5nEhgKB3ZlcnNpb24YCiABKAlSB3ZlcnNpb24SPwoKaW5kaWNh'
-    'dG9ycxgLIAEoCzIfLnZvbHZveGdyaWQudjEuSW5kaWNhdG9yc0NvbmZpZ1IKaW5kaWNhdG9ycw'
-    '==');
+    'dG9ycxgLIAEoCzIfLnZvbHZveGdyaWQudjEuSW5kaWNhdG9yc0NvbmZpZ1IKaW5kaWNhdG9ycx'
+    'JCCgx0aGVtZV9wcmVzZXQYDCABKA4yGi52b2x2b3hncmlkLnYxLlRoZW1lUHJlc2V0SABSC3Ro'
+    'ZW1lUHJlc2V0iAEBQg8KDV90aGVtZV9wcmVzZXQ=');
 
 @$core.Deprecated('Use layoutConfigDescriptor instead')
 const LayoutConfig$json = {

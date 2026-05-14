@@ -61,6 +61,7 @@ import io.github.ivere27.volvoxgrid.SelectionState;
 import io.github.ivere27.volvoxgrid.SpanConfig;
 import io.github.ivere27.volvoxgrid.SpanCompareMode;
 import io.github.ivere27.volvoxgrid.TextSelection;
+import io.github.ivere27.volvoxgrid.ThemePreset;
 import io.github.ivere27.volvoxgrid.TreeIndicatorStyle;
 import io.github.ivere27.volvoxgrid.UpdateCellsRequest;
 import java.io.ByteArrayOutputStream;
@@ -288,9 +289,7 @@ public final class VolvoxGridDesktopTuiExample {
         int width,
         int height
     ) throws SynurangDesktopBridge.SynurangBridgeException {
-        GridConfig config = GridConfig.newBuilder()
-            .setLayout(LayoutConfig.newBuilder().setRows(2).setCols(2).build())
-            .setIndicators(VolvoxGridDesktopController.defaultIndicatorsConfig())
+        GridConfig config = VolvoxGridDesktopController.defaultGridConfigBuilder(2, 2)
             .setRendering(
                 RenderConfig.newBuilder()
                     .setRendererMode(RendererMode.RENDERER_TUI)
@@ -307,7 +306,7 @@ public final class VolvoxGridDesktopTuiExample {
                 .setConfig(config)
                 .build()
         );
-        return new VolvoxGridDesktopController(client, response.getGridId());
+        return new VolvoxGridDesktopController(client, response.getGridId(), false);
     }
 
     private static void loadDemo(VolvoxGridDesktopController controller, DemoKind demo)
@@ -757,6 +756,7 @@ public final class VolvoxGridDesktopTuiExample {
         int outlineWidth = hierarchyTuiOutlineWidth(maxOutlineDepth);
         int expanderWidth = hierarchyTuiExpanderWidth(maxOutlineDepth);
         return GridConfig.newBuilder()
+            .setThemePreset(ThemePreset.THEME_AMBER)
             .setSelection(
                 SelectionConfig.newBuilder()
                     .setMode(SelectionMode.SELECTION_FREE)

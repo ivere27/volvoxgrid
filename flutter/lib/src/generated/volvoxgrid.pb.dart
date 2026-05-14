@@ -5505,6 +5505,7 @@ class GridConfig extends $pb.GeneratedMessage {
     RenderConfig? rendering,
     $core.String? version,
     IndicatorsConfig? indicators,
+    ThemePreset? themePreset,
   }) {
     final result = create();
     if (layout != null) result.layout = layout;
@@ -5518,6 +5519,7 @@ class GridConfig extends $pb.GeneratedMessage {
     if (rendering != null) result.rendering = rendering;
     if (version != null) result.version = version;
     if (indicators != null) result.indicators = indicators;
+    if (themePreset != null) result.themePreset = themePreset;
     return result;
   }
 
@@ -5555,6 +5557,8 @@ class GridConfig extends $pb.GeneratedMessage {
     ..aOS(10, _omitFieldNames ? '' : 'version')
     ..aOM<IndicatorsConfig>(11, _omitFieldNames ? '' : 'indicators',
         subBuilder: IndicatorsConfig.create)
+    ..aE<ThemePreset>(12, _omitFieldNames ? '' : 'themePreset',
+        enumValues: ThemePreset.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -5693,6 +5697,18 @@ class GridConfig extends $pb.GeneratedMessage {
   void clearIndicators() => $_clearField(11);
   @$pb.TagNumber(11)
   IndicatorsConfig ensureIndicators() => $_ensure(10);
+
+  /// Apply a built-in visual theme before the other fields in this Configure()
+  /// call. See ThemePreset for resolution rules. Not stored — GetConfig()
+  /// returns the resolved style/selection/scrolling/indicators.
+  @$pb.TagNumber(12)
+  ThemePreset get themePreset => $_getN(11);
+  @$pb.TagNumber(12)
+  set themePreset(ThemePreset value) => $_setField(12, value);
+  @$pb.TagNumber(12)
+  $core.bool hasThemePreset() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearThemePreset() => $_clearField(12);
 }
 
 /// ── Layout ──

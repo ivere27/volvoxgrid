@@ -5,11 +5,6 @@ import io.github.ivere27.volvoxgrid.CellInteraction;
 import io.github.ivere27.volvoxgrid.CreateRequest;
 import io.github.ivere27.volvoxgrid.CreateResponse;
 import io.github.ivere27.volvoxgrid.DestroyRequest;
-import io.github.ivere27.volvoxgrid.EditConfig;
-import io.github.ivere27.volvoxgrid.EditorKind;
-import io.github.ivere27.volvoxgrid.EditorOwner;
-import io.github.ivere27.volvoxgrid.EditorPresentation;
-import io.github.ivere27.volvoxgrid.EditorSpec;
 import io.github.ivere27.volvoxgrid.GridEvent;
 import io.github.ivere27.volvoxgrid.GridConfig;
 import io.github.ivere27.volvoxgrid.FramePacingMode;
@@ -361,24 +356,12 @@ public final class VolvoxGridDesktopExample {
         int height = Math.max(gridPanel.getHeight(), 600);
         float scale = Math.max((float) Toolkit.getDefaultToolkit().getScreenResolution() / 96.0f, 1.0f);
 
-        GridConfig config = GridConfig.newBuilder()
-            .setLayout(
-                LayoutConfig.newBuilder()
-                    .setRows(2)
-                    .setCols(2)
-                    .build()
-            )
-            .setIndicators(VolvoxGridDesktopController.defaultIndicatorsConfig())
+        GridConfig config = VolvoxGridDesktopController.defaultGridConfigBuilder(2, 2)
             .setRendering(
                 RenderConfig.newBuilder()
                     .setRendererMode(rendererMode)
                     .setFramePacingMode(FramePacingMode.FRAME_PACING_MODE_PLATFORM)
                     .setScrollBlit(scrollBlitEnabled)
-                    .build()
-            )
-            .setEditing(
-                EditConfig.newBuilder()
-                    .setDefaultEditor(defaultHostTextEditor())
                     .build()
             )
             .build();
@@ -392,14 +375,6 @@ public final class VolvoxGridDesktopExample {
                 .build()
         );
         return response.getGridId();
-    }
-
-    private static EditorSpec defaultHostTextEditor() {
-        return EditorSpec.newBuilder()
-            .setKind(EditorKind.EDITOR_TEXT)
-            .setOwner(EditorOwner.EDITOR_OWNER_HOST_NATIVE)
-            .setPresentation(EditorPresentation.EDITOR_INLINE)
-            .build();
     }
 
     private void applyEditableToggle() {

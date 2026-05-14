@@ -511,6 +511,7 @@ func buildHierarchyTuiConfig(rows, cols int, maxOutlineDepth, maxOutlineLevel in
 	outlineWidth := hierarchyTuiOutlineWidth(maxOutlineDepth)
 	expanderWidth := hierarchyTuiExpanderWidth(maxOutlineDepth)
 	return finalizeTuiConfig(&pb.GridConfig{
+		ThemePreset: ptr(pb.ThemePreset_THEME_AMBER),
 		Selection: &pb.SelectionConfig{
 			Mode: ptr(pb.SelectionMode_SELECTION_FREE),
 		},
