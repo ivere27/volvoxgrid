@@ -171,7 +171,9 @@ fn default_platform_text_renderer() -> Option<Box<dyn volvoxgrid_engine::text::T
 fn install_default_platform_text_renderer(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) {
     if let Some(renderer) = default_platform_text_renderer() {
         let cap = grid.text_layout_cache_cap;
+        let fallback_enabled = grid.font_fallback_enabled;
         let text_engine = grid.ensure_text_engine();
+        text_engine.set_font_fallback_enabled(fallback_enabled);
         text_engine.set_external_renderer(Some(renderer));
         text_engine.set_layout_cache_cap(cap);
     }
@@ -8199,13 +8201,18 @@ fn clear_grid_text_cache(grid_id: i64) {
 fn set_grid_external_text_renderer(grid_id: i64, registration: Option<TextRendererRegistration>) {
     let _ = SHARED_GRID_MANAGER.with_grid(grid_id, |grid| match registration {
         Some(reg) => {
-            grid.ensure_text_engine()
+            let fallback_enabled = grid.font_fallback_enabled;
+            let text_engine = grid.ensure_text_engine();
+            text_engine.set_font_fallback_enabled(fallback_enabled);
+            text_engine
                 .set_external_renderer(Some(Box::new(ffi_text_renderer_from_registration(reg))));
         }
         None => {
             if let Some(renderer) = default_platform_text_renderer() {
                 let cap = grid.text_layout_cache_cap;
+                let fallback_enabled = grid.font_fallback_enabled;
                 let text_engine = grid.ensure_text_engine();
+                text_engine.set_font_fallback_enabled(fallback_enabled);
                 text_engine.set_external_renderer(Some(renderer));
                 text_engine.set_layout_cache_cap(cap);
             } else if let Some(text_engine) = &mut grid.text_engine {

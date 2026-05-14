@@ -1116,6 +1116,15 @@ impl GpuRenderer {
         self.glyph_atlas.set_external_rasterizer(r);
     }
 
+    pub fn set_font_fallback_enabled(&mut self, enabled: bool) {
+        if self.text_engine.font_fallback_enabled() == enabled {
+            return;
+        }
+        self.text_engine.set_font_fallback_enabled(enabled);
+        self.glyph_atlas.set_external_rasterizer_enabled(enabled);
+        self.glyph_pos_cache.clear();
+    }
+
     /// Render to the configured GPU surface.
     ///
     /// Returns `RenderResult`: dirty rect, per-layer times (us), zone cell counts.
@@ -1334,6 +1343,7 @@ impl GpuRenderer {
             self.text_engine
                 .set_layout_cache_cap(grid.text_layout_cache_cap);
         }
+        self.set_font_fallback_enabled(grid.font_fallback_enabled);
 
         self.text_engine.set_render_options(
             grid.style.text_render_mode,

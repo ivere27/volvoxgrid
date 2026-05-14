@@ -10655,9 +10655,13 @@ type RenderConfig struct {
 	// CPU scroll-blit optimization: reuses previously-rendered pixels
 	// when only scroll position changes. Only valid when no animation,
 	// no editing, no background image, and not right-to-left.
-	ScrollBlit    *bool `protobuf:"varint,11,opt,name=scroll_blit,json=scrollBlit,proto3,oneof" json:"scroll_blit,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	ScrollBlit *bool `protobuf:"varint,11,opt,name=scroll_blit,json=scrollBlit,proto3,oneof" json:"scroll_blit,omitempty"`
+	// Enables font fallback for missing glyphs. When false, missing glyphs are
+	// skipped instead of using host/OS fallback or the engine's final tofu fallback.
+	// The debug overlay always uses its internal diagnostic font.
+	FontFallbackEnabled *bool `protobuf:"varint,12,opt,name=font_fallback_enabled,json=fontFallbackEnabled,proto3,oneof" json:"font_fallback_enabled,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *RenderConfig) Reset() {
@@ -10763,6 +10767,13 @@ func (x *RenderConfig) GetLayerProfiling() bool {
 func (x *RenderConfig) GetScrollBlit() bool {
 	if x != nil && x.ScrollBlit != nil {
 		return *x.ScrollBlit
+	}
+	return false
+}
+
+func (x *RenderConfig) GetFontFallbackEnabled() bool {
+	if x != nil && x.FontFallbackEnabled != nil {
+		return *x.FontFallbackEnabled
 	}
 	return false
 }
@@ -27125,7 +27136,7 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\n" +
 	"_drop_modeB\x16\n" +
 	"\x14_decision_timeout_msB\x1e\n" +
-	"\x1c_compare_response_timeout_ms\"\xda\x06\n" +
+	"\x1c_compare_response_timeout_ms\"\xad\a\n" +
 	"\fRenderConfig\x12E\n" +
 	"\rrenderer_mode\x18\x01 \x01(\x0e2\x1b.volvoxgrid.v1.RendererModeH\x00R\frendererMode\x88\x01\x01\x12(\n" +
 	"\rdebug_overlay\x18\x02 \x01(\bH\x01R\fdebugOverlay\x88\x01\x01\x120\n" +
@@ -27140,7 +27151,8 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	" \x01(\bH\tR\x0elayerProfiling\x88\x01\x01\x12$\n" +
 	"\vscroll_blit\x18\v \x01(\bH\n" +
 	"R\n" +
-	"scrollBlit\x88\x01\x01B\x10\n" +
+	"scrollBlit\x88\x01\x01\x127\n" +
+	"\x15font_fallback_enabled\x18\f \x01(\bH\vR\x13fontFallbackEnabled\x88\x01\x01B\x10\n" +
 	"\x0e_renderer_modeB\x10\n" +
 	"\x0e_debug_overlayB\x14\n" +
 	"\x12_animation_enabledB\x18\n" +
@@ -27151,7 +27163,8 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\x15_target_frame_rate_hzB\x14\n" +
 	"\x12_render_layer_maskB\x12\n" +
 	"\x10_layer_profilingB\x0e\n" +
-	"\f_scroll_blit\"R\n" +
+	"\f_scroll_blitB\x18\n" +
+	"\x16_font_fallback_enabled\"R\n" +
 	"\x15ColIndicatorCellModes\x129\n" +
 	"\x05modes\x18\x01 \x03(\x0e2#.volvoxgrid.v1.ColIndicatorCellModeR\x05modes\"\xfe\x01\n" +
 	"\x10RowIndicatorSlot\x12<\n" +

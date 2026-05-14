@@ -7308,6 +7308,7 @@ class RenderConfig extends $pb.GeneratedMessage {
     $fixnum.Int64? renderLayerMask,
     $core.bool? layerProfiling,
     $core.bool? scrollBlit,
+    $core.bool? fontFallbackEnabled,
   }) {
     final result = create();
     if (rendererMode != null) result.rendererMode = rendererMode;
@@ -7323,6 +7324,8 @@ class RenderConfig extends $pb.GeneratedMessage {
     if (renderLayerMask != null) result.renderLayerMask = renderLayerMask;
     if (layerProfiling != null) result.layerProfiling = layerProfiling;
     if (scrollBlit != null) result.scrollBlit = scrollBlit;
+    if (fontFallbackEnabled != null)
+      result.fontFallbackEnabled = fontFallbackEnabled;
     return result;
   }
 
@@ -7353,6 +7356,7 @@ class RenderConfig extends $pb.GeneratedMessage {
     ..aInt64(9, _omitFieldNames ? '' : 'renderLayerMask')
     ..aOB(10, _omitFieldNames ? '' : 'layerProfiling')
     ..aOB(11, _omitFieldNames ? '' : 'scrollBlit')
+    ..aOB(12, _omitFieldNames ? '' : 'fontFallbackEnabled')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -7477,6 +7481,18 @@ class RenderConfig extends $pb.GeneratedMessage {
   $core.bool hasScrollBlit() => $_has(10);
   @$pb.TagNumber(11)
   void clearScrollBlit() => $_clearField(11);
+
+  /// Enables font fallback for missing glyphs. When false, missing glyphs are
+  /// skipped instead of using host/OS fallback or the engine's final tofu fallback.
+  /// The debug overlay always uses its internal diagnostic font.
+  @$pb.TagNumber(12)
+  $core.bool get fontFallbackEnabled => $_getBF(11);
+  @$pb.TagNumber(12)
+  set fontFallbackEnabled($core.bool value) => $_setBool(11, value);
+  @$pb.TagNumber(12)
+  $core.bool hasFontFallbackEnabled() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearFontFallbackEnabled() => $_clearField(12);
 }
 
 class ColIndicatorCellModes extends $pb.GeneratedMessage {

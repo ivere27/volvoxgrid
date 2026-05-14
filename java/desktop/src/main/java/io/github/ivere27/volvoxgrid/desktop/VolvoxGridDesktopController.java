@@ -1276,6 +1276,21 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
     }
 
     @Override
+    public boolean fontFallbackEnabled() throws SynurangDesktopBridge.SynurangBridgeException {
+        RenderConfig rendering = getConfig().getRendering();
+        return !rendering.hasFontFallbackEnabled() || rendering.getFontFallbackEnabled();
+    }
+
+    @Override
+    public void setFontFallbackEnabled(boolean enabled) throws SynurangDesktopBridge.SynurangBridgeException {
+        configure(
+            GridConfig.newBuilder()
+                .setRendering(RenderConfig.newBuilder().setFontFallbackEnabled(enabled).build())
+                .build()
+        );
+    }
+
+    @Override
     public long renderLayerMask() throws SynurangDesktopBridge.SynurangBridgeException {
         RenderConfig rendering = getConfig().getRendering();
         return rendering.hasRenderLayerMask() ? rendering.getRenderLayerMask() : -1L;

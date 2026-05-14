@@ -17,6 +17,7 @@ type FontSystem = ();
 type SwashCache = ();
 
 // Re-export shared types so existing `glyph_atlas::` paths keep working.
+use crate::glyph_rasterizer::rasterize_final_fallback_glyph;
 pub use crate::glyph_rasterizer::{ExternalGlyphRasterizer, GlyphBitmap};
 
 /// Atlas page dimensions (power-of-two, fits most GPUs).
@@ -112,21 +113,36 @@ impl AtlasPage {
 
 /// Key for caching rasterized glyphs.
 ///
-/// For glyphs rasterized via SwashCache, `ext_char` is `None`.
-/// For glyphs rasterized via the external rasterizer (e.g. Canvas2D),
-/// `ext_char` holds the actual character so that different characters
-/// sharing the same `.notdef` cache_key get separate atlas entries.
+/// Fallback glyph sources include the actual character so different characters
+/// sharing the same `.notdef` cache key get separate atlas entries.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+enum GlyphSource {
+    Font,
+    External(char),
+    FinalFallback(char),
+}
+
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 struct GlyphKey {
     cache_key: CacheKey,
-    ext_char: Option<char>,
+    source: GlyphSource,
+}
+
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+struct FallbackGlyphKey {
+    ch: char,
+    font_size_px: u16,
+    bold: bool,
+    italic: bool,
 }
 
 /// GPU glyph atlas manager.
 pub struct GlyphAtlas {
     pages: Vec<AtlasPage>,
     cache: HashMap<GlyphKey, GlyphEntry>,
+    fallback_cache: HashMap<FallbackGlyphKey, GlyphEntry>,
     external_rasterizer: Option<Box<dyn ExternalGlyphRasterizer>>,
+    external_rasterizer_enabled: bool,
     /// Pre-rasterised 7x13 bitmap-font glyphs for the debug overlay.
     /// Stored as `(scale, entries)` where each of the 95 printable ASCII
     /// chars (0x20..=0x7E) maps to an atlas GlyphEntry.
@@ -138,7 +154,9 @@ impl GlyphAtlas {
         Self {
             pages: vec![AtlasPage::new()],
             cache: HashMap::new(),
+            fallback_cache: HashMap::new(),
             external_rasterizer: None,
+            external_rasterizer_enabled: true,
             bitmap_font: None,
         }
     }
@@ -167,7 +185,7 @@ impl GlyphAtlas {
     pub fn get_glyph(&self, cache_key: CacheKey) -> Option<&GlyphEntry> {
         self.cache.get(&GlyphKey {
             cache_key,
-            ext_char: None,
+            source: GlyphSource::Font,
         })
     }
 
@@ -183,7 +201,7 @@ impl GlyphAtlas {
     ) -> Option<GlyphEntry> {
         let key = GlyphKey {
             cache_key,
-            ext_char: None,
+            source: GlyphSource::Font,
         };
         if let Some(entry) = self.cache.get(&key) {
             return Some(*entry);
@@ -274,6 +292,7 @@ impl GlyphAtlas {
     /// Clear all cached glyphs (e.g. on font change).
     pub fn clear(&mut self) {
         self.cache.clear();
+        self.fallback_cache.clear();
         self.pages.clear();
         self.pages.push(AtlasPage::new());
         self.bitmap_font = None;
@@ -368,17 +387,25 @@ impl GlyphAtlas {
     /// Register an external glyph rasterizer (e.g. Canvas2D on WASM).
     pub fn set_external_rasterizer(&mut self, r: Box<dyn ExternalGlyphRasterizer>) {
         self.external_rasterizer = Some(r);
+        self.clear();
+    }
+
+    pub fn set_external_rasterizer_enabled(&mut self, enabled: bool) {
+        if self.external_rasterizer_enabled != enabled {
+            self.external_rasterizer_enabled = enabled;
+            self.clear();
+        }
     }
 
     /// Remove the external rasterizer.
     pub fn clear_external_rasterizer(&mut self) {
         self.external_rasterizer = None;
+        self.clear();
     }
 
     /// Pack an alpha bitmap into the atlas and return a `GlyphEntry`.
-    fn pack_alpha_bitmap(
+    fn pack_alpha_bitmap_uncached(
         &mut self,
-        key: GlyphKey,
         w: u32,
         h: u32,
         offset_x: i32,
@@ -403,6 +430,22 @@ impl GlyphAtlas {
             offset_y,
             advance_width,
         };
+        entry
+    }
+
+    /// Pack an alpha bitmap into the atlas, cache it, and return a `GlyphEntry`.
+    fn pack_alpha_bitmap(
+        &mut self,
+        key: GlyphKey,
+        w: u32,
+        h: u32,
+        offset_x: i32,
+        offset_y: i32,
+        alpha_data: &[u8],
+        advance_width: Option<f32>,
+    ) -> GlyphEntry {
+        let entry =
+            self.pack_alpha_bitmap_uncached(w, h, offset_x, offset_y, alpha_data, advance_width);
         self.cache.insert(key, entry);
         entry
     }
@@ -426,13 +469,16 @@ impl GlyphAtlas {
         // external rasterizer when available.
         let is_notdef = cache_key.glyph_id == 0;
         if is_notdef {
+            if !self.external_rasterizer_enabled {
+                return None;
+            }
             if let Some(entry) = self
                 .try_external_rasterize(cache_key, character, font_name, font_size, bold, italic)
             {
                 return Some(entry);
             }
-            // External rasterizer unavailable or returned None — fall through
-            // to SwashCache (renders tofu).
+            return self
+                .try_final_fallback_rasterize(cache_key, character, font_size, bold, italic);
         }
 
         // Try normal SwashCache path.
@@ -440,8 +486,16 @@ impl GlyphAtlas {
             return Some(entry);
         }
 
-        // SwashCache returned None — try external rasterizer as last resort.
+        if !self.external_rasterizer_enabled {
+            return None;
+        }
+
+        // SwashCache returned None — try external rasterizer and then the
+        // procedural final fallback.
         self.try_external_rasterize(cache_key, character, font_name, font_size, bold, italic)
+            .or_else(|| {
+                self.try_final_fallback_rasterize(cache_key, character, font_size, bold, italic)
+            })
     }
 
     /// Attempt to rasterize a character via the external rasterizer.
@@ -459,10 +513,13 @@ impl GlyphAtlas {
         // .notdef cache_key get separate atlas entries.
         let key = GlyphKey {
             cache_key,
-            ext_char: Some(ch),
+            source: GlyphSource::External(ch),
         };
         if let Some(entry) = self.cache.get(&key) {
             return Some(*entry);
+        }
+        if !self.external_rasterizer_enabled {
+            return None;
         }
         let rasterizer = self.external_rasterizer.as_mut()?;
         let bitmap = rasterizer.rasterize_glyph(ch, font_name, font_size, bold, italic)?;
@@ -488,6 +545,94 @@ impl GlyphAtlas {
             &bitmap.alpha_data,
             bitmap.advance_width,
         ))
+    }
+
+    fn try_final_fallback_rasterize(
+        &mut self,
+        cache_key: CacheKey,
+        character: Option<char>,
+        font_size: f32,
+        bold: bool,
+        italic: bool,
+    ) -> Option<GlyphEntry> {
+        let ch = character?;
+        let key = GlyphKey {
+            cache_key,
+            source: GlyphSource::FinalFallback(ch),
+        };
+        if let Some(entry) = self.cache.get(&key) {
+            return Some(*entry);
+        }
+        let bitmap = rasterize_final_fallback_glyph(ch, font_size, bold, italic);
+        if bitmap.width == 0 || bitmap.height == 0 {
+            let entry = GlyphEntry {
+                page: 0,
+                uv: [0.0, 0.0, 0.0, 0.0],
+                width: 0,
+                height: 0,
+                offset_x: bitmap.offset_x,
+                offset_y: bitmap.offset_y,
+                advance_width: bitmap.advance_width,
+            };
+            self.cache.insert(key, entry);
+            return Some(entry);
+        }
+        Some(self.pack_alpha_bitmap(
+            key,
+            bitmap.width,
+            bitmap.height,
+            bitmap.offset_x,
+            bitmap.offset_y,
+            &bitmap.alpha_data,
+            bitmap.advance_width,
+        ))
+    }
+
+    pub fn final_fallback_glyph(
+        &mut self,
+        ch: char,
+        font_size: f32,
+        bold: bool,
+        italic: bool,
+    ) -> GlyphEntry {
+        let font_size_px = if font_size.is_finite() && font_size > 0.0 {
+            font_size.round().clamp(1.0, u16::MAX as f32) as u16
+        } else {
+            13
+        };
+        let key = FallbackGlyphKey {
+            ch,
+            font_size_px,
+            bold,
+            italic,
+        };
+        if let Some(entry) = self.fallback_cache.get(&key) {
+            return *entry;
+        }
+        let bitmap = rasterize_final_fallback_glyph(ch, font_size, bold, italic);
+        let (width, height) = (bitmap.width, bitmap.height);
+        let entry = if width == 0 || height == 0 {
+            GlyphEntry {
+                page: 0,
+                uv: [0.0, 0.0, 0.0, 0.0],
+                width,
+                height,
+                offset_x: bitmap.offset_x,
+                offset_y: bitmap.offset_y,
+                advance_width: bitmap.advance_width,
+            }
+        } else {
+            self.pack_alpha_bitmap_uncached(
+                width,
+                height,
+                bitmap.offset_x,
+                bitmap.offset_y,
+                &bitmap.alpha_data,
+                bitmap.advance_width,
+            )
+        };
+        self.fallback_cache.insert(key, entry);
+        entry
     }
 }
 
@@ -516,7 +661,7 @@ pub fn layout_text_glyphs(
         return;
     }
 
-    let has_external = atlas.external_rasterizer.is_some();
+    let fallback_enabled = atlas.external_rasterizer_enabled;
 
     for run in buffer.layout_runs() {
         let run_y = y + run.line_y;
@@ -525,7 +670,7 @@ pub fn layout_text_glyphs(
         let mut x_adjust: f32 = 0.0;
         for glyph in run.glyphs.iter() {
             let physical = glyph.physical((x, run_y), 1.0);
-            let entry = if has_external {
+            let entry = if fallback_enabled {
                 // Extract the character from the original text using cosmic-text's
                 // start field (byte index into the source string).
                 let character = text.get(glyph.start..).and_then(|s| s.chars().next());
@@ -539,6 +684,8 @@ pub fn layout_text_glyphs(
                     bold,
                     italic,
                 )
+            } else if physical.cache_key.glyph_id == 0 {
+                None
             } else {
                 atlas.rasterize_glyph(font_system, swash_cache, physical.cache_key)
             };

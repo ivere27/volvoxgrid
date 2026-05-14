@@ -281,6 +281,20 @@ namespace VolvoxGrid.DotNet
             }
         }
 
+        public bool FontFallbackEnabled
+        {
+            get { return _config.Rendering == null || !_config.Rendering.HasFontFallbackEnabled || _config.Rendering.FontFallbackEnabled; }
+            set
+            {
+                var cfg = EnsureRenderConfig();
+                if (!cfg.HasFontFallbackEnabled || cfg.FontFallbackEnabled != value)
+                {
+                    cfg.FontFallbackEnabled = value;
+                    ApplyEngineConfig();
+                }
+            }
+        }
+
         public object DataSource
         {
             get { return _dataSource; }
@@ -1454,6 +1468,7 @@ namespace VolvoxGrid.DotNet
             if (source.HasRenderLayerMask) copy.RenderLayerMask = source.RenderLayerMask;
             if (source.HasLayerProfiling) copy.LayerProfiling = source.LayerProfiling;
             if (source.HasScrollBlit) copy.ScrollBlit = source.ScrollBlit;
+            if (source.HasFontFallbackEnabled) copy.FontFallbackEnabled = source.FontFallbackEnabled;
             return copy;
         }
 

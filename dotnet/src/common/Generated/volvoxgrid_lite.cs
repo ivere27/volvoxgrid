@@ -11629,6 +11629,9 @@ namespace Volvoxgrid.V1
         private bool? _scrollBlit;
         public bool ScrollBlit { get { return _scrollBlit.GetValueOrDefault(); } set { _scrollBlit = value; } }
         public bool HasScrollBlit { get { return _scrollBlit.HasValue; } }
+        private bool? _fontFallbackEnabled;
+        public bool FontFallbackEnabled { get { return _fontFallbackEnabled.GetValueOrDefault(); } set { _fontFallbackEnabled = value; } }
+        public bool HasFontFallbackEnabled { get { return _fontFallbackEnabled.HasValue; } }
 
         // ── Serialization ──
 
@@ -11657,6 +11660,8 @@ namespace Volvoxgrid.V1
                 w.WriteBool(10, _layerProfiling.Value);
             if (_scrollBlit.HasValue)
                 w.WriteBool(11, _scrollBlit.Value);
+            if (_fontFallbackEnabled.HasValue)
+                w.WriteBool(12, _fontFallbackEnabled.Value);
             return w.ToArray();
         }
 
@@ -11685,6 +11690,7 @@ namespace Volvoxgrid.V1
                     case 9: msg.RenderLayerMask = r.ReadInt64(); break;
                     case 10: msg.LayerProfiling = r.ReadBool(); break;
                     case 11: msg.ScrollBlit = r.ReadBool(); break;
+                    case 12: msg.FontFallbackEnabled = r.ReadBool(); break;
                     default: r.SkipField(wire); break;
                 }
             }

@@ -1378,6 +1378,12 @@ class VolvoxGridController(
             .build())
     }
 
+    fun setFontFallbackEnabled(enabled: Boolean) {
+        configure(GridConfig.newBuilder()
+            .setRendering(RenderConfig.newBuilder().setFontFallbackEnabled(enabled).build())
+            .build())
+    }
+
     fun setTextLayoutCacheCap(cap: Int) {
         configure(GridConfig.newBuilder()
             .setRendering(
@@ -1394,6 +1400,11 @@ class VolvoxGridController(
 
     fun scrollBlitEnabled(): Boolean {
         return getConfig().rendering.scrollBlit
+    }
+
+    fun fontFallbackEnabled(): Boolean {
+        val rendering = getConfig().rendering
+        return !rendering.hasFontFallbackEnabled() || rendering.fontFallbackEnabled
     }
 
     fun textLayoutCacheCap(): Int {

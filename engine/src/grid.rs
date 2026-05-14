@@ -343,6 +343,8 @@ pub struct VolvoxGrid {
     pub text_engine: Option<TextEngine>,
     /// Configured text layout cache capacity, applied to `text_engine` on init.
     pub text_layout_cache_cap: usize,
+    /// Whether missing glyphs may use host/OS fallback or engine final fallback.
+    pub font_fallback_enabled: bool,
     // ── Compatibility Properties ────────────────────────────────────
     /// Whether bulk bind/load writes auto-fit row heights / column widths.
     ///
@@ -866,6 +868,7 @@ impl VolvoxGrid {
             // Text engine (lazily initialized)
             text_engine: None,
             text_layout_cache_cap: DEFAULT_LAYOUT_CACHE_CAP,
+            font_fallback_enabled: true,
 
             // Compatibility defaults
             auto_resize: true,
@@ -2435,9 +2438,18 @@ impl VolvoxGrid {
         if self.text_engine.is_none() {
             let mut te = TextEngine::new();
             te.set_layout_cache_cap(self.text_layout_cache_cap);
+            te.set_font_fallback_enabled(self.font_fallback_enabled);
             self.text_engine = Some(te);
         }
         self.text_engine.as_mut().unwrap()
+    }
+
+    pub fn set_font_fallback_enabled(&mut self, enabled: bool) {
+        self.font_fallback_enabled = enabled;
+        if let Some(te) = &mut self.text_engine {
+            te.set_font_fallback_enabled(enabled);
+        }
+        self.mark_dirty();
     }
 
     pub fn set_text_layout_cache_cap(&mut self, cap: i32) {

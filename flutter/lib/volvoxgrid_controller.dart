@@ -1591,6 +1591,12 @@ class VolvoxGridController extends ChangeNotifier {
         GridConfig()..rendering = (RenderConfig()..scrollBlit = enabled));
   }
 
+  /// Enable or disable font fallback for missing glyphs.
+  Future<void> setFontFallbackEnabled(bool enabled) async {
+    await _configure(GridConfig()
+      ..rendering = (RenderConfig()..fontFallbackEnabled = enabled));
+  }
+
   /// Set the render layer visibility bitmask.
   ///
   /// Each bit corresponds to a [RenderLayerBit] position.
@@ -1642,6 +1648,13 @@ class VolvoxGridController extends ChangeNotifier {
   Future<bool> scrollBlitEnabled() async {
     final config = await _getConfig();
     return config.rendering.scrollBlit;
+  }
+
+  /// Get whether font fallback is enabled.
+  Future<bool> fontFallbackEnabled() async {
+    final config = await _getConfig();
+    final rendering = config.rendering;
+    return !rendering.hasFontFallbackEnabled() || rendering.fontFallbackEnabled;
   }
 
   /// Get text layout cache capacity.

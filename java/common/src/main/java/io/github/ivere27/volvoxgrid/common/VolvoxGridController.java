@@ -71,6 +71,9 @@ public interface VolvoxGridController {
     void setRendererBackend(RendererBackend backend);
     RendererBackend rendererBackend();
 
+    boolean fontFallbackEnabled();
+    void setFontFallbackEnabled(boolean enabled);
+
     long renderLayerMask();
     void setRenderLayerMask(long mask);
 

@@ -2000,6 +2000,9 @@ impl VolvoxGrid {
         if let Some(v) = rc.text_layout_cache_cap {
             self.set_text_layout_cache_cap(v);
         }
+        if let Some(v) = rc.font_fallback_enabled {
+            self.set_font_fallback_enabled(v);
+        }
         if let Some(v) = rc.present_mode {
             self.present_mode = v;
         }
@@ -2377,6 +2380,7 @@ impl VolvoxGrid {
             render_layer_mask: Some(self.render_layer_mask as i64),
             layer_profiling: Some(self.layer_profiling),
             scroll_blit: Some(self.scroll_blit_enabled),
+            font_fallback_enabled: Some(self.font_fallback_enabled),
         }
     }
 
@@ -4875,6 +4879,34 @@ mod tests {
         assert_eq!(
             config.rendering.as_ref().unwrap().text_layout_cache_cap,
             Some(1234)
+        );
+    }
+
+    #[test]
+    fn apply_config_sets_font_fallback_enabled() {
+        let mut grid = test_grid();
+        assert!(grid.font_fallback_enabled);
+
+        let config = v1::GridConfig {
+            rendering: Some(v1::RenderConfig {
+                font_fallback_enabled: Some(false),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        grid.apply_config(&config);
+        assert!(!grid.font_fallback_enabled);
+        assert!(!grid.ensure_text_engine().font_fallback_enabled());
+    }
+
+    #[test]
+    fn get_config_returns_font_fallback_enabled() {
+        let mut grid = test_grid();
+        grid.font_fallback_enabled = false;
+        let config = grid.get_config();
+        assert_eq!(
+            config.rendering.as_ref().unwrap().font_fallback_enabled,
+            Some(false)
         );
     }
 

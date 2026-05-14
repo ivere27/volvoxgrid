@@ -19,6 +19,7 @@ import {
 } from "../js/src/volvoxgrid.js";
 import { setupDefaultInput } from "../js/src/default-input.js";
 import { createCanvas2DTextRenderer } from "../js/src/canvas2d-text-renderer.js";
+import { createCanvas2DRasterizer } from "../js/src/canvas2d-rasterizer.js";
 import {
   AggregateType,
   Align,
@@ -252,6 +253,15 @@ type DemoFontAsset = {
   aliases?: string[];
   weight?: string;
   style?: string;
+};
+type DemoFontLoadResult = {
+  font: DemoFontAsset;
+  loaded: boolean;
+};
+type DemoFontLoadSummary = {
+  anyLoaded: boolean;
+  missingFonts: string[];
+  missingTextFonts: string[];
 };
 type HierarchyRichTextRunStyle = {
   foreground?: string | number;
@@ -645,26 +655,42 @@ async function loadBrowserFontFaces(font: DemoFontAsset, fontData: Uint8Array): 
   return loaded.some(Boolean);
 }
 
+function isIconFontAsset(font: DemoFontAsset): boolean {
+  return font.family === "Material Icons" || (font.aliases ?? []).includes("MaterialIcons");
+}
+
 function loadDemoFontsInBackground(
   wasmModule: WasmModule,
-): Promise<boolean> {
+): Promise<DemoFontLoadSummary> {
   const fonts = demoFontAssetsForLocales(browserLocaleHints());
 
   return Promise.all(
-    fonts.map(async (font) => {
+    fonts.map(async (font): Promise<DemoFontLoadResult> => {
       const fontData = await fetchFontWithTimeout(font.url);
       if (fontData) {
-        wasmModule.load_font(fontData);
-        await loadBrowserFontFaces(font, fontData);
-        console.info(`Loaded demo font: ${font.label}`);
-        return true;
+        try {
+          wasmModule.load_font(fontData);
+          await loadBrowserFontFaces(font, fontData);
+          console.info(`Loaded demo font: ${font.label}`);
+          return { font, loaded: true };
+        } catch (err) {
+          console.warn(`Could not register ${font.label}:`, err);
+        }
       } else {
         console.warn(`Could not load ${font.label} - some glyphs may be missing`);
-        return false;
       }
+      return { font, loaded: false };
     }),
   )
-    .then((results) => results.some(Boolean));
+    .then((results) => ({
+      anyLoaded: results.some((result) => result.loaded),
+      missingFonts: results
+        .filter((result) => !result.loaded)
+        .map((result) => result.font.label),
+      missingTextFonts: results
+        .filter((result) => !result.loaded && !isIconFontAsset(result.font))
+        .map((result) => result.font.label),
+    }));
 }
 
 /**
@@ -2206,11 +2232,17 @@ async function main() {
       console.warn("WASM v1 runtime init failed (continuing with legacy APIs):", err);
     }
   }
+  const fontFallbacksEnabled = typeof (wasmModule as any).get_font_fallback_enabled === "function"
+    ? Boolean((wasmModule as any).get_font_fallback_enabled())
+    : true;
 
-  // Register Canvas2D text renderer only when the built-in engine is absent (Lite mode)
+  // Canvas2D is the primary text renderer in Lite mode and a browser-font
+  // fallback when remote font bytes are unavailable in the full WASM build.
   const hasBuiltinText = typeof (wasmModule as any).has_builtin_text_engine === "function"
     && (wasmModule as any).has_builtin_text_engine();
   let canvas2DRenderer: any = null;
+  let useCanvas2DTextRenderer = !hasBuiltinText;
+  let fullCanvas2DTextFallbackActive = false;
 
   const registerCanvas2DTextRenderer = (renderer: any, gridId?: number): void => {
     const wasmAny = wasmModule as any;
@@ -2233,10 +2265,56 @@ async function main() {
     }
   };
 
-  if (!hasBuiltinText && typeof (wasmModule as any).set_text_renderer === "function") {
-    canvas2DRenderer = createCanvas2DTextRenderer(wasmModule);
+  const ensureCanvas2DRenderer = (): any => {
+    if (canvas2DRenderer == null) {
+      canvas2DRenderer = createCanvas2DTextRenderer(wasmModule, {
+        fontFallbacksEnabled,
+        wasm: wasmModule,
+      });
+    }
     canvas2DRenderer.setCacheSize(selectedTextLayoutCacheCap());
-    registerCanvas2DTextRenderer(canvas2DRenderer);
+    return canvas2DRenderer;
+  };
+
+  const enableCanvas2DTextRenderer = (reason: string, gridIds: number[] = []): boolean => {
+    if (hasBuiltinText && !fontFallbacksEnabled) {
+      console.error(`Font fallback disabled; not using Canvas2D text fallback (${reason})`);
+      return false;
+    }
+    const wasmAny = wasmModule as any;
+    if (
+      typeof wasmAny.set_text_renderer !== "function"
+      && typeof wasmAny.set_text_renderer_with_cache !== "function"
+    ) {
+      return false;
+    }
+    const renderer = ensureCanvas2DRenderer();
+    registerCanvas2DTextRenderer(renderer);
+    for (const gridId of gridIds) {
+      registerCanvas2DTextRenderer(renderer, gridId);
+    }
+    if (hasBuiltinText) {
+      fullCanvas2DTextFallbackActive = true;
+    }
+    const wasAlreadyEnabled = useCanvas2DTextRenderer;
+    useCanvas2DTextRenderer = true;
+    if (!wasAlreadyEnabled) {
+      console.warn(`Using Canvas2D text renderer fallback (${reason})`);
+    }
+    return true;
+  };
+
+  if (
+    fontFallbacksEnabled
+    && hasBuiltinText
+    && typeof (wasmModule as any).set_glyph_rasterizer === "function"
+  ) {
+    (wasmModule as any).set_glyph_rasterizer(
+      createCanvas2DRasterizer({ fontFallbacksEnabled, wasm: wasmModule }),
+    );
+  }
+
+  if (!hasBuiltinText && enableCanvas2DTextRenderer("Lite mode")) {
     console.info("Registered Canvas2D external text renderer (Lite mode)");
   }
 
@@ -2291,8 +2369,8 @@ async function main() {
     }
 
     // Also register the external renderer for this specific grid (for measurement/auto-size)
-    if (!hasBuiltinText && typeof (wasmModule as any).set_grid_text_renderer === "function") {
-      const renderer = canvas2DRenderer ?? createCanvas2DTextRenderer(wasmModule);
+    if (useCanvas2DTextRenderer && typeof (wasmModule as any).set_grid_text_renderer === "function") {
+      const renderer = ensureCanvas2DRenderer();
       registerCanvas2DTextRenderer(renderer, id);
     }
 
@@ -2312,8 +2390,8 @@ async function main() {
   };
 
   const grid = new VolvoxGrid(canvas, wasmModule, 2, SALES_COLS);
-  if (!hasBuiltinText && typeof (wasmModule as any).set_grid_text_renderer === "function") {
-    const renderer = canvas2DRenderer ?? createCanvas2DTextRenderer(wasmModule);
+  if (useCanvas2DTextRenderer && typeof (wasmModule as any).set_grid_text_renderer === "function") {
+    const renderer = ensureCanvas2DRenderer();
     registerCanvas2DTextRenderer(renderer, grid.id);
   }
   setupDefaultInput(grid, wasmModule, canvas);
@@ -2323,7 +2401,25 @@ async function main() {
   if (typeof (wasmModule as any).get_render_layer_mask_lo === "function") {
     layerMask = normalizeLayerMask(Number((wasmModule as any).get_render_layer_mask_lo(grid.id)));
   }
-  const demoFontsReady = loadDemoFontsInBackground(wasmModule);
+  const demoFontsReady = loadDemoFontsInBackground(wasmModule).then((summary) => {
+    if (hasBuiltinText && summary.missingTextFonts.length > 0) {
+      if (!fontFallbacksEnabled) {
+        console.error(
+          `Required demo font(s) failed and font fallback is disabled: ${summary.missingTextFonts.join(", ")}`,
+        );
+        return summary;
+      }
+      const enabled = enableCanvas2DTextRenderer(
+        `font download failed: ${summary.missingTextFonts.join(", ")}`,
+        [grid.id],
+      );
+      if (enabled) {
+        applyActiveRenderSettings();
+        grid.invalidate();
+      }
+    }
+    return summary;
+  });
 
   // Prefer MAILBOX for lower-latency GPU presentation when available.
   grid.presentMode = PresentMode.PRESENT_MAILBOX;
@@ -2341,6 +2437,7 @@ async function main() {
   let demoFontsResolved = false;
   const hierarchyFontAutosizedGridIds = new Set<number>();
   let activeRendererMode = RendererMode.RENDERER_CPU;
+  let warnedGpuCanvasTextFallback = false;
   let scrollBlitEnabled = false;
   let editEnabled = false;
   let doomGridId: number | null = null;
@@ -2937,7 +3034,17 @@ async function main() {
   }
 
   function applyActiveRenderSettings(): void {
-    grid.rendererMode = activeRendererMode;
+    const rendererMode = fullCanvas2DTextFallbackActive && activeRendererMode === RendererMode.RENDERER_GPU
+      ? RendererMode.RENDERER_CPU
+      : activeRendererMode;
+    if (
+      rendererMode !== activeRendererMode
+      && !warnedGpuCanvasTextFallback
+    ) {
+      warnedGpuCanvasTextFallback = true;
+      console.warn("GPU rendering disabled while Canvas2D whole-text font fallback is active");
+    }
+    grid.rendererMode = rendererMode;
     grid.scrollBlit = scrollBlitEnabled;
     grid.debugOverlay = chkDebug.checked;
     debugEventLoggingEnabled = chkDebug.checked;

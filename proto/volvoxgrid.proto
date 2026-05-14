@@ -1533,6 +1533,10 @@ message RenderConfig {
   // when only scroll position changes. Only valid when no animation,
   // no editing, no background image, and not right-to-left.
   optional bool            scroll_blit           = 11;
+  // Enables font fallback for missing glyphs. When false, missing glyphs are
+  // skipped instead of using host/OS fallback or the engine's final tofu fallback.
+  // The debug overlay always uses its internal diagnostic font.
+  optional bool            font_fallback_enabled = 12;
 }
 
 // ═══════════════════════════════════════════════════════════

@@ -5310,6 +5310,15 @@ const RenderConfig$json = {
       '10': 'scrollBlit',
       '17': true
     },
+    {
+      '1': 'font_fallback_enabled',
+      '3': 12,
+      '4': 1,
+      '5': 8,
+      '9': 11,
+      '10': 'fontFallbackEnabled',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_renderer_mode'},
@@ -5323,6 +5332,7 @@ const RenderConfig$json = {
     {'1': '_render_layer_mask'},
     {'1': '_layer_profiling'},
     {'1': '_scroll_blit'},
+    {'1': '_font_fallback_enabled'},
   ],
 };
 
@@ -5339,11 +5349,12 @@ final $typed_data.Uint8List renderConfigDescriptor = $convert.base64Decode(
     'YXJnZXRfZnJhbWVfcmF0ZV9oehgIIAEoBUgHUhF0YXJnZXRGcmFtZVJhdGVIeogBARIvChFyZW'
     '5kZXJfbGF5ZXJfbWFzaxgJIAEoA0gIUg9yZW5kZXJMYXllck1hc2uIAQESLAoPbGF5ZXJfcHJv'
     'ZmlsaW5nGAogASgISAlSDmxheWVyUHJvZmlsaW5niAEBEiQKC3Njcm9sbF9ibGl0GAsgASgISA'
-    'pSCnNjcm9sbEJsaXSIAQFCEAoOX3JlbmRlcmVyX21vZGVCEAoOX2RlYnVnX292ZXJsYXlCFAoS'
-    'X2FuaW1hdGlvbl9lbmFibGVkQhgKFl9hbmltYXRpb25fZHVyYXRpb25fbXNCGAoWX3RleHRfbG'
-    'F5b3V0X2NhY2hlX2NhcEIPCg1fcHJlc2VudF9tb2RlQhQKEl9mcmFtZV9wYWNpbmdfbW9kZUIX'
-    'ChVfdGFyZ2V0X2ZyYW1lX3JhdGVfaHpCFAoSX3JlbmRlcl9sYXllcl9tYXNrQhIKEF9sYXllcl'
-    '9wcm9maWxpbmdCDgoMX3Njcm9sbF9ibGl0');
+    'pSCnNjcm9sbEJsaXSIAQESNwoVZm9udF9mYWxsYmFja19lbmFibGVkGAwgASgISAtSE2ZvbnRG'
+    'YWxsYmFja0VuYWJsZWSIAQFCEAoOX3JlbmRlcmVyX21vZGVCEAoOX2RlYnVnX292ZXJsYXlCFA'
+    'oSX2FuaW1hdGlvbl9lbmFibGVkQhgKFl9hbmltYXRpb25fZHVyYXRpb25fbXNCGAoWX3RleHRf'
+    'bGF5b3V0X2NhY2hlX2NhcEIPCg1fcHJlc2VudF9tb2RlQhQKEl9mcmFtZV9wYWNpbmdfbW9kZU'
+    'IXChVfdGFyZ2V0X2ZyYW1lX3JhdGVfaHpCFAoSX3JlbmRlcl9sYXllcl9tYXNrQhIKEF9sYXll'
+    'cl9wcm9maWxpbmdCDgoMX3Njcm9sbF9ibGl0QhgKFl9mb250X2ZhbGxiYWNrX2VuYWJsZWQ=');
 
 @$core.Deprecated('Use colIndicatorCellModesDescriptor instead')
 const ColIndicatorCellModes$json = {

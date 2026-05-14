@@ -105,6 +105,32 @@ Lite WASM excludes the built-in Rust text engine, GPU renderer, regex search, an
 
 See [../../TEXT_RENDERING.md](../../TEXT_RENDERING.md) for full/lite text rendering and cache ownership.
 
+## Font Fallback Policy
+
+Font fallback is enabled by default. When enabled, the WASM runtime can use the
+registered browser glyph rasterizer for missing glyphs; the web demo may also
+fall back to browser Canvas2D text rendering when demo font downloads fail.
+Browser fallback font families are derived from the runtime fallback policy and
+the browser locale hints.
+
+If no font source can render a glyph, the engine uses a small internal final
+fallback: printable ASCII uses an embedded bitmap font, and other missing
+characters render as a diagnostic tofu box with the codepoint inside.
+
+Disable fallback at runtime if you prefer missing text over substituted or
+diagnostic fallback glyphs:
+
+```js
+await grid.loaded;
+grid.fontFallbackEnabled = false;
+// or:
+grid.setFontFallbackEnabled(false);
+```
+
+The same setting is also available in the shared protobuf API as
+`RenderConfig.font_fallback_enabled`. It applies to CPU and GPU rendering in
+the WASM runtime.
+
 ## Data Operations
 
 #### LoadData

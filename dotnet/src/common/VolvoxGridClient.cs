@@ -62,6 +62,26 @@ namespace VolvoxGrid.DotNet
                 });
         }
 
+        public bool GetFontFallbackEnabled()
+        {
+            EnsureNotDisposed();
+            var rendering = GetConfig().Rendering;
+            return rendering == null || !rendering.HasFontFallbackEnabled || rendering.FontFallbackEnabled;
+        }
+
+        public void SetFontFallbackEnabled(bool enabled)
+        {
+            EnsureNotDisposed();
+            Configure(
+                new GridConfig
+                {
+                    Rendering = new RenderConfig
+                    {
+                        FontFallbackEnabled = enabled,
+                    },
+                });
+        }
+
         public bool IsRenderLayerEnabled(RenderLayerBit layer)
         {
             long bit = RenderLayerFlag(layer);

@@ -1994,6 +1994,7 @@ export const RenderConfigFields = {
   "render_layer_mask": 9,
   "layer_profiling": 10,
   "scroll_blit": 11,
+  "font_fallback_enabled": 12,
 } as const;
 export const RenderInputFields = {
   "grid_id": 1,

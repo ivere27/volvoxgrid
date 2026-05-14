@@ -1,7 +1,5 @@
-#[cfg(not(target_arch = "wasm32"))]
 use std::collections::HashSet;
 
-#[cfg(not(target_arch = "wasm32"))]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum LocaleBucket {
     Korean,
@@ -15,16 +13,19 @@ enum LocaleBucket {
     Latin,
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 fn locale_bucket(locale: &str) -> LocaleBucket {
     let l = locale.to_ascii_lowercase();
-    if l.starts_with("ko") {
+    let language = l
+        .split(|c| c == '-' || c == '_')
+        .next()
+        .unwrap_or(l.as_str());
+    if language == "ko" {
         return LocaleBucket::Korean;
     }
-    if l.starts_with("ja") {
+    if language == "ja" {
         return LocaleBucket::Japanese;
     }
-    if l.starts_with("zh") {
+    if language == "zh" {
         if l.contains("hant")
             || l.contains("-tw")
             || l.contains("_tw")
@@ -37,33 +38,24 @@ fn locale_bucket(locale: &str) -> LocaleBucket {
         }
         return LocaleBucket::ChineseSimplified;
     }
-    if l.starts_with("th") {
+    if language == "th" {
         return LocaleBucket::Thai;
     }
-    if l.starts_with("ar") {
+    if language == "ar" {
         return LocaleBucket::Arabic;
     }
-    if l.starts_with("he") || l.starts_with("iw") {
+    if language == "he" || language == "iw" {
         return LocaleBucket::Hebrew;
     }
-    if l.starts_with("hi")
-        || l.starts_with("mr")
-        || l.starts_with("ne")
-        || l.starts_with("bn")
-        || l.starts_with("ta")
-        || l.starts_with("te")
-        || l.starts_with("ml")
-        || l.starts_with("kn")
-        || l.starts_with("gu")
-        || l.starts_with("pa")
-        || l.starts_with("or")
-    {
+    if matches!(
+        language,
+        "hi" | "mr" | "ne" | "bn" | "ta" | "te" | "ml" | "kn" | "gu" | "pa" | "or"
+    ) {
         return LocaleBucket::Indic;
     }
     LocaleBucket::Latin
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 fn append_unique(
     out: &mut Vec<&'static str>,
     seen: &mut HashSet<&'static str>,
@@ -346,6 +338,92 @@ const APPLE_COMMON_FALLBACKS: &[&str] = &[
     "/System/Library/Fonts/Supplemental/Helvetica.ttc",
     "/System/Library/Fonts/PingFang.ttc",
 ];
+
+#[cfg(target_arch = "wasm32")]
+const BROWSER_BASE_FALLBACKS: &[&str] = &["system-ui", "-apple-system", "Segoe UI"];
+#[cfg(target_arch = "wasm32")]
+const BROWSER_KOREAN_FALLBACKS: &[&str] = &[
+    "Noto Sans KR",
+    "Apple SD Gothic Neo",
+    "Malgun Gothic",
+    "Noto Sans CJK KR",
+];
+#[cfg(target_arch = "wasm32")]
+const BROWSER_JAPANESE_FALLBACKS: &[&str] = &[
+    "Noto Sans JP",
+    "Hiragino Sans",
+    "Yu Gothic",
+    "Meiryo",
+    "Noto Sans CJK JP",
+];
+#[cfg(target_arch = "wasm32")]
+const BROWSER_ZH_HANS_FALLBACKS: &[&str] = &[
+    "Noto Sans SC",
+    "PingFang SC",
+    "Microsoft YaHei",
+    "Noto Sans CJK SC",
+];
+#[cfg(target_arch = "wasm32")]
+const BROWSER_ZH_HANT_FALLBACKS: &[&str] = &[
+    "Noto Sans TC",
+    "PingFang TC",
+    "Microsoft JhengHei",
+    "Noto Sans CJK TC",
+];
+#[cfg(target_arch = "wasm32")]
+const BROWSER_THAI_FALLBACKS: &[&str] = &["Noto Sans Thai", "Leelawadee UI", "Thonburi", "Tahoma"];
+#[cfg(target_arch = "wasm32")]
+const BROWSER_ARABIC_FALLBACKS: &[&str] = &["Noto Naskh Arabic", "Noto Sans Arabic", "Arial"];
+#[cfg(target_arch = "wasm32")]
+const BROWSER_INDIC_FALLBACKS: &[&str] = &[
+    "Noto Sans Devanagari",
+    "Noto Sans Bengali",
+    "Noto Sans Tamil",
+    "Noto Sans Telugu",
+    "Noto Sans Malayalam",
+    "Noto Sans Kannada",
+    "Noto Sans Gujarati",
+    "Noto Sans Gurmukhi",
+    "Nirmala UI",
+];
+#[cfg(target_arch = "wasm32")]
+const BROWSER_HEBREW_FALLBACKS: &[&str] = &["Noto Sans Hebrew", "Arial Hebrew", "Arial"];
+#[cfg(target_arch = "wasm32")]
+const BROWSER_LATIN_FALLBACKS: &[&str] = &[];
+#[cfg(target_arch = "wasm32")]
+const BROWSER_COMMON_FALLBACKS: &[&str] = &["Noto Sans", "Arial", "sans-serif"];
+
+#[cfg(target_arch = "wasm32")]
+fn browser_locale_candidates_for_bucket(bucket: LocaleBucket) -> &'static [&'static str] {
+    match bucket {
+        LocaleBucket::Korean => BROWSER_KOREAN_FALLBACKS,
+        LocaleBucket::Japanese => BROWSER_JAPANESE_FALLBACKS,
+        LocaleBucket::ChineseSimplified => BROWSER_ZH_HANS_FALLBACKS,
+        LocaleBucket::ChineseTraditional => BROWSER_ZH_HANT_FALLBACKS,
+        LocaleBucket::Thai => BROWSER_THAI_FALLBACKS,
+        LocaleBucket::Arabic => BROWSER_ARABIC_FALLBACKS,
+        LocaleBucket::Indic => BROWSER_INDIC_FALLBACKS,
+        LocaleBucket::Hebrew => BROWSER_HEBREW_FALLBACKS,
+        LocaleBucket::Latin => BROWSER_LATIN_FALLBACKS,
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn browser_fallback_family_candidates(locale_hints: &[&str]) -> Vec<&'static str> {
+    let mut candidates = Vec::new();
+    let mut seen = HashSet::new();
+    append_unique(&mut candidates, &mut seen, BROWSER_BASE_FALLBACKS);
+    for locale in locale_hints {
+        let bucket = locale_bucket(locale);
+        append_unique(
+            &mut candidates,
+            &mut seen,
+            browser_locale_candidates_for_bucket(bucket),
+        );
+    }
+    append_unique(&mut candidates, &mut seen, BROWSER_COMMON_FALLBACKS);
+    candidates
+}
 
 #[cfg(not(target_arch = "wasm32"))]
 fn locale_candidates_for_bucket(bucket: LocaleBucket) -> &'static [&'static str] {

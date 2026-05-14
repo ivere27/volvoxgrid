@@ -2657,6 +2657,7 @@ export const RenderConfigFields = {
   "render_layer_mask": 9,
   "layer_profiling": 10,
   "scroll_blit": 11,
+  "font_fallback_enabled": 12,
 } as const;
 export const RenderInputFields = {
   "grid_id": 1,
@@ -17532,6 +17533,14 @@ export class RenderConfig implements LiteMessage {
       kind: "bool" as ProtoKind,
       optional: true,
     },
+    {
+      no: 12,
+      name: "font_fallback_enabled",
+      jsonName: "fontFallbackEnabled",
+      prop: "fontFallbackEnabled",
+      kind: "bool" as ProtoKind,
+      optional: true,
+    },
   ];
   rendererMode: RendererMode = 0;
   debugOverlay: boolean = false;
@@ -17544,6 +17553,7 @@ export class RenderConfig implements LiteMessage {
   renderLayerMask: bigint = 0n;
   layerProfiling: boolean = false;
   scrollBlit: boolean = false;
+  fontFallbackEnabled: boolean = false;
 
   constructor(init?: Partial<RenderConfig>) {
     initMessage(this, RenderConfig.fields, init as Record<string, unknown> | undefined);

@@ -47,6 +47,9 @@ static PENDING_DECISION_EVENTS: LazyLock<Mutex<HashMap<i64, VecDeque<PendingDeci
 thread_local! {
     static CUSTOM_COMPARE_CALLBACKS: RefCell<HashMap<i32, js_sys::Function>> =
         RefCell::new(HashMap::new());
+    #[cfg(feature = "gpu")]
+    static GLYPH_RASTERIZER_CALLBACK: RefCell<Option<js_sys::Function>> =
+        const { RefCell::new(None) };
 }
 
 // GPU renderer globals (opt-in via `gpu` feature).
@@ -66,6 +69,7 @@ static GPU_AVAILABLE: Mutex<bool> = Mutex::new(false);
 
 // Font data cache — replayed into GPU renderer at init time
 static LOADED_FONTS: Mutex<Vec<Vec<u8>>> = Mutex::new(Vec::new());
+static FONT_FALLBACK_ENABLED: Mutex<bool> = Mutex::new(true);
 
 const DEBUG_MEM_SAMPLE_MS: f64 = 10_000.0;
 const ERROR_DECISION_TIMEOUT: i32 = 1001;
@@ -220,10 +224,10 @@ fn maybe_update_debug_memory(
 
 fn replay_loaded_fonts_into_grid(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) {
     let fonts = LOADED_FONTS.lock().unwrap();
-    if fonts.is_empty() {
-        return;
-    }
+    let font_fallback_enabled = *FONT_FALLBACK_ENABLED.lock().unwrap();
+    grid.set_font_fallback_enabled(font_fallback_enabled);
     let te = grid.ensure_text_engine();
+    te.set_font_fallback_enabled(font_fallback_enabled);
     for font_data in fonts.iter() {
         te.load_font_data(font_data.clone());
     }
@@ -1562,12 +1566,73 @@ pub fn set_glyph_rasterizer(callback: js_sys::Function) {
     // GPU renderer (when feature enabled)
     #[cfg(feature = "gpu")]
     {
+        GLYPH_RASTERIZER_CALLBACK.with(|stored| {
+            *stored.borrow_mut() = Some(callback.clone());
+        });
         let rasterizer = Box::new(JsGlyphRasterizer { callback });
         let mut gr = GPU_RENDERER.lock().unwrap();
         if let Some(gpu) = gr.0.as_mut() {
             gpu.set_external_glyph_rasterizer(rasterizer);
         }
     }
+}
+
+/// Enable or disable external font fallback.
+///
+/// When disabled, externally-rasterized fallback glyphs are ignored and missing
+/// `.notdef` glyphs are skipped instead of being substituted.
+#[wasm_bindgen]
+pub fn set_font_fallback_enabled(enabled: bool) {
+    *FONT_FALLBACK_ENABLED.lock().unwrap() = enabled;
+
+    ensure_renderer();
+    {
+        let mut renderer = RENDERER.lock().unwrap();
+        if let Some(r) = renderer.as_mut() {
+            r.set_font_fallback_enabled(enabled);
+        }
+    }
+
+    #[cfg(feature = "gpu")]
+    {
+        let mut gr = GPU_RENDERER.lock().unwrap();
+        if let Some(gpu) = gr.0.as_mut() {
+            gpu.set_font_fallback_enabled(enabled);
+        }
+    }
+
+    ensure_manager();
+    let grid_ids = {
+        let mgr = MANAGER.lock().unwrap();
+        mgr.as_ref().map_or_else(Vec::new, GridManager::grid_ids)
+    };
+    for id in grid_ids {
+        let _ = wasm_with_grid(id, |grid| {
+            grid.set_font_fallback_enabled(enabled);
+            let te = grid.ensure_text_engine();
+            te.set_font_fallback_enabled(enabled);
+        });
+    }
+}
+
+#[wasm_bindgen]
+pub fn get_font_fallback_enabled() -> bool {
+    *FONT_FALLBACK_ENABLED.lock().unwrap()
+}
+
+#[wasm_bindgen]
+pub fn browser_font_fallback_families(locales: Array) -> Array {
+    let locale_strings: Vec<String> = (0..locales.length())
+        .filter_map(|index| locales.get(index).as_string())
+        .collect();
+    let locale_hints: Vec<&str> = locale_strings.iter().map(String::as_str).collect();
+    let families =
+        volvoxgrid_engine::font_fallbacks::browser_fallback_family_candidates(&locale_hints);
+    let out = Array::new();
+    for family in families {
+        out.push(&JsValue::from_str(family));
+    }
+    out
 }
 
 // ---------------------------------------------------------------------------
@@ -4095,6 +4160,21 @@ pub fn get_scroll_blit(id: i32) -> bool {
     with_grid(id, |grid| grid.scroll_blit_enabled).unwrap_or(false)
 }
 
+/// Enable or disable font fallback for one grid.
+#[wasm_bindgen]
+pub fn set_grid_font_fallback_enabled(id: i32, enabled: bool) {
+    with_grid(id, |grid| {
+        grid.set_font_fallback_enabled(enabled);
+    });
+}
+
+/// Get the current per-grid font fallback state.
+#[wasm_bindgen]
+pub fn get_grid_font_fallback_enabled(id: i32) -> bool {
+    with_grid(id, |grid| grid.font_fallback_enabled)
+        .unwrap_or_else(|| *FONT_FALLBACK_ENABLED.lock().unwrap())
+}
+
 /// Enable or disable layout animation.
 /// `duration_ms` sets the animation duration in milliseconds (0 = default 200ms).
 #[wasm_bindgen]
@@ -4151,9 +4231,16 @@ pub fn init_gpu() -> js_sys::Promise {
 
         // Replay cached fonts into the GPU renderer
         let fonts = LOADED_FONTS.lock().unwrap().clone();
+        let font_fallback_enabled = *FONT_FALLBACK_ENABLED.lock().unwrap();
         if let Some(gpu) = gr.0.as_mut() {
+            gpu.set_font_fallback_enabled(font_fallback_enabled);
             for font_data in fonts {
                 gpu.load_font_data(font_data);
+            }
+            let glyph_rasterizer_callback =
+                GLYPH_RASTERIZER_CALLBACK.with(|stored| stored.borrow().clone());
+            if let Some(callback) = glyph_rasterizer_callback {
+                gpu.set_external_glyph_rasterizer(Box::new(JsGlyphRasterizer { callback }));
             }
         }
 

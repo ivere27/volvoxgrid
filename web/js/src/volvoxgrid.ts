@@ -3857,6 +3857,40 @@ export class VolvoxGrid {
     }
   }
 
+  get fontFallbackEnabled(): boolean {
+    if (typeof this.wasm.get_grid_font_fallback_enabled === "function") {
+      return Boolean(this.wasm.get_grid_font_fallback_enabled(this.gridId));
+    }
+    if (typeof this.wasm.get_font_fallback_enabled === "function") {
+      return Boolean(this.wasm.get_font_fallback_enabled());
+    }
+    return true;
+  }
+
+  set fontFallbackEnabled(enabled: boolean) {
+    this.setFontFallbackEnabled(enabled);
+  }
+
+  get fontFallbacksEnabled(): boolean {
+    return this.fontFallbackEnabled;
+  }
+
+  set fontFallbacksEnabled(enabled: boolean) {
+    this.setFontFallbackEnabled(enabled);
+  }
+
+  setFontFallbackEnabled(enabled: boolean): void {
+    if (typeof this.wasm.set_grid_font_fallback_enabled === "function") {
+      this.wasm.set_grid_font_fallback_enabled(this.gridId, Boolean(enabled));
+      this.invalidateRenderCache();
+      this.dirty = true;
+    } else if (typeof this.wasm.set_font_fallback_enabled === "function") {
+      this.wasm.set_font_fallback_enabled(Boolean(enabled));
+      this.invalidateRenderCache();
+      this.dirty = true;
+    }
+  }
+
   get cellSpanMode(): number {
     if (typeof this.wasm.get_span_mode === "function") {
       this.cellSpanModeValue = Number(this.wasm.get_span_mode(this.gridId));
