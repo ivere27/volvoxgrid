@@ -1,5 +1,9 @@
 import { defineConfig, type Plugin } from "vite";
 
+declare const process: {
+  env: Record<string, string | undefined>;
+};
+
 const crossOriginIsolationHeaders = {
   "Cross-Origin-Opener-Policy": "same-origin",
   "Cross-Origin-Embedder-Policy": "require-corp",
@@ -17,6 +21,7 @@ const CDN_BASE = "https://cdn.jsdelivr.net/npm";
 // Maps relative source-tree imports in the demo to package specifiers,
 // so the build can externalize `volvoxgrid` and load it from a CDN.
 const externalAliasMap: Record<string, string> = {
+  "../js/src/index.js": "volvoxgrid",
   "../js/src/volvoxgrid.js": "volvoxgrid",
   "../js/src/default-input.js": "volvoxgrid",
   "../js/src/canvas2d-text-renderer.js": "volvoxgrid",

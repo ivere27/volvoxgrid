@@ -477,6 +477,35 @@ fn volvox_grid_service_run_stream(ctx: &mut VolvoxGridServiceStreamContext) {
 // =============================================================================
 
 #[wasm_bindgen]
+pub fn volvox_grid_create_pb(data: &[u8]) -> Vec<u8> {
+    let runtime = match get_volvox_grid_service_runtime() {
+        Some(p) => p,
+        None => {
+            set_last_error("runtime not registered".into());
+            return Vec::new();
+        }
+    };
+    let req = match CreateRequest::decode(data) {
+        Ok(r) => r,
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
+    };
+    match runtime.create(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            let _ = r.encode(&mut buf);
+            buf
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
+    }
+}
+#[wasm_bindgen]
 pub fn volvox_grid_create(
     viewport_width: i32,
     viewport_height: i32,
@@ -518,6 +547,35 @@ pub fn volvox_grid_create(
 }
 
 #[wasm_bindgen]
+pub fn volvox_grid_destroy_pb(data: &[u8]) -> Vec<u8> {
+    let runtime = match get_volvox_grid_service_runtime() {
+        Some(p) => p,
+        None => {
+            set_last_error("runtime not registered".into());
+            return Vec::new();
+        }
+    };
+    let req = match DestroyRequest::decode(data) {
+        Ok(r) => r,
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
+    };
+    match runtime.destroy(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            let _ = r.encode(&mut buf);
+            buf
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
+    }
+}
+#[wasm_bindgen]
 pub fn volvox_grid_destroy(grid_id: i64) -> Vec<u8> {
     let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
@@ -544,6 +602,35 @@ pub fn volvox_grid_destroy(grid_id: i64) -> Vec<u8> {
     }
 }
 
+#[wasm_bindgen]
+pub fn volvox_grid_configure_pb(data: &[u8]) -> Vec<u8> {
+    let runtime = match get_volvox_grid_service_runtime() {
+        Some(p) => p,
+        None => {
+            set_last_error("runtime not registered".into());
+            return Vec::new();
+        }
+    };
+    let req = match ConfigureRequest::decode(data) {
+        Ok(r) => r,
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
+    };
+    match runtime.configure(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            let _ = r.encode(&mut buf);
+            buf
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
+    }
+}
 #[wasm_bindgen]
 pub fn volvox_grid_configure(grid_id: i64, config: &[u8]) -> Vec<u8> {
     let runtime = match get_volvox_grid_service_runtime() {
@@ -578,6 +665,35 @@ pub fn volvox_grid_configure(grid_id: i64, config: &[u8]) -> Vec<u8> {
     }
 }
 
+#[wasm_bindgen]
+pub fn volvox_grid_get_config_pb(data: &[u8]) -> Vec<u8> {
+    let runtime = match get_volvox_grid_service_runtime() {
+        Some(p) => p,
+        None => {
+            set_last_error("runtime not registered".into());
+            return Vec::new();
+        }
+    };
+    let req = match GetConfigRequest::decode(data) {
+        Ok(r) => r,
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
+    };
+    match runtime.get_config(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            let _ = r.encode(&mut buf);
+            buf
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
+    }
+}
 #[wasm_bindgen]
 pub fn volvox_grid_get_config(grid_id: i64) -> Vec<u8> {
     let runtime = match get_volvox_grid_service_runtime() {
@@ -666,6 +782,35 @@ pub fn volvox_grid_define_columns_pb(data: &[u8]) -> Vec<u8> {
 }
 
 #[wasm_bindgen]
+pub fn volvox_grid_get_schema_pb(data: &[u8]) -> Vec<u8> {
+    let runtime = match get_volvox_grid_service_runtime() {
+        Some(p) => p,
+        None => {
+            set_last_error("runtime not registered".into());
+            return Vec::new();
+        }
+    };
+    let req = match GetSchemaRequest::decode(data) {
+        Ok(r) => r,
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
+    };
+    match runtime.get_schema(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            let _ = r.encode(&mut buf);
+            buf
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
+    }
+}
+#[wasm_bindgen]
 pub fn volvox_grid_get_schema(grid_id: i64) -> Vec<u8> {
     let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
@@ -753,6 +898,35 @@ pub fn volvox_grid_insert_rows_pb(data: &[u8]) -> Vec<u8> {
 }
 
 #[wasm_bindgen]
+pub fn volvox_grid_remove_rows_pb(data: &[u8]) -> Vec<u8> {
+    let runtime = match get_volvox_grid_service_runtime() {
+        Some(p) => p,
+        None => {
+            set_last_error("runtime not registered".into());
+            return Vec::new();
+        }
+    };
+    let req = match RemoveRowsRequest::decode(data) {
+        Ok(r) => r,
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
+    };
+    match runtime.remove_rows(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            let _ = r.encode(&mut buf);
+            buf
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
+    }
+}
+#[wasm_bindgen]
 pub fn volvox_grid_remove_rows(grid_id: i64, index: i32, count: i32) -> Vec<u8> {
     let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
@@ -782,6 +956,35 @@ pub fn volvox_grid_remove_rows(grid_id: i64, index: i32, count: i32) -> Vec<u8> 
 }
 
 #[wasm_bindgen]
+pub fn volvox_grid_move_column_pb(data: &[u8]) -> Vec<u8> {
+    let runtime = match get_volvox_grid_service_runtime() {
+        Some(p) => p,
+        None => {
+            set_last_error("runtime not registered".into());
+            return Vec::new();
+        }
+    };
+    let req = match MoveColumnRequest::decode(data) {
+        Ok(r) => r,
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
+    };
+    match runtime.move_column(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            let _ = r.encode(&mut buf);
+            buf
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
+    }
+}
+#[wasm_bindgen]
 pub fn volvox_grid_move_column(grid_id: i64, col: i32, position: i32) -> Vec<u8> {
     let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
@@ -810,6 +1013,35 @@ pub fn volvox_grid_move_column(grid_id: i64, col: i32, position: i32) -> Vec<u8>
     }
 }
 
+#[wasm_bindgen]
+pub fn volvox_grid_move_row_pb(data: &[u8]) -> Vec<u8> {
+    let runtime = match get_volvox_grid_service_runtime() {
+        Some(p) => p,
+        None => {
+            set_last_error("runtime not registered".into());
+            return Vec::new();
+        }
+    };
+    let req = match MoveRowRequest::decode(data) {
+        Ok(r) => r,
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
+    };
+    match runtime.move_row(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            let _ = r.encode(&mut buf);
+            buf
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
+    }
+}
 #[wasm_bindgen]
 pub fn volvox_grid_move_row(grid_id: i64, row: i32, position: i32) -> Vec<u8> {
     let runtime = match get_volvox_grid_service_runtime() {
@@ -869,6 +1101,35 @@ pub fn volvox_grid_update_cells_pb(data: &[u8]) -> Vec<u8> {
     }
 }
 
+#[wasm_bindgen]
+pub fn volvox_grid_get_cells_pb(data: &[u8]) -> Vec<u8> {
+    let runtime = match get_volvox_grid_service_runtime() {
+        Some(p) => p,
+        None => {
+            set_last_error("runtime not registered".into());
+            return Vec::new();
+        }
+    };
+    let req = match GetCellsRequest::decode(data) {
+        Ok(r) => r,
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
+    };
+    match runtime.get_cells(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            let _ = r.encode(&mut buf);
+            buf
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
+    }
+}
 #[wasm_bindgen]
 pub fn volvox_grid_get_cells(
     grid_id: i64,
@@ -1007,6 +1268,35 @@ pub fn volvox_grid_append_data_pb(data: &[u8]) -> Vec<u8> {
 }
 
 #[wasm_bindgen]
+pub fn volvox_grid_clear_pb(data: &[u8]) -> Vec<u8> {
+    let runtime = match get_volvox_grid_service_runtime() {
+        Some(p) => p,
+        None => {
+            set_last_error("runtime not registered".into());
+            return Vec::new();
+        }
+    };
+    let req = match ClearRequest::decode(data) {
+        Ok(r) => r,
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
+    };
+    match runtime.clear(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            let _ = r.encode(&mut buf);
+            buf
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
+    }
+}
+#[wasm_bindgen]
 pub fn volvox_grid_clear(grid_id: i64, scope: i32, region: i32) -> Vec<u8> {
     let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
@@ -1066,6 +1356,35 @@ pub fn volvox_grid_select_pb(data: &[u8]) -> Vec<u8> {
 }
 
 #[wasm_bindgen]
+pub fn volvox_grid_get_selection_pb(data: &[u8]) -> Vec<u8> {
+    let runtime = match get_volvox_grid_service_runtime() {
+        Some(p) => p,
+        None => {
+            set_last_error("runtime not registered".into());
+            return Vec::new();
+        }
+    };
+    let req = match GetSelectionRequest::decode(data) {
+        Ok(r) => r,
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
+    };
+    match runtime.get_selection(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            let _ = r.encode(&mut buf);
+            buf
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
+    }
+}
+#[wasm_bindgen]
 pub fn volvox_grid_get_selection(grid_id: i64) -> Vec<u8> {
     let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
@@ -1092,6 +1411,35 @@ pub fn volvox_grid_get_selection(grid_id: i64) -> Vec<u8> {
     }
 }
 
+#[wasm_bindgen]
+pub fn volvox_grid_show_cell_pb(data: &[u8]) -> Vec<u8> {
+    let runtime = match get_volvox_grid_service_runtime() {
+        Some(p) => p,
+        None => {
+            set_last_error("runtime not registered".into());
+            return Vec::new();
+        }
+    };
+    let req = match ShowCellRequest::decode(data) {
+        Ok(r) => r,
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
+    };
+    match runtime.show_cell(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            let _ = r.encode(&mut buf);
+            buf
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
+    }
+}
 #[wasm_bindgen]
 pub fn volvox_grid_show_cell(grid_id: i64, row: i32, col: i32) -> Vec<u8> {
     let runtime = match get_volvox_grid_service_runtime() {
@@ -1122,6 +1470,35 @@ pub fn volvox_grid_show_cell(grid_id: i64, row: i32, col: i32) -> Vec<u8> {
 }
 
 #[wasm_bindgen]
+pub fn volvox_grid_set_top_row_pb(data: &[u8]) -> Vec<u8> {
+    let runtime = match get_volvox_grid_service_runtime() {
+        Some(p) => p,
+        None => {
+            set_last_error("runtime not registered".into());
+            return Vec::new();
+        }
+    };
+    let req = match SetRowRequest::decode(data) {
+        Ok(r) => r,
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
+    };
+    match runtime.set_top_row(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            let _ = r.encode(&mut buf);
+            buf
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
+    }
+}
+#[wasm_bindgen]
 pub fn volvox_grid_set_top_row(grid_id: i64, row: i32) -> Vec<u8> {
     let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
@@ -1149,6 +1526,35 @@ pub fn volvox_grid_set_top_row(grid_id: i64, row: i32) -> Vec<u8> {
     }
 }
 
+#[wasm_bindgen]
+pub fn volvox_grid_set_left_col_pb(data: &[u8]) -> Vec<u8> {
+    let runtime = match get_volvox_grid_service_runtime() {
+        Some(p) => p,
+        None => {
+            set_last_error("runtime not registered".into());
+            return Vec::new();
+        }
+    };
+    let req = match SetColRequest::decode(data) {
+        Ok(r) => r,
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
+    };
+    match runtime.set_left_col(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            let _ = r.encode(&mut buf);
+            buf
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
+    }
+}
 #[wasm_bindgen]
 pub fn volvox_grid_set_left_col(grid_id: i64, col: i32) -> Vec<u8> {
     let runtime = match get_volvox_grid_service_runtime() {
@@ -1238,6 +1644,35 @@ pub fn volvox_grid_sort_pb(data: &[u8]) -> Vec<u8> {
 }
 
 #[wasm_bindgen]
+pub fn volvox_grid_subtotal_pb(data: &[u8]) -> Vec<u8> {
+    let runtime = match get_volvox_grid_service_runtime() {
+        Some(p) => p,
+        None => {
+            set_last_error("runtime not registered".into());
+            return Vec::new();
+        }
+    };
+    let req = match SubtotalRequest::decode(data) {
+        Ok(r) => r,
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
+    };
+    match runtime.subtotal(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            let _ = r.encode(&mut buf);
+            buf
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
+    }
+}
+#[wasm_bindgen]
 pub fn volvox_grid_subtotal(
     grid_id: i64,
     aggregate: i32,
@@ -1289,6 +1724,35 @@ pub fn volvox_grid_subtotal(
 }
 
 #[wasm_bindgen]
+pub fn volvox_grid_auto_size_pb(data: &[u8]) -> Vec<u8> {
+    let runtime = match get_volvox_grid_service_runtime() {
+        Some(p) => p,
+        None => {
+            set_last_error("runtime not registered".into());
+            return Vec::new();
+        }
+    };
+    let req = match AutoSizeRequest::decode(data) {
+        Ok(r) => r,
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
+    };
+    match runtime.auto_size(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            let _ = r.encode(&mut buf);
+            buf
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
+    }
+}
+#[wasm_bindgen]
 pub fn volvox_grid_auto_size(
     grid_id: i64,
     col_from: i32,
@@ -1325,6 +1789,35 @@ pub fn volvox_grid_auto_size(
     }
 }
 
+#[wasm_bindgen]
+pub fn volvox_grid_outline_pb(data: &[u8]) -> Vec<u8> {
+    let runtime = match get_volvox_grid_service_runtime() {
+        Some(p) => p,
+        None => {
+            set_last_error("runtime not registered".into());
+            return Vec::new();
+        }
+    };
+    let req = match OutlineRequest::decode(data) {
+        Ok(r) => r,
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
+    };
+    match runtime.outline(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            let _ = r.encode(&mut buf);
+            buf
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
+    }
+}
 #[wasm_bindgen]
 pub fn volvox_grid_outline(grid_id: i64, level: i32) -> Vec<u8> {
     let runtime = match get_volvox_grid_service_runtime() {
@@ -1414,6 +1907,35 @@ pub fn volvox_grid_find_pb(data: &[u8]) -> Vec<u8> {
 }
 
 #[wasm_bindgen]
+pub fn volvox_grid_aggregate_pb(data: &[u8]) -> Vec<u8> {
+    let runtime = match get_volvox_grid_service_runtime() {
+        Some(p) => p,
+        None => {
+            set_last_error("runtime not registered".into());
+            return Vec::new();
+        }
+    };
+    let req = match AggregateRequest::decode(data) {
+        Ok(r) => r,
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
+    };
+    match runtime.aggregate(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            let _ = r.encode(&mut buf);
+            buf
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
+    }
+}
+#[wasm_bindgen]
 pub fn volvox_grid_aggregate(
     grid_id: i64,
     aggregate: i32,
@@ -1453,6 +1975,35 @@ pub fn volvox_grid_aggregate(
 }
 
 #[wasm_bindgen]
+pub fn volvox_grid_get_merged_range_pb(data: &[u8]) -> Vec<u8> {
+    let runtime = match get_volvox_grid_service_runtime() {
+        Some(p) => p,
+        None => {
+            set_last_error("runtime not registered".into());
+            return Vec::new();
+        }
+    };
+    let req = match GetMergedRangeRequest::decode(data) {
+        Ok(r) => r,
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
+    };
+    match runtime.get_merged_range(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            let _ = r.encode(&mut buf);
+            buf
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
+    }
+}
+#[wasm_bindgen]
 pub fn volvox_grid_get_merged_range(grid_id: i64, row: i32, col: i32) -> Vec<u8> {
     let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
@@ -1481,6 +2032,35 @@ pub fn volvox_grid_get_merged_range(grid_id: i64, row: i32, col: i32) -> Vec<u8>
     }
 }
 
+#[wasm_bindgen]
+pub fn volvox_grid_merge_cells_pb(data: &[u8]) -> Vec<u8> {
+    let runtime = match get_volvox_grid_service_runtime() {
+        Some(p) => p,
+        None => {
+            set_last_error("runtime not registered".into());
+            return Vec::new();
+        }
+    };
+    let req = match MergeCellsRequest::decode(data) {
+        Ok(r) => r,
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
+    };
+    match runtime.merge_cells(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            let _ = r.encode(&mut buf);
+            buf
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
+    }
+}
 #[wasm_bindgen]
 pub fn volvox_grid_merge_cells(grid_id: i64, range: &[u8]) -> Vec<u8> {
     let runtime = match get_volvox_grid_service_runtime() {
@@ -1516,6 +2096,35 @@ pub fn volvox_grid_merge_cells(grid_id: i64, range: &[u8]) -> Vec<u8> {
 }
 
 #[wasm_bindgen]
+pub fn volvox_grid_unmerge_cells_pb(data: &[u8]) -> Vec<u8> {
+    let runtime = match get_volvox_grid_service_runtime() {
+        Some(p) => p,
+        None => {
+            set_last_error("runtime not registered".into());
+            return Vec::new();
+        }
+    };
+    let req = match UnmergeCellsRequest::decode(data) {
+        Ok(r) => r,
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
+    };
+    match runtime.unmerge_cells(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            let _ = r.encode(&mut buf);
+            buf
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
+    }
+}
+#[wasm_bindgen]
 pub fn volvox_grid_unmerge_cells(grid_id: i64, range: &[u8]) -> Vec<u8> {
     let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
@@ -1550,6 +2159,35 @@ pub fn volvox_grid_unmerge_cells(grid_id: i64, range: &[u8]) -> Vec<u8> {
 }
 
 #[wasm_bindgen]
+pub fn volvox_grid_get_merged_regions_pb(data: &[u8]) -> Vec<u8> {
+    let runtime = match get_volvox_grid_service_runtime() {
+        Some(p) => p,
+        None => {
+            set_last_error("runtime not registered".into());
+            return Vec::new();
+        }
+    };
+    let req = match GetMergedRegionsRequest::decode(data) {
+        Ok(r) => r,
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
+    };
+    match runtime.get_merged_regions(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            let _ = r.encode(&mut buf);
+            buf
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
+    }
+}
+#[wasm_bindgen]
 pub fn volvox_grid_get_merged_regions(grid_id: i64) -> Vec<u8> {
     let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
@@ -1576,6 +2214,35 @@ pub fn volvox_grid_get_merged_regions(grid_id: i64) -> Vec<u8> {
     }
 }
 
+#[wasm_bindgen]
+pub fn volvox_grid_get_memory_usage_pb(data: &[u8]) -> Vec<u8> {
+    let runtime = match get_volvox_grid_service_runtime() {
+        Some(p) => p,
+        None => {
+            set_last_error("runtime not registered".into());
+            return Vec::new();
+        }
+    };
+    let req = match GetMemoryUsageRequest::decode(data) {
+        Ok(r) => r,
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
+    };
+    match runtime.get_memory_usage(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            let _ = r.encode(&mut buf);
+            buf
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
+    }
+}
 #[wasm_bindgen]
 pub fn volvox_grid_get_memory_usage(grid_id: i64) -> Vec<u8> {
     let runtime = match get_volvox_grid_service_runtime() {
@@ -1633,6 +2300,35 @@ pub fn volvox_grid_clipboard_pb(data: &[u8]) -> Vec<u8> {
     }
 }
 
+#[wasm_bindgen]
+pub fn volvox_grid_export_pb(data: &[u8]) -> Vec<u8> {
+    let runtime = match get_volvox_grid_service_runtime() {
+        Some(p) => p,
+        None => {
+            set_last_error("runtime not registered".into());
+            return Vec::new();
+        }
+    };
+    let req = match ExportRequest::decode(data) {
+        Ok(r) => r,
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
+    };
+    match runtime.export(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            let _ = r.encode(&mut buf);
+            buf
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
+    }
+}
 #[wasm_bindgen]
 pub fn volvox_grid_export(grid_id: i64, format: i32, scope: i32) -> Vec<u8> {
     let runtime = match get_volvox_grid_service_runtime() {
@@ -1693,6 +2389,35 @@ pub fn volvox_grid_print_pb(data: &[u8]) -> Vec<u8> {
 }
 
 #[wasm_bindgen]
+pub fn volvox_grid_archive_pb(data: &[u8]) -> Vec<u8> {
+    let runtime = match get_volvox_grid_service_runtime() {
+        Some(p) => p,
+        None => {
+            set_last_error("runtime not registered".into());
+            return Vec::new();
+        }
+    };
+    let req = match ArchiveRequest::decode(data) {
+        Ok(r) => r,
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
+    };
+    match runtime.archive(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            let _ = r.encode(&mut buf);
+            buf
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
+    }
+}
+#[wasm_bindgen]
 pub fn volvox_grid_archive(grid_id: i64, name: &str, action: i32, data: &[u8]) -> Vec<u8> {
     let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
@@ -1723,6 +2448,35 @@ pub fn volvox_grid_archive(grid_id: i64, name: &str, action: i32, data: &[u8]) -
 }
 
 #[wasm_bindgen]
+pub fn volvox_grid_resize_viewport_pb(data: &[u8]) -> Vec<u8> {
+    let runtime = match get_volvox_grid_service_runtime() {
+        Some(p) => p,
+        None => {
+            set_last_error("runtime not registered".into());
+            return Vec::new();
+        }
+    };
+    let req = match ResizeViewportRequest::decode(data) {
+        Ok(r) => r,
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
+    };
+    match runtime.resize_viewport(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            let _ = r.encode(&mut buf);
+            buf
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
+    }
+}
+#[wasm_bindgen]
 pub fn volvox_grid_resize_viewport(grid_id: i64, width: i32, height: i32) -> Vec<u8> {
     let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
@@ -1752,6 +2506,35 @@ pub fn volvox_grid_resize_viewport(grid_id: i64, width: i32, height: i32) -> Vec
 }
 
 #[wasm_bindgen]
+pub fn volvox_grid_set_redraw_pb(data: &[u8]) -> Vec<u8> {
+    let runtime = match get_volvox_grid_service_runtime() {
+        Some(p) => p,
+        None => {
+            set_last_error("runtime not registered".into());
+            return Vec::new();
+        }
+    };
+    let req = match SetRedrawRequest::decode(data) {
+        Ok(r) => r,
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
+    };
+    match runtime.set_redraw(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            let _ = r.encode(&mut buf);
+            buf
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
+    }
+}
+#[wasm_bindgen]
 pub fn volvox_grid_set_redraw(grid_id: i64, enabled: bool) -> Vec<u8> {
     let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
@@ -1780,6 +2563,35 @@ pub fn volvox_grid_set_redraw(grid_id: i64, enabled: bool) -> Vec<u8> {
 }
 
 #[wasm_bindgen]
+pub fn volvox_grid_refresh_pb(data: &[u8]) -> Vec<u8> {
+    let runtime = match get_volvox_grid_service_runtime() {
+        Some(p) => p,
+        None => {
+            set_last_error("runtime not registered".into());
+            return Vec::new();
+        }
+    };
+    let req = match RefreshRequest::decode(data) {
+        Ok(r) => r,
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
+    };
+    match runtime.refresh(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            let _ = r.encode(&mut buf);
+            buf
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
+    }
+}
+#[wasm_bindgen]
 pub fn volvox_grid_refresh(grid_id: i64) -> Vec<u8> {
     let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
@@ -1806,6 +2618,35 @@ pub fn volvox_grid_refresh(grid_id: i64) -> Vec<u8> {
     }
 }
 
+#[wasm_bindgen]
+pub fn volvox_grid_load_demo_pb(data: &[u8]) -> Vec<u8> {
+    let runtime = match get_volvox_grid_service_runtime() {
+        Some(p) => p,
+        None => {
+            set_last_error("runtime not registered".into());
+            return Vec::new();
+        }
+    };
+    let req = match LoadDemoRequest::decode(data) {
+        Ok(r) => r,
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
+    };
+    match runtime.load_demo(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            let _ = r.encode(&mut buf);
+            buf
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
+    }
+}
 #[wasm_bindgen]
 pub fn volvox_grid_load_demo(grid_id: i64, demo: &str) -> Vec<u8> {
     let runtime = match get_volvox_grid_service_runtime() {
@@ -1834,6 +2675,35 @@ pub fn volvox_grid_load_demo(grid_id: i64, demo: &str) -> Vec<u8> {
     }
 }
 
+#[wasm_bindgen]
+pub fn volvox_grid_get_demo_data_pb(data: &[u8]) -> Vec<u8> {
+    let runtime = match get_volvox_grid_service_runtime() {
+        Some(p) => p,
+        None => {
+            set_last_error("runtime not registered".into());
+            return Vec::new();
+        }
+    };
+    let req = match GetDemoDataRequest::decode(data) {
+        Ok(r) => r,
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
+    };
+    match runtime.get_demo_data(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            let _ = r.encode(&mut buf);
+            buf
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
+    }
+}
 #[wasm_bindgen]
 pub fn volvox_grid_get_demo_data(demo: &str) -> Vec<u8> {
     let runtime = match get_volvox_grid_service_runtime() {

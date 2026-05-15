@@ -53,6 +53,10 @@
 - [ ] **Leftover Debug Logging (HTML)** (`adapters/sheet/index.html`): Stray `console.log` statements left from testing (e.g., `console.log("[test] editInput keydown...");`).
 - [ ] **Hand-rolled protobuf encoder in JS** (`adapters/sheet/src/proto/proto-utils.ts`): Manual varint/zigzag/tag encoding. Correct but high maintenance burden on proto schema changes.
 
+## Web/JS
+
+- [ ] **Worker-runtime option for event API** (`web/js/src/volvoxgrid.ts`, `web/js/src/proto-host.ts`, `web/js/src/event-pump.ts`): Add `new VolvoxGrid({ runtime: "worker" })` that hosts the wasm + event pump in a dedicated Worker and posts decoded events to the main thread. Same `grid.on/off/once` surface; useful for true async (sub-ms latency, no main-thread blocking) and high-frequency event streams (>1kHz).
+
 ## Adapter/AG Grid
 
 ## Adapter/SfDataGrid

@@ -8,6 +8,11 @@
 import {
   AggregateType,
   ArchiveRequest_Action,
+  BarcodeCaptionOptionsFields,
+  BarcodeDataFields,
+  BarcodeEncodingOptionsFields,
+  BarcodeRenderOptionsFields,
+  CellUpdateFields,
   CellValueFields,
   CheckboxEditorParamsFields,
   ClearScope,
@@ -17,6 +22,9 @@ import {
   ColIndicatorConfigFields,
   ColumnDataType,
   ColumnDefFields,
+  CornerIndicatorConfigFields,
+  CornerIndicatorSlotFields,
+  DefineRowsRequestFields,
   DropdownItemLayout,
   EditTrigger,
   EditConfigFields,
@@ -34,6 +42,7 @@ import {
   GridEventFields,
   GridConfigFields,
   HeaderFeaturesFields,
+  HoverConfigFields,
   IndicatorsConfigFields,
   InteractionConfigFields,
   LayoutConfigFields,
@@ -45,17 +54,125 @@ import {
   RenderLayerBit,
   RenderOutputFields,
   ResizePolicyFields,
+  RichTextFields,
+  RowDefFields,
   RowIndicatorConfigFields,
   RowIndicatorSlotKind,
   RowIndicatorSlotFields,
+  SelectionConfigFields,
+  TextFormatRunFields,
+  TextRunStyleFields,
   ScrollBarsMode,
   ScrollConfigFields,
   SpanConfigFields,
   ThemePreset,
+  UpdateCellsRequestFields,
   ValidationErrorFields,
 } from "./generated/volvoxgrid_ffi.js";
+import { EventPump } from "./event-pump.js";
+import { VolvoxGridServiceFfi } from "./generated/volvoxgrid_ffi.js";
+import { WasmPluginHost } from "./proto-host.js";
 
 export { DropdownItemLayout, ThemePreset } from "./generated/volvoxgrid_ffi.js";
+
+export type VolvoxGridRowId = string | number;
+export type VolvoxGridDataRow = Record<string, unknown> | ReadonlyArray<unknown>;
+
+export interface VolvoxGridGetRowIdParams<TRow = VolvoxGridDataRow> {
+  data: TRow;
+  rowIndex: number;
+}
+
+export type VolvoxGridGetRowId<TRow = VolvoxGridDataRow> =
+  (params: VolvoxGridGetRowIdParams<TRow>) => VolvoxGridRowId;
+
+export interface VolvoxGridValueGetterParams<TRow = VolvoxGridDataRow> {
+  data: TRow;
+  rowIndex: number;
+  colIndex: number;
+  field?: string;
+  column: VolvoxGridColumnDef<TRow>;
+}
+
+export interface VolvoxGridValueFormatterParams<TRow = VolvoxGridDataRow>
+  extends VolvoxGridValueGetterParams<TRow> {
+  value: unknown;
+}
+
+export interface VolvoxGridColumnDef<TRow = VolvoxGridDataRow> extends VolvoxGridColumnSpec {
+  /** Object field name. Mirrors AG Grid/MUI/Kendo-style data-column APIs. */
+  field?: string;
+  /** Stable column id. Used as the engine column key when `key` is omitted. */
+  colId?: string;
+  /** User-facing header text. Used as the engine caption when `caption` is omitted. */
+  headerName?: string;
+  /** Host-side value projection for data rows. */
+  valueGetter?: (params: VolvoxGridValueGetterParams<TRow>) => unknown;
+  /** Host-side display formatting for values written through the easy data API. */
+  valueFormatter?: (params: VolvoxGridValueFormatterParams<TRow>) => unknown;
+}
+
+export interface VolvoxGridSetDataOptions<TRow = VolvoxGridDataRow> {
+  columns?: ReadonlyArray<VolvoxGridColumnDef<TRow>>;
+  getRowId?: VolvoxGridGetRowId<TRow>;
+  atomic?: boolean;
+  loadDataOptions?: VolvoxGridLoadDataOptions;
+}
+
+export interface VolvoxGridUpdateRowsOptions<TRow = VolvoxGridDataRow> {
+  getRowId?: VolvoxGridGetRowId<TRow>;
+  addMissing?: boolean;
+  atomic?: boolean;
+}
+
+export interface VolvoxGridTransaction<TRow = VolvoxGridDataRow> {
+  add?: ReadonlyArray<TRow>;
+  update?: ReadonlyArray<TRow>;
+  remove?: ReadonlyArray<TRow | VolvoxGridRowId>;
+}
+
+export interface VolvoxGridTransactionResult {
+  add: number[];
+  update: number[];
+  remove: number[];
+}
+
+export interface VolvoxGridTreeDataOptions<TRow = VolvoxGridDataRow> {
+  columns?: ReadonlyArray<VolvoxGridColumnDef<TRow>>;
+  getId?: (row: TRow, index: number) => VolvoxGridRowId;
+  getParentId?: (row: TRow, index: number) => VolvoxGridRowId | null | undefined;
+  getChildren?: (row: TRow, index: number) => ReadonlyArray<TRow> | null | undefined;
+  idField?: string;
+  parentIdField?: string;
+  childrenField?: string;
+  labelField?: string;
+  replace?: boolean;
+  collapseInitial?: boolean;
+}
+
+export type VolvoxGridProtoRequest =
+  | Uint8Array
+  | ArrayBuffer
+  | {
+    gridId?: bigint | number;
+    grid_id?: bigint | number;
+    toBinary?: () => Uint8Array;
+    toByteArray?: () => Uint8Array;
+  };
+
+export interface VolvoxGridProtoMessageType<T> {
+  fromBinary?: (data: Uint8Array) => T;
+  parseFrom?: (data: Uint8Array) => T;
+}
+
+export interface VolvoxGridCallProtoOptions {
+  /** Fill generated request.gridId/grid_id with the current engine id when it is unset. */
+  injectGridId?: boolean;
+  /** Mark the canvas dirty after the raw call. Defaults to the known RPC mutability. */
+  dirty?: boolean;
+  /** Permit zero-byte protobuf responses. Defaults true because empty protobufs are valid. */
+  allowEmptyResponse?: boolean;
+}
 
 /**
  * Options for the data-first `new VolvoxGrid(host, options)` form.
@@ -95,6 +212,18 @@ export interface VolvoxGridOptions {
   rowCount?: number;
   /** Initial column count for the grid body. Defaults to 5. */
   colCount?: number;
+  /** Initial commercial-grid style column definitions. */
+  columns?: ReadonlyArray<VolvoxGridColumnDef>;
+  /** Alias for `columns`, matching AG Grid/MUI-style naming. */
+  columnDefs?: ReadonlyArray<VolvoxGridColumnDef>;
+  /** Initial row data. Alias: `data`. */
+  rowData?: ReadonlyArray<VolvoxGridDataRow>;
+  /** Initial row data. Alias: `rowData`. */
+  data?: ReadonlyArray<VolvoxGridDataRow>;
+  /** Stable row id callback used by `updateRows` and `applyTransaction`. */
+  getRowId?: VolvoxGridGetRowId;
+  /** Load `rowData` as tree data instead of flat rows. */
+  treeData?: boolean | VolvoxGridTreeDataOptions;
 }
 
 export interface VolvoxGridCellRange {
@@ -252,6 +381,30 @@ export interface VolvoxGridCompareDetails {
 
 export type VolvoxGridCompareCallback = (details: VolvoxGridCompareDetails) => number;
 
+/**
+ * Typed event map for `grid.on(name, listener)`. The value type for each key is
+ * the argument passed to the listener.
+ *
+ * Cancelable events (`beforeEdit`, `cellEditValidating`, `beforeSort`) pass a
+ * mutable details object — set `details.cancel = true` from any listener to
+ * veto the action. If multiple listeners are registered, any one of them can
+ * cancel.
+ */
+export interface VolvoxGridEventMap {
+  beforeEdit: VolvoxGridBeforeEditDetails;
+  cellEditValidating: VolvoxGridCellEditValidatingDetails;
+  beforeSort: VolvoxGridBeforeSortDetails;
+  editorSessionStarted: VolvoxGridEditorSessionStartedDetails;
+  editorSessionUpdated: VolvoxGridEditorSessionUpdatedDetails;
+  editorSessionEnded: VolvoxGridEditorSessionEndedDetails;
+  zoomChange: number;
+  contextMenuRequest: VolvoxGridContextMenuRequest;
+  gridEventRaw: Uint8Array;
+}
+
+export type VolvoxGridEventListener<K extends keyof VolvoxGridEventMap> =
+  (event: VolvoxGridEventMap[K]) => void;
+
 export interface VolvoxGridHeaderFeatures {
   sort?: boolean;
   reorder?: boolean;
@@ -304,6 +457,65 @@ export interface VolvoxGridColumnIndicatorConfig {
 export interface VolvoxGridFreezePolicy {
   columns?: boolean;
   rows?: boolean;
+}
+
+export interface VolvoxGridSelectionHoverMode {
+  row?: boolean;
+  column?: boolean;
+  cell?: boolean;
+}
+
+export interface VolvoxGridRowSpec {
+  height?: number;
+  hidden?: boolean;
+  isSubtotal?: boolean;
+  outlineLevel?: number;
+}
+
+export interface VolvoxGridBarcodeEncoding {
+  checkDigit?: number;
+  textEncoding?: number;
+  qrEcc?: number;
+}
+
+export interface VolvoxGridBarcodeRender {
+  foreground?: number;
+  background?: number;
+  alignment?: number;
+  moduleSize?: number;
+  quietZone?: number;
+  barHeight?: number;
+  narrowBarWidth?: number;
+  showSizeWarning?: boolean;
+  sizeWarningColor?: number;
+  useFullRect?: boolean;
+}
+
+export interface VolvoxGridBarcodeCaption {
+  position?: number;
+  text?: string;
+  color?: number;
+  fontSize?: number;
+}
+
+export interface VolvoxGridBarcode {
+  symbology: number;
+  value?: string;
+  encoding?: VolvoxGridBarcodeEncoding;
+  render?: VolvoxGridBarcodeRender;
+  caption?: VolvoxGridBarcodeCaption;
+}
+
+export interface VolvoxGridCellUpdate {
+  row: number;
+  col: number;
+  text?: string;
+  style?: VolvoxGridCellStyle;
+  barcode?: VolvoxGridBarcode;
+}
+
+export interface VolvoxGridUpdateCellsOptions {
+  atomic?: boolean;
 }
 
 export interface VolvoxGridPadding {
@@ -553,6 +765,74 @@ export interface VolvoxGridAddSubtotalsOptions {
   mergeColTo?: number;
 }
 
+export interface VolvoxGridColumnSpec {
+  caption?: string;
+  key?: string;
+  width?: number;
+  align?: number;
+  dataType?: number;
+  format?: string;
+  progressColor?: number;
+  dropdownItems?: string;
+  dropdown?: VolvoxGridDropdown;
+  interaction?: number;
+  hidden?: boolean;
+  span?: boolean;
+  nullable?: boolean;
+}
+
+export interface VolvoxGridRichTextRun {
+  startIndex: number;
+  foreground?: number;
+  font?: VolvoxGridFont;
+  baseline?: number;
+  linkUrl?: string;
+}
+
+export interface VolvoxGridTreeCell {
+  col: number;
+  text?: string;
+  style?: VolvoxGridCellStyle;
+  richText?: ReadonlyArray<VolvoxGridRichTextRun>;
+}
+
+export interface VolvoxGridTreeNode {
+  id: string;
+  parentId?: string;
+  hasChildren?: boolean;
+  cells?: ReadonlyArray<VolvoxGridTreeCell>;
+}
+
+export interface VolvoxGridLoadTreeOptions {
+  replace?: boolean;
+  collapseInitial?: boolean;
+}
+
+export interface VolvoxGridOutlineConfig {
+  treeIndicator?: number;
+  treeColor?: number;
+  groupTotalPosition?: number;
+  multiTotals?: boolean;
+  indicatorIndent?: number;
+  maxLevels?: number;
+  showLevelButtons?: boolean;
+  labelColumn?: number;
+  iconColumn?: number;
+}
+
+export interface VolvoxGridCornerIndicatorSlot {
+  kind: number;
+  width?: number;
+  visible?: boolean;
+}
+
+export interface VolvoxGridCornerIndicatorConfig {
+  visible?: boolean;
+  background?: number;
+  foreground?: number;
+  slots?: ReadonlyArray<VolvoxGridCornerIndicatorSlot>;
+}
+
 type ResolvedHeaderSeparatorStyle = {
   enabled: boolean;
   colorArgb: number;
@@ -643,7 +923,8 @@ const GRID_EVENT_CELL_EDIT_VALIDATE = GridEventFields["cell_edit_validate"];
 const GRID_EVENT_BEFORE_SORT = GridEventFields["before_sort"];
 const STREAM_STATUS_DATA = 0;
 const STREAM_STATUS_EOF = 1;
-const STREAM_STATUS_PENDING = 2;
+const STREAM_STATUS_ERROR = 2;
+const STREAM_STATUS_PENDING = 3;
 const PB_WIRE_VARINT = 0;
 const PB_WIRE_LENGTH_DELIMITED = 2;
 const PB_WIRE_FIXED32 = 5;
@@ -663,8 +944,106 @@ const HOST_DROPDOWN_OVERLAY_DISABLED = 0;
 const DEFAULT_FONT_SIZE_CSS_PX = 11.0;
 type StreamHandle = number | bigint;
 
-function decodeSignedStatus(statusByte: number): number {
-  return statusByte > 127 ? statusByte - 256 : statusByte;
+const VOLVOX_GRID_PROTO_RPC_EXPORTS: Record<string, { exportName: string; mutates: boolean }> = {
+  LoadFontData: { exportName: "volvox_grid_load_font_data_pb", mutates: false },
+  DefineColumns: { exportName: "volvox_grid_define_columns_pb", mutates: true },
+  DefineRows: { exportName: "volvox_grid_define_rows_pb", mutates: true },
+  InsertRows: { exportName: "volvox_grid_insert_rows_pb", mutates: true },
+  UpdateCells: { exportName: "volvox_grid_update_cells_pb", mutates: true },
+  LoadTable: { exportName: "volvox_grid_load_table_pb", mutates: true },
+  LoadData: { exportName: "volvox_grid_load_data_pb", mutates: true },
+  AppendData: { exportName: "volvox_grid_append_data_pb", mutates: true },
+  Select: { exportName: "volvox_grid_select_pb", mutates: true },
+  Edit: { exportName: "volvox_grid_edit_pb", mutates: true },
+  Sort: { exportName: "volvox_grid_sort_pb", mutates: true },
+  GetNode: { exportName: "volvox_grid_get_node_pb", mutates: false },
+  Find: { exportName: "volvox_grid_find_pb", mutates: false },
+  Clipboard: { exportName: "volvox_grid_clipboard_pb", mutates: true },
+  Print: { exportName: "volvox_grid_print_pb", mutates: false },
+};
+
+function normalizeProtoRpcName(method: string): string {
+  const servicePrefix = "volvoxgrid.v1.VolvoxGridService/";
+  if (method.startsWith(servicePrefix)) {
+    return method.slice(servicePrefix.length);
+  }
+  const slash = method.lastIndexOf("/");
+  return slash >= 0 ? method.slice(slash + 1) : method;
+}
+
+function defaultCellText(value: unknown): string {
+  if (value == null) {
+    return "";
+  }
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  if (typeof value === "bigint") {
+    return value.toString();
+  }
+  return String(value);
+}
+
+function jsonStringifyGridData(value: unknown): string {
+  return JSON.stringify(value, (_key, v) => {
+    if (typeof v === "bigint") {
+      return v.toString();
+    }
+    if (v instanceof Date) {
+      return v.toISOString();
+    }
+    return v;
+  }) ?? "null";
+}
+
+function columnField<TRow>(column: VolvoxGridColumnDef<TRow>, index: number): string | undefined {
+  return column.field ?? column.key ?? column.colId ?? (column.valueGetter == null ? String(index) : undefined);
+}
+
+function columnKey<TRow>(column: VolvoxGridColumnDef<TRow>, index: number): string {
+  return column.key ?? column.field ?? column.colId ?? String(index);
+}
+
+function normalizeDataColumn<TRow>(
+  column: VolvoxGridColumnDef<TRow>,
+  index: number,
+): VolvoxGridColumnDef<TRow> {
+  const key = columnKey(column, index);
+  return {
+    ...column,
+    key,
+    caption: column.caption ?? column.headerName ?? column.field ?? column.colId ?? key,
+  };
+}
+
+function inferColumnsFromRows<TRow = VolvoxGridDataRow>(
+  rows: ReadonlyArray<TRow>,
+): VolvoxGridColumnDef<TRow>[] {
+  const keys: string[] = [];
+  const seen = new Set<string>();
+  let maxArrayLength = 0;
+  for (const row of rows) {
+    if (Array.isArray(row)) {
+      maxArrayLength = Math.max(maxArrayLength, row.length);
+      continue;
+    }
+    if (isPlainObject(row)) {
+      for (const key of Object.keys(row)) {
+        if (!seen.has(key)) {
+          seen.add(key);
+          keys.push(key);
+        }
+      }
+    }
+  }
+  if (keys.length > 0) {
+    return keys.map((field) => ({ field, key: field, caption: field }));
+  }
+  return Array.from({ length: maxArrayLength }, (_unused, index) => ({
+    field: String(index),
+    key: String(index),
+    caption: String(index + 1),
+  }));
 }
 
 function decodeFfiErrorPayload(payload: Uint8Array): {
@@ -1066,11 +1445,172 @@ function pbEncodeColumnWithDefaultEditor(
   return new Uint8Array(out);
 }
 
+export function dropdownFromLabels(items: string): VolvoxGridDropdown {
+  const allowCustomValue = items.startsWith("|");
+  const source = allowCustomValue ? items.slice(1) : items;
+  const out: VolvoxGridDropdown = { items: [], allowCustomValue };
+  for (const label of source.split("|")) {
+    if (!label) continue;
+    out.items.push({ label });
+  }
+  return out;
+}
+
+function pbEncodeColumnDefFromSpec(index: number, spec: VolvoxGridColumnSpec): Uint8Array {
+  const out: number[] = [];
+  out.push(...pbEncodeTag(ColumnDefFields.index, 0), ...pbEncodeInt32(index));
+  if (spec.width != null) {
+    out.push(...pbEncodeInt32Field(ColumnDefFields.width, spec.width));
+  }
+  if (spec.caption != null) {
+    out.push(...pbEncodeStringField(ColumnDefFields.caption, spec.caption));
+  }
+  if (spec.align != null) {
+    out.push(...pbEncodeInt32Field(ColumnDefFields.align, spec.align));
+  }
+  if (spec.dataType != null) {
+    out.push(...pbEncodeInt32Field(ColumnDefFields.data_type, spec.dataType));
+  }
+  if (spec.format != null) {
+    out.push(...pbEncodeStringField(ColumnDefFields.format, spec.format));
+  }
+  if (spec.progressColor != null) {
+    out.push(...pbEncodeUint32Field(ColumnDefFields.progress_color, spec.progressColor));
+  }
+  if (spec.key != null) {
+    out.push(...pbEncodeStringField(ColumnDefFields.key, spec.key));
+  }
+  const dropdown = spec.dropdown
+    ?? (spec.dropdownItems != null ? dropdownFromLabels(spec.dropdownItems) : null);
+  if (dropdown != null) {
+    out.push(...pbEncodeMessageField(ColumnDefFields.editor, pbEncodeDropdownEditor(dropdown)));
+  }
+  if (spec.hidden != null) {
+    out.push(...pbEncodeTag(ColumnDefFields.hidden, 0), ...pbEncodeBool(spec.hidden));
+  }
+  if (spec.span != null) {
+    out.push(...pbEncodeTag(ColumnDefFields.span, 0), ...pbEncodeBool(spec.span));
+  }
+  if (spec.interaction != null) {
+    out.push(...pbEncodeInt32Field(ColumnDefFields.interaction, spec.interaction));
+  }
+  if (spec.nullable != null) {
+    out.push(...pbEncodeTag(ColumnDefFields.nullable, 0), ...pbEncodeBool(spec.nullable));
+  }
+  return new Uint8Array(out);
+}
+
 function pbEncodeDefineColumnsRequest(gridId: number, columns: Uint8Array[]): Uint8Array {
   const out: number[] = [];
   out.push(...pbEncodeTag(1, 0), ...pbEncodeInt64(BigInt(Math.trunc(gridId))));
   for (const column of columns) {
     out.push(...pbEncodeMessageField(2, column));
+  }
+  return new Uint8Array(out);
+}
+
+const NodeCellUpdateFieldsLocal = { node_id: 1, col: 2, value: 3, style: 4, rich_text: 9 } as const;
+const TreeNodeFieldsLocal = { node_id: 1, parent_id: 2, cells: 4, children_state: 5 } as const;
+const LoadTreeRequestFieldsLocal = { grid_id: 1, nodes: 2, replace: 3, collapse_initial: 4 } as const;
+const NODE_CHILDREN_STATE_LEAF = 1;
+const NODE_CHILDREN_STATE_LOADED = 4;
+
+function pbEncodeRichTextRun(run: VolvoxGridRichTextRun): Uint8Array | null {
+  const start = Math.trunc(run.startIndex);
+  if (!Number.isFinite(start) || start < 0) {
+    return null;
+  }
+  const style: number[] = [];
+  if (run.foreground != null) {
+    style.push(...pbEncodeUint32Field(TextRunStyleFields.foreground, run.foreground));
+  }
+  if (run.font != null) {
+    const font = pbEncodeFont(run.font);
+    if (font.length > 0) {
+      style.push(...pbEncodeMessageField(TextRunStyleFields.font, font));
+    }
+  }
+  if (run.baseline != null) {
+    style.push(...pbEncodeInt32Field(TextRunStyleFields.baseline, run.baseline));
+  }
+  if (run.linkUrl != null && run.linkUrl !== "") {
+    style.push(...pbEncodeStringField(TextRunStyleFields.link_url, run.linkUrl));
+  }
+  const out: number[] = [];
+  out.push(...pbEncodeUint32Field(TextFormatRunFields.start_index, start));
+  if (style.length > 0) {
+    out.push(...pbEncodeMessageField(TextFormatRunFields.style, new Uint8Array(style)));
+  }
+  return new Uint8Array(out);
+}
+
+function pbEncodeRichText(runs: ReadonlyArray<VolvoxGridRichTextRun>): Uint8Array {
+  const out: number[] = [];
+  for (const run of runs) {
+    const encoded = pbEncodeRichTextRun(run);
+    if (encoded != null && encoded.length > 0) {
+      out.push(...pbEncodeMessageField(RichTextFields.runs, encoded));
+    }
+  }
+  return new Uint8Array(out);
+}
+
+function pbEncodeCellValueText(text: string): Uint8Array {
+  return new Uint8Array(pbEncodeStringField(CellValueFields.text, text));
+}
+
+function pbEncodeTreeNodeCell(nodeId: string, cell: VolvoxGridTreeCell): Uint8Array {
+  const out: number[] = [];
+  out.push(...pbEncodeStringField(NodeCellUpdateFieldsLocal.node_id, nodeId));
+  out.push(...pbEncodeInt32Field(NodeCellUpdateFieldsLocal.col, cell.col));
+  if (cell.text != null) {
+    out.push(...pbEncodeMessageField(NodeCellUpdateFieldsLocal.value, pbEncodeCellValueText(cell.text)));
+  }
+  if (cell.style != null) {
+    const style = pbEncodeCellStyle(cell.style);
+    if (style.length > 0) {
+      out.push(...pbEncodeMessageField(NodeCellUpdateFieldsLocal.style, style));
+    }
+  }
+  if (cell.richText != null && cell.richText.length > 0) {
+    const richText = pbEncodeRichText(cell.richText);
+    if (richText.length > 0) {
+      out.push(...pbEncodeMessageField(NodeCellUpdateFieldsLocal.rich_text, richText));
+    }
+  }
+  return new Uint8Array(out);
+}
+
+function pbEncodeTreeNode(node: VolvoxGridTreeNode): Uint8Array {
+  const out: number[] = [];
+  out.push(...pbEncodeStringField(TreeNodeFieldsLocal.node_id, node.id));
+  if (node.parentId != null && node.parentId !== "") {
+    out.push(...pbEncodeStringField(TreeNodeFieldsLocal.parent_id, node.parentId));
+  }
+  for (const cell of node.cells ?? []) {
+    out.push(...pbEncodeMessageField(TreeNodeFieldsLocal.cells, pbEncodeTreeNodeCell(node.id, cell)));
+  }
+  out.push(...pbEncodeInt32Field(
+    TreeNodeFieldsLocal.children_state,
+    node.hasChildren ? NODE_CHILDREN_STATE_LOADED : NODE_CHILDREN_STATE_LEAF,
+  ));
+  return new Uint8Array(out);
+}
+
+function pbEncodeLoadTreeRequest(
+  gridId: number,
+  nodes: ReadonlyArray<VolvoxGridTreeNode>,
+  replace: boolean,
+  collapseInitial?: boolean,
+): Uint8Array {
+  const out: number[] = [];
+  out.push(...pbEncodeTag(LoadTreeRequestFieldsLocal.grid_id, 0), ...pbEncodeVarint(BigInt(Math.trunc(gridId))));
+  for (const node of nodes) {
+    out.push(...pbEncodeMessageField(LoadTreeRequestFieldsLocal.nodes, pbEncodeTreeNode(node)));
+  }
+  out.push(...pbEncodeTag(LoadTreeRequestFieldsLocal.replace, 0), ...pbEncodeBool(replace));
+  if (collapseInitial != null) {
+    out.push(...pbEncodeTag(LoadTreeRequestFieldsLocal.collapse_initial, 0), ...pbEncodeBool(collapseInitial));
   }
   return new Uint8Array(out);
 }
@@ -1458,6 +1998,174 @@ function pbEncodeThemePresetConfig(preset: number): Uint8Array {
   return new Uint8Array(gridConfig);
 }
 
+function pbEncodeSelectionHoverConfig(mode: VolvoxGridSelectionHoverMode): Uint8Array {
+  const hover: number[] = [];
+  hover.push(...pbEncodeBoolField(HoverConfigFields.row, mode.row === true));
+  hover.push(...pbEncodeBoolField(HoverConfigFields.column, mode.column === true));
+  hover.push(...pbEncodeBoolField(HoverConfigFields.cell, mode.cell === true));
+  const selection: number[] = [];
+  selection.push(...pbEncodeMessageField(SelectionConfigFields.hover, new Uint8Array(hover)));
+  const gridConfig: number[] = [];
+  gridConfig.push(...pbEncodeMessageField(GridConfigFields.selection, new Uint8Array(selection)));
+  return new Uint8Array(gridConfig);
+}
+
+function pbEncodeRowDef(index: number, row: VolvoxGridRowSpec): Uint8Array {
+  const out: number[] = [];
+  out.push(...pbEncodeInt32Field(RowDefFields.index, index));
+  if (row.height != null) {
+    out.push(...pbEncodeInt32Field(RowDefFields.height, row.height));
+  }
+  if (row.hidden != null) {
+    out.push(...pbEncodeBoolField(RowDefFields.hidden, row.hidden));
+  }
+  if (row.isSubtotal != null) {
+    out.push(...pbEncodeBoolField(RowDefFields.is_subtotal, row.isSubtotal));
+  }
+  if (row.outlineLevel != null) {
+    out.push(...pbEncodeInt32Field(RowDefFields.outline_level, row.outlineLevel));
+  }
+  return new Uint8Array(out);
+}
+
+function pbEncodeDefineRowsRequest(
+  gridId: number,
+  rows: ReadonlyArray<VolvoxGridRowSpec>,
+): Uint8Array {
+  const out: number[] = [];
+  out.push(...pbEncodeTag(DefineRowsRequestFields.grid_id, 0), ...pbEncodeVarint(BigInt(gridId)));
+  rows.forEach((row, index) => {
+    out.push(...pbEncodeMessageField(DefineRowsRequestFields.rows, pbEncodeRowDef(index, row)));
+  });
+  return new Uint8Array(out);
+}
+
+function pbEncodeBarcodeEncoding(encoding: VolvoxGridBarcodeEncoding): Uint8Array {
+  const out: number[] = [];
+  if (encoding.checkDigit != null) {
+    out.push(...pbEncodeInt32Field(BarcodeEncodingOptionsFields.check_digit, encoding.checkDigit));
+  }
+  if (encoding.textEncoding != null) {
+    out.push(...pbEncodeInt32Field(BarcodeEncodingOptionsFields.text_encoding, encoding.textEncoding));
+  }
+  if (encoding.qrEcc != null) {
+    out.push(...pbEncodeInt32Field(BarcodeEncodingOptionsFields.qr_ecc, encoding.qrEcc));
+  }
+  return new Uint8Array(out);
+}
+
+function pbEncodeBarcodeRender(render: VolvoxGridBarcodeRender): Uint8Array {
+  const out: number[] = [];
+  if (render.foreground != null) {
+    out.push(...pbEncodeUint32Field(BarcodeRenderOptionsFields.foreground, render.foreground));
+  }
+  if (render.background != null) {
+    out.push(...pbEncodeUint32Field(BarcodeRenderOptionsFields.background, render.background));
+  }
+  if (render.alignment != null) {
+    out.push(...pbEncodeInt32Field(BarcodeRenderOptionsFields.alignment, render.alignment));
+  }
+  if (render.moduleSize != null) {
+    out.push(...pbEncodeUint32Field(BarcodeRenderOptionsFields.module_size, render.moduleSize));
+  }
+  if (render.quietZone != null) {
+    out.push(...pbEncodeUint32Field(BarcodeRenderOptionsFields.quiet_zone, render.quietZone));
+  }
+  if (render.barHeight != null) {
+    out.push(...pbEncodeUint32Field(BarcodeRenderOptionsFields.bar_height, render.barHeight));
+  }
+  if (render.narrowBarWidth != null) {
+    out.push(...pbEncodeUint32Field(BarcodeRenderOptionsFields.narrow_bar_width, render.narrowBarWidth));
+  }
+  if (render.showSizeWarning != null) {
+    out.push(...pbEncodeBoolField(BarcodeRenderOptionsFields.show_size_warning, render.showSizeWarning));
+  }
+  if (render.sizeWarningColor != null) {
+    out.push(...pbEncodeUint32Field(BarcodeRenderOptionsFields.size_warning_color, render.sizeWarningColor));
+  }
+  if (render.useFullRect != null) {
+    out.push(...pbEncodeBoolField(BarcodeRenderOptionsFields.use_full_rect, render.useFullRect));
+  }
+  return new Uint8Array(out);
+}
+
+function pbEncodeBarcodeCaption(caption: VolvoxGridBarcodeCaption): Uint8Array {
+  const out: number[] = [];
+  if (caption.position != null) {
+    out.push(...pbEncodeInt32Field(BarcodeCaptionOptionsFields.position, caption.position));
+  }
+  if (caption.text != null) {
+    out.push(...pbEncodeStringField(BarcodeCaptionOptionsFields.text, caption.text));
+  }
+  if (caption.color != null) {
+    out.push(...pbEncodeUint32Field(BarcodeCaptionOptionsFields.color, caption.color));
+  }
+  if (caption.fontSize != null) {
+    out.push(...pbEncodeFloatField(BarcodeCaptionOptionsFields.font_size, caption.fontSize));
+  }
+  return new Uint8Array(out);
+}
+
+function pbEncodeBarcode(barcode: VolvoxGridBarcode): Uint8Array {
+  const out: number[] = [];
+  out.push(...pbEncodeInt32Field(BarcodeDataFields.symbology, barcode.symbology));
+  if (barcode.value != null) {
+    out.push(...pbEncodeStringField(BarcodeDataFields.value, barcode.value));
+  }
+  if (barcode.encoding != null) {
+    const enc = pbEncodeBarcodeEncoding(barcode.encoding);
+    if (enc.length > 0) {
+      out.push(...pbEncodeMessageField(BarcodeDataFields.encoding, enc));
+    }
+  }
+  if (barcode.render != null) {
+    const render = pbEncodeBarcodeRender(barcode.render);
+    if (render.length > 0) {
+      out.push(...pbEncodeMessageField(BarcodeDataFields.render, render));
+    }
+  }
+  if (barcode.caption != null) {
+    const caption = pbEncodeBarcodeCaption(barcode.caption);
+    if (caption.length > 0) {
+      out.push(...pbEncodeMessageField(BarcodeDataFields.caption, caption));
+    }
+  }
+  return new Uint8Array(out);
+}
+
+function pbEncodeCellUpdateMessage(cell: VolvoxGridCellUpdate): Uint8Array {
+  const out: number[] = [];
+  out.push(...pbEncodeInt32Field(CellUpdateFields.row, cell.row));
+  out.push(...pbEncodeInt32Field(CellUpdateFields.col, cell.col));
+  if (cell.text != null) {
+    out.push(...pbEncodeMessageField(CellUpdateFields.value, pbEncodeCellValueText(cell.text)));
+  }
+  if (cell.style != null) {
+    const style = pbEncodeCellStyle(cell.style);
+    if (style.length > 0) {
+      out.push(...pbEncodeMessageField(CellUpdateFields.style, style));
+    }
+  }
+  if (cell.barcode != null) {
+    out.push(...pbEncodeMessageField(CellUpdateFields.barcode, pbEncodeBarcode(cell.barcode)));
+  }
+  return new Uint8Array(out);
+}
+
+function pbEncodeUpdateCellsRequest(
+  gridId: number,
+  cells: ReadonlyArray<VolvoxGridCellUpdate>,
+  atomic: boolean,
+): Uint8Array {
+  const out: number[] = [];
+  out.push(...pbEncodeTag(UpdateCellsRequestFields.grid_id, 0), ...pbEncodeVarint(BigInt(gridId)));
+  for (const cell of cells) {
+    out.push(...pbEncodeMessageField(UpdateCellsRequestFields.cells, pbEncodeCellUpdateMessage(cell)));
+  }
+  out.push(...pbEncodeBoolField(UpdateCellsRequestFields.atomic, atomic));
+  return new Uint8Array(out);
+}
+
 function pbEncodeOutlineMultiTotalsConfig(enabled: boolean): Uint8Array {
   const outline: number[] = [];
   outline.push(...pbEncodeBoolField(OutlineConfigFields.multi_totals, enabled));
@@ -1465,6 +2173,82 @@ function pbEncodeOutlineMultiTotalsConfig(enabled: boolean): Uint8Array {
   gridConfig.push(...pbEncodeMessageField(GridConfigFields.outline, new Uint8Array(outline)));
   return new Uint8Array(gridConfig);
 }
+
+function pbEncodeOutlineConfig(config: VolvoxGridOutlineConfig): Uint8Array {
+  const outline: number[] = [];
+  if (config.treeIndicator != null) {
+    outline.push(...pbEncodeInt32Field(OutlineConfigFields.tree_indicator, config.treeIndicator));
+  }
+  if (config.treeColor != null) {
+    outline.push(...pbEncodeUint32Field(OutlineConfigFields.tree_color, config.treeColor));
+  }
+  if (config.groupTotalPosition != null) {
+    outline.push(...pbEncodeInt32Field(OutlineConfigFields.group_total_position, config.groupTotalPosition));
+  }
+  if (config.multiTotals != null) {
+    outline.push(...pbEncodeBoolField(OutlineConfigFields.multi_totals, config.multiTotals));
+  }
+  if (config.indicatorIndent != null) {
+    outline.push(...pbEncodeInt32Field(OutlineConfigFields.indicator_indent, config.indicatorIndent));
+  }
+  if (config.maxLevels != null) {
+    outline.push(...pbEncodeInt32Field(OutlineConfigFields.max_levels, config.maxLevels));
+  }
+  if (config.showLevelButtons != null) {
+    outline.push(...pbEncodeBoolField(OutlineConfigFields.show_level_buttons, config.showLevelButtons));
+  }
+  if (config.labelColumn != null) {
+    outline.push(...pbEncodeInt32Field(OutlineConfigFields.label_column, config.labelColumn));
+  }
+  if (config.iconColumn != null) {
+    outline.push(...pbEncodeInt32Field(OutlineConfigFields.icon_column, config.iconColumn));
+  }
+  const gridConfig: number[] = [];
+  gridConfig.push(...pbEncodeMessageField(GridConfigFields.outline, new Uint8Array(outline)));
+  return new Uint8Array(gridConfig);
+}
+
+function pbEncodeCornerIndicatorSlot(slot: VolvoxGridCornerIndicatorSlot): Uint8Array {
+  const out: number[] = [];
+  out.push(...pbEncodeInt32Field(CornerIndicatorSlotFields.kind, slot.kind));
+  if (slot.width != null) {
+    out.push(...pbEncodeInt32Field(CornerIndicatorSlotFields.width, slot.width));
+  }
+  if (slot.visible != null) {
+    out.push(...pbEncodeBoolField(CornerIndicatorSlotFields.visible, slot.visible));
+  }
+  return new Uint8Array(out);
+}
+
+function pbEncodeCornerIndicatorTopStartConfig(config: VolvoxGridCornerIndicatorConfig): Uint8Array {
+  const corner: number[] = [];
+  if (config.visible != null) {
+    corner.push(...pbEncodeBoolField(CornerIndicatorConfigFields.visible, config.visible));
+  }
+  if (config.background != null) {
+    corner.push(...pbEncodeUint32Field(CornerIndicatorConfigFields.background, config.background));
+  }
+  if (config.foreground != null) {
+    corner.push(...pbEncodeUint32Field(CornerIndicatorConfigFields.foreground, config.foreground));
+  }
+  for (const slot of config.slots ?? []) {
+    corner.push(...pbEncodeMessageField(CornerIndicatorConfigFields.slots, pbEncodeCornerIndicatorSlot(slot)));
+  }
+  const indicators: number[] = [];
+  indicators.push(...pbEncodeMessageField(IndicatorsConfigFields.corner_top_start, new Uint8Array(corner)));
+  const gridConfig: number[] = [];
+  gridConfig.push(...pbEncodeMessageField(GridConfigFields.indicators, new Uint8Array(indicators)));
+  return new Uint8Array(gridConfig);
+}
+
+function pbEncodeIndicatorAppearance(appearance: number): Uint8Array {
+  const indicators: number[] = [];
+  indicators.push(...pbEncodeInt32Field(IndicatorsConfigFields.appearance, Math.trunc(appearance)));
+  const gridConfig: number[] = [];
+  gridConfig.push(...pbEncodeMessageField(GridConfigFields.indicators, new Uint8Array(indicators)));
+  return new Uint8Array(gridConfig);
+}
+
 
 function pbEncodeDefaultPresentationConfig(): Uint8Array {
   const layout: number[] = [];
@@ -3143,6 +3927,8 @@ export class VolvoxGrid {
     ((details: VolvoxGridEditorSessionEndedDetails) => void) | null = null;
   private beforeSortListener: ((details: VolvoxGridBeforeSortDetails) => void) | null = null;
   private compareListener: VolvoxGridCompareCallback | null = null;
+  private readonly namedEventListeners: Map<keyof VolvoxGridEventMap, Set<(event: unknown) => void>> = new Map();
+  private eventPump: EventPump | null = null;
   private manualEventDecisionEnabled: boolean = false;
   private dpr: number = 1;
   private dprX: number = 1;
@@ -3210,6 +3996,11 @@ export class VolvoxGrid {
   private animationEnabledValue: boolean = false;
   private animationDurationMsValue: number = 0;
   private textLayoutCacheCapValue: number = 0;
+  private dataColumns: VolvoxGridColumnDef[] = [];
+  private dataRows: VolvoxGridDataRow[] = [];
+  private rowIdToIndex = new Map<string, number>();
+  private getRowIdCallback: VolvoxGridGetRowId | null = null;
+  private ffiClient: VolvoxGridServiceFfi | null = null;
 
   /** Cancelable edit-start hook for the web canvas host. */
   get onBeforeEdit(): ((details: VolvoxGridBeforeEditDetails) => void) | null {
@@ -3314,6 +4105,80 @@ export class VolvoxGrid {
   }
 
   /**
+   * Register a typed event listener. Returns an `off()` disposer for
+   * convenience. Multiple listeners per event are supported. For cancelable
+   * events, any listener that sets `details.cancel = true` vetoes the action.
+   *
+   * ```ts
+   * grid.on("beforeEdit", (e) => { if (e.col === 0) e.cancel = true; });
+   * grid.on("editorSessionEnded", (e) => console.log("committed", e.committedText));
+   * ```
+   */
+  on<K extends keyof VolvoxGridEventMap>(
+    event: K,
+    listener: VolvoxGridEventListener<K>,
+  ): () => void {
+    let set = this.namedEventListeners.get(event);
+    if (set == null) {
+      set = new Set();
+      this.namedEventListeners.set(event, set);
+    }
+    set.add(listener as (e: unknown) => void);
+    if (event === "beforeEdit" || event === "cellEditValidating" || event === "beforeSort") {
+      this.syncCancelableEventDecisionSupport();
+    }
+    return () => this.off(event, listener);
+  }
+
+  /** Remove a listener previously registered via `on()` or `once()`. */
+  off<K extends keyof VolvoxGridEventMap>(
+    event: K,
+    listener: VolvoxGridEventListener<K>,
+  ): void {
+    const set = this.namedEventListeners.get(event);
+    if (set == null) return;
+    set.delete(listener as (e: unknown) => void);
+    if (set.size === 0) {
+      this.namedEventListeners.delete(event);
+    }
+    if (event === "beforeEdit" || event === "cellEditValidating" || event === "beforeSort") {
+      this.syncCancelableEventDecisionSupport();
+    }
+  }
+
+  /** Register a listener that fires at most once. Returns an `off()` disposer. */
+  once<K extends keyof VolvoxGridEventMap>(
+    event: K,
+    listener: VolvoxGridEventListener<K>,
+  ): () => void {
+    const wrapper = ((payload: VolvoxGridEventMap[K]) => {
+      this.off(event, wrapper);
+      listener(payload);
+    }) as VolvoxGridEventListener<K>;
+    return this.on(event, wrapper);
+  }
+
+  private emit<K extends keyof VolvoxGridEventMap>(
+    event: K,
+    payload: VolvoxGridEventMap[K],
+  ): void {
+    const set = this.namedEventListeners.get(event);
+    if (set == null || set.size === 0) return;
+    for (const listener of set) {
+      try {
+        (listener as VolvoxGridEventListener<K>)(payload);
+      } catch (error) {
+        console.error(`VolvoxGrid '${event}' listener failed`, error);
+      }
+    }
+  }
+
+  private hasNamedListener(event: keyof VolvoxGridEventMap): boolean {
+    const set = this.namedEventListeners.get(event);
+    return set != null && set.size > 0;
+  }
+
+  /**
    * Data-first constructor: pass any HTMLElement and a `VolvoxGridOptions`
    * object describing the WASM module URL and initial dimensions. After
    * construction, await `grid.loaded` before calling other methods.
@@ -3361,6 +4226,7 @@ export class VolvoxGrid {
       this.loaded = (async () => {
         const wasm = await VolvoxGrid.loadWasm(wasmUrl);
         this.initEngine(wasm, r, c);
+        this.applyInitialOptions(opts);
         return this;
       })();
     } else {
@@ -3514,8 +4380,434 @@ export class VolvoxGrid {
     });
     this.resizeObserver.observe(this.canvas);
 
+    // Push-based event delivery on top of the sync wasm runtime. The pump
+    // coalesces drain requests so spamming `schedule()` from DOM handlers,
+    // FFI returns, and decision chains is free; the rAF tick still
+    // `flushNow()`s as a safety net.
+    this.eventPump = new EventPump({ flush: () => this.flushEventQueues() });
+
     // Kick off the render loop
     this.startRenderLoop();
+  }
+
+  private applyInitialOptions(options: VolvoxGridOptions): void {
+    const columns = options.columnDefs ?? options.columns;
+    if (columns != null) {
+      this.setColumns(columns);
+    }
+    if (options.getRowId != null) {
+      this.getRowIdCallback = options.getRowId;
+    }
+
+    const rowData = options.rowData ?? options.data;
+    if (rowData == null) {
+      return;
+    }
+
+    if (options.treeData) {
+      const treeOptions = typeof options.treeData === "object" ? options.treeData : {};
+      this.setTreeData(rowData, {
+        ...treeOptions,
+        columns: treeOptions.columns ?? columns,
+      });
+      return;
+    }
+
+    this.setData(rowData, { getRowId: options.getRowId });
+  }
+
+  setGridOption<K extends keyof VolvoxGridOptions>(key: K, value: VolvoxGridOptions[K]): void {
+    this.updateGridOptions({ [key]: value } as Partial<VolvoxGridOptions>);
+  }
+
+  updateGridOptions(options: Partial<VolvoxGridOptions>): void {
+    const columns = options.columnDefs ?? options.columns;
+    if (columns != null) {
+      this.setColumns(columns);
+    }
+    if (options.getRowId != null) {
+      this.getRowIdCallback = options.getRowId;
+      this.rebuildRowIdIndex();
+    }
+    if (options.rowCount != null) {
+      this.rowCount = options.rowCount;
+    }
+    if (options.colCount != null) {
+      this.colCount = options.colCount;
+    }
+
+    const rowData = options.rowData ?? options.data;
+    if (rowData == null) {
+      return;
+    }
+    if (options.treeData) {
+      const treeOptions = typeof options.treeData === "object" ? options.treeData : {};
+      this.setTreeData(rowData, {
+        ...treeOptions,
+        columns: treeOptions.columns ?? columns,
+      });
+      return;
+    }
+    this.setData(rowData, { getRowId: options.getRowId });
+  }
+
+  setColumns<TRow = VolvoxGridDataRow>(columns: ReadonlyArray<VolvoxGridColumnDef<TRow>>): void {
+    const normalized = columns.map((column, index) => normalizeDataColumn(column, index));
+    this.dataColumns = normalized as VolvoxGridColumnDef[];
+    this.colCount = normalized.length;
+    this.defineColumns(normalized);
+  }
+
+  setColumnDefs<TRow = VolvoxGridDataRow>(columns: ReadonlyArray<VolvoxGridColumnDef<TRow>>): void {
+    this.setColumns(columns);
+  }
+
+  setData<TRow extends VolvoxGridDataRow>(
+    rows: ReadonlyArray<TRow>,
+    options: VolvoxGridSetDataOptions<TRow> = {},
+  ): VolvoxGridLoadDataResult {
+    if (options.getRowId != null) {
+      this.getRowIdCallback = options.getRowId as VolvoxGridGetRowId;
+    }
+    if (options.columns != null) {
+      this.setColumns(options.columns);
+    } else if (this.dataColumns.length === 0 && rows.length > 0) {
+      this.setColumns(inferColumnsFromRows(rows));
+    }
+
+    this.dataRows = rows.map((row) => row as VolvoxGridDataRow);
+    this.rebuildRowIdIndex();
+    this.rowCount = rows.length;
+
+    const columns = this.dataColumns as VolvoxGridColumnDef<TRow>[];
+    if (typeof this.wasm.volvox_grid_load_data_pb !== "function") {
+      this.writeRowsAsCells(rows, 0, columns, options.atomic ?? true);
+      return {
+        status: LoadDataStatus.LOAD_OK,
+        rows: rows.length,
+        cols: columns.length,
+        rejected: 0,
+        violations: [],
+        warnings: [],
+        inferredColumns: [],
+      };
+    }
+
+    const loadOptions: VolvoxGridLoadDataOptions = { ...(options.loadDataOptions ?? {}) };
+    delete (loadOptions as { csv?: VolvoxGridLoadDataCsvOptions }).csv;
+    loadOptions.json = loadOptions.json ?? {};
+    loadOptions.atomic = options.atomic ?? loadOptions.atomic ?? true;
+    loadOptions.autoCreateColumns = loadOptions.autoCreateColumns ?? columns.length === 0;
+
+    const usesRecordRows = rows.some((row) => isPlainObject(row));
+    if (loadOptions.fieldMap == null && usesRecordRows && columns.length > 0) {
+      const fieldMap: VolvoxGridLoadDataFieldMapping[] = [];
+      columns.forEach((column, colIndex) => {
+        const field = column.field ?? column.key ?? column.colId;
+        if (field != null) {
+          fieldMap.push({ field, colIndex });
+        }
+      });
+      loadOptions.fieldMap = fieldMap;
+    }
+
+    return this.loadData(jsonStringifyGridData(rows), loadOptions);
+  }
+
+  updateRows<TRow extends VolvoxGridDataRow>(
+    rows: ReadonlyArray<TRow>,
+    options: VolvoxGridUpdateRowsOptions<TRow> = {},
+  ): number[] {
+    if (options.getRowId != null) {
+      this.getRowIdCallback = options.getRowId as VolvoxGridGetRowId;
+    }
+    if (this.dataColumns.length === 0 && rows.length > 0) {
+      this.setColumns(inferColumnsFromRows(rows));
+    }
+
+    const addMissing = options.addMissing ?? true;
+    const changedRows: number[] = [];
+    const cells: VolvoxGridCellUpdate[] = [];
+    const columns = this.dataColumns as VolvoxGridColumnDef<TRow>[];
+
+    rows.forEach((incoming, inputIndex) => {
+      let rowIndex = this.resolveRowIndex(incoming, inputIndex, options.getRowId as VolvoxGridGetRowId | undefined);
+      if (rowIndex == null) {
+        if (!addMissing) {
+          return;
+        }
+        rowIndex = this.dataRows.length;
+        this.dataRows.push(incoming as VolvoxGridDataRow);
+      } else {
+        const previous = this.dataRows[rowIndex];
+        this.dataRows[rowIndex] = this.mergeRowData(previous, incoming as VolvoxGridDataRow);
+      }
+
+      if (rowIndex >= this.rowCount) {
+        this.rowCount = rowIndex + 1;
+      }
+      changedRows.push(rowIndex);
+      cells.push(...this.rowToCellUpdates(this.dataRows[rowIndex] as TRow, rowIndex, columns));
+    });
+
+    this.rebuildRowIdIndex();
+    this.updateCells(cells, { atomic: options.atomic ?? true });
+    return changedRows;
+  }
+
+  applyTransaction<TRow extends VolvoxGridDataRow>(
+    transaction: VolvoxGridTransaction<TRow>,
+  ): VolvoxGridTransactionResult {
+    const result: VolvoxGridTransactionResult = { add: [], update: [], remove: [] };
+
+    const removeIndices = (transaction.remove ?? [])
+      .map((rowOrId, inputIndex) => this.resolveRowIndex(rowOrId, inputIndex))
+      .filter((index): index is number => index != null)
+      .sort((a, b) => b - a);
+    for (const rowIndex of removeIndices) {
+      this.removeRows(rowIndex, 1);
+      this.dataRows.splice(rowIndex, 1);
+      result.remove.push(rowIndex);
+    }
+    if (removeIndices.length > 0) {
+      this.rebuildRowIdIndex();
+    }
+
+    const addRows = transaction.add ?? [];
+    if (addRows.length > 0) {
+      if (this.dataColumns.length === 0) {
+        this.setColumns(inferColumnsFromRows(addRows));
+      }
+      const start = this.dataRows.length;
+      this.dataRows.push(...addRows.map((row) => row as VolvoxGridDataRow));
+      this.rowCount = this.dataRows.length;
+      const columns = this.dataColumns as VolvoxGridColumnDef<TRow>[];
+      const cells: VolvoxGridCellUpdate[] = [];
+      addRows.forEach((row, offset) => {
+        const rowIndex = start + offset;
+        result.add.push(rowIndex);
+        cells.push(...this.rowToCellUpdates(row, rowIndex, columns));
+      });
+      this.updateCells(cells, { atomic: true });
+      this.rebuildRowIdIndex();
+    }
+
+    if (transaction.update != null && transaction.update.length > 0) {
+      result.update.push(...this.updateRows(transaction.update, { addMissing: false, atomic: true }));
+    }
+
+    return result;
+  }
+
+  setTreeData<TRow extends VolvoxGridDataRow>(
+    rows: ReadonlyArray<TRow>,
+    options: VolvoxGridTreeDataOptions<TRow> = {},
+  ): void {
+    if (options.columns != null) {
+      this.setColumns(options.columns);
+    } else if (this.dataColumns.length === 0 && rows.length > 0) {
+      const inferred = options.labelField != null
+        ? [{ field: options.labelField, key: options.labelField, caption: options.labelField }]
+        : inferColumnsFromRows(rows).filter((column) => {
+          const field = column.field ?? column.key;
+          return field !== (options.idField ?? "id")
+            && field !== (options.parentIdField ?? "parentId")
+            && field !== (options.childrenField ?? "children");
+        });
+      this.setColumns(inferred);
+    }
+
+    const nodes: VolvoxGridTreeNode[] = [];
+    const columns = this.dataColumns as VolvoxGridColumnDef<TRow>[];
+    const childrenField = options.childrenField ?? "children";
+    let sequence = 0;
+
+    const visit = (row: TRow, parentId: string | undefined): void => {
+      const rowIndex = sequence;
+      const nodeId = this.treeRowId(row, rowIndex, options);
+      sequence += 1;
+      const children = this.treeChildren(row, rowIndex, options);
+      const explicitParent = parentId ?? this.treeParentId(row, rowIndex, options);
+      const cells = columns
+        .filter((column) => column.field !== childrenField)
+        .map((column, colIndex) => ({
+          col: colIndex,
+          text: this.cellTextForColumn(row, rowIndex, colIndex, column),
+        }));
+
+      nodes.push({
+        id: nodeId,
+        parentId: explicitParent,
+        hasChildren: children.length > 0 || (isPlainObject(row) && row.hasChildren === true),
+        cells,
+      });
+
+      for (const child of children) {
+        visit(child, nodeId);
+      }
+    };
+
+    for (const row of rows) {
+      visit(row, undefined);
+    }
+
+    this.dataRows = rows.map((row) => row as VolvoxGridDataRow);
+    this.rebuildRowIdIndex();
+    this.loadTree(nodes, {
+      replace: options.replace ?? true,
+      collapseInitial: options.collapseInitial,
+    });
+  }
+
+  private writeRowsAsCells<TRow extends VolvoxGridDataRow>(
+    rows: ReadonlyArray<TRow>,
+    startRow: number,
+    columns: ReadonlyArray<VolvoxGridColumnDef<TRow>>,
+    atomic: boolean,
+  ): void {
+    const cells: VolvoxGridCellUpdate[] = [];
+    rows.forEach((row, offset) => {
+      cells.push(...this.rowToCellUpdates(row, startRow + offset, columns));
+    });
+    this.updateCells(cells, { atomic });
+  }
+
+  private rowToCellUpdates<TRow extends VolvoxGridDataRow>(
+    row: TRow,
+    rowIndex: number,
+    columns: ReadonlyArray<VolvoxGridColumnDef<TRow>>,
+  ): VolvoxGridCellUpdate[] {
+    return columns.map((column, colIndex) => ({
+      row: rowIndex,
+      col: colIndex,
+      text: this.cellTextForColumn(row, rowIndex, colIndex, column),
+    }));
+  }
+
+  private cellTextForColumn<TRow extends VolvoxGridDataRow>(
+    row: TRow,
+    rowIndex: number,
+    colIndex: number,
+    column: VolvoxGridColumnDef<TRow>,
+  ): string {
+    const field = columnField(column, colIndex);
+    let value: unknown;
+    if (column.valueGetter != null) {
+      value = column.valueGetter({ data: row, rowIndex, colIndex, field, column });
+    } else if (Array.isArray(row)) {
+      const arrayIndex = field != null && /^\d+$/.test(field) ? Number(field) : colIndex;
+      value = row[arrayIndex];
+    } else if (field != null && isPlainObject(row)) {
+      value = row[field];
+    }
+
+    if (column.valueFormatter != null) {
+      return defaultCellText(column.valueFormatter({
+        data: row,
+        rowIndex,
+        colIndex,
+        field,
+        column,
+        value,
+      }));
+    }
+    return defaultCellText(value);
+  }
+
+  private mergeRowData(previous: VolvoxGridDataRow | undefined, incoming: VolvoxGridDataRow): VolvoxGridDataRow {
+    if (isPlainObject(previous) && isPlainObject(incoming)) {
+      return { ...previous, ...incoming };
+    }
+    return incoming;
+  }
+
+  private rowIdFor(row: unknown, rowIndex: number, getRowId?: VolvoxGridGetRowId): string | undefined {
+    const callback = getRowId ?? this.getRowIdCallback ?? undefined;
+    if (callback != null && (Array.isArray(row) || isPlainObject(row))) {
+      const id = callback({ data: row as VolvoxGridDataRow, rowIndex });
+      return id == null ? undefined : String(id);
+    }
+    if (isPlainObject(row)) {
+      const id = row.id ?? row._id;
+      return id == null ? undefined : String(id);
+    }
+    if (typeof row === "string" || typeof row === "number") {
+      return String(row);
+    }
+    return undefined;
+  }
+
+  private resolveRowIndex(rowOrId: unknown, inputIndex: number, getRowId?: VolvoxGridGetRowId): number | undefined {
+    const id = this.rowIdFor(rowOrId, inputIndex, getRowId);
+    if (id != null) {
+      const rowIndex = this.rowIdToIndex.get(id);
+      if (rowIndex != null) {
+        return rowIndex;
+      }
+      if (typeof rowOrId === "string" || typeof rowOrId === "number") {
+        return undefined;
+      }
+    }
+    if (isPlainObject(rowOrId) && typeof rowOrId.rowIndex === "number") {
+      return Math.trunc(rowOrId.rowIndex);
+    }
+    return inputIndex < this.dataRows.length ? inputIndex : undefined;
+  }
+
+  private rebuildRowIdIndex(): void {
+    this.rowIdToIndex.clear();
+    this.dataRows.forEach((row, rowIndex) => {
+      const id = this.rowIdFor(row, rowIndex);
+      if (id != null) {
+        this.rowIdToIndex.set(id, rowIndex);
+      }
+    });
+  }
+
+  private treeRowId<TRow extends VolvoxGridDataRow>(
+    row: TRow,
+    rowIndex: number,
+    options: VolvoxGridTreeDataOptions<TRow>,
+  ): string {
+    if (options.getId != null) {
+      return String(options.getId(row, rowIndex));
+    }
+    if (isPlainObject(row)) {
+      const idField = options.idField ?? "id";
+      const id = row[idField];
+      if (id != null) {
+        return String(id);
+      }
+    }
+    return String(rowIndex);
+  }
+
+  private treeParentId<TRow extends VolvoxGridDataRow>(
+    row: TRow,
+    rowIndex: number,
+    options: VolvoxGridTreeDataOptions<TRow>,
+  ): string | undefined {
+    const raw = options.getParentId != null
+      ? options.getParentId(row, rowIndex)
+      : isPlainObject(row)
+        ? row[options.parentIdField ?? "parentId"]
+        : undefined;
+    return raw == null || raw === "" ? undefined : String(raw);
+  }
+
+  private treeChildren<TRow extends VolvoxGridDataRow>(
+    row: TRow,
+    rowIndex: number,
+    options: VolvoxGridTreeDataOptions<TRow>,
+  ): ReadonlyArray<TRow> {
+    if (options.getChildren != null) {
+      return options.getChildren(row, rowIndex) ?? [];
+    }
+    if (isPlainObject(row)) {
+      const children = row[options.childrenField ?? "children"];
+      return Array.isArray(children) ? children as TRow[] : [];
+    }
+    return [];
   }
 
   // ── Properties ───────────────────────────────────────────────────────
@@ -3523,6 +4815,152 @@ export class VolvoxGrid {
   /** Engine-side grid ID for direct WASM calls. */
   get id(): number {
     return this.gridId;
+  }
+
+  /**
+   * Low-level escape hatch — the underlying WebAssembly module instance.
+   *
+   * Advanced use only. Prefer the typed `VolvoxGrid` methods (e.g. `defineColumns`,
+   * `updateCells`, `setSelectionHover`). Calling raw `volvox_*_pb` exports requires
+   * hand-encoding protobuf messages using the `*Fields` constants exported from
+   * `volvoxgrid/generated/volvoxgrid_ffi.js`. No API stability guarantees on this
+   * path — wire format and exports may change between releases.
+   */
+  get rawWasm(): any {
+    return this.wasm;
+  }
+
+  /**
+   * Typed protobuf-level escape hatch built on the synurang-generated FFI client.
+   *
+   * Use this when you want full access to `proto/volvoxgrid.proto` RPCs without
+   * dropping all the way to hand-encoding wasm exports. Pass typed
+   * request messages from `volvoxgrid/generated/volvoxgrid_lite.js`; the
+   * generated `VolvoxGridServiceFfi` handles serialization and routes the call
+   * through the wasm `_pb` exports.
+   *
+   * The same caveats apply as `rawWasm`: wire format and method shapes follow
+   * the proto file, which is not part of the stable facade contract.
+   */
+  get ffi(): VolvoxGridServiceFfi {
+    let client = this.ffiClient;
+    if (client == null) {
+      client = new VolvoxGridServiceFfi(new WasmPluginHost(this.wasm));
+      this.ffiClient = client;
+    }
+    return client;
+  }
+
+  get protoLastError(): string {
+    if (typeof this.wasm.volvox_grid_last_error === "function") {
+      return String(this.wasm.volvox_grid_last_error() ?? "");
+    }
+    return "";
+  }
+
+  withGridId<T extends { gridId?: bigint | number; grid_id?: bigint | number }>(request: T): T {
+    const id = BigInt(this.gridId);
+    if ("gridId" in request) {
+      request.gridId = id;
+    } else if ("grid_id" in request) {
+      request.grid_id = id;
+    } else {
+      request.gridId = id;
+    }
+    return request;
+  }
+
+  callProto(method: string, request: VolvoxGridProtoRequest, options?: VolvoxGridCallProtoOptions): Uint8Array;
+  callProto<TResponse>(
+    method: string,
+    request: VolvoxGridProtoRequest,
+    responseType: VolvoxGridProtoMessageType<TResponse>,
+    options?: VolvoxGridCallProtoOptions,
+  ): TResponse;
+  callProto<TResponse>(
+    method: string,
+    request: VolvoxGridProtoRequest,
+    responseTypeOrOptions?: VolvoxGridProtoMessageType<TResponse> | VolvoxGridCallProtoOptions,
+    maybeOptions?: VolvoxGridCallProtoOptions,
+  ): Uint8Array | TResponse {
+    const responseType = responseTypeOrOptions != null
+      && ("fromBinary" in responseTypeOrOptions || "parseFrom" in responseTypeOrOptions)
+      ? responseTypeOrOptions as VolvoxGridProtoMessageType<TResponse>
+      : undefined;
+    const options = responseType == null
+      ? responseTypeOrOptions as VolvoxGridCallProtoOptions | undefined
+      : maybeOptions;
+    const response = this.callProtoBytes(method, request, options);
+    if (responseType == null) {
+      return response;
+    }
+    if (typeof responseType.fromBinary === "function") {
+      return responseType.fromBinary(response);
+    }
+    if (typeof responseType.parseFrom === "function") {
+      return responseType.parseFrom(response);
+    }
+    throw new TypeError("VolvoxGrid.callProto: response type must expose fromBinary() or parseFrom()");
+  }
+
+  callProtoBytes(
+    method: string,
+    request: VolvoxGridProtoRequest,
+    options: VolvoxGridCallProtoOptions = {},
+  ): Uint8Array {
+    const normalized = normalizeProtoRpcName(method);
+    const rpc = VOLVOX_GRID_PROTO_RPC_EXPORTS[normalized];
+    const exportName = rpc?.exportName ?? method;
+    if (rpc == null && !exportName.endsWith("_pb")) {
+      throw new Error(`VolvoxGrid.callProto: '${method}' is not a protobuf request export`);
+    }
+    if (typeof this.wasm[exportName] !== "function") {
+      throw new Error(`VolvoxGrid.callProto: wasm export '${exportName}' is not available`);
+    }
+
+    if (options.injectGridId !== false && !(
+      request instanceof Uint8Array || request instanceof ArrayBuffer
+    )) {
+      const maybeGridId = request.gridId ?? request.grid_id;
+      if (maybeGridId == null || maybeGridId === 0 || maybeGridId === 0n) {
+        this.withGridId(request);
+      }
+    }
+
+    const requestBytes = this.encodeProtoRequest(request);
+    const response = this.wasm[exportName](requestBytes) as unknown;
+    if (!(response instanceof Uint8Array)) {
+      throw new Error(`VolvoxGrid.callProto: '${exportName}' did not return Uint8Array`);
+    }
+
+    const lastError = this.protoLastError;
+    if (response.length === 0 && options.allowEmptyResponse === false) {
+      throw new Error(`VolvoxGrid.callProto(${normalized}): ${lastError || "empty response"}`);
+    }
+    if (response.length === 0 && lastError !== "") {
+      throw new Error(`VolvoxGrid.callProto(${normalized}): ${lastError}`);
+    }
+
+    if (options.dirty ?? rpc?.mutates ?? true) {
+      this.dirty = true;
+    }
+    return response;
+  }
+
+  private encodeProtoRequest(request: VolvoxGridProtoRequest): Uint8Array {
+    if (request instanceof Uint8Array) {
+      return request;
+    }
+    if (request instanceof ArrayBuffer) {
+      return new Uint8Array(request);
+    }
+    if (typeof request.toBinary === "function") {
+      return request.toBinary();
+    }
+    if (typeof request.toByteArray === "function") {
+      return request.toByteArray();
+    }
+    throw new TypeError("VolvoxGrid.callProto: request must be Uint8Array, ArrayBuffer, or a protobuf-lite message");
   }
 
   /** Last requested theme preset; manual style changes are not reflected here. */
@@ -3872,8 +5310,11 @@ export class VolvoxGrid {
 
     const requestBytes = pbEncodeLoadDataRequest(this.gridId, payload, options);
     const response = this.wasm.volvox_grid_load_data_pb(requestBytes) as Uint8Array;
-    if (!(response instanceof Uint8Array) || response.length === 0) {
-      throw new Error("VolvoxGrid.loadData returned an empty response");
+    if (!(response instanceof Uint8Array)) {
+      throw new Error("VolvoxGrid.loadData returned a non-binary response");
+    }
+    if (response.length === 0 && this.protoLastError !== "") {
+      throw new Error(`VolvoxGrid.loadData: ${this.protoLastError}`);
     }
 
     const result = pbDecodeLoadDataResult(response);
@@ -3901,8 +5342,11 @@ export class VolvoxGrid {
 
     const requestBytes = pbEncodeLoadDataRequest(this.gridId, payload, options);
     const response = this.wasm.volvox_grid_append_data_pb(requestBytes) as Uint8Array;
-    if (!(response instanceof Uint8Array) || response.length === 0) {
-      throw new Error("VolvoxGrid.appendData returned an empty response");
+    if (!(response instanceof Uint8Array)) {
+      throw new Error("VolvoxGrid.appendData returned a non-binary response");
+    }
+    if (response.length === 0 && this.protoLastError !== "") {
+      throw new Error(`VolvoxGrid.appendData: ${this.protoLastError}`);
     }
 
     const result = pbDecodeLoadDataResult(response);
@@ -4274,6 +5718,26 @@ export class VolvoxGrid {
     this.dirty = true;
   }
 
+  setOutlineConfig(config: VolvoxGridOutlineConfig): void {
+    this.applyProtoConfig(pbEncodeOutlineConfig(config), "OutlineConfig");
+    this.dirty = true;
+  }
+
+  setCornerIndicatorTopStartConfig(config: VolvoxGridCornerIndicatorConfig): void {
+    this.applyProtoConfig(pbEncodeCornerIndicatorTopStartConfig(config), "CornerIndicatorTopStartConfig");
+    this.dirty = true;
+  }
+
+  setIndicatorAppearance(appearance: number): void {
+    this.applyProtoConfig(pbEncodeIndicatorAppearance(appearance), "IndicatorAppearance");
+    this.dirty = true;
+  }
+
+  setSelectionHover(mode: VolvoxGridSelectionHoverMode): void {
+    this.applyProtoConfig(pbEncodeSelectionHoverConfig(mode), "SelectionHover");
+    this.dirty = true;
+  }
+
   private normalizeHeaderMarkHeight(
     input: VolvoxGridHeaderMarkHeight | undefined,
     fallback: VolvoxGridHeaderMarkHeight,
@@ -4551,10 +6015,22 @@ export class VolvoxGrid {
     return 0;
   }
 
-  setRowData(row: number, data: Uint8Array): void {
-    if (typeof this.wasm.set_row_data === "function") {
-      this.wasm.set_row_data(this.gridId, row, data);
+  setRowData<TRow extends VolvoxGridDataRow>(
+    rows: ReadonlyArray<TRow>,
+    options?: VolvoxGridSetDataOptions<TRow>,
+  ): VolvoxGridLoadDataResult;
+  setRowData(row: number, data: Uint8Array): void;
+  setRowData<TRow extends VolvoxGridDataRow>(
+    rowOrRows: number | ReadonlyArray<TRow>,
+    dataOrOptions?: Uint8Array | VolvoxGridSetDataOptions<TRow>,
+  ): void | VolvoxGridLoadDataResult {
+    if (Array.isArray(rowOrRows)) {
+      return this.setData(rowOrRows, dataOrOptions as VolvoxGridSetDataOptions<TRow> | undefined);
     }
+    if (typeof this.wasm.set_row_data === "function") {
+      this.wasm.set_row_data(this.gridId, rowOrRows, dataOrOptions as Uint8Array);
+    }
+    return undefined;
   }
 
   getRowData(row: number): Uint8Array {
@@ -5144,6 +6620,60 @@ export class VolvoxGrid {
     this.defineColumnsWithDefaultEditors(defs);
   }
 
+  defineColumns(columns: ReadonlyArray<VolvoxGridColumnSpec>): void {
+    if (columns.length === 0) {
+      return;
+    }
+    if (typeof this.wasm.volvox_grid_define_columns_pb !== "function") {
+      throw new Error("VolvoxGrid.defineColumns requires wasm support for volvox_grid_define_columns_pb");
+    }
+    const defs = columns.map((spec, index) => pbEncodeColumnDefFromSpec(index, spec));
+    this.wasm.volvox_grid_define_columns_pb(pbEncodeDefineColumnsRequest(this.gridId, defs));
+    this.dirty = true;
+  }
+
+  defineRows(rows: ReadonlyArray<VolvoxGridRowSpec>): void {
+    if (rows.length === 0) {
+      return;
+    }
+    if (typeof this.wasm.volvox_grid_define_rows_pb !== "function") {
+      throw new Error("VolvoxGrid.defineRows requires wasm support for volvox_grid_define_rows_pb");
+    }
+    this.wasm.volvox_grid_define_rows_pb(pbEncodeDefineRowsRequest(this.gridId, rows));
+    this.dirty = true;
+  }
+
+  updateCells(
+    cells: ReadonlyArray<VolvoxGridCellUpdate>,
+    options: VolvoxGridUpdateCellsOptions = {},
+  ): void {
+    if (cells.length === 0) {
+      return;
+    }
+    if (typeof this.wasm.volvox_grid_update_cells_pb !== "function") {
+      throw new Error("VolvoxGrid.updateCells requires wasm support for volvox_grid_update_cells_pb");
+    }
+    const atomic = options.atomic ?? true;
+    this.wasm.volvox_grid_update_cells_pb(pbEncodeUpdateCellsRequest(this.gridId, cells, atomic));
+    this.dirty = true;
+  }
+
+  loadTree(
+    nodes: ReadonlyArray<VolvoxGridTreeNode>,
+    options: VolvoxGridLoadTreeOptions = {},
+  ): void {
+    if (typeof this.wasm.volvox_tree_load_tree_pb !== "function") {
+      throw new Error("VolvoxGrid.loadTree requires wasm support for volvox_tree_load_tree_pb");
+    }
+    const replace = options.replace ?? true;
+    const request = pbEncodeLoadTreeRequest(this.gridId, nodes, replace, options.collapseInitial);
+    const response = this.wasm.volvox_tree_load_tree_pb(request) as unknown;
+    if (!(response instanceof Uint8Array)) {
+      throw new Error("VolvoxGrid.loadTree: VolvoxTreeService.LoadTree returned a non-binary response");
+    }
+    this.dirty = true;
+  }
+
   setColDataType(col: number, dataType: number, nullable?: boolean): void {
     const hasExistingEditor = this.columnsWithExplicitEditors().has(col);
     this.defineColumnsWithDefaultEditors([
@@ -5416,6 +6946,21 @@ export class VolvoxGrid {
     }
   }
 
+  /** Enable or disable the engine's fast-scroll path. */
+  get fastScrollEnabled(): boolean {
+    if (typeof this.wasm.get_fast_scroll_enabled === "function") {
+      return Boolean(this.wasm.get_fast_scroll_enabled(this.gridId));
+    }
+    return false;
+  }
+
+  set fastScrollEnabled(enabled: boolean) {
+    if (typeof this.wasm.set_fast_scroll_enabled === "function") {
+      this.wasm.set_fast_scroll_enabled(this.gridId, Boolean(enabled));
+      this.dirty = true;
+    }
+  }
+
   get animationEnabled(): boolean {
     if (typeof this.wasm.get_animation_enabled === "function") {
       this.animationEnabledValue = Boolean(this.wasm.get_animation_enabled(this.gridId));
@@ -5535,12 +7080,12 @@ export class VolvoxGrid {
         if (!(frame instanceof Uint8Array) || frame.length < 1) {
           break;
         }
-        const status = decodeSignedStatus(Number(frame[0]));
-        if (status === 0) {
+        const status = Number(frame[0]);
+        if (status === STREAM_STATUS_DATA) {
           out.push(frame.slice(1));
           continue;
         }
-        if (status < 0) {
+        if (status === STREAM_STATUS_ERROR) {
           throwFfiErrorPayload(frame.slice(1));
         }
         if (status === STREAM_STATUS_EOF || status === STREAM_STATUS_PENDING) {
@@ -5557,7 +7102,10 @@ export class VolvoxGrid {
   private hasCancelableEventListeners(): boolean {
     return this.beforeEditListener != null
       || this.cellEditValidatingListener != null
-      || this.beforeSortListener != null;
+      || this.beforeSortListener != null
+      || this.hasNamedListener("beforeEdit")
+      || this.hasNamedListener("cellEditValidating")
+      || this.hasNamedListener("beforeSort");
   }
 
   private decisionChannelRequested(): boolean {
@@ -5613,6 +7161,7 @@ export class VolvoxGrid {
       return false;
     }
     this.wasm.send_event_decision(this.gridId, eventId, cancel);
+    this.eventPump?.schedule();
     return true;
   }
 
@@ -5640,6 +7189,7 @@ export class VolvoxGrid {
           cancel: false,
         };
         this.beforeEditListener?.(details);
+        this.emit("beforeEdit", details);
         return details.cancel;
       }
 
@@ -5654,6 +7204,7 @@ export class VolvoxGrid {
           cancel: false,
         };
         this.cellEditValidatingListener?.(details);
+        this.emit("cellEditValidating", details);
         return details.cancel;
       }
 
@@ -5666,6 +7217,7 @@ export class VolvoxGrid {
           cancel: false,
         };
         this.beforeSortListener?.(details);
+        this.emit("beforeSort", details);
         return details.cancel;
       }
     } catch (error) {
@@ -5680,15 +7232,38 @@ export class VolvoxGrid {
     return this.flushCancelableEventDecisions();
   }
 
+  /**
+   * Drain queued grid events synchronously and dispatch to listeners. Call
+   * this after programmatic state changes if you want listeners to fire
+   * before the next animation frame; otherwise the pump fires within ~0.5ms
+   * of the next task tick on its own.
+   */
+  flushEvents(): void {
+    this.flushEventQueues();
+  }
+
+  /** Request a drain on the next task tick. Coalesces. */
+  scheduleEventFlush(): void {
+    this.eventPump?.schedule();
+  }
+
+  private flushEventQueues(): void {
+    if (this.hasCancelableEventListeners()) {
+      this.flushCancelableEventDecisions();
+    }
+    this.dispatchRawGridEvents();
+  }
+
   private dispatchRawGridEvents(maxEvents: number = 64): void {
-    if (this.rawGridEventListener == null) {
+    if (this.rawGridEventListener == null && !this.hasNamedListener("gridEventRaw")) {
       return;
     }
 
     try {
       const events = this.drainEventStreamRaw(maxEvents);
       for (const rawEvent of events) {
-        this.rawGridEventListener(rawEvent);
+        this.rawGridEventListener?.(rawEvent);
+        this.emit("gridEventRaw", rawEvent);
       }
     } catch (error) {
       console.error("VolvoxGrid raw event listener failed", error);
@@ -6320,7 +7895,7 @@ export class VolvoxGrid {
         const frame = this.wasm.volvox_grid_stream_recv(handle) as Uint8Array;
         if (!(frame instanceof Uint8Array) || frame.length < 1) break;
 
-        const status = decodeSignedStatus(Number(frame[0]));
+        const status = Number(frame[0]);
         if (status === STREAM_STATUS_DATA) {
           const data = frame.slice(1);
           const decoded = pbDecodePrintResponse(data);
@@ -6334,7 +7909,7 @@ export class VolvoxGrid {
           }
           continue;
         }
-        if (status < 0) {
+        if (status === STREAM_STATUS_ERROR) {
           throwFfiErrorPayload(frame.slice(1));
         }
         if (status === STREAM_STATUS_EOF || status === STREAM_STATUS_PENDING) {
@@ -6400,6 +7975,10 @@ export class VolvoxGrid {
     if (this.animFrame) {
       cancelAnimationFrame(this.animFrame);
       this.animFrame = 0;
+    }
+    if (this.eventPump != null) {
+      this.eventPump.close();
+      this.eventPump = null;
     }
     if (this.resizeObserver) {
       this.resizeObserver.disconnect();
@@ -6706,11 +8285,14 @@ export class VolvoxGrid {
     if (event.kind === "started") {
       this.activeEditorSessionPresentation = event.details.presentation;
       this.editorSessionStartedListener?.(event.details);
+      this.emit("editorSessionStarted", event.details);
     } else if (event.kind === "updated") {
       this.editorSessionUpdatedListener?.(event.details);
+      this.emit("editorSessionUpdated", event.details);
     } else {
       this.activeEditorSessionPresentation = null;
       this.editorSessionEndedListener?.(event.details);
+      this.emit("editorSessionEnded", event.details);
     }
   }
 
@@ -6749,7 +8331,7 @@ export class VolvoxGrid {
         if (!(frame instanceof Uint8Array) || frame.length < 1) {
           break;
         }
-        const status = decodeSignedStatus(Number(frame[0]));
+        const status = Number(frame[0]);
         if (status === STREAM_STATUS_DATA) {
           const decoded = pbDecodeRenderOutput(frame.slice(1));
           if (decoded.rendered) {
@@ -6763,7 +8345,7 @@ export class VolvoxGrid {
           }
           continue;
         }
-        if (status < 0) {
+        if (status === STREAM_STATUS_ERROR) {
           throwFfiErrorPayload(frame.slice(1));
         }
         if (status === STREAM_STATUS_EOF || status === STREAM_STATUS_PENDING) {
@@ -6788,10 +8370,9 @@ export class VolvoxGrid {
       if (typeof this.wasm.resolve_expired_event_decisions === "function") {
         this.wasm.resolve_expired_event_decisions(this.gridId);
       }
-      if (this.hasCancelableEventListeners()) {
-        this.flushCancelableEventDecisions();
-      }
-      this.dispatchRawGridEvents();
+      // Safety drain: ensures events still flow if no DOM input / FFI call
+      // triggered the pump this frame. Coalesces with any pending schedule().
+      this.flushEventQueues();
 
       if (this.dirty || this.wasm.is_dirty(this.gridId)) {
         this.render();
@@ -7008,6 +8589,7 @@ export class VolvoxGrid {
     if (this.onZoomChange) {
       this.onZoomChange(safeScale);
     }
+    this.emit("zoomChange", safeScale);
   }
 
   private touchPinchMetrics():
@@ -7459,7 +9041,7 @@ export class VolvoxGrid {
     const selection = this.getSelection();
     const row = selection.mouseRow >= 0 ? selection.mouseRow : selection.row;
     const col = selection.mouseCol >= 0 ? selection.mouseCol : selection.col;
-    this.onContextMenuRequest?.({
+    const request: VolvoxGridContextMenuRequest = {
       trigger: "secondary_click",
       clientX: e.clientX,
       clientY: e.clientY,
@@ -7468,7 +9050,13 @@ export class VolvoxGrid {
       row,
       col,
       selection,
-    });
+    };
+    this.onContextMenuRequest?.(request);
+    this.emit("contextMenuRequest", request);
+  };
+
+  private readonly schedulePumpFromDom = (): void => {
+    this.eventPump?.schedule();
   };
 
   private setupEventListeners(): void {
@@ -7480,6 +9068,14 @@ export class VolvoxGrid {
     c.addEventListener("pointercancel", this.onPointerCancel);
     c.addEventListener("wheel", this.onWheel, { passive: false });
     c.addEventListener("contextmenu", this.onContextMenu);
+    // Bubble-phase trailing listeners — registered after the handlers above,
+    // so they run last and request an event drain whenever user input may
+    // have queued wasm-side events.
+    c.addEventListener("pointerdown", this.schedulePumpFromDom);
+    c.addEventListener("pointerup", this.schedulePumpFromDom);
+    c.addEventListener("wheel", this.schedulePumpFromDom);
+    c.addEventListener("keydown", this.schedulePumpFromDom);
+    c.addEventListener("keyup", this.schedulePumpFromDom);
 
     // Make the canvas focusable so it receives keyboard events
     if (!c.hasAttribute("tabindex")) {
@@ -7495,6 +9091,11 @@ export class VolvoxGrid {
     c.removeEventListener("pointercancel", this.onPointerCancel);
     c.removeEventListener("wheel", this.onWheel);
     c.removeEventListener("contextmenu", this.onContextMenu);
+    c.removeEventListener("pointerdown", this.schedulePumpFromDom);
+    c.removeEventListener("pointerup", this.schedulePumpFromDom);
+    c.removeEventListener("wheel", this.schedulePumpFromDom);
+    c.removeEventListener("keydown", this.schedulePumpFromDom);
+    c.removeEventListener("keyup", this.schedulePumpFromDom);
   }
 
   private modifierBits(e: PointerEvent | KeyboardEvent): number {

@@ -101,13 +101,19 @@ npm install volvoxgrid
 
   const grid = new VolvoxGrid(document.getElementById("grid"), {
     wasmUrl: "./wasm/volvoxgrid_wasm.js",
-    rowCount: 100,
-    colCount: 5,
+    columnDefs: [
+      { field: "name", headerName: "Name" },
+      { field: "status", headerName: "Status" },
+    ],
+    rowData: [
+      { id: "1", name: "Hello", status: "Ready" },
+      { id: "2", name: "World", status: "Queued" },
+    ],
+    getRowId: ({ data }) => data.id,
   });
 
   await grid.loaded;
-  grid.setCellText(0, 0, "Hello");
-  grid.setCellText(0, 1, "World");
+  grid.updateRows([{ id: "2", status: "Done" }]);
 </script>
 
 <div id="grid" style="width: 800px; height: 400px;"></div>

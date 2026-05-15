@@ -741,7 +741,9 @@ export class DoomRuntime {
         }
         this.prevDoomColors = newColors;
         if (changed > 0) {
-          grid.setCellBackColors(colorUpdatesBuffer.subarray(0, colorUpdateLen));
+          grid.setCellBackColors(
+            colorUpdatesBuffer.subarray(0, colorUpdateLen) as unknown as ReadonlyArray<number>,
+          );
           grid.invalidate();
         }
         cellUpdatesWindowCount += changed;

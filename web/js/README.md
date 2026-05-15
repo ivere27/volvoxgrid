@@ -19,18 +19,25 @@ npm install volvoxgrid-lite
 ### Using `VolvoxGrid` directly
 
 ```js
-import { HeaderPolicy, VolvoxGrid } from "volvoxgrid";
+import { VolvoxGrid } from "volvoxgrid";
 
 const grid = new VolvoxGrid(document.getElementById("grid"), {
   wasmUrl: "./wasm/volvoxgrid_wasm.js",
-  rowCount: 100,
-  colCount: 5,
+  columnDefs: [
+    { field: "name", headerName: "Name", width: 180 },
+    { field: "price", headerName: "Price", width: 90 },
+    { field: "qty", headerName: "Qty", width: 80 },
+  ],
+  rowData: [
+    { id: "a", name: "Widget A", price: 29.99, qty: 150 },
+    { id: "b", name: "Widget B", price: 49.99, qty: 200 },
+  ],
+  getRowId: ({ data }) => data.id,
 });
 
-grid.setColumnCaption(0, "Name");
-grid.setColumnCaption(1, "Price");
-grid.setCellText(0, 0, "Widget A");
-grid.setCellText(0, 1, "29.99");
+await grid.loaded;
+grid.updateRows([{ id: "a", qty: 175 }]);
+grid.applyTransaction({ add: [{ id: "c", name: "Widget C", price: 9.99, qty: 80 }] });
 ```
 
 ### Using the `<volvox-grid>` custom element
@@ -132,6 +139,78 @@ The same setting is also available in the shared protobuf API as
 the WASM runtime.
 
 ## Data Operations
+
+#### RowData / Transactions
+
+Use `columnDefs` and `rowData` for the normal application API:
+
+```js
+grid.setColumns([
+  { field: "name", headerName: "Name" },
+  { field: "status", headerName: "Status" },
+]);
+
+grid.setData([
+  { id: "1", name: "Alpha", status: "Ready" },
+  { id: "2", name: "Beta", status: "Queued" },
+], {
+  getRowId: ({ data }) => data.id,
+});
+
+grid.updateRows([{ id: "2", status: "Done" }]);
+
+grid.applyTransaction({
+  add: [{ id: "3", name: "Gamma", status: "Ready" }],
+  update: [{ id: "1", status: "Paused" }],
+  remove: ["2"],
+});
+```
+
+For tree data, pass nested children or parent ids:
+
+```js
+grid.setTreeData([
+  {
+    id: "root",
+    name: "Root",
+    children: [{ id: "child", name: "Child" }],
+  },
+], {
+  columns: [{ field: "name", headerName: "Name" }],
+});
+```
+
+#### Raw Protobuf Calls
+
+For exact `proto/volvoxgrid.proto` request/response access, import the generated
+protobuf-lite messages and call the runtime RPC by service method name:
+
+```js
+import { VolvoxGrid } from "volvoxgrid";
+import {
+  CellUpdate,
+  CellValue,
+  UpdateCellsRequest,
+  WriteResult,
+} from "volvoxgrid/generated/volvoxgrid_lite.js";
+
+const request = new UpdateCellsRequest({
+  cells: [
+    new CellUpdate({
+      row: 0,
+      col: 0,
+      value: new CellValue({ text: "Raw protobuf write" }),
+    }),
+  ],
+  atomic: true,
+});
+
+const result = grid.callProto("UpdateCells", request, WriteResult);
+```
+
+`callProto` fills `request.gridId` with the current engine id when the generated
+message has an unset `gridId` field. `callProtoBytes(method, bytes)` is available
+when you already have encoded protobuf bytes.
 
 #### LoadData
 
