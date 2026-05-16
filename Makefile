@@ -75,6 +75,8 @@ VOLVOXGRID_VERSION ?= $(VERSION_FILE_VALUE)
 ifeq ($(strip $(VOLVOXGRID_VERSION)),)
 $(error VOLVOXGRID_VERSION is empty. Set VOLVOXGRID_VERSION or populate $(VERSION_FILE))
 endif
+MAVEN_SNAPSHOT_QUALIFIER ?= SNAPSHOT
+MAVEN_SNAPSHOT_SUFFIX := -$(MAVEN_SNAPSHOT_QUALIFIER)
 VOLVOXGRID_SOURCE ?= local
 VOLVOXGRID_SOURCE_RAW := $(strip $(VOLVOXGRID_SOURCE))
 VOLVOXGRID_SOURCE_RESOLVED := $(VOLVOXGRID_SOURCE_RAW)
@@ -333,20 +335,20 @@ help:
 	@echo ""
 	@echo "Docker + Maven:"
 	@echo "  docker_android_aar_image  Build Docker image for Android AAR"
-	@echo "  docker_android            Build Android AAR + Android lite AAR via Docker, auto-install SNAPSHOT to mavenLocal"
+	@echo "  docker_android            Build Android AAR + Android lite AAR via Docker"
 	@echo "  docker_desktop_image      Build Docker image for desktop JAR"
-	@echo "  docker_desktop            Build desktop JAR + desktop lite JAR + .NET WinForms full+lite x64+x86 artifacts via Docker (+ ActiveX OCX release/release-lite), auto-install SNAPSHOT to mavenLocal"
-	@echo "  docker_desktop_lite       Build desktop lite JAR via Docker, auto-install SNAPSHOT to mavenLocal"
+	@echo "  docker_desktop            Build desktop JAR + desktop lite JAR + .NET WinForms full+lite x64+x86 artifacts via Docker (+ ActiveX OCX release/release-lite)"
+	@echo "  docker_desktop_lite       Build desktop lite JAR via Docker"
 	@echo "  docker_web_image          Build Docker image for web dist/bundle tasks"
 	@echo "  docker_web                Build in Docker (default WEB_DOCKER_TARGET=all): WEB_DOCKER_TARGET={all|bundle|web|sheet|sheet-lite|report|wasm|wasm-lite|wasm-threaded}"
 	@echo "  docker_ios_image          Build Docker image for iOS"
 	@echo "  docker_ios                Build iOS XCFramework via Docker (set IOS_LIBRARY_BUILD_MODE=lite for lite)"
 	@echo "  docker_ios_lite           Build iOS lite XCFramework via Docker"
 	@echo "  docker_all_image          Build unified Docker image (all toolchains)"
-	@echo "  docker_all                Build all platform artifacts via unified Docker image (Android full+lite, desktop full+lite, iOS full+lite, .NET WinForms full+lite x64+x86), auto-install SNAPSHOT to mavenLocal"
+	@echo "  docker_all                Build all platform artifacts via unified Docker image (Android full+lite, desktop full+lite, iOS full+lite, .NET WinForms full+lite x64+x86)"
 	@echo "  publish_maven             Upload Android, Android lite, Compose, Compose lite AARs + desktop JARs to Maven Central"
 	@echo "  publish_github            Upload all artifacts (xcframework, AAR, JAR, .NET, ActiveX, web zips, debug symbols) to GitHub release"
-	@echo "  publish_local             Install built SNAPSHOT artifacts from dist/maven into ~/.m2/repository"
+	@echo "  publish_local             Install built internal snapshot artifacts from dist/maven into ~/.m2/repository"
 	@echo "  publish_web               Copy dist/web -> public (clean), then run firebase deploy"
 	@echo "  publish_npm               Publish volvoxgrid + adapter npm packages from dist/web zip"
 	@echo "  publish_nuget             Publish VolvoxGrid.DotNet + VolvoxGrid.DotNet.Lite NuGet packages to nuget.org"
@@ -354,10 +356,10 @@ help:
 	@echo "  publish_go_bubbletea      Tag + push 'adapters/bubbletea/vX.Y.Z' (requires publish_go to have shipped first)"
 	@echo ""
 	@echo "Example dependency source flags (default is local):"
-	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.8.8"
-	@echo "  make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.8.8"
-	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.8.8"
-	@echo "  make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.8.8-SNAPSHOT"
+	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.8.9"
+	@echo "  make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.8.9"
+	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.8.9"
+	@echo "  make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.8.9"
 	@echo "  (maven mode skips local native library build for the example targets)"
 	@echo "  Flutter defaults to maven when VOLVOXGRID_SOURCE is omitted."
 	@echo "  VOLVOXGRID_SOURCE=local builds from source."
@@ -1003,7 +1005,7 @@ android-library:
 		CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" \
 		GRADLE_MAX_WORKERS="$(GRADLE_MAX_WORKERS)" \
 		bash "$(CURRENT_DIR)/docker/build_android_aar.sh"; \
-		if [ "$(VOLVOXGRID_SOURCE_RESOLVED)" = "maven" ] && echo "$(VOLVOXGRID_VERSION)" | grep -q -- '-SNAPSHOT$$'; then \
+		if [ "$(VOLVOXGRID_SOURCE_RESOLVED)" = "maven" ] && echo "$(VOLVOXGRID_VERSION)" | grep -q -- '$(MAVEN_SNAPSHOT_SUFFIX)$$'; then \
 			if [ "$$PACKAGE_MODE" = "lite" ]; then \
 				$(MAKE) publish_local \
 					AAR_VERSION="$(VOLVOXGRID_VERSION)" \
@@ -1141,7 +1143,7 @@ android-library-release:
 				CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" \
 				GRADLE_MAX_WORKERS="$(GRADLE_MAX_WORKERS)" \
 				bash "$(CURRENT_DIR)/docker/build_android_aar.sh"; \
-				if [ "$(VOLVOXGRID_SOURCE_RESOLVED)" = "maven" ] && echo "$(VOLVOXGRID_VERSION)" | grep -q -- '-SNAPSHOT$$'; then \
+				if [ "$(VOLVOXGRID_SOURCE_RESOLVED)" = "maven" ] && echo "$(VOLVOXGRID_VERSION)" | grep -q -- '$(MAVEN_SNAPSHOT_SUFFIX)$$'; then \
 					if [ "$$PACKAGE_MODE" = "lite" ]; then \
 						$(MAKE) publish_local \
 							AAR_VERSION="$(VOLVOXGRID_VERSION)" \
@@ -1365,7 +1367,7 @@ docker_android: docker_android_aar_image
 		-e BUILD_DATE="$(AAR_BUILD_DATE)" \
 		"$(AAR_DOCKER_IMAGE)"
 	@echo "Android AAR artifacts (default + lite + compose + compose-lite): dist/maven/"
-	@if echo "$(AAR_VERSION)" | grep -q -- '-SNAPSHOT$$'; then \
+	@if echo "$(AAR_VERSION)" | grep -q -- '$(MAVEN_SNAPSHOT_SUFFIX)$$'; then \
 		$(MAKE) publish_local; \
 	else \
 		echo "Skip publish_local: AAR_VERSION=$(AAR_VERSION) is not a SNAPSHOT."; \
@@ -1433,7 +1435,7 @@ docker_desktop: docker_desktop_image
 	else \
 		echo ".NET artifacts: dist/dotnet/winforms_release/, winforms_release_x86/, winforms_release_lite/, and winforms_release_lite_x86/ (set DESKTOP_BUILD_DOTNET=0 to skip)"; \
 	fi
-	@if echo "$(DESKTOP_VERSION)" | grep -q -- '-SNAPSHOT$$'; then \
+	@if echo "$(DESKTOP_VERSION)" | grep -q -- '$(MAVEN_SNAPSHOT_SUFFIX)$$'; then \
 		$(MAKE) publish_local; \
 	else \
 		echo "Skip publish_local: DESKTOP_VERSION=$(DESKTOP_VERSION) is not a SNAPSHOT."; \
@@ -1471,7 +1473,7 @@ docker_desktop_lite: docker_desktop_image
 		-e BUILD_DEBUG_SYMBOLS="$(DESKTOP_BUILD_DEBUG_SYMBOLS)" \
 		"$(DESKTOP_DOCKER_IMAGE)"
 	@echo "Desktop lite JAR artifacts: dist/maven/"
-	@if echo "$(DESKTOP_VERSION)" | grep -q -- '-SNAPSHOT$$'; then \
+	@if echo "$(DESKTOP_VERSION)" | grep -q -- '$(MAVEN_SNAPSHOT_SUFFIX)$$'; then \
 		$(MAKE) publish_local; \
 	else \
 		echo "Skip publish_local: DESKTOP_VERSION=$(DESKTOP_VERSION) is not a SNAPSHOT."; \
@@ -1600,7 +1602,7 @@ docker_all: docker_all_image
 	else \
 		echo ".NET artifacts: dist/dotnet/winforms_release/, winforms_release_x86/, winforms_release_lite/, and winforms_release_lite_x86/"; \
 	fi
-	@if echo "$(AAR_VERSION)" | grep -q -- '-SNAPSHOT$$' || echo "$(DESKTOP_VERSION)" | grep -q -- '-SNAPSHOT$$'; then \
+	@if echo "$(AAR_VERSION)" | grep -q -- '$(MAVEN_SNAPSHOT_SUFFIX)$$' || echo "$(DESKTOP_VERSION)" | grep -q -- '$(MAVEN_SNAPSHOT_SUFFIX)$$'; then \
 		$(MAKE) publish_local; \
 	else \
 		echo "Skip publish_local: AAR_VERSION=$(AAR_VERSION), DESKTOP_VERSION=$(DESKTOP_VERSION) are not SNAPSHOT."; \
@@ -1697,7 +1699,7 @@ publish_local:
 	mkdir -p "$$LOCAL_REPO"; \
 	is_snapshot() { \
 		case "$$1" in \
-			*-SNAPSHOT) return 0 ;; \
+			*$(MAVEN_SNAPSHOT_SUFFIX)) return 0 ;; \
 			*) return 1 ;; \
 		esac; \
 	}; \
@@ -1752,7 +1754,7 @@ publish_github:
 	VERIFY_SCRIPT="$(CURRENT_DIR)/scripts/verify_embedded_version.sh"; \
 	PRERELEASE_FLAG=""; \
 	case "$(VOLVOXGRID_VERSION)" in \
-		*-SNAPSHOT) PRERELEASE_FLAG="--prerelease" ;; \
+		*$(MAVEN_SNAPSHOT_SUFFIX)) PRERELEASE_FLAG="--prerelease" ;; \
 	esac; \
 	if [ ! -f "$$VERIFY_SCRIPT" ]; then \
 		echo "Error: version verification script not found: $$VERIFY_SCRIPT"; \
@@ -2025,9 +2027,9 @@ NUGET_SOURCE          ?= https://api.nuget.org/v3/index.json
 
 publish_nuget:
 	@command -v dotnet >/dev/null 2>&1 || { echo "Error: dotnet SDK not found in PATH."; exit 1; }
-	@if echo "$(VOLVOXGRID_VERSION)" | grep -q -- '-SNAPSHOT$$'; then \
+	@if echo "$(VOLVOXGRID_VERSION)" | grep -q -- '$(MAVEN_SNAPSHOT_SUFFIX)$$'; then \
 		echo "Error: publish_nuget refuses SNAPSHOT versions ($(VOLVOXGRID_VERSION))."; \
-		echo "Build a release version first, for example: make docker_all VOLVOXGRID_VERSION=$$(printf '%s' "$(VOLVOXGRID_VERSION)" | sed 's/-SNAPSHOT$$//')"; \
+		echo "Build a release version first, for example: make docker_all VOLVOXGRID_VERSION=$$(printf '%s' "$(VOLVOXGRID_VERSION)" | sed 's/$(MAVEN_SNAPSHOT_SUFFIX)$$//')"; \
 		exit 1; \
 	fi
 	@if [ -z "$$NUGET_API_KEY" ] && [ -f "$$HOME/.nuget-env" ]; then \

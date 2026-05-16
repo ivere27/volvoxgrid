@@ -7,8 +7,8 @@ Binary sizes are examples, not compatibility guarantees. They change with Rust,
 Zig/MinGW, LLVM, target OS ABI, enabled features, link-time optimization, and
 post-build stripping.
 
-The example sizes below come from a `0.8.8-SNAPSHOT` Docker build inspected on
-2026-05-10.
+The example sizes below are illustrative and use current `0.8.9`
+filenames. The measurements were last inspected on 2026-05-10.
 
 ## Artifact Types
 
@@ -127,7 +127,7 @@ Wrapper-specific host text fallback:
 
 ## Split Debug Symbols
 
-`make docker_all VOLVOXGRID_VERSION=0.8.8-SNAPSHOT` builds release binaries with
+`make docker_all VOLVOXGRID_VERSION=0.8.9` builds release binaries with
 line-table debug information, extracts that information into separate archives
 under `dist/symbols/`, then strips the production binaries that are packaged
 into Maven, GitHub release, .NET, and Apple artifacts.
@@ -165,8 +165,8 @@ Sizes below are uncompressed native files inside the Java desktop JARs, measured
 with:
 
 ```bash
-unzip -l dist/maven/volvoxgrid-desktop-0.8.8-SNAPSHOT.jar 'native/*/*'
-unzip -l dist/maven/volvoxgrid-desktop-lite-0.8.8-SNAPSHOT.jar 'native/*/*'
+unzip -l dist/maven/volvoxgrid-desktop-0.8.9.jar 'native/*/*'
+unzip -l dist/maven/volvoxgrid-desktop-lite-0.8.9.jar 'native/*/*'
 ```
 
 | Target | Full native runtime | Lite native runtime |
@@ -184,8 +184,8 @@ Compressed JAR sizes from the same build:
 
 | Artifact | Size |
 | --- | ---: |
-| `volvoxgrid-desktop-0.8.8-SNAPSHOT.jar` | 30 MiB |
-| `volvoxgrid-desktop-lite-0.8.8-SNAPSHOT.jar` | 9.6 MiB |
+| `volvoxgrid-desktop-0.8.9.jar` | 30 MiB |
+| `volvoxgrid-desktop-lite-0.8.9.jar` | 9.6 MiB |
 
 The macOS native rows are lower than older builds because Docker now runs
 `llvm-strip` on packaged `.dylib` files after Zig cross-linking.
@@ -196,10 +196,10 @@ Android sizes from `dist/maven/`:
 
 | Artifact | Size | Notes |
 | --- | ---: | --- |
-| `volvoxgrid-android-0.8.8-SNAPSHOT.aar` | 7.3 MiB | `arm64-v8a` and `armeabi-v7a` native runtimes |
-| `volvoxgrid-android-lite-0.8.8-SNAPSHOT.aar` | 3.6 MiB | Lite native runtimes |
-| `volvoxgrid-android-compose-0.8.8-SNAPSHOT.aar` | 12 KiB | Thin Compose wrapper |
-| `volvoxgrid-android-compose-lite-0.8.8-SNAPSHOT.aar` | 12 KiB | Thin Compose wrapper for lite |
+| `volvoxgrid-android-0.8.9.aar` | 7.3 MiB | `arm64-v8a` and `armeabi-v7a` native runtimes |
+| `volvoxgrid-android-lite-0.8.9.aar` | 3.6 MiB | Lite native runtimes |
+| `volvoxgrid-android-compose-0.8.9.aar` | 12 KiB | Thin Compose wrapper |
+| `volvoxgrid-android-compose-lite-0.8.9.aar` | 12 KiB | Thin Compose wrapper for lite |
 
 Uncompressed Android native runtime sizes inside the AARs:
 
@@ -221,8 +221,8 @@ WASM and web bundle sizes:
 | --- | ---: |
 | `dist/wasm/volvoxgrid_wasm_bg.wasm` | 3.3 MiB |
 | `dist/wasm-lite/volvoxgrid_wasm_bg.wasm` | 1.3 MiB |
-| `volvoxgrid-web-0.8.8-SNAPSHOT.zip` | 1.7 MiB |
-| `volvoxgrid-web-lite-0.8.8-SNAPSHOT.zip` | 960 KiB |
+| `volvoxgrid-web-0.8.9.zip` | 1.7 MiB |
+| `volvoxgrid-web-lite-0.8.9.zip` | 960 KiB |
 
 ## Example .NET and ActiveX Sizes
 
@@ -246,13 +246,13 @@ Docker build.
 
 | Symbol archive | Size | Contains |
 | --- | ---: | --- |
-| `volvoxgrid-android-0.8.8-SNAPSHOT-debug-symbols.zip` | 16 MiB | Android full `.so.debug` files |
-| `volvoxgrid-android-lite-0.8.8-SNAPSHOT-debug-symbols.zip` | 5.4 MiB | Android lite `.so.debug` files |
-| `volvoxgrid-desktop-0.8.8-SNAPSHOT-debug-symbols.zip` | 63 MiB | Desktop native symbols, macOS `.dSYM`, and .NET PDBs |
-| `volvoxgrid-desktop-lite-0.8.8-SNAPSHOT-debug-symbols.zip` | 22 MiB | Desktop lite native symbols and macOS `.dSYM` |
-| `volvoxgrid-activex-0.8.8-SNAPSHOT-debug-symbols.zip` | 6.7 MiB | Full and lite OCX `.debug` files |
-| `VolvoxGrid-0.8.8-SNAPSHOT-debug-symbols.zip` | 25 MiB | iOS full unstripped static archives |
-| `VolvoxGridLite-0.8.8-SNAPSHOT-debug-symbols.zip` | 15 MiB | iOS lite unstripped static archives |
+| `volvoxgrid-android-0.8.9-debug-symbols.zip` | 16 MiB | Android full `.so.debug` files |
+| `volvoxgrid-android-lite-0.8.9-debug-symbols.zip` | 5.4 MiB | Android lite `.so.debug` files |
+| `volvoxgrid-desktop-0.8.9-debug-symbols.zip` | 63 MiB | Desktop native symbols, macOS `.dSYM`, and .NET PDBs |
+| `volvoxgrid-desktop-lite-0.8.9-debug-symbols.zip` | 22 MiB | Desktop lite native symbols and macOS `.dSYM` |
+| `volvoxgrid-activex-0.8.9-debug-symbols.zip` | 6.7 MiB | Full and lite OCX `.debug` files |
+| `VolvoxGrid-0.8.9-debug-symbols.zip` | 25 MiB | iOS full unstripped static archives |
+| `VolvoxGridLite-0.8.9-debug-symbols.zip` | 15 MiB | iOS lite unstripped static archives |
 
 ## Why Full Runtime DLLs Are Around 10 MB
 
@@ -317,8 +317,8 @@ metadata because Zig 0.13 rejects Darwin `-exported_symbols_list`.
 Show JAR embedded native file sizes:
 
 ```bash
-unzip -l dist/maven/volvoxgrid-desktop-0.8.8-SNAPSHOT.jar 'native/*/*'
-unzip -l dist/maven/volvoxgrid-desktop-lite-0.8.8-SNAPSHOT.jar 'native/*/*'
+unzip -l dist/maven/volvoxgrid-desktop-0.8.9.jar 'native/*/*'
+unzip -l dist/maven/volvoxgrid-desktop-lite-0.8.9.jar 'native/*/*'
 ```
 
 Show local distribution sizes:
@@ -338,11 +338,11 @@ find dist/maven dist/web dist/symbols -type f \
 Verify embedded versions in native release artifacts:
 
 ```bash
-bash scripts/verify_embedded_version.sh 0.8.8-SNAPSHOT \
-  dist/maven/volvoxgrid-android-0.8.8-SNAPSHOT.aar \
-  dist/maven/volvoxgrid-android-lite-0.8.8-SNAPSHOT.aar \
-  dist/maven/volvoxgrid-desktop-0.8.8-SNAPSHOT.jar \
-  dist/maven/volvoxgrid-desktop-lite-0.8.8-SNAPSHOT.jar \
+bash scripts/verify_embedded_version.sh 0.8.9 \
+  dist/maven/volvoxgrid-android-0.8.9.aar \
+  dist/maven/volvoxgrid-android-lite-0.8.9.aar \
+  dist/maven/volvoxgrid-desktop-0.8.9.jar \
+  dist/maven/volvoxgrid-desktop-lite-0.8.9.jar \
   dist/ios/VolvoxGrid.xcframework \
   dist/ios/VolvoxGridLite.xcframework \
   dist/dotnet/winforms_release/volvoxgrid.dll \
@@ -366,7 +366,7 @@ x86_64-w64-mingw32-objdump -h dist/desktop/ocx/VolvoxGrid_x86_64.ocx
 Inspect Linux section sizes:
 
 ```bash
-unzip -p dist/maven/volvoxgrid-desktop-0.8.8-SNAPSHOT.jar \
+unzip -p dist/maven/volvoxgrid-desktop-0.8.9.jar \
   native/linux-x86_64/libvolvoxgrid.so > /tmp/libvolvoxgrid.so
 readelf -S -W /tmp/libvolvoxgrid.so
 ```
@@ -374,7 +374,7 @@ readelf -S -W /tmp/libvolvoxgrid.so
 Inspect macOS Mach-O sections:
 
 ```bash
-unzip -p dist/maven/volvoxgrid-desktop-0.8.8-SNAPSHOT.jar \
+unzip -p dist/maven/volvoxgrid-desktop-0.8.9.jar \
   native/macos-aarch64/libvolvoxgrid.dylib > /tmp/libvolvoxgrid.dylib
 llvm-objdump --macho --private-headers /tmp/libvolvoxgrid.dylib
 ```
@@ -384,19 +384,19 @@ llvm-objdump --macho --private-headers /tmp/libvolvoxgrid.dylib
 Build everything:
 
 ```bash
-make docker_all VOLVOXGRID_VERSION=0.8.8-SNAPSHOT
+make docker_all VOLVOXGRID_VERSION=0.8.9
 ```
 
 Build Java desktop full and lite artifacts:
 
 ```bash
-make docker_desktop VOLVOXGRID_VERSION=0.8.8-SNAPSHOT
+make docker_desktop VOLVOXGRID_VERSION=0.8.9
 ```
 
 Build only Java desktop lite:
 
 ```bash
-make docker_desktop_lite VOLVOXGRID_VERSION=0.8.8-SNAPSHOT
+make docker_desktop_lite VOLVOXGRID_VERSION=0.8.9
 ```
 
 Build ActiveX variants locally:

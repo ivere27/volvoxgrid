@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.9
+
+- Regenerated protocol bindings for editor sessions, edit validation, indicator configuration, and font fallbacks.
+- Added controller APIs for row/column indicator configuration and font fallback settings.
+- Refreshed Flutter docs and examples for Maven-backed native loading, hierarchy indicators, and edit validation demos.
+
 ## 0.8.8
 
 - Added `VOLVOXGRID_VARIANT=lite` documentation and iOS podspec support for `VolvoxGridLite.xcframework`.
@@ -80,7 +86,7 @@
 - Added Flutter platform declarations for `macos` and `windows`.
 - Added desktop native resolution from Maven for Linux, macOS, and Windows.
 - Added support for `VOLVOXGRID_SOURCE` and `VOLVOXGRID_VERSION` across desktop native library builds.
-- Added `-SNAPSHOT` refresh handling for desktop native resolution.
+- Added snapshot refresh handling for desktop native resolution.
 
 ## 0.1.3
 
