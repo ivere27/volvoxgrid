@@ -31,6 +31,64 @@ const LEGACY_GRIDLINE_INSET_VERTICAL: i32 = 7;
 const LEGACY_GRIDLINE_RAISED_HORIZONTAL: i32 = 8;
 const LEGACY_GRIDLINE_RAISED_VERTICAL: i32 = 9;
 
+fn default_text_editor_spec(max_length: i32, mask: String) -> v1::EditorSpec {
+    v1::EditorSpec {
+        kind: v1::EditorKind::EditorText as i32,
+        owner: v1::EditorOwner::Engine as i32,
+        presentation: v1::EditorPresentation::EditorCanvas as i32,
+        validation_mode: v1::ValidationMode::ValidationBlock as i32,
+        validation_trigger: v1::ValidationTrigger::OnCommit as i32,
+        validation_debounce_ms: 0,
+        custom_editor_id: None,
+        text: Some(v1::TextEditorParams {
+            max_length,
+            mask,
+            allow_newlines: false,
+            input_type: v1::InputType::Text as i32,
+        }),
+        number: None,
+        checkbox: None,
+        list: None,
+        date_time: None,
+        actions: Vec::new(),
+        custom_props: None,
+    }
+}
+
+fn validate_editor_spec(
+    editor: &v1::EditorSpec,
+    tui_mode: bool,
+    capabilities: Option<&crate::edit::HostEditorCapabilities>,
+) -> Result<(), String> {
+    let kind_raw = editor.kind;
+    let owner_raw = editor.owner;
+    let kind = v1::EditorKind::try_from(kind_raw)
+        .map_err(|_| format!("invalid editor kind {kind_raw}"))?;
+    let owner = v1::EditorOwner::try_from(owner_raw)
+        .map_err(|_| format!("invalid editor owner {owner_raw}"))?;
+    if tui_mode && owner != v1::EditorOwner::Engine {
+        return Err("only ENGINE-owned editors are valid in TUI mode".to_string());
+    }
+    if owner == v1::EditorOwner::Custom
+        && editor
+            .custom_editor_id
+            .as_ref()
+            .map_or(true, |id| id.trim().is_empty())
+    {
+        return Err("CUSTOM editors require custom_editor_id".to_string());
+    }
+    if owner == v1::EditorOwner::Custom && kind != v1::EditorKind::EditorCustom {
+        return Err("EDITOR_OWNER_CUSTOM requires EDITOR_CUSTOM".to_string());
+    }
+    if kind == v1::EditorKind::EditorCustom && owner != v1::EditorOwner::Custom {
+        return Err("EDITOR_CUSTOM requires EDITOR_OWNER_CUSTOM".to_string());
+    }
+    if let Some(caps) = capabilities {
+        caps.accepts(kind, owner)?;
+    }
+    Ok(())
+}
+
 fn apply_padding_patch(base: style::Padding, patch: &v1::Padding) -> style::Padding {
     let mut next = base;
     if let Some(v) = patch.left {
@@ -379,8 +437,8 @@ fn apply_col_indicator_config(
     if let Some(v) = cfg.band_rows {
         target.band_rows = v.max(0);
     }
-    if let Some(v) = cfg.mode_bits {
-        target.mode_bits = v;
+    if let Some(v) = &cfg.cell_modes {
+        target.cell_modes = v.modes.clone();
     }
     if let Some(v) = cfg.background {
         target.back_color = Some(v);
@@ -426,7 +484,7 @@ fn apply_col_indicator_config(
                 col1: cell.col1.unwrap_or(0).max(0),
                 col2: cell.col2.unwrap_or(0).max(0),
                 text: cell.text.clone().unwrap_or_default(),
-                mode_bits: cell.mode_bits.unwrap_or(0),
+                modes: cell.modes.as_ref().map(|modes| modes.modes.clone()),
                 custom_key: cell.custom_key.clone().unwrap_or_default(),
                 data: cell.data.clone().unwrap_or_default(),
             })
@@ -439,7 +497,6 @@ fn col_indicator_to_proto(src: &crate::indicator::ColIndicatorState) -> v1::ColI
         visible: Some(src.visible),
         default_row_height: Some(src.default_row_height_px.max(1)),
         band_rows: Some(src.band_rows.max(0)),
-        mode_bits: Some(src.mode_bits),
         background: src.back_color,
         foreground: src.fore_color,
         grid_lines: src.grid_lines,
@@ -465,11 +522,16 @@ fn col_indicator_to_proto(src: &crate::indicator::ColIndicatorState) -> v1::ColI
                 col1: Some(cell.col1.max(0)),
                 col2: Some(cell.col2.max(0)),
                 text: Some(cell.text.clone()),
-                mode_bits: Some(cell.mode_bits),
                 custom_key: Some(cell.custom_key.clone()),
                 data: Some(cell.data.clone()),
+                modes: cell.modes.as_ref().map(|modes| v1::ColIndicatorCellModes {
+                    modes: modes.clone(),
+                }),
             })
             .collect(),
+        cell_modes: Some(v1::ColIndicatorCellModes {
+            modes: src.cell_modes.clone(),
+        }),
     }
 }
 
@@ -479,9 +541,6 @@ fn apply_corner_indicator_config(
 ) {
     if let Some(v) = cfg.visible {
         target.visible = v;
-    }
-    if let Some(v) = cfg.mode_bits {
-        target.mode_bits = v;
     }
     if let Some(v) = cfg.background {
         target.back_color = Some(v);
@@ -514,7 +573,6 @@ fn apply_corner_indicator_config(
 fn corner_indicator_to_proto(src: &CornerIndicatorState) -> v1::CornerIndicatorConfig {
     v1::CornerIndicatorConfig {
         visible: Some(src.visible),
-        mode_bits: Some(src.mode_bits),
         background: src.back_color,
         foreground: src.fore_color,
         custom_key: Some(src.custom_key.clone()),
@@ -1080,6 +1138,15 @@ fn cell_value_data_to_proto(value: &CellValueData, fallback_text: &str) -> v1::C
 impl VolvoxGrid {
     /// Apply a partial `GridConfig`. Only set sub-messages are dispatched.
     pub fn apply_config(&mut self, config: &v1::GridConfig) {
+        if let Some(preset_value) = config.theme_preset {
+            let preset = v1::ThemePreset::try_from(preset_value)
+                .unwrap_or(v1::ThemePreset::ThemeNone);
+            if preset != v1::ThemePreset::ThemeNone {
+                let mut palette = crate::theme::palette_for(preset);
+                palette.theme_preset = None;
+                self.apply_config(&palette);
+            }
+        }
         if let Some(rc) = &config.rendering {
             if let Some(renderer_mode) = rc.renderer_mode {
                 self.set_renderer_mode(renderer_mode);
@@ -1131,6 +1198,7 @@ impl VolvoxGrid {
             rendering: Some(self.get_render_config()),
             indicators: Some(self.get_indicator_bands_config()),
             version: Self::version().to_string(),
+            theme_preset: None,
         }
     }
 
@@ -1642,36 +1710,50 @@ impl VolvoxGrid {
     }
 
     fn apply_edit_config(&mut self, ec: &v1::EditConfig) {
-        if let Some(v) = ec.trigger {
-            self.edit_trigger_mode = v;
+        if let Some(v) = &ec.activation {
+            if let Some(value) = v.trigger {
+                self.edit_trigger_mode = value;
+            }
+            if let Some(value) = v.tab_behavior {
+                self.tab_behavior = value;
+            }
+            if let Some(value) = v.single_click_edit {
+                self.single_click_edit = value;
+            }
+            if let Some(value) = v.suppress_click_edit {
+                self.suppress_click_edit = value;
+            }
+            if let Some(value) = v.commit_on_focus_lost {
+                self.commit_on_focus_lost = value;
+            }
+            if let Some(value) = v.preserve_edit_on_navigation {
+                self.preserve_edit_on_navigation = value;
+            }
         }
-        if let Some(v) = ec.tab_behavior {
-            self.tab_behavior = v;
+        if let Some(editor) = &ec.default_editor {
+            match validate_editor_spec(
+                editor,
+                self.tui_mode,
+                self.host_editor_capabilities.as_ref(),
+            ) {
+                Ok(()) => {
+                    self.default_editor = Some(editor.clone());
+                    if let Some(text) = &editor.text {
+                        self.edit_max_length = text.max_length;
+                        self.edit_mask = text.mask.clone();
+                    }
+                    if let Some(list) = &editor.list {
+                        self.dropdown_search = list.searchable;
+                    }
+                }
+                Err(message) => self.events.push(crate::event::GridEventData::Error {
+                    code: v1::ErrorCode::ErrorInvalidArgument as i32,
+                    message,
+                }),
+            }
         }
-        if let Some(v) = ec.dropdown_trigger {
-            self.dropdown_trigger = v;
-        }
-        if let Some(v) = ec.dropdown_search {
-            self.dropdown_search = v;
-        }
-        if let Some(v) = ec.max_length {
-            self.edit_max_length = v;
-        }
-        if let Some(v) = &ec.mask {
-            self.edit_mask = v.clone();
-        }
-        if let Some(v) = ec.host_key_dispatch {
-            self.host_key_dispatch = v;
-        }
-        if let Some(v) = ec.host_pointer_dispatch {
-            self.host_pointer_dispatch = v;
-        }
-        if let Some(v) = ec.engine_compose {
-            self.engine_compose = v;
-            self.engine_compose_configured = true;
-        }
-        if let Some(v) = ec.compose_method {
-            self.compose_method = v;
+        if let Some(value) = ec.compose_method {
+            self.compose_method = value;
             self.compose_method_configured = true;
         }
         self.edit.configure_compose(
@@ -1927,6 +2009,9 @@ impl VolvoxGrid {
         }
         if let Some(v) = rc.text_layout_cache_cap {
             self.set_text_layout_cache_cap(v);
+        }
+        if let Some(v) = rc.font_fallback_enabled {
+            self.set_font_fallback_enabled(v);
         }
         if let Some(v) = rc.present_mode {
             self.present_mode = v;
@@ -2189,15 +2274,17 @@ impl VolvoxGrid {
 
     fn get_edit_config(&self) -> v1::EditConfig {
         v1::EditConfig {
-            trigger: Some(self.edit_trigger_mode),
-            tab_behavior: Some(self.tab_behavior),
-            dropdown_trigger: Some(self.dropdown_trigger),
-            dropdown_search: Some(self.dropdown_search),
-            max_length: Some(self.edit_max_length),
-            mask: Some(self.edit_mask.clone()),
-            host_key_dispatch: Some(self.host_key_dispatch),
-            host_pointer_dispatch: Some(self.host_pointer_dispatch),
-            engine_compose: Some(self.effective_engine_compose_enabled()),
+            activation: Some(v1::EditActivation {
+                trigger: Some(self.edit_trigger_mode),
+                tab_behavior: Some(self.tab_behavior),
+                single_click_edit: Some(self.single_click_edit),
+                suppress_click_edit: Some(self.suppress_click_edit),
+                commit_on_focus_lost: Some(self.commit_on_focus_lost),
+                preserve_edit_on_navigation: Some(self.preserve_edit_on_navigation),
+            }),
+            default_editor: Some(self.default_editor.clone().unwrap_or_else(|| {
+                default_text_editor_spec(self.edit_max_length, self.edit_mask.clone())
+            })),
             compose_method: Some(self.effective_compose_method()),
         }
     }
@@ -2303,6 +2390,7 @@ impl VolvoxGrid {
             render_layer_mask: Some(self.render_layer_mask as i64),
             layer_profiling: Some(self.layer_profiling),
             scroll_blit: Some(self.scroll_blit_enabled),
+            font_fallback_enabled: Some(self.font_fallback_enabled),
         }
     }
 
@@ -2349,6 +2437,23 @@ impl VolvoxGrid {
             }
             let col = idx as usize;
             let mut format_changed = false;
+            let validated_editor = def.editor.as_ref().and_then(|editor| {
+                let result = validate_editor_spec(
+                    editor,
+                    self.tui_mode,
+                    self.host_editor_capabilities.as_ref(),
+                );
+                match result {
+                    Ok(()) => Some(editor.clone()),
+                    Err(message) => {
+                        self.events.push(crate::event::GridEventData::Error {
+                            code: v1::ErrorCode::ErrorInvalidArgument as i32,
+                            message,
+                        });
+                        None
+                    }
+                }
+            });
 
             // Width
             if let Some(w) = def.width {
@@ -2405,12 +2510,14 @@ impl VolvoxGrid {
                     cp.sort_order = merge_sort_spec(cp.sort_order, def.sort_order, sort_type);
                     cp.sort_defined = true;
                 }
-                if let Some(v) = &def.dropdown {
-                    cp.dropdown = Some(v.clone());
-                    cp.dropdown_items = crate::edit::dropdown_to_legacy_items(v);
-                }
-                if let Some(v) = &def.edit_mask {
-                    cp.edit_mask = v.clone();
+                if let Some(v) = &validated_editor {
+                    cp.editor = Some(v.clone());
+                    if let Some(list) = &v.list {
+                        cp.dropdown_items = crate::edit::dropdown_to_legacy_items(list);
+                    }
+                    if let Some(text) = &v.text {
+                        cp.edit_mask = text.mask.clone();
+                    }
                 }
                 if let Some(v) = def.indent {
                     cp.indent = v;
@@ -3079,11 +3186,25 @@ impl VolvoxGrid {
             }
         }
 
-        if let Some(dropdown) = &u.dropdown {
-            let cell = self.cells.get_mut(row, col);
-            let extra = cell.extra_mut();
-            extra.dropdown = Some(dropdown.clone());
-            extra.dropdown_items = crate::edit::dropdown_to_legacy_items(dropdown);
+        if let Some(editor) = &u.editor {
+            match validate_editor_spec(
+                editor,
+                self.tui_mode,
+                self.host_editor_capabilities.as_ref(),
+            ) {
+                Ok(()) => {
+                    let cell = self.cells.get_mut(row, col);
+                    let extra = cell.extra_mut();
+                    extra.editor = Some(editor.clone());
+                    if let Some(list) = &editor.list {
+                        extra.dropdown_items = crate::edit::dropdown_to_legacy_items(list);
+                    }
+                }
+                Err(message) => self.events.push(crate::event::GridEventData::Error {
+                    code: v1::ErrorCode::ErrorInvalidArgument as i32,
+                    message,
+                }),
+            }
         }
 
         if let Some(barcode) = &u.barcode {
@@ -3180,7 +3301,7 @@ impl VolvoxGrid {
                 || entry.update.picture.is_some()
                 || entry.update.picture_align.is_some()
                 || entry.update.button_picture.is_some()
-                || entry.update.dropdown.is_some()
+                || entry.update.editor.is_some()
                 || entry.update.barcode.is_some()
                 || entry.update.rich_text.is_some()
                 || entry.update.interaction.is_some()
@@ -3235,7 +3356,7 @@ impl VolvoxGrid {
                     picture: None,
                     picture_align: None,
                     button_picture: None,
-                    dropdown: None,
+                    editor: None,
                     sticky_row: None,
                     sticky_col: None,
                     interaction: None,
@@ -3326,12 +3447,7 @@ impl VolvoxGrid {
                 },
                 sort_order,
                 sort_type,
-                dropdown: cp.dropdown,
-                edit_mask: if cp.edit_mask.is_empty() {
-                    None
-                } else {
-                    Some(cp.edit_mask)
-                },
+                editor: cp.editor,
                 indent: if cp.indent != 0 {
                     Some(cp.indent)
                 } else {
@@ -3692,6 +3808,65 @@ mod tests {
     }
 
     #[test]
+    fn host_capabilities_reject_unsupported_owner() {
+        let caps = crate::edit::HostEditorCapabilities {
+            adapter_id: "tui".to_string(),
+            allowed: Vec::new(),
+            host_native_supported: false,
+            custom_owner_supported: false,
+        };
+        let spec = v1::EditorSpec {
+            kind: v1::EditorKind::EditorText as i32,
+            owner: v1::EditorOwner::HostNative as i32,
+            ..Default::default()
+        };
+        let err = validate_editor_spec(&spec, false, Some(&caps)).unwrap_err();
+        assert!(
+            err.contains("EDITOR_OWNER_HOST_NATIVE"),
+            "expected host-native rejection, got: {err}",
+        );
+    }
+
+    #[test]
+    fn host_capabilities_allow_listed_pair_is_accepted() {
+        let caps = crate::edit::HostEditorCapabilities {
+            adapter_id: "sfdatagrid".to_string(),
+            allowed: vec![
+                (v1::EditorKind::EditorText, v1::EditorOwner::HostNative),
+                (v1::EditorKind::EditorCheckbox, v1::EditorOwner::HostNative),
+                (v1::EditorKind::EditorText, v1::EditorOwner::Engine),
+            ],
+            host_native_supported: true,
+            custom_owner_supported: false,
+        };
+        let spec = v1::EditorSpec {
+            kind: v1::EditorKind::EditorText as i32,
+            owner: v1::EditorOwner::HostNative as i32,
+            ..Default::default()
+        };
+        validate_editor_spec(&spec, false, Some(&caps)).unwrap();
+
+        let bad = v1::EditorSpec {
+            kind: v1::EditorKind::EditorDateTime as i32,
+            owner: v1::EditorOwner::HostNative as i32,
+            ..Default::default()
+        };
+        let err = validate_editor_spec(&bad, false, Some(&caps)).unwrap_err();
+        assert!(err.contains("EditorDateTime"), "got: {err}");
+    }
+
+    #[test]
+    fn host_capabilities_none_falls_through_universal_only() {
+        let spec = v1::EditorSpec {
+            kind: v1::EditorKind::EditorText as i32,
+            owner: v1::EditorOwner::HostNative as i32,
+            ..Default::default()
+        };
+        // tui_mode = false, no capabilities → universal-only checks pass.
+        validate_editor_spec(&spec, false, None).unwrap();
+    }
+
+    #[test]
     fn apply_config_partial_style() {
         let mut grid = test_grid();
         let old_back = grid.style.back_color;
@@ -3788,6 +3963,69 @@ mod tests {
     }
 
     #[test]
+    fn edit_activation_partial_update_preserves_unset_fields() {
+        let mut grid = test_grid();
+        grid.edit_trigger_mode = v1::EditTrigger::KeyClick as i32;
+        grid.tab_behavior = v1::TabBehavior::TabControls as i32;
+        grid.single_click_edit = true;
+        grid.suppress_click_edit = true;
+        grid.commit_on_focus_lost = true;
+        grid.preserve_edit_on_navigation = true;
+
+        grid.apply_config(&v1::GridConfig {
+            editing: Some(v1::EditConfig {
+                activation: Some(v1::EditActivation {
+                    trigger: Some(v1::EditTrigger::None as i32),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            ..Default::default()
+        });
+
+        assert_eq!(grid.edit_trigger_mode, v1::EditTrigger::None as i32);
+        assert_eq!(grid.tab_behavior, v1::TabBehavior::TabControls as i32);
+        assert!(grid.single_click_edit);
+        assert!(grid.suppress_click_edit);
+        assert!(grid.commit_on_focus_lost);
+        assert!(grid.preserve_edit_on_navigation);
+    }
+
+    #[test]
+    fn edit_config_without_compose_method_preserves_tui_default() {
+        let mut grid = test_grid();
+        grid.apply_config(&v1::GridConfig {
+            rendering: Some(v1::RenderConfig {
+                renderer_mode: Some(v1::RendererMode::RendererTui as i32),
+                ..Default::default()
+            }),
+            ..Default::default()
+        });
+        assert!(!grid.compose_method_configured);
+        assert_eq!(
+            grid.effective_compose_method(),
+            v1::ComposeMethod::DeadKey as i32
+        );
+
+        grid.apply_config(&v1::GridConfig {
+            editing: Some(v1::EditConfig {
+                activation: Some(v1::EditActivation {
+                    trigger: Some(v1::EditTrigger::KeyClick as i32),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            ..Default::default()
+        });
+
+        assert!(!grid.compose_method_configured);
+        assert_eq!(
+            grid.effective_compose_method(),
+            v1::ComposeMethod::DeadKey as i32
+        );
+    }
+
+    #[test]
     fn get_config_roundtrip() {
         let mut grid = test_grid();
         grid.style.back_color = 0xAABBCCDD;
@@ -3804,7 +4042,14 @@ mod tests {
         let config = grid.get_config();
 
         assert_eq!(config.style.as_ref().unwrap().background, Some(0xAABBCCDD));
-        assert_eq!(config.editing.as_ref().unwrap().trigger, Some(2));
+        assert_eq!(
+            config
+                .editing
+                .as_ref()
+                .and_then(|editing| editing.activation.as_ref())
+                .map(|activation| activation.trigger),
+            Some(Some(2))
+        );
         let scrolling = config.scrolling.as_ref().unwrap();
         let scroll_bar = scrolling.scroll_bar.as_ref().unwrap();
         assert_eq!(
@@ -4496,7 +4741,7 @@ mod tests {
                 picture: None,
                 picture_align: None,
                 button_picture: None,
-                dropdown: None,
+                editor: None,
                 sticky_row: None,
                 sticky_col: None,
                 interaction: Some(v1::CellInteraction::Button as i32),
@@ -4522,7 +4767,7 @@ mod tests {
                 picture: None,
                 picture_align: None,
                 button_picture: None,
-                dropdown: None,
+                editor: None,
                 sticky_row: None,
                 sticky_col: None,
                 interaction: Some(v1::CellInteraction::Unspecified as i32),
@@ -4644,6 +4889,34 @@ mod tests {
         assert_eq!(
             config.rendering.as_ref().unwrap().text_layout_cache_cap,
             Some(1234)
+        );
+    }
+
+    #[test]
+    fn apply_config_sets_font_fallback_enabled() {
+        let mut grid = test_grid();
+        assert!(grid.font_fallback_enabled);
+
+        let config = v1::GridConfig {
+            rendering: Some(v1::RenderConfig {
+                font_fallback_enabled: Some(false),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        grid.apply_config(&config);
+        assert!(!grid.font_fallback_enabled);
+        assert!(!grid.ensure_text_engine().font_fallback_enabled());
+    }
+
+    #[test]
+    fn get_config_returns_font_fallback_enabled() {
+        let mut grid = test_grid();
+        grid.font_fallback_enabled = false;
+        let config = grid.get_config();
+        assert_eq!(
+            config.rendering.as_ref().unwrap().font_fallback_enabled,
+            Some(false)
         );
     }
 

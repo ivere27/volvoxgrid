@@ -8,9 +8,11 @@
 
 import { VolvoxGrid } from "volvoxgrid";
 import * as volvoxgrid from "volvoxgrid";
+import { EditEndReason } from "volvoxgrid/generated/volvoxgrid_ffi.js";
 import type {
   VolvoxSheetOptions, VolvoxSheetApi, CellRef, CellRange,
   CellStyleUpdate, SpreadsheetAction, VolvoxSheetGrid,
+  VolvoxGridRowIndicatorConfig,
 } from "./types.js";
 import { encodeGridConfig } from "./proto/config-encoder.js";
 import {
@@ -24,14 +26,11 @@ import {
 import {
   decodeGridEventEnvelope,
   decodeCellFocusPayload,
-  decodeAfterEditPayload,
   decodeCellEditChangePayload,
   decodeSelectionChangedPayload,
   EVENT_CELL_FOCUS_CHANGED,
   EVENT_ENTER_CELL,
   EVENT_SELECTION_CHANGED,
-  EVENT_START_EDIT,
-  EVENT_AFTER_EDIT,
   EVENT_CELL_EDIT_CHANGE,
 } from "./proto/event-decoder.js";
 import { buildSheetConfig, ALIGN, SHEET_COLORS } from "./theme/sheet-theme.js";
@@ -78,7 +77,17 @@ const DEFAULT_CJK_FONTS = {
     url: "https://cdn.jsdelivr.net/gh/notofonts/noto-cjk@main/Sans/SubsetOTF/TC/NotoSansTC-Regular.otf",
   },
 } as const satisfies Record<string, DefaultFontSource>;
-const SHEET_ROW_INDICATOR_MODE = 1; // numbers
+const SHEET_ROW_NUMBER_SLOT_KIND = 1;
+
+function sheetRowIndicatorConfig(width: number): VolvoxGridRowIndicatorConfig {
+  const normalizedWidth = Math.max(1, Math.trunc(width));
+  return {
+    visible: true,
+    width: normalizedWidth,
+    allowResize: true,
+    slots: [{ kind: SHEET_ROW_NUMBER_SLOT_KIND, width: normalizedWidth, visible: true }],
+  };
+}
 
 const createCanvas2DTextRendererMaybe =
   (volvoxgrid as { createCanvas2DTextRenderer?: (wasm: any) => { measureText: Function; renderText: Function } })
@@ -154,6 +163,28 @@ interface FormulaRefToken {
   col2: number;
 }
 
+interface EditorSessionStartedDetails {
+  sessionId: bigint;
+  row: number;
+  col: number;
+  initialText: string;
+  stateVersion: bigint;
+}
+
+interface EditorSessionUpdatedDetails {
+  sessionId: bigint;
+  text?: string;
+  visible?: boolean;
+  stateVersion: bigint;
+}
+
+interface EditorSessionEndedDetails {
+  sessionId: bigint;
+  reason: EditEndReason;
+  committedText?: string;
+  stateVersion: bigint;
+}
+
 export class VolvoxSheet implements VolvoxSheetApi {
   readonly grid: VolvoxSheetGrid;
   private wasm: any;
@@ -210,6 +241,9 @@ export class VolvoxSheet implements VolvoxSheetApi {
   private _preMergeRow: number = 0;
   private _preMergeCol: number = 0;
   private pendingEditOriginalRaw = new Map<string, string>();
+  private activeEditorSessionId: bigint = 0n;
+  private activeEditorSessionRow: number = -1;
+  private activeEditorSessionCol: number = -1;
 
   // Event loop
   private eventPollTimer: number = 0;
@@ -327,8 +361,7 @@ export class VolvoxSheet implements VolvoxSheetApi {
     this.grid.showColumnHeaders = true;
     this.grid.columnIndicatorTopRowCount = 1;
     this.grid.showRowIndicator = true;
-    this.grid.rowIndicatorStartModeBits = SHEET_ROW_INDICATOR_MODE;
-    this.grid.rowIndicatorStartWidth = this.baseRowIndicatorStartWidth;
+    this.grid.setRowIndicatorStartConfig(sheetRowIndicatorConfig(this.baseRowIndicatorStartWidth));
     this.applyIndicatorTheme();
 
     this.grid.setResizePolicy({ columns: true, rows: true, uniform: false });
@@ -340,18 +373,11 @@ export class VolvoxSheet implements VolvoxSheetApi {
 
     // Enable double-click editing via the direct wrapper property (bypasses protobuf config)
     // 2 = EDIT_TRIGGER_KEY_CLICK: allows editing from RPC and dblclick.
-    // host_key_dispatch=true still prevents engine from auto-starting on keypress.
     this.grid.editTrigger = 2;
 
     // Enable double-click-to-auto-size on column header borders
     if (typeof this.wasm.set_auto_size_mouse === "function") {
       this.wasm.set_auto_size_mouse(this.grid.id, 1);
-    }
-
-    // Host pointer dispatch: Sheet adapter owns all pointer-driven selection
-    // and edit triggers.  Engine still handles resize, scrollbar, fast-scroll.
-    if (typeof this.wasm.set_host_pointer_dispatch === "function") {
-      this.wasm.set_host_pointer_dispatch(this.grid.id, 1);
     }
 
     // Full WASM mode needs one real font in the engine for shaping/measurement.
@@ -463,6 +489,12 @@ export class VolvoxSheet implements VolvoxSheetApi {
         force: true,
       });
     };
+    (this.grid as any).onEditorSessionStarted = (details: EditorSessionStartedDetails) =>
+      this.handleEditorSessionStarted(details);
+    (this.grid as any).onEditorSessionUpdated = (details: EditorSessionUpdatedDetails) =>
+      this.handleEditorSessionUpdated(details);
+    (this.grid as any).onEditorSessionEnded = (details: EditorSessionEndedDetails) =>
+      this.handleEditorSessionEnded(details);
     this.applyResponsiveLayout(true);
     if (typeof ResizeObserver !== "undefined") {
       this.layoutResizeObserver = new ResizeObserver(() => {
@@ -508,14 +540,7 @@ export class VolvoxSheet implements VolvoxSheetApi {
     (this.grid as any).onCompositionEditStart = () => {
       const master = this.resolveMergedMaster(this.selection.row, this.selection.col);
       (this.grid as any).suppressEditorSelect = true;
-      this.editState.onEngineStartEdit(master.row, master.col);
-      this.updateEditModeUI(true);
-      const dataRow = master.row;
-      const dataCol = master.col;
-      if (dataRow >= 0 && dataCol >= 0) {
-        const key = `${dataRow}:${dataCol}`;
-        this.pendingEditOriginalRaw.set(key, this.store.getCellRawValue(dataRow, dataCol));
-      }
+      this.syncEngineEditStarted(master.row, master.col, "");
       requestAnimationFrame(() => {
         (this.grid as any).suppressEditorSelect = false;
       });
@@ -549,6 +574,112 @@ export class VolvoxSheet implements VolvoxSheetApi {
       }
     } catch (err) {
       console.warn("VolvoxSheet: font load error", err);
+    }
+  }
+
+  private editKey(row: number, col: number): string {
+    return `${row}:${col}`;
+  }
+
+  private rememberEditOriginal(row: number, col: number): void {
+    if (row < 0 || col < 0) return;
+    const key = this.editKey(row, col);
+    if (!this.pendingEditOriginalRaw.has(key)) {
+      this.pendingEditOriginalRaw.set(key, this.store.getCellRawValue(row, col));
+    }
+  }
+
+  private syncEngineEditStarted(row: number, col: number, text?: string): void {
+    const currentText = text ?? this.gridEditInput?.value ?? this.store.getCellRawValue(row, col);
+    this.editState.syncActiveEdit(row, col, currentText);
+    this.rememberEditOriginal(row, col);
+    this.updateEditModeUI(true);
+    requestAnimationFrame(() => {
+      this.syncEditInputAlign();
+      this.syncHostEditSelectionFromEngine();
+    });
+  }
+
+  private applyCommittedEdit(row: number, col: number, newText: string): void {
+    if (row < 0 || col < 0) return;
+    const key = this.editKey(row, col);
+    const oldRaw =
+      this.pendingEditOriginalRaw.get(key)
+      ?? this.store.getCellRawValue(row, col);
+    this.pendingEditOriginalRaw.delete(key);
+
+    this.store.onCellEdited(row, col, newText);
+    if (oldRaw !== newText) {
+      this.undoStack.pushExecuted(
+        new CellValueChange(this.store, row, col, oldRaw, newText),
+      );
+      this.autoAlignCell(row, col, this.store.getCellValue(row, col));
+    }
+  }
+
+  private finishEngineEdit(row: number, col: number, newText?: string): void {
+    if (newText != null) {
+      this.editState.onEngineAfterEdit(
+        row,
+        col,
+        this.pendingEditOriginalRaw.get(this.editKey(row, col)) ?? "",
+        newText,
+      );
+      this.applyCommittedEdit(row, col, newText);
+    } else {
+      if (row >= 0 && col >= 0) {
+        this.pendingEditOriginalRaw.delete(this.editKey(row, col));
+      }
+      this.editState.reset();
+    }
+    this.formulaBar?.updateFormulaInput();
+    this.updateEditModeUI(false);
+    this.updateToolbarState();
+  }
+
+  private handleEditorSessionStarted(details: EditorSessionStartedDetails): void {
+    this.activeEditorSessionId = details.sessionId;
+    this.activeEditorSessionRow = details.row;
+    this.activeEditorSessionCol = details.col;
+    this.syncEngineEditStarted(details.row, details.col, details.initialText);
+  }
+
+  private handleEditorSessionUpdated(details: EditorSessionUpdatedDetails): void {
+    if (this.activeEditorSessionId !== 0n && details.sessionId !== this.activeEditorSessionId) {
+      return;
+    }
+    if (details.text != null) {
+      this.editState.onEditTextChanged(details.text);
+      this.formulaBar?.onEditTextChanged(details.text);
+      this.syncFormulaHighlightsFromText(details.text);
+    }
+  }
+
+  private handleEditorSessionEnded(details: EditorSessionEndedDetails): void {
+    const row = this.activeEditorSessionId === details.sessionId
+      ? this.activeEditorSessionRow
+      : this.editState.row;
+    const col = this.activeEditorSessionId === details.sessionId
+      ? this.activeEditorSessionCol
+      : this.editState.col;
+    this.activeEditorSessionId = 0n;
+    this.activeEditorSessionRow = -1;
+    this.activeEditorSessionCol = -1;
+
+    switch (details.reason) {
+      case EditEndReason.EDIT_END_COMMITTED:
+        this.finishEngineEdit(row, col, details.committedText ?? "");
+        break;
+      case EditEndReason.EDIT_END_REVERTED_INVALID:
+      case EditEndReason.EDIT_END_CANCELED:
+      case EditEndReason.EDIT_END_FOCUS_LOST:
+      case EditEndReason.EDIT_END_CELL_REMOVED:
+      case EditEndReason.EDIT_END_GRID_DESTROYED:
+      case EditEndReason.EDIT_END_UNSPECIFIED:
+      default:
+        // No commit: discard pending undo snapshot and reset edit state.
+        this.finishEngineEdit(row, col);
+        break;
     }
   }
 
@@ -682,7 +813,7 @@ export class VolvoxSheet implements VolvoxSheetApi {
       return;
     }
 
-    // Enter/Tab: engine ignores these with host_key_dispatch, move ourselves
+        // Enter/Tab: move through the sheet selection model ourselves.
     const moveMap: Partial<Record<SpreadsheetAction, [number, number]>> = {
       commitMoveDown: [1, 0],
       commitMoveUp: [-1, 0],
@@ -1267,6 +1398,7 @@ export class VolvoxSheet implements VolvoxSheetApi {
       const req = encodeEditSetText({
         gridId: this.grid.id,
         text,
+        ...this.editState.sessionIdentity(),
       });
       this.wasm.volvox_grid_edit_pb(req);
     } else if (typeof this.wasm.set_edit_text === "function") {
@@ -1858,10 +1990,6 @@ export class VolvoxSheet implements VolvoxSheetApi {
       requestAnimationFrame(() => this.syncEditInputAlign());
       return;
     }
-    // EVENT_AFTER_EDIT is the single source of truth for edit undo history.
-    if (result && result.oldText !== result.newText) {
-      // no-op
-    }
     this.updateEditModeUI(false);
     this.moveSelectionMergeAware(dRow, dCol);
     this.onSelectionUpdated();
@@ -1875,10 +2003,6 @@ export class VolvoxSheet implements VolvoxSheetApi {
         this.formulaBar?.updateFormulaInput();
         requestAnimationFrame(() => this.syncEditInputAlign());
         return;
-      }
-      // EVENT_AFTER_EDIT records undo/history after engine commit.
-      if (result && result.oldText !== text) {
-        // no-op
       }
     } else {
       // Direct cell value change (no active edit session)
@@ -2525,10 +2649,10 @@ export class VolvoxSheet implements VolvoxSheetApi {
     this.grid.columnIndicatorTopRowCount = 1;
     this.setColumnHeaderHeight(this.currentColumnHeaderHeight);
     this.grid.showRowIndicator = true;
-    this.grid.rowIndicatorStartModeBits = SHEET_ROW_INDICATOR_MODE;
-    this.grid.rowIndicatorStartWidth = this.toLayoutPixels(
+    const rowIndicatorWidth = this.toLayoutPixels(
       Math.max(24, this.baseRowIndicatorStartWidth * this.responsiveScale * this.userZoomScale),
     );
+    this.grid.setRowIndicatorStartConfig(sheetRowIndicatorConfig(rowIndicatorWidth));
     this.applyIndicatorTheme();
     this.grid.invalidate();
   }
@@ -2632,55 +2756,6 @@ export class VolvoxSheet implements VolvoxSheetApi {
         const sel = decodeSelectionChangedPayload(payload);
         this.selection.onSelectionEndChanged(sel.rowEnd, sel.colEnd);
         this.onSelectionUpdated();
-        break;
-      }
-      case EVENT_START_EDIT: {
-        const { row, col } = decodeCellFocusPayload(payload);
-        this.editState.onEngineStartEdit(row, col);
-        if (this.gridEditInput) {
-          this.editState.onEditTextChanged(this.gridEditInput.value);
-        }
-        this.updateEditModeUI(true);
-        requestAnimationFrame(() => {
-          this.syncEditInputAlign();
-          this.syncHostEditSelectionFromEngine();
-        });
-        const dataRow = row - 0;
-        const dataCol = col - 0;
-        if (dataRow >= 0 && dataCol >= 0) {
-          const key = `${dataRow}:${dataCol}`;
-          this.pendingEditOriginalRaw.set(
-            key,
-            this.store.getCellRawValue(dataRow, dataCol),
-          );
-        }
-        break;
-      }
-      case EVENT_AFTER_EDIT: {
-        const { row, col, oldText: _oldText, newText } = decodeAfterEditPayload(payload);
-        this.editState.onEngineAfterEdit(row, col, _oldText, newText);
-        const rowOffset = 0;
-        const colOffset = 0;
-        const dataRow = row - rowOffset;
-        const dataCol = col - colOffset;
-        if (dataRow >= 0 && dataCol >= 0) {
-          const key = `${dataRow}:${dataCol}`;
-          const oldRaw =
-            this.pendingEditOriginalRaw.get(key)
-            ?? this.store.getCellRawValue(dataRow, dataCol);
-          this.pendingEditOriginalRaw.delete(key);
-
-          this.store.onCellEdited(dataRow, dataCol, newText);
-          if (oldRaw !== newText) {
-            this.undoStack.pushExecuted(
-              new CellValueChange(this.store, dataRow, dataCol, oldRaw, newText),
-            );
-            this.autoAlignCell(dataRow, dataCol, this.store.getCellValue(dataRow, dataCol));
-          }
-        }
-        this.formulaBar?.updateFormulaInput();
-        this.updateEditModeUI(false);
-        this.updateToolbarState();
         break;
       }
       case EVENT_CELL_EDIT_CHANGE: {
@@ -3418,6 +3493,9 @@ export class VolvoxSheet implements VolvoxSheetApi {
     this.activeTouchPointers.clear();
     this.pinchBaseZoomScale = null;
     this.grid.onZoomChange = null;
+    (this.grid as any).onEditorSessionStarted = null;
+    (this.grid as any).onEditorSessionUpdated = null;
+    (this.grid as any).onEditorSessionEnded = null;
     (this.grid as any).onCompositionEditStart = null;
 
     this.grid.destroy();

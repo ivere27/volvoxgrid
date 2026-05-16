@@ -36,6 +36,12 @@ namespace VolvoxGrid.DotNet
             return _client.GetConfig(_gridId);
         }
 
+        public SchemaResponse GetSchema()
+        {
+            EnsureNotDisposed();
+            return _client.GetSchema(_gridId);
+        }
+
         public void Configure(GridConfig config)
         {
             EnsureNotDisposed();
@@ -58,6 +64,26 @@ namespace VolvoxGrid.DotNet
                     Rendering = new RenderConfig
                     {
                         RenderLayerMask = mask,
+                    },
+                });
+        }
+
+        public bool GetFontFallbackEnabled()
+        {
+            EnsureNotDisposed();
+            var rendering = GetConfig().Rendering;
+            return rendering == null || !rendering.HasFontFallbackEnabled || rendering.FontFallbackEnabled;
+        }
+
+        public void SetFontFallbackEnabled(bool enabled)
+        {
+            EnsureNotDisposed();
+            Configure(
+                new GridConfig
+                {
+                    Rendering = new RenderConfig
+                    {
+                        FontFallbackEnabled = enabled,
                     },
                 });
         }
@@ -294,10 +320,10 @@ namespace VolvoxGrid.DotNet
             return _client.GetMergedRegions(_gridId);
         }
 
-        public void BeginEdit(int row, int col, bool? selectAll, bool? caretEnd, string seedText)
+        public void BeginEdit(int row, int col, EditStartReason reason, string seedText, int? caretPosition = null)
         {
             EnsureNotDisposed();
-            _client.EditStart(_gridId, row, col, selectAll, caretEnd, seedText);
+            _client.EditStart(_gridId, row, col, reason, seedText, caretPosition);
         }
 
         public void CommitEdit(string text)

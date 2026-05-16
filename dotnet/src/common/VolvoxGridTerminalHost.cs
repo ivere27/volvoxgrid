@@ -674,7 +674,7 @@ namespace VolvoxGrid.DotNet
             {
                 return "Ready";
             }
-            return state.UiMode == EditUiMode.EDIT_UI_MODE_EDIT ? "Edit" : "Enter";
+            return "Edit";
         }
 
         private static VolvoxGridTerminalRunOptions NormalizeOptions(VolvoxGridTerminalRunOptions options)

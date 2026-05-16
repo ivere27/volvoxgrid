@@ -4,7 +4,7 @@ go 1.24.0
 
 require (
 	github.com/charmbracelet/bubbletea v1.3.10
-	github.com/ivere27/volvoxgrid/go v0.8.8
+	github.com/ivere27/volvoxgrid/go v0.8.9
 	google.golang.org/protobuf v1.36.0
 )
 

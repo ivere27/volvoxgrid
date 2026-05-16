@@ -14,9 +14,11 @@ use crate::cell::{BarcodeSpec, CellStore};
 use crate::column::ColumnProps;
 use crate::control::CellControl;
 use crate::drag::DragState;
-use crate::edit::EditState;
+use crate::edit::{editor_line_index_for_char, editor_visual_lines, EditState};
 use crate::event::{EventQueue, EventTarget};
-use crate::indicator::{ColIndicatorRowDefState, IndicatorBandsState, RowIndicatorState};
+use crate::indicator::{
+    col_indicator_modes_contain, ColIndicatorRowDefState, IndicatorBandsState, RowIndicatorState,
+};
 use crate::layout::LayoutCache;
 use crate::outline::OutlineState;
 use crate::proto::volvoxgrid::v1 as pb;
@@ -24,9 +26,9 @@ use crate::rich_text::utf16_index_to_byte_index;
 use crate::row::RowProps;
 use crate::scroll::ScrollState;
 use crate::scrollbar::{
-    reset_scrollbar_fade_state, scrollbar_fade_animating, scrollbar_overlays_content,
-    ScrollBarColors, DEFAULT_SCROLLBAR_FADE_DELAY_MS, DEFAULT_SCROLLBAR_FADE_DURATION_MS,
-    DEFAULT_SCROLLBAR_MARGIN, DEFAULT_SCROLLBAR_MIN_THUMB,
+    compute_scroll_viewport, reset_scrollbar_fade_state, scrollbar_fade_animating,
+    scrollbar_overlays_content, ScrollBarColors, DEFAULT_SCROLLBAR_FADE_DELAY_MS,
+    DEFAULT_SCROLLBAR_FADE_DURATION_MS, DEFAULT_SCROLLBAR_MARGIN, DEFAULT_SCROLLBAR_MIN_THUMB,
 };
 use crate::selection::SelectionState;
 use crate::sort::SortState;
@@ -44,6 +46,11 @@ pub const DEFAULT_TUI_ROW_HEIGHT: i32 = 1;
 pub const DEFAULT_TUI_COL_WIDTH: i32 = 15;
 /// Default fixed-rate pacing fallback when no platform frame clock is available.
 pub const DEFAULT_TARGET_FRAME_RATE_HZ: i32 = 30;
+
+pub const EDITOR_BUTTON_NEVER: i32 = 0;
+pub const EDITOR_BUTTON_ALWAYS: i32 = 1;
+pub const EDITOR_BUTTON_WHEN_EDITING: i32 = 2;
+pub const EDITOR_BUTTON_WHEN_FOCUSED: i32 = 3;
 
 #[derive(Clone, Debug)]
 struct TextMeasureStyle {
@@ -336,6 +343,8 @@ pub struct VolvoxGrid {
     pub text_engine: Option<TextEngine>,
     /// Configured text layout cache capacity, applied to `text_engine` on init.
     pub text_layout_cache_cap: usize,
+    /// Whether missing glyphs may use host/OS fallback or engine final fallback.
+    pub font_fallback_enabled: bool,
     // ── Compatibility Properties ────────────────────────────────────
     /// Whether bulk bind/load writes auto-fit row heights / column widths.
     ///
@@ -361,6 +370,19 @@ pub struct VolvoxGrid {
     // ── Misc Properties ───────────────────────────────────────────────────
     /// Edit trigger mode: 0 = none, 1 = keyboard, 2 = keyboard+mouse.
     pub edit_trigger_mode: i32,
+    /// Whether a single click on the active cell should start editing.
+    pub single_click_edit: bool,
+    /// Whether mouse activation of editing is suppressed.
+    pub suppress_click_edit: bool,
+    /// Whether an active edit should commit when focus leaves the grid.
+    pub commit_on_focus_lost: bool,
+    /// Whether navigation should preserve the active edit session.
+    pub preserve_edit_on_navigation: bool,
+    /// Adapter-advertised editor support matrix. `None` means "no restriction
+    /// beyond the universal checks"; set via `set_host_editor_capabilities` so
+    /// each adapter (sfdatagrid, xtragrid, terminal-tui, web) can reject
+    /// configurations its host UI cannot render.
+    pub host_editor_capabilities: Option<crate::edit::HostEditorCapabilities>,
     /// Apply scope: 0 = single cell, 1 = repeat across selection.
     pub apply_scope: i32,
     /// Whether cell selection is allowed.
@@ -449,9 +471,9 @@ pub struct VolvoxGrid {
     pub extend_last_col: bool,
     /// Whether the grid should repaint on data changes. Set to false to batch updates.
     pub redraw: bool,
-    /// Whether typing in a dropdown cell searches the dropdown list.
+    /// Whether typing in a list editor searches the item list.
     pub dropdown_search: bool,
-    /// When to show dropdown button: 0=never, 1=always, 2=when editing.
+    /// When to show the in-cell editor button.
     pub dropdown_trigger: i32,
     /// Host integration provides dropdown UI; renderer suppresses built-in popup list.
     pub host_dropdown_overlay: bool,
@@ -459,16 +481,9 @@ pub struct VolvoxGrid {
     pub edit_mask: String,
     /// Maximum number of characters allowed in an edit cell. 0 = unlimited.
     pub edit_max_length: i32,
-    /// When true, the engine stops handling edit-action keys (Enter, Escape, F2,
-    /// typing-to-start-edit) — the host adapter dispatches those via Edit RPC.
-    /// In-edit text manipulation (character insert, backspace, delete, cursor,
-    /// dropdown nav) remains engine-handled.
-    pub host_key_dispatch: bool,
-    /// When true, the engine stops handling pointer-driven selection changes
-    /// and edit triggers — the host adapter drives those via Select / Edit RPC.
-    /// Engine-rendered UI (resize, scrollbar, fast-scroll, freeze drag) remains
-    /// engine-handled.
-    pub host_pointer_dispatch: bool,
+    /// Raw default editor spec from EditConfig. Legacy scalar fields above are
+    /// kept in sync for existing engine internals.
+    pub default_editor: Option<pb::EditorSpec>,
     /// When true, keypresses in edit mode route through the engine-side compose layer.
     pub engine_compose: bool,
     /// Tracks whether `engine_compose` was explicitly configured.
@@ -853,6 +868,7 @@ impl VolvoxGrid {
             // Text engine (lazily initialized)
             text_engine: None,
             text_layout_cache_cap: DEFAULT_LAYOUT_CACHE_CAP,
+            font_fallback_enabled: true,
 
             // Compatibility defaults
             auto_resize: true,
@@ -866,6 +882,11 @@ impl VolvoxGrid {
 
             // Misc properties
             edit_trigger_mode: 0,
+            single_click_edit: false,
+            suppress_click_edit: false,
+            commit_on_focus_lost: false,
+            preserve_edit_on_navigation: false,
+            host_editor_capabilities: None,
             apply_scope: 0,
             allow_selection: true,
             header_click_select: true,
@@ -913,12 +934,11 @@ impl VolvoxGrid {
             extend_last_col: false,
             redraw: true,
             dropdown_search: false,
-            dropdown_trigger: 0,
+            dropdown_trigger: EDITOR_BUTTON_ALWAYS,
             host_dropdown_overlay: false,
             edit_mask: String::new(),
             edit_max_length: 0,
-            host_key_dispatch: false,
-            host_pointer_dispatch: false,
+            default_editor: None,
             engine_compose: false,
             engine_compose_configured: false,
             compose_method: pb::ComposeMethod::None as i32,
@@ -2258,6 +2278,78 @@ impl VolvoxGrid {
         self.edit.is_active()
     }
 
+    pub fn resolved_editor_owner(&self, row: i32, col: i32) -> i32 {
+        if row >= 0 && col >= 0 {
+            if let Some(owner) = self
+                .cells
+                .get(row, col)
+                .and_then(|cell| cell.editor())
+                .map(|editor| editor.owner)
+            {
+                return owner;
+            }
+        }
+        if col >= 0 {
+            if let Some(owner) = self
+                .columns
+                .get(col as usize)
+                .and_then(|column| column.editor.as_ref())
+                .map(|editor| editor.owner)
+            {
+                return owner;
+            }
+        }
+        self.default_editor
+            .as_ref()
+            .map_or(pb::EditorOwner::Engine as i32, |editor| editor.owner)
+    }
+
+    pub fn active_editor_is_engine_owned(&self, row: i32, col: i32) -> bool {
+        self.resolved_editor_owner(row, col) == pb::EditorOwner::Engine as i32
+    }
+
+    pub fn resolved_editor_presentation(&self, row: i32, col: i32) -> i32 {
+        if row >= 0 && col >= 0 {
+            if let Some(presentation) = self
+                .cells
+                .get(row, col)
+                .and_then(|cell| cell.editor())
+                .map(|editor| editor.presentation)
+            {
+                return presentation;
+            }
+        }
+        if col >= 0 {
+            if let Some(presentation) = self
+                .columns
+                .get(col as usize)
+                .and_then(|column| column.editor.as_ref())
+                .map(|editor| editor.presentation)
+            {
+                return presentation;
+            }
+        }
+        self.default_editor
+            .as_ref()
+            .map_or(pb::EditorPresentation::EditorCanvas as i32, |editor| {
+                editor.presentation
+            })
+    }
+
+    pub fn active_editor_is_canvas_presented(&self, row: i32, col: i32) -> bool {
+        self.resolved_editor_presentation(row, col) == pb::EditorPresentation::EditorCanvas as i32
+    }
+
+    /// Sets the per-adapter editor support matrix. Passing `None` clears the
+    /// restriction; the engine then only enforces the universal validity
+    /// matrix at configuration time.
+    pub fn set_host_editor_capabilities(
+        &mut self,
+        capabilities: Option<crate::edit::HostEditorCapabilities>,
+    ) {
+        self.host_editor_capabilities = capabilities;
+    }
+
     /// Returns true when editing may begin at the given cell.
     ///
     /// Header rows and subtotal/grandtotal rows are always read-only.
@@ -2299,6 +2391,29 @@ impl VolvoxGrid {
         CellControl::None
     }
 
+    pub fn editor_button_visible_for_control(
+        &self,
+        row: i32,
+        col: i32,
+        control: CellControl,
+    ) -> bool {
+        if control == CellControl::None {
+            return false;
+        }
+        match self.dropdown_trigger {
+            EDITOR_BUTTON_ALWAYS => true,
+            EDITOR_BUTTON_WHEN_EDITING => {
+                self.edit.is_active() && self.edit.edit_row == row && self.edit.edit_col == col
+            }
+            EDITOR_BUTTON_WHEN_FOCUSED => self.selection.row == row && self.selection.col == col,
+            _ => false,
+        }
+    }
+
+    pub fn editor_button_visible_for_cell(&self, row: i32, col: i32) -> bool {
+        self.editor_button_visible_for_control(row, col, self.resolved_cell_control(row, col))
+    }
+
     pub fn can_begin_edit(&self, row: i32, col: i32, force: bool) -> bool {
         if row < 0 || row >= self.rows || col < 0 || col >= self.cols {
             return false;
@@ -2323,9 +2438,18 @@ impl VolvoxGrid {
         if self.text_engine.is_none() {
             let mut te = TextEngine::new();
             te.set_layout_cache_cap(self.text_layout_cache_cap);
+            te.set_font_fallback_enabled(self.font_fallback_enabled);
             self.text_engine = Some(te);
         }
         self.text_engine.as_mut().unwrap()
+    }
+
+    pub fn set_font_fallback_enabled(&mut self, enabled: bool) {
+        self.font_fallback_enabled = enabled;
+        if let Some(te) = &mut self.text_engine {
+            te.set_font_fallback_enabled(enabled);
+        }
+        self.mark_dirty();
     }
 
     pub fn set_text_layout_cache_cap(&mut self, cap: i32) {
@@ -2470,6 +2594,41 @@ impl VolvoxGrid {
     /// Returns the row properties for a row, if it exists.
     pub fn get_row_props(&self, row: i32) -> Option<&RowProps> {
         self.row_props.get(&row)
+    }
+
+    /// Returns true if `row` is a real data row — i.e. not a subtotal/grand-total
+    /// aggregate row and not a tree/outline group node with children.
+    /// Used by `RowIndicatorSlotNumbersDataOnly` to skip non-data rows in numbering.
+    pub fn is_data_row(&self, row: i32) -> bool {
+        if row < self.fixed_rows || row >= self.rows {
+            return false;
+        }
+        if self
+            .row_props
+            .get(&row)
+            .map_or(false, |rp| rp.is_subtotal)
+        {
+            return false;
+        }
+        if self.tree.row_has_children(self.fixed_rows, row) {
+            return false;
+        }
+        true
+    }
+
+    /// Returns the 1-based count of data rows from `fixed_rows` up to and
+    /// including `row`, or `None` if `row` itself is not a data row.
+    pub fn data_row_number(&self, row: i32) -> Option<i32> {
+        if !self.is_data_row(row) {
+            return None;
+        }
+        let mut count = 0i32;
+        for r in self.fixed_rows..=row {
+            if self.is_data_row(r) {
+                count += 1;
+            }
+        }
+        Some(count)
     }
 
     /// Returns mutable row properties for a row, creating defaults as needed.
@@ -2768,9 +2927,9 @@ impl VolvoxGrid {
     /// Resolve the configured typed dropdown for a cell without applying editability rules.
     ///
     /// Cell-level dropdown config has priority over the column-level config.
-    pub fn configured_dropdown(&self, row: i32, col: i32) -> Option<pb::Dropdown> {
+    pub fn configured_dropdown(&self, row: i32, col: i32) -> Option<pb::ListEditorParams> {
         if let Some(cell) = self.cells.get(row, col) {
-            if let Some(dropdown) = cell.dropdown() {
+            if let Some(dropdown) = cell.editor().and_then(|editor| editor.list.as_ref()) {
                 if dropdown_has_items(dropdown) {
                     return Some(dropdown.clone());
                 }
@@ -2782,7 +2941,11 @@ impl VolvoxGrid {
         }
         if col >= 0 && (col as usize) < self.columns.len() {
             let column = &self.columns[col as usize];
-            if let Some(dropdown) = &column.dropdown {
+            if let Some(dropdown) = column
+                .editor
+                .as_ref()
+                .and_then(|editor| editor.list.as_ref())
+            {
                 if dropdown_has_items(dropdown) {
                     return Some(dropdown.clone());
                 }
@@ -3456,7 +3619,10 @@ impl VolvoxGrid {
             .filter(|(_, slot)| slot.visible)
         {
             let labels: &[&str] =
-                if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers as i32 {
+                if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers as i32
+                    || slot.kind
+                        == pb::RowIndicatorSlotKind::RowIndicatorSlotNumbersDataOnly as i32
+                {
                     &[]
                 } else if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotCurrent as i32 {
                     &["▶"]
@@ -3474,6 +3640,18 @@ impl VolvoxGrid {
             let mut max_w = 0.0f32;
             if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers as i32 {
                 let label = (self.rows - self.fixed_rows).max(1).to_string();
+                let (w, _) = te.measure_text(&label, &font_name, font_size, false, false, None);
+                max_w = max_w.max(w);
+            } else if slot.kind
+                == pb::RowIndicatorSlotKind::RowIndicatorSlotNumbersDataOnly as i32
+            {
+                let mut last = 0i32;
+                for r in self.fixed_rows..self.rows {
+                    if self.is_data_row(r) {
+                        last += 1;
+                    }
+                }
+                let label = last.max(1).to_string();
                 let (w, _) = te.measure_text(&label, &font_name, font_size, false, false, None);
                 max_w = max_w.max(w);
             } else if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotExpander as i32
@@ -3531,6 +3709,7 @@ impl VolvoxGrid {
                 continue;
             }
             let min_width = if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers as i32
+                || slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotNumbersDataOnly as i32
             {
                 crate::indicator::DEFAULT_ROW_INDICATOR_WIDTH
             } else {
@@ -3580,7 +3759,7 @@ impl VolvoxGrid {
         self.configured_dropdown_list(row, col)
     }
 
-    pub fn active_dropdown(&self, row: i32, col: i32) -> Option<pb::Dropdown> {
+    pub fn active_dropdown(&self, row: i32, col: i32) -> Option<pb::ListEditorParams> {
         if !self.can_begin_edit(row, col, true) {
             return None;
         }
@@ -3588,9 +3767,24 @@ impl VolvoxGrid {
     }
 
     pub fn effective_dropdown_search(&self, row: i32, col: i32) -> bool {
-        self.configured_dropdown(row, col)
-            .and_then(|dropdown| dropdown.searchable)
+        self.configured_editor_dropdown(row, col)
+            .map(|dropdown| dropdown.searchable)
             .unwrap_or(self.dropdown_search)
+    }
+
+    fn configured_editor_dropdown(&self, row: i32, col: i32) -> Option<&pb::ListEditorParams> {
+        if let Some(cell) = self.cells.get(row, col) {
+            if let Some(dropdown) = cell.editor().and_then(|editor| editor.list.as_ref()) {
+                return Some(dropdown);
+            }
+        }
+        if col >= 0 && (col as usize) < self.columns.len() {
+            return self.columns[col as usize]
+                .editor
+                .as_ref()
+                .and_then(|editor| editor.list.as_ref());
+        }
+        None
     }
 
     /// Returns display text for a cell, applying dropdown list value translation
@@ -3838,7 +4032,6 @@ impl VolvoxGrid {
 
         let mut heights: Vec<i32> = (0..row_count).map(|row| band.row_height_px(row)).collect();
         let padding = self.style.fixed_cell_padding.vertical().max(2);
-        let header_mode = pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as u32;
         let mut changed = false;
 
         if band.cells.is_empty()
@@ -3864,14 +4057,15 @@ impl VolvoxGrid {
             if row1 >= heights.len() || row2 >= heights.len() {
                 continue;
             }
-            let mode_bits = if cell.mode_bits != 0 {
-                cell.mode_bits
-            } else {
-                band.mode_bits
-            };
+            let modes = band.effective_modes_for_cell(cell);
             let text = if !cell.text.trim().is_empty() {
                 cell.text.clone()
-            } else if cell.col1 == cell.col2 && (mode_bits & header_mode != 0) {
+            } else if cell.col1 == cell.col2
+                && col_indicator_modes_contain(
+                    modes,
+                    pb::ColIndicatorCellMode::ColIndicatorCellHeaderText,
+                )
+            {
                 self.column_header_text(cell.col1)
             } else {
                 String::new()
@@ -4852,10 +5046,11 @@ impl VolvoxGrid {
         }
         let pinned_h = self.pinned_top_height() + self.pinned_bottom_height();
         let pinned_w = self.pinned_left_width() + self.pinned_right_width();
+        let scroll_view = compute_scroll_viewport(self, self.viewport_width, self.viewport_height);
         self.scroll.update_bounds(
             &self.layout,
-            self.data_viewport_width(),
-            self.data_viewport_height(),
+            scroll_view.data_w,
+            scroll_view.data_h,
             self.fixed_rows,
             self.fixed_cols,
             pinned_h,
@@ -4885,11 +5080,10 @@ impl VolvoxGrid {
         if first_scrollable >= self.rows {
             return first_scrollable.saturating_sub(1).max(0);
         }
-        let (first, _) = self.layout.visible_rows(
-            self.scroll.scroll_y,
-            self.data_viewport_height(),
-            first_scrollable,
-        );
+        let scroll_view = compute_scroll_viewport(self, self.viewport_width, self.viewport_height);
+        let (first, _) =
+            self.layout
+                .visible_rows(self.scroll.scroll_y, scroll_view.data_h, first_scrollable);
         first.clamp(first_scrollable, self.rows - 1)
     }
 
@@ -4904,14 +5098,13 @@ impl VolvoxGrid {
         let fixed_h = self.layout.row_pos(first_scrollable);
         let row_top = self.layout.row_pos(target_row);
         let target_scroll_y = (row_top - fixed_h).max(0) as f32;
-        let viewport_w = self.data_viewport_width();
-        let viewport_h = self.data_viewport_height();
+        let scroll_view = compute_scroll_viewport(self, self.viewport_width, self.viewport_height);
         let pinned_h = self.pinned_top_height() + self.pinned_bottom_height();
         let pinned_w = self.pinned_left_width() + self.pinned_right_width();
         let (max_scroll_x, max_scroll_y) = ScrollState::compute_max_scroll(
             &self.layout,
-            viewport_w,
-            viewport_h,
+            scroll_view.data_w,
+            scroll_view.data_h,
             self.fixed_rows,
             self.fixed_cols,
             pinned_h,
@@ -4936,11 +5129,10 @@ impl VolvoxGrid {
         if first_scrollable >= self.rows {
             return first_scrollable.saturating_sub(1).max(0);
         }
-        let (_, last) = self.layout.visible_rows(
-            self.scroll.scroll_y,
-            self.data_viewport_height(),
-            first_scrollable,
-        );
+        let scroll_view = compute_scroll_viewport(self, self.viewport_width, self.viewport_height);
+        let (_, last) =
+            self.layout
+                .visible_rows(self.scroll.scroll_y, scroll_view.data_h, first_scrollable);
         last.clamp(first_scrollable, self.rows - 1)
     }
 
@@ -4951,11 +5143,10 @@ impl VolvoxGrid {
         if first_scrollable >= self.cols {
             return first_scrollable.saturating_sub(1).max(0);
         }
-        let (first, _) = self.layout.visible_cols(
-            self.scroll.scroll_x,
-            self.data_viewport_width(),
-            first_scrollable,
-        );
+        let scroll_view = compute_scroll_viewport(self, self.viewport_width, self.viewport_height);
+        let (first, _) =
+            self.layout
+                .visible_cols(self.scroll.scroll_x, scroll_view.data_w, first_scrollable);
         first.clamp(first_scrollable, self.cols - 1)
     }
 
@@ -4970,14 +5161,13 @@ impl VolvoxGrid {
         let fixed_w = self.layout.col_pos(first_scrollable);
         let col_left = self.layout.col_pos(target_col);
         let target_scroll_x = (col_left - fixed_w).max(0) as f32;
-        let viewport_w = self.data_viewport_width();
-        let viewport_h = self.data_viewport_height();
+        let scroll_view = compute_scroll_viewport(self, self.viewport_width, self.viewport_height);
         let pinned_h = self.pinned_top_height() + self.pinned_bottom_height();
         let pinned_w = self.pinned_left_width() + self.pinned_right_width();
         let (max_scroll_x, max_scroll_y) = ScrollState::compute_max_scroll(
             &self.layout,
-            viewport_w,
-            viewport_h,
+            scroll_view.data_w,
+            scroll_view.data_h,
             self.fixed_rows,
             self.fixed_cols,
             pinned_h,
@@ -4998,11 +5188,10 @@ impl VolvoxGrid {
         if first_scrollable >= self.cols {
             return first_scrollable.saturating_sub(1).max(0);
         }
-        let (_, last) = self.layout.visible_cols(
-            self.scroll.scroll_x,
-            self.data_viewport_width(),
-            first_scrollable,
-        );
+        let scroll_view = compute_scroll_viewport(self, self.viewport_width, self.viewport_height);
+        let (_, last) =
+            self.layout
+                .visible_cols(self.scroll.scroll_x, scroll_view.data_w, first_scrollable);
         last.clamp(first_scrollable, self.cols - 1)
     }
 
@@ -5010,36 +5199,62 @@ impl VolvoxGrid {
     /// and emitting all required events (CellEditValidate, AfterEdit, CellChanged,
     /// DropdownClosed).  Returns true if an edit was committed.
     pub fn commit_edit(&mut self) -> bool {
-        let Some((row, col, old_text, new_text)) = self.edit.commit() else {
+        if !self.edit.is_active() {
             return false;
-        };
-
-        // Normalize: truncate, translate dropdown display→value.
-        let mut committed = truncate_chars(&new_text, self.edit_max_length);
-        if let Some(dropdown) = self.configured_dropdown(row, col) {
-            if let Some(mapped) =
-                crate::edit::translate_dropdown_display_to_value_typed(&dropdown, &committed)
-            {
-                committed = mapped;
-            }
-        } else if col >= 0 && (col as usize) < self.columns.len() {
-            let col_list = &self.columns[col as usize].dropdown_items;
-            if !col_list.is_empty() {
-                if let Some(mapped) =
-                    crate::edit::translate_dropdown_display_to_value(col_list, &committed)
-                {
-                    committed = mapped;
-                }
-            }
         }
 
-        // Emit events and apply.
-        self.events
-            .push(crate::event::GridEventData::CellEditValidate {
-                row,
-                col,
-                edit_text: committed.clone(),
-            });
+        self.edit.flush_preedit();
+        let row = self.edit.edit_row;
+        let col = self.edit.edit_col;
+        let old_text = self.cells.get_text(row, col).to_string();
+        let new_text = self.edit.edit_text.clone();
+        let committed = match self.prepare_committed_edit_text(row, col, &old_text, &new_text) {
+            crate::edit::PreparedEditCommit::Commit(committed) => committed,
+            crate::edit::PreparedEditCommit::AllowInvalid { committed, errors } => {
+                if !errors.is_empty() {
+                    self.edit.set_validation_errors(errors);
+                }
+                committed
+            }
+            crate::edit::PreparedEditCommit::Block { attempted, errors } => {
+                self.edit.update_text(attempted.clone());
+                self.edit.set_sel_start(attempted.chars().count() as i32);
+                self.edit.set_sel_length(0);
+                self.edit.set_validation_errors(errors);
+                self.mark_dirty();
+                return false;
+            }
+            crate::edit::PreparedEditCommit::Revert(committed) => {
+                self.edit.cancel();
+                self.apply_committed_edit_text(row, col, old_text, committed, false);
+                return true;
+            }
+        };
+
+        let Some((row, col, old_text)) = self.edit.finish_commit_with_text(committed.clone())
+        else {
+            return false;
+        };
+        self.apply_committed_edit_text(row, col, old_text, committed, true);
+        true
+    }
+
+    fn apply_committed_edit_text(
+        &mut self,
+        row: i32,
+        col: i32,
+        old_text: String,
+        committed: String,
+        emit_validate: bool,
+    ) {
+        if emit_validate {
+            self.events
+                .push(crate::event::GridEventData::CellEditValidate {
+                    row,
+                    col,
+                    edit_text: committed.clone(),
+                });
+        }
         self.cells.set_text(row, col, committed.clone());
         self.sync_explicit_progress_from_text(row, col);
         if old_text != committed {
@@ -5062,7 +5277,124 @@ impl VolvoxGrid {
                 .push(crate::event::GridEventData::DropdownClosed);
         }
         self.mark_dirty();
-        true
+    }
+
+    fn prepare_committed_edit_text(
+        &self,
+        row: i32,
+        col: i32,
+        old_text: &str,
+        new_text: &str,
+    ) -> crate::edit::PreparedEditCommit {
+        let editor = self.editor_spec_for_commit(row, col);
+        crate::edit::prepare_committed_edit_text(&editor, old_text, new_text, self.edit_max_length)
+    }
+
+    fn editor_spec_for_commit(&self, row: i32, col: i32) -> pb::EditorSpec {
+        let mut spec = self
+            .configured_editor_spec(row, col)
+            .or_else(|| {
+                self.configured_dropdown(row, col)
+                    .map(|dropdown| pb::EditorSpec {
+                        kind: if dropdown.allow_custom_value {
+                            pb::EditorKind::EditorCombo as i32
+                        } else {
+                            pb::EditorKind::EditorSelect as i32
+                        },
+                        owner: pb::EditorOwner::Engine as i32,
+                        presentation: pb::EditorPresentation::EditorCanvas as i32,
+                        validation_mode: pb::ValidationMode::ValidationBlock as i32,
+                        validation_trigger: pb::ValidationTrigger::OnCommit as i32,
+                        validation_debounce_ms: 0,
+                        custom_editor_id: None,
+                        text: None,
+                        number: None,
+                        checkbox: None,
+                        list: Some(dropdown),
+                        date_time: None,
+                        actions: Vec::new(),
+                        custom_props: None,
+                    })
+            })
+            .unwrap_or_else(|| pb::EditorSpec {
+                kind: pb::EditorKind::EditorText as i32,
+                owner: pb::EditorOwner::Engine as i32,
+                presentation: pb::EditorPresentation::EditorCanvas as i32,
+                validation_mode: pb::ValidationMode::ValidationBlock as i32,
+                validation_trigger: pb::ValidationTrigger::OnCommit as i32,
+                validation_debounce_ms: 0,
+                custom_editor_id: None,
+                text: Some(pb::TextEditorParams {
+                    max_length: self.edit_max_length,
+                    mask: String::new(),
+                    allow_newlines: false,
+                    input_type: pb::InputType::Text as i32,
+                }),
+                number: None,
+                checkbox: None,
+                list: None,
+                date_time: None,
+                actions: Vec::new(),
+                custom_props: None,
+            });
+
+        if spec.kind == pb::EditorKind::Unspecified as i32 {
+            spec.kind = if spec
+                .list
+                .as_ref()
+                .is_some_and(|list| list.allow_custom_value)
+            {
+                pb::EditorKind::EditorCombo as i32
+            } else if spec.list.is_some() {
+                pb::EditorKind::EditorSelect as i32
+            } else {
+                pb::EditorKind::EditorText as i32
+            };
+        }
+        if spec.list.is_none() {
+            spec.list = self.configured_dropdown(row, col);
+        }
+        if matches!(
+            pb::EditorKind::try_from(spec.kind).unwrap_or(pb::EditorKind::Unspecified),
+            pb::EditorKind::EditorText | pb::EditorKind::EditorMultilineText
+        ) && spec.text.is_none()
+        {
+            spec.text = Some(pb::TextEditorParams {
+                max_length: self.edit_max_length,
+                mask: String::new(),
+                allow_newlines: spec.kind == pb::EditorKind::EditorMultilineText as i32,
+                input_type: pb::InputType::Text as i32,
+            });
+        }
+        if let Some(text) = spec.text.as_mut() {
+            if text.max_length == 0 {
+                text.max_length = self.edit_max_length;
+            }
+        }
+        spec
+    }
+
+    fn configured_editor_spec(&self, row: i32, col: i32) -> Option<pb::EditorSpec> {
+        if row >= 0 && col >= 0 {
+            if let Some(editor) = self
+                .cells
+                .get(row, col)
+                .and_then(|cell| cell.editor())
+                .cloned()
+            {
+                return Some(editor);
+            }
+        }
+        if col >= 0 {
+            if let Some(editor) = self
+                .columns
+                .get(col as usize)
+                .and_then(|column| column.editor.clone())
+            {
+                return Some(editor);
+            }
+        }
+        self.default_editor.clone()
     }
 
     /// If a cell already carries explicit progress metadata, keep the visual
@@ -5097,7 +5429,7 @@ impl VolvoxGrid {
     }
 
     /// Begin editing a cell, handling dropdown list parsing and event emission.
-    pub fn begin_edit(&mut self, row: i32, col: i32) {
+    pub fn begin_edit(&mut self, row: i32, col: i32, reason: pb::EditStartReason) {
         if !self.can_begin_edit(row, col, false) {
             return;
         }
@@ -5109,7 +5441,7 @@ impl VolvoxGrid {
 
         let stored_text = self.cells.get_text(row, col).to_string();
         let display_text = self.get_display_text(row, col);
-        self.edit.start_edit(row, col, &display_text);
+        self.edit.start_edit(row, col, reason, &display_text);
         if let Some(dropdown) = dropdown.as_ref() {
             self.edit.parse_dropdown(dropdown);
         } else {
@@ -5321,6 +5653,183 @@ impl VolvoxGrid {
         Some((x, y, w, h))
     }
 
+    /// Resolve the editor text origin after alignment and caret-visible scrolling.
+    fn editor_aligned_draw_x(
+        clip_x: i32,
+        clip_w: i32,
+        text_w: i32,
+        caret_px: i32,
+        halign: i32,
+        scroll_margin: i32,
+    ) -> i32 {
+        let mut draw_x = match halign {
+            0 => clip_x,
+            1 => clip_x + (clip_w - text_w) / 2,
+            _ => clip_x + clip_w - text_w,
+        };
+        let margin = scroll_margin.max(0).min((clip_w / 2).max(0));
+        let caret_x = draw_x + caret_px.max(0);
+        let min_caret_x = clip_x + margin;
+        let max_caret_x = clip_x + clip_w - margin;
+        if caret_x < min_caret_x {
+            draw_x += min_caret_x - caret_x;
+        } else if caret_x > max_caret_x {
+            draw_x -= caret_x - max_caret_x;
+        }
+        draw_x
+    }
+
+    fn caret_index_from_line_x<F>(
+        line_text: &str,
+        relative_x: f32,
+        line_w: f32,
+        measure_width: &mut F,
+    ) -> i32
+    where
+        F: FnMut(&str) -> f32,
+    {
+        if relative_x <= 0.0 {
+            return 0;
+        }
+
+        let char_count = line_text.chars().count() as i32;
+        if relative_x >= line_w {
+            return char_count;
+        }
+
+        let mut prefix = String::new();
+        let mut prev_w = 0.0f32;
+        let mut pos = 0i32;
+        for ch in line_text.chars() {
+            prefix.push(ch);
+            let next_w = measure_width(&prefix);
+            if next_w >= relative_x {
+                if pos > 0 && (relative_x - prev_w) < (next_w - relative_x) {
+                    return pos;
+                }
+                return pos + 1;
+            }
+            prev_w = next_w;
+            pos += 1;
+        }
+
+        char_count
+    }
+
+    /// Approximate the active editor caret index from a pointer inside the editing cell.
+    pub fn active_edit_caret_index_from_pointer_click(
+        &mut self,
+        row: i32,
+        col: i32,
+        x_in_cell: f32,
+        y_in_cell: f32,
+    ) -> i32 {
+        if row < 0 || row >= self.rows || col < 0 || col >= self.cols || !self.layout.valid {
+            return 0;
+        }
+
+        let text = self.edit.edit_text.clone();
+        let current_caret = self.edit.current_caret_char();
+        let style_override = self.get_cell_style(row, col);
+        let (_, _, cw, ch) = self.layout.cell_rect(row, col);
+        let font_name = style_override
+            .font_name
+            .clone()
+            .unwrap_or_else(|| self.style.font_name.clone());
+        let font_size = style_override.font_size.unwrap_or(self.style.font_size);
+        let font_bold = style_override.font_bold.unwrap_or(self.style.font_bold);
+        let font_italic = style_override.font_italic.unwrap_or(self.style.font_italic);
+
+        let button_reserve = if crate::canvas::show_dropdown_button_for_cell(self, row, col) {
+            crate::canvas::dropdown_button_rect(0, 0, cw, ch).map_or(0, |(_, _, bw, _)| bw + 2)
+        } else {
+            0
+        };
+        let edit_w = (cw - button_reserve).max(1);
+        let padding = self.resolve_cell_padding(row, col, &style_override);
+        let text_x = padding.left;
+        let text_clip_y = padding.top;
+        let clip_w = (edit_w - padding.left - padding.right).max(1);
+        let clip_h = (ch - padding.top - padding.bottom).max(1);
+        let (halign, _) = crate::canvas::alignment_components(crate::canvas::resolve_alignment(
+            self,
+            row,
+            col,
+            &style_override,
+            &text,
+        ));
+
+        let te = self.ensure_text_engine();
+        let mut measure_width = |sample: &str| -> f32 {
+            if te.has_fonts() {
+                te.measure_text(sample, &font_name, font_size, font_bold, font_italic, None)
+                    .0
+            } else {
+                sample.chars().count() as f32 * font_size * 0.6
+            }
+        };
+
+        let lines = editor_visual_lines(&text);
+        if lines.len() <= 1 {
+            let text_w = measure_width(&text);
+            let local_caret = current_caret.clamp(0, text.chars().count() as i32);
+            let caret_prefix: String = text.chars().take(local_caret as usize).collect();
+            let caret_px = measure_width(&caret_prefix).ceil() as i32;
+            let draw_x = Self::editor_aligned_draw_x(
+                text_x,
+                clip_w,
+                text_w.ceil() as i32,
+                caret_px,
+                halign,
+                2,
+            );
+            return Self::caret_index_from_line_x(
+                &text,
+                x_in_cell - draw_x as f32,
+                text_w,
+                &mut measure_width,
+            );
+        }
+
+        let line_h = (font_size * crate::canvas::TEXT_LINE_HEIGHT_FACTOR)
+            .ceil()
+            .max(1.0) as i32;
+        let total_h = line_h * lines.len().max(1) as i32;
+        let caret_line_index = editor_line_index_for_char(&lines, current_caret);
+        let mut base_y = text_clip_y + ((clip_h - total_h) / 2).max(0);
+        if total_h > clip_h {
+            let caret_y = base_y + caret_line_index as i32 * line_h;
+            let clip_bottom = text_clip_y + clip_h;
+            if caret_y < text_clip_y {
+                base_y += text_clip_y - caret_y;
+            } else if caret_y + line_h > clip_bottom {
+                base_y -= caret_y + line_h - clip_bottom;
+            }
+        }
+
+        let raw_line_index =
+            ((y_in_cell as i32 - base_y) / line_h).clamp(0, lines.len() as i32 - 1);
+        let line_index = raw_line_index as usize;
+        let line = lines[line_index];
+        let line_w = measure_width(line.text);
+        let local_caret = if line_index == caret_line_index {
+            (current_caret.clamp(line.start_char, line.end_char) - line.start_char).max(0)
+        } else {
+            0
+        };
+        let caret_prefix: String = line.text.chars().take(local_caret as usize).collect();
+        let caret_px = measure_width(&caret_prefix).ceil() as i32;
+        let draw_x =
+            Self::editor_aligned_draw_x(text_x, clip_w, line_w.ceil() as i32, caret_px, halign, 2);
+        let local_index = Self::caret_index_from_line_x(
+            line.text,
+            x_in_cell - draw_x as f32,
+            line_w,
+            &mut measure_width,
+        );
+        line.start_char + local_index
+    }
+
     /// Approximate the display-text caret index from a click inside the cell.
     ///
     /// Used for spreadsheet-style double-click editing: edit mode opens with
@@ -5357,11 +5866,8 @@ impl VolvoxGrid {
 
         let button_reserve = if self.edit_trigger_mode > 0
             && meta.has_dropdown_list
-            && match self.dropdown_trigger {
-                b if b == pb::DropdownTrigger::DropdownAlways as i32 => true,
-                3 => self.selection.row == row && self.selection.col == col,
-                _ => false,
-            } {
+            && self.editor_button_visible_for_cell(row, col)
+        {
             crate::canvas::dropdown_button_rect(0, 0, cw, ch).map_or(0, |(_, _, bw, _)| bw + 2)
         } else {
             0
@@ -5491,21 +5997,13 @@ impl VolvoxGrid {
     }
 }
 
-fn dropdown_has_items(dropdown: &pb::Dropdown) -> bool {
-    dropdown.items.iter().any(|item| {
+fn dropdown_has_items(dropdown: &pb::ListEditorParams) -> bool {
+    dropdown.static_items.iter().any(|item| {
         !item.disabled
-            && (item.value.as_deref().is_some_and(|v| !v.is_empty())
-                || item.label.as_deref().is_some_and(|v| !v.is_empty())
+            && (item.value.is_some()
+                || !item.label.is_empty()
                 || item.details.iter().any(|v| !v.is_empty()))
     })
-}
-
-/// Truncate a string to at most `max_chars` characters.
-fn truncate_chars(input: &str, max_chars: i32) -> String {
-    if max_chars <= 0 {
-        return input.to_string();
-    }
-    input.chars().take(max_chars as usize).collect()
 }
 
 #[cfg(test)]
@@ -5553,7 +6051,7 @@ mod tests {
         grid.columns[0].alignment = pb::Align::RightCenter as i32;
         grid.cells.set_text(1, 0, "123".to_string());
 
-        grid.begin_edit(1, 0);
+        grid.begin_edit(1, 0, pb::EditStartReason::EditStartProgrammatic);
 
         assert!(grid.is_editing());
         assert_eq!(grid.edit_horizontal_alignment(), 2);
@@ -5871,6 +6369,22 @@ mod tests {
     }
 
     #[test]
+    fn data_row_number_skips_subtotal_rows() {
+        // 6 rows, 1 fixed header. Row 3 and row 5 are subtotal rows.
+        // Data rows (1, 2, 4) should number 1, 2, 3. Subtotal rows return None.
+        let mut grid = VolvoxGrid::new(1, 640, 480, 6, 1, 1, 0);
+        grid.row_props.entry(3).or_default().is_subtotal = true;
+        grid.row_props.entry(5).or_default().is_subtotal = true;
+
+        assert_eq!(grid.data_row_number(0), None); // header (below fixed_rows)
+        assert_eq!(grid.data_row_number(1), Some(1));
+        assert_eq!(grid.data_row_number(2), Some(2));
+        assert_eq!(grid.data_row_number(3), None); // subtotal
+        assert_eq!(grid.data_row_number(4), Some(3));
+        assert_eq!(grid.data_row_number(5), None); // subtotal
+    }
+
+    #[test]
     fn active_dropdown_list_hidden_for_header_and_subtotal_rows() {
         let mut grid = VolvoxGrid::new(1, 640, 480, 4, 2, 1, 0);
         grid.columns[1].dropdown_items = "A|B|C".to_string();
@@ -5890,7 +6404,7 @@ mod tests {
         grid.set_renderer_mode(pb::RendererMode::RendererTui as i32);
         grid.columns[0].dropdown_items = "A|B|C".to_string();
         grid.cells.set_text(0, 0, "A".to_string());
-        grid.begin_edit(0, 0);
+        grid.begin_edit(0, 0, pb::EditStartReason::EditStartProgrammatic);
 
         assert_eq!(grid.dropdown_hit_index(5.0, 3.0), None);
     }
@@ -5936,15 +6450,15 @@ mod tests {
         grid.row_props.entry(2).or_default().is_subtotal = true;
 
         // Header row: must stay read-only.
-        grid.begin_edit(0, 1);
+        grid.begin_edit(0, 1, pb::EditStartReason::EditStartProgrammatic);
         assert!(!grid.is_editing());
 
         // Subtotal/grandtotal row: must stay read-only.
-        grid.begin_edit(2, 1);
+        grid.begin_edit(2, 1, pb::EditStartReason::EditStartProgrammatic);
         assert!(!grid.is_editing());
 
         // Normal data row: editable.
-        grid.begin_edit(1, 1);
+        grid.begin_edit(1, 1, pb::EditStartReason::EditStartProgrammatic);
         assert!(grid.is_editing());
         assert_eq!(grid.edit.edit_row, 1);
         assert_eq!(grid.edit.edit_col, 1);
@@ -5974,7 +6488,7 @@ mod tests {
         assert!(!grid.can_begin_edit(1, 1, false));
         assert!(!grid.can_begin_edit(1, 1, true));
 
-        grid.begin_edit(1, 1);
+        grid.begin_edit(1, 1, pb::EditStartReason::EditStartProgrammatic);
         assert!(!grid.is_editing());
     }
 
@@ -5989,7 +6503,7 @@ mod tests {
             extra.progress_color = 0xFF22C55E;
         }
 
-        grid.begin_edit(1, 0);
+        grid.begin_edit(1, 0, pb::EditStartReason::EditStartProgrammatic);
         grid.edit.edit_text = "80".to_string();
 
         assert!(grid.commit_edit());
@@ -5997,6 +6511,119 @@ mod tests {
         assert_eq!(cell.text, "80");
         assert!((cell.progress_percent() - 0.8).abs() < 1e-6);
         assert_eq!(cell.progress_color(), 0xFF22C55E);
+    }
+
+    fn test_number_editor(min: Option<f64>, max: Option<f64>, nullable: bool) -> pb::EditorSpec {
+        pb::EditorSpec {
+            kind: pb::EditorKind::EditorNumber as i32,
+            validation_mode: pb::ValidationMode::ValidationBlock as i32,
+            validation_trigger: pb::ValidationTrigger::OnCommit as i32,
+            number: Some(pb::NumberEditorParams {
+                min,
+                max,
+                step: None,
+                format: String::new(),
+                nullable,
+            }),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn commit_edit_blocks_invalid_number_editor_text() {
+        let mut grid = VolvoxGrid::new(1, 320, 200, 2, 1, 1, 0);
+        grid.edit_trigger_mode = 2;
+        grid.columns[0].editor = Some(test_number_editor(None, None, false));
+        grid.cells.set_text(1, 0, "12".to_string());
+
+        grid.begin_edit(1, 0, pb::EditStartReason::EditStartProgrammatic);
+        grid.edit.update_text("abc".to_string());
+
+        assert!(!grid.commit_edit());
+        assert!(grid.is_editing());
+        assert_eq!(grid.cells.get_text(1, 0), "12");
+        assert_eq!(grid.edit.validation_errors[0].code, "number.invalid");
+    }
+
+    #[test]
+    fn commit_edit_blocks_number_outside_editor_range() {
+        let mut grid = VolvoxGrid::new(1, 320, 200, 2, 1, 1, 0);
+        grid.edit_trigger_mode = 2;
+        grid.columns[0].editor = Some(test_number_editor(Some(0.0), Some(100.0), false));
+        grid.cells.set_text(1, 0, "40".to_string());
+
+        grid.begin_edit(1, 0, pb::EditStartReason::EditStartProgrammatic);
+        grid.edit.update_text("120".to_string());
+
+        assert!(!grid.commit_edit());
+        assert!(grid.is_editing());
+        assert_eq!(grid.cells.get_text(1, 0), "40");
+        assert_eq!(grid.edit.validation_errors[0].code, "number.max");
+    }
+
+    #[test]
+    fn commit_edit_accepts_number_inside_editor_range() {
+        let mut grid = VolvoxGrid::new(1, 320, 200, 2, 1, 1, 0);
+        grid.edit_trigger_mode = 2;
+        grid.columns[0].editor = Some(test_number_editor(Some(0.0), Some(100.0), false));
+        grid.cells.set_text(1, 0, "40".to_string());
+
+        grid.begin_edit(1, 0, pb::EditStartReason::EditStartProgrammatic);
+        grid.edit.update_text("85".to_string());
+
+        assert!(grid.commit_edit());
+        assert!(!grid.is_editing());
+        assert_eq!(grid.cells.get_text(1, 0), "85");
+    }
+
+    #[test]
+    fn commit_edit_revert_mode_restores_old_value_and_closes_editor() {
+        let mut grid = VolvoxGrid::new(1, 320, 200, 2, 1, 1, 0);
+        grid.edit_trigger_mode = 2;
+        let mut editor = test_number_editor(Some(0.0), Some(100.0), false);
+        editor.validation_mode = pb::ValidationMode::ValidationRevert as i32;
+        grid.columns[0].editor = Some(editor);
+        grid.cells.set_text(1, 0, "40".to_string());
+
+        grid.begin_edit(1, 0, pb::EditStartReason::EditStartProgrammatic);
+        grid.edit.update_text("abc".to_string());
+
+        assert!(grid.commit_edit());
+        assert!(!grid.is_editing());
+        assert_eq!(grid.cells.get_text(1, 0), "40");
+    }
+
+    #[test]
+    fn commit_edit_allow_invalid_mode_commits_invalid_value() {
+        let mut grid = VolvoxGrid::new(1, 320, 200, 2, 1, 1, 0);
+        grid.edit_trigger_mode = 2;
+        let mut editor = test_number_editor(Some(0.0), Some(100.0), false);
+        editor.validation_mode = pb::ValidationMode::ValidationAllowInvalid as i32;
+        grid.columns[0].editor = Some(editor);
+        grid.cells.set_text(1, 0, "40".to_string());
+
+        grid.begin_edit(1, 0, pb::EditStartReason::EditStartProgrammatic);
+        grid.edit.update_text("abc".to_string());
+
+        assert!(grid.commit_edit());
+        assert!(!grid.is_editing());
+        assert_eq!(grid.cells.get_text(1, 0), "abc");
+    }
+
+    #[test]
+    fn commit_edit_rejects_custom_text_for_select_dropdown() {
+        let mut grid = VolvoxGrid::new(1, 320, 200, 2, 1, 1, 0);
+        grid.edit_trigger_mode = 2;
+        grid.columns[0].dropdown_items = "Open|Closed".to_string();
+        grid.cells.set_text(1, 0, "Open".to_string());
+
+        grid.begin_edit(1, 0, pb::EditStartReason::EditStartProgrammatic);
+        grid.edit.update_text("Injected".to_string());
+
+        assert!(!grid.commit_edit());
+        assert!(grid.is_editing());
+        assert_eq!(grid.cells.get_text(1, 0), "Open");
+        assert_eq!(grid.edit.validation_errors[0].code, "select.invalid");
     }
 
     #[test]
@@ -6106,6 +6733,51 @@ mod tests {
         assert_eq!(anchor, tail);
         assert!(anchor.2 > grid.col_width(0));
         assert!(anchor.3 > 0);
+    }
+
+    #[test]
+    fn bottom_scroll_keeps_last_row_above_pinned_bottom_with_indicators_and_scrollbars() {
+        let mut grid = VolvoxGrid::new(1, 200, 100, 10, 2, 0, 0);
+        grid.default_row_height = 10;
+        grid.scrollbar_show_h = pb::ScrollBarMode::ScrollbarModeAlways as i32;
+        grid.scrollbar_show_v = pb::ScrollBarMode::ScrollbarModeAlways as i32;
+        grid.indicator_bands.col_top.visible = true;
+        grid.indicator_bands.col_top.default_row_height_px = 20;
+        grid.pin_row(3, 2);
+        grid.ensure_layout();
+
+        assert_eq!(grid.scroll.max_scroll_y, 36.0);
+        grid.scroll.scroll_to(0.0, grid.scroll.max_scroll_y);
+
+        let last = grid.cell_screen_rect(9, 0).expect("last row rect");
+        let pinned = grid.cell_screen_rect(3, 0).expect("pinned row rect");
+
+        assert_eq!(last.1 + last.3, pinned.1);
+        assert_eq!(pinned.1, 74);
+    }
+
+    #[test]
+    fn sales_bottom_scroll_keeps_row_1021_visible_when_row_187_is_pinned_bottom() {
+        let mut grid = VolvoxGrid::new(1, 800, 600, 1022, 9, 0, 0);
+        grid.default_row_height = 24;
+        grid.scrollbar_show_h = pb::ScrollBarMode::ScrollbarModeAlways as i32;
+        grid.scrollbar_show_v = pb::ScrollBarMode::ScrollbarModeAlways as i32;
+        grid.indicator_bands.row_start.visible = true;
+        grid.indicator_bands.row_start.width_px = 40;
+        grid.indicator_bands.col_top.visible = true;
+        grid.indicator_bands.col_top.default_row_height_px = 28;
+        grid.pin_row(187, 2);
+        grid.ensure_layout();
+
+        grid.scroll.scroll_to(0.0, grid.scroll.max_scroll_y);
+
+        let last = grid.cell_screen_rect(1021, 0).expect("last sales row rect");
+        let pinned = grid
+            .cell_screen_rect(187, 0)
+            .expect("bottom-pinned sales row rect");
+
+        assert_eq!(last.1 + last.3, pinned.1);
+        assert!(last.1 >= grid.indicator_top_height());
     }
 
     #[test]
@@ -6267,7 +6939,7 @@ mod tests {
         let mut dropdown = VolvoxGrid::new(1, 320, 200, 1, 1, 0, 0);
         dropdown.default_col_width = 10;
         dropdown.auto_resize = true;
-        dropdown.dropdown_trigger = pb::DropdownTrigger::DropdownAlways as i32;
+        dropdown.dropdown_trigger = EDITOR_BUTTON_ALWAYS;
         dropdown.columns[0].dropdown_items = "A|B|C".to_string();
         dropdown.auto_resize_col(0);
 
@@ -6286,7 +6958,7 @@ mod tests {
         dropdown.default_col_width = 10;
         dropdown.auto_resize = true;
         dropdown.auto_size_mode = 1;
-        dropdown.dropdown_trigger = pb::DropdownTrigger::DropdownAlways as i32;
+        dropdown.dropdown_trigger = EDITOR_BUTTON_ALWAYS;
         dropdown.columns[0].dropdown_items = "A|B|C".to_string();
         dropdown.auto_resize_all();
 
@@ -6332,8 +7004,8 @@ mod tests {
         grid.style.font_size = 40.0;
         grid.indicator_bands.col_top.visible = true;
         grid.indicator_bands.col_top.band_rows = 1;
-        grid.indicator_bands.col_top.mode_bits =
-            pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as u32;
+        grid.indicator_bands.col_top.cell_modes =
+            vec![pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as i32];
         grid.columns[0].caption = "품명".to_string();
         grid.columns[1].caption = "고객명".to_string();
 

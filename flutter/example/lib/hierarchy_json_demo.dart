@@ -5,7 +5,20 @@ import 'package:flutter/foundation.dart'
     show TargetPlatform, defaultTargetPlatform;
 import 'package:volvoxgrid/volvoxgrid.dart' hide Padding;
 
-const List<int> _hierarchyColWidths = [260, 80, 80, 120, 100, 92];
+const int _hierNameColumnWidth = 260;
+const int _hierTypeColumnWidth = 80;
+const int _hierSizeColumnWidth = 80;
+const int _hierModifiedColumnWidth = 120;
+const int _hierPermissionsColumnWidth = 100;
+const int _hierActionColumnWidth = 92;
+const List<int> _hierarchyColWidths = [
+  _hierNameColumnWidth,
+  _hierTypeColumnWidth,
+  _hierSizeColumnWidth,
+  _hierModifiedColumnWidth,
+  _hierPermissionsColumnWidth,
+  _hierActionColumnWidth,
+];
 const List<String> _hierarchyCaptions = [
   'Name',
   'Type',
@@ -23,27 +36,20 @@ const List<String> _hierarchyKeys = [
   'Action',
 ];
 const int hierarchyNameColumn = 0;
+const int _hierarchySizeColumn = 2;
+const int _hierarchyModifiedColumn = 3;
+const int _hierarchyPermissionsColumn = 4;
 const int hierarchyActionColumn = 5;
-
-const int _hierBodyBg = 0xFFFFFFFF;
-const int _hierBodyFg = 0xFF1C1917;
-const int _hierCanvasBg = 0xFFFAFAF9;
-const int _hierAltRowBg = 0xFFF5F5F4;
-const int _hierFixedBg = 0xFFF5F5F4;
-const int _hierFixedFg = 0xFF44403C;
-const int _hierGridColor = 0xFFE7E5E4;
-const int _hierFixedGridColor = 0xFFD6D3D1;
-const int _hierHeaderBg = 0xFFFAFAF9;
-const int _hierHeaderFg = 0xFF1C1917;
-const int _hierSelectionBg = 0xFFD97706;
-const int _hierSelectionFg = 0xFFFFFFFF;
-const int _hierAccent = 0xFFF59E0B;
 const int _hierTreeColor = 0xFFA8A29E;
-const int _hierHoverCellBg = 0x1AD97706;
+const int _hierFolderTextColor = 0xFF92400E;
+const int _hierActionTextColor = 0xFF2563EB;
 const int _hierOutlineIndent = 20;
 const int _hierMinOutlineIndicatorWidth = 56;
+const int _hierNameExpanderWidth = 280;
+const int _hierHeaderBandRows = 1;
 const int _hierDesktopHeaderHeight = 28;
 const int _hierMobileHeaderHeight = 44;
+const String _hierShortDateFormat = 'short date';
 
 bool get _hierTouchHeader {
   switch (defaultTargetPlatform) {
@@ -86,9 +92,9 @@ Future<void> loadHierarchyJsonDemo(VolvoxGridController controller) async {
     ),
   );
 
-  final actionStyle = CellStyle()..foreground = 0xFF2563EB;
+  final actionStyle = CellStyle()..foreground = _hierActionTextColor;
   final folderStyle = CellStyle()
-    ..foreground = 0xFF92400E
+    ..foreground = _hierFolderTextColor
     ..font = (Font()..bold = true);
 
   for (var row = 0; row < levels.length; row += 1) {
@@ -102,7 +108,13 @@ Future<void> loadHierarchyJsonDemo(VolvoxGridController controller) async {
       actionStyle,
     );
     if (isFolder) {
-      await controller.setCellStyleRange(row, 0, row, 0, folderStyle);
+      await controller.setCellStyleRange(
+        row,
+        hierarchyNameColumn,
+        row,
+        hierarchyNameColumn,
+        folderStyle,
+      );
     }
   }
 }
@@ -162,12 +174,13 @@ DefineColumnsRequest _hierarchyDefineColumnsRequest() {
       ..caption = _hierarchyCaptions[col]
       ..key = _hierarchyKeys[col]
       ..width = _hierarchyColWidths[col];
-    if (col == 2) {
+    if (col == _hierarchySizeColumn) {
       def.align = Align.ALIGN_RIGHT_CENTER;
-    } else if (col == 3) {
+    } else if (col == _hierarchyModifiedColumn) {
       def.dataType = ColumnDataType.COLUMN_DATA_DATE;
-      def.format = 'short date';
-    } else if (col == 4 || col == hierarchyActionColumn) {
+      def.format = _hierShortDateFormat;
+    } else if (col == _hierarchyPermissionsColumn ||
+        col == hierarchyActionColumn) {
       def.align = Align.ALIGN_CENTER_CENTER;
     }
     if (col == hierarchyActionColumn) {
@@ -219,76 +232,19 @@ int _hierarchyOutlineWidth(int maxOutlineDepth) {
 }
 
 int _hierarchyExpanderWidth(int maxOutlineDepth) {
-  return _hierarchyOutlineWidth(maxOutlineDepth) + 280;
+  return _hierarchyOutlineWidth(maxOutlineDepth) + _hierNameExpanderWidth;
 }
 
 GridConfig _hierarchyThemeConfig(int maxOutlineDepth, int maxOutlineLevel) {
   final outlineWidth = _hierarchyOutlineWidth(maxOutlineDepth);
   final expanderWidth = _hierarchyExpanderWidth(maxOutlineDepth);
   return GridConfig()
+    ..themePreset = ThemePreset.THEME_AMBER
     ..layout = (LayoutConfig()..fixedRows = 0)
-    ..style = (StyleConfig()
-      ..background = _hierBodyBg
-      ..foreground = _hierBodyFg
-      ..alternateBackground = _hierAltRowBg
-      ..progressColor = _hierAccent
-      ..sheetBackground = _hierCanvasBg
-      ..sheetBorder = _hierFixedGridColor
-      ..gridLines = (GridLines()
-        ..style = GridLineStyle.GRIDLINE_SOLID
-        ..color = _hierGridColor)
-      ..fixed = (RegionStyle()
-        ..background = _hierFixedBg
-        ..foreground = _hierFixedFg
-        ..gridLines = (GridLines()
-          ..style = GridLineStyle.GRIDLINE_SOLID
-          ..color = _hierFixedGridColor))
-      ..frozen = (RegionStyle()
-        ..background = _hierBodyBg
-        ..foreground = _hierBodyFg
-        ..gridLines = (GridLines()
-          ..style = GridLineStyle.GRIDLINE_SOLID
-          ..color = _hierFixedGridColor))
-      ..header = (HeaderStyle()
-        ..separator = (HeaderSeparator()
-          ..enabled = true
-          ..color = _hierFixedGridColor
-          ..width = 1)
-        ..resizeHandle = (HeaderResizeHandle()
-          ..enabled = true
-          ..color = _hierFixedGridColor
-          ..width = 1
-          ..hitWidth = 6)))
-    ..selection = (SelectionConfig()
-      ..mode = SelectionMode.SELECTION_FREE
-      ..style = (HighlightStyle()
-        ..background = _hierSelectionBg
-        ..foreground = _hierSelectionFg
-        ..fillHandle = FillHandlePosition.FILL_HANDLE_NONE
-        ..fillHandleColor = _hierAccent)
-      ..activeCellStyle = (HighlightStyle()
-        ..background = 0x22000000
-        ..foreground = _hierSelectionFg
-        ..borders = (Borders()
-          ..all = (Border()
-            ..style = BorderStyle.BORDER_THICK
-            ..color = _hierAccent)))
-      ..hover = (HoverConfig()
-        ..cell = true
-        ..cellStyle = (HighlightStyle()
-          ..background = _hierHoverCellBg
-          ..borders = (Borders()
-            ..all = (Border()
-              ..style = BorderStyle.BORDER_THIN
-              ..color = _hierAccent)))))
+    ..selection = (SelectionConfig()..mode = SelectionMode.SELECTION_FREE)
     ..editing = (EditConfig()
-      ..trigger = EditTrigger.EDIT_TRIGGER_NONE
-      ..dropdownTrigger = DropdownTrigger.DROPDOWN_NEVER)
-    ..scrolling = (ScrollConfig()
-      ..scrollbars = ScrollBarsMode.SCROLLBAR_BOTH
-      ..flingEnabled = true
-      ..flingImpulseGain = 220.0
-      ..flingFriction = 0.9)
+      ..activation =
+          (EditActivation()..trigger = EditTrigger.EDIT_TRIGGER_NONE))
     ..outline = (OutlineConfig()
       ..treeIndicator = TreeIndicatorStyle.TREE_INDICATOR_ARROWS_LEAF
       ..indicatorIndent = _hierOutlineIndent
@@ -309,9 +265,6 @@ GridConfig _hierarchyThemeConfig(int maxOutlineDepth, int maxOutlineLevel) {
       ..rowStart = (RowIndicatorConfig()
         ..visible = true
         ..width = expanderWidth
-        ..background = _hierHeaderBg
-        ..foreground = _hierFixedFg
-        ..gridColor = _hierFixedGridColor
         ..autoSize = false
         ..allowResize = true
         ..slots.add(RowIndicatorSlot()
@@ -320,8 +273,6 @@ GridConfig _hierarchyThemeConfig(int maxOutlineDepth, int maxOutlineLevel) {
           ..visible = true))
       ..cornerTopStart = (CornerIndicatorConfig()
         ..visible = true
-        ..background = _hierHeaderBg
-        ..foreground = _hierFixedFg
         ..slots.add(CornerIndicatorSlot()
           ..kind = CornerIndicatorSlotKind.CORNER_SLOT_OUTLINE_LEVELS
           ..width = outlineWidth
@@ -329,11 +280,9 @@ GridConfig _hierarchyThemeConfig(int maxOutlineDepth, int maxOutlineLevel) {
       ..colTop = (ColIndicatorConfig()
         ..visible = true
         ..defaultRowHeight = _hierHeaderHeight
-        ..bandRows = 1
-        ..modeBits = ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT.value
-        ..background = _hierHeaderBg
-        ..foreground = _hierHeaderFg
-        ..gridColor = _hierFixedGridColor
+        ..bandRows = _hierHeaderBandRows
+        ..cellModes = (ColIndicatorCellModes()
+          ..modes.add(ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT))
         ..allowResize = true)
       ..appearance = IndicatorAppearance.INDICATOR_APPEARANCE_MODERN);
 }

@@ -206,24 +206,33 @@ func (g *Grid) Clear(scope pb.ClearScope, region pb.ClearRegion) error {
 }
 
 func (g *Grid) CancelEdit() error {
+	session := &pb.EditorSessionCommand{
+		Command: &pb.EditorSessionCommand_Cancel{
+			Cancel: &pb.EditCancel{},
+		},
+	}
+	if err := g.prepareEditorSessionCommand(session); err != nil {
+		return err
+	}
 	_, err := g.client.client.Edit(context.Background(), &pb.EditCommand{
 		GridId: g.ID,
-		Command: &pb.EditCommand_Cancel{
-			Cancel: &pb.EditCancel{},
+		Command: &pb.EditCommand_Session{
+			Session: session,
 		},
 	})
 	return err
 }
 
 func (g *Grid) StartEdit(row, col int32, selectAll, caretEnd bool) (*pb.EditState, error) {
+	reason, caretPosition := editStartReason(selectAll, caretEnd)
 	return g.client.client.Edit(context.Background(), &pb.EditCommand{
 		GridId: g.ID,
 		Command: &pb.EditCommand_Start{
 			Start: &pb.EditStart{
-				Row:       row,
-				Col:       col,
-				SelectAll: ptr(selectAll),
-				CaretEnd:  ptr(caretEnd),
+				Row:           row,
+				Col:           col,
+				Reason:        reason,
+				CaretPosition: caretPosition,
 			},
 		},
 	})
@@ -232,7 +241,34 @@ func (g *Grid) StartEdit(row, col int32, selectAll, caretEnd bool) (*pb.EditStat
 func (g *Grid) GetEditState() (*pb.EditState, error) {
 	return g.client.client.Edit(context.Background(), &pb.EditCommand{
 		GridId: g.ID,
+		Command: &pb.EditCommand_GetState{
+			GetState: &pb.EditGetState{},
+		},
 	})
+}
+
+func (g *Grid) prepareEditorSessionCommand(session *pb.EditorSessionCommand) error {
+	state, err := g.GetEditState()
+	if err != nil {
+		return err
+	}
+	if state != nil && state.GetActive() && state.GetSession() != nil {
+		active := state.GetSession()
+		session.SessionId = active.GetSessionId()
+		session.StateVersion = active.GetStateVersion()
+	}
+	return nil
+}
+
+func editStartReason(selectAll, caretEnd bool) (pb.EditStartReason, *int32) {
+	if selectAll {
+		return pb.EditStartReason_EDIT_START_PROGRAMMATIC, nil
+	}
+	if caretEnd {
+		return pb.EditStartReason_EDIT_START_F2, nil
+	}
+	var start int32
+	return pb.EditStartReason_EDIT_START_CLICK_CARET, &start
 }
 
 func (g *Grid) GetConfig() (*pb.GridConfig, error) {

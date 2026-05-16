@@ -11,6 +11,12 @@
  *   set_glyph_rasterizer(createCanvas2DRasterizer());
  */
 
+import {
+  browserFontFallbackStack,
+  quoteFontFamily,
+  type BrowserFontFallbackOptions,
+} from './font-fallbacks.js';
+
 interface GlyphBitmap {
   width: number;
   height: number;
@@ -20,7 +26,12 @@ interface GlyphBitmap {
   data: Uint8Array;
 }
 
-export function createCanvas2DRasterizer(): (
+export interface Canvas2DRasterizerOptions {
+  fontFallbacksEnabled?: boolean;
+  wasm?: BrowserFontFallbackOptions['wasm'];
+}
+
+export function createCanvas2DRasterizer(options: Canvas2DRasterizerOptions = {}): (
   char: string,
   fontName: string,
   fontSize: number,
@@ -31,6 +42,11 @@ export function createCanvas2DRasterizer(): (
   canvas.width = 64;
   canvas.height = 64;
   const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+  const fontFallbacksEnabled = options.fontFallbacksEnabled ?? true;
+  const fallbackFontStack = browserFontFallbackStack({
+    fontFallbacksEnabled,
+    wasm: options.wasm,
+  });
 
   return function rasterizeGlyph(
     char: string,
@@ -39,7 +55,12 @@ export function createCanvas2DRasterizer(): (
     bold: boolean,
     italic: boolean,
   ): GlyphBitmap | null {
-    const style = `${italic ? 'italic ' : ''}${bold ? 'bold ' : ''}${fontSize}px "${fontName}", sans-serif`;
+    const family = fontName.trim() && fontFallbacksEnabled
+      ? `${quoteFontFamily(fontName.trim())}, ${fallbackFontStack}`
+      : fontName.trim()
+        ? quoteFontFamily(fontName.trim())
+        : fallbackFontStack;
+    const style = `${italic ? 'italic ' : ''}${bold ? 'bold ' : ''}${fontSize}px ${family}`;
     ctx.font = style;
     const metrics = ctx.measureText(char);
     const w = Math.ceil(metrics.width);

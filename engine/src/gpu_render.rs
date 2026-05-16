@@ -1116,6 +1116,15 @@ impl GpuRenderer {
         self.glyph_atlas.set_external_rasterizer(r);
     }
 
+    pub fn set_font_fallback_enabled(&mut self, enabled: bool) {
+        if self.text_engine.font_fallback_enabled() == enabled {
+            return;
+        }
+        self.text_engine.set_font_fallback_enabled(enabled);
+        self.glyph_atlas.set_external_rasterizer_enabled(enabled);
+        self.glyph_pos_cache.clear();
+    }
+
     /// Render to the configured GPU surface.
     ///
     /// Returns `RenderResult`: dirty rect, per-layer times (us), zone cell counts.
@@ -1334,6 +1343,7 @@ impl GpuRenderer {
             self.text_engine
                 .set_layout_cache_cap(grid.text_layout_cache_cap);
         }
+        self.set_font_fallback_enabled(grid.font_fallback_enabled);
 
         self.text_engine.set_render_options(
             grid.style.text_render_mode,
@@ -1977,8 +1987,8 @@ mod tests {
         grid.indicator_bands.col_top.visible = true;
         grid.indicator_bands.col_top.band_rows = 1;
         grid.indicator_bands.col_top.default_row_height_px = 24;
-        grid.indicator_bands.col_top.mode_bits =
-            pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as u32;
+        grid.indicator_bands.col_top.cell_modes =
+            vec![pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as i32];
 
         for row in 0..grid.rows {
             grid.set_row_height(row, 20 + (row % 3) * 4);

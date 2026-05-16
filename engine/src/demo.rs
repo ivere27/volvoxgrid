@@ -4,7 +4,7 @@
 //! production builds. It keeps shared demo helpers, stress-demo setup,
 //! and embedded fixture access for `GetDemoData`.
 
-use crate::grid::VolvoxGrid;
+use crate::grid::{VolvoxGrid, EDITOR_BUTTON_ALWAYS};
 use crate::indicator::{RowIndicatorSlotState, DEFAULT_ROW_INDICATOR_WIDTH};
 use crate::proto::volvoxgrid::v1 as pb;
 use crate::scrollbar::{
@@ -154,15 +154,15 @@ fn apply_demo_column_headers(
     grid.indicator_bands.col_top.visible = true;
     grid.indicator_bands.col_top.band_rows = 1;
     grid.indicator_bands.col_top.default_row_height_px = sp(grid, band_row_height_px);
-    grid.indicator_bands.col_top.mode_bits = (pb::ColIndicatorCellMode::ColIndicatorCellHeaderText
-        as u32)
-        | (pb::ColIndicatorCellMode::ColIndicatorCellSortGlyph as u32);
+    grid.indicator_bands.col_top.cell_modes = vec![
+        pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as i32,
+        pb::ColIndicatorCellMode::ColIndicatorCellSortGlyph as i32,
+    ];
     grid.indicator_bands.col_top.back_color = Some(theme.header_bg);
     grid.indicator_bands.col_top.fore_color = Some(theme.header_fg);
     grid.indicator_bands.col_top.grid_color = Some(theme.fixed_grid_color);
     grid.indicator_bands.col_top.allow_resize = true;
     grid.indicator_bands.corner_top_start.visible = false;
-    grid.indicator_bands.corner_top_start.mode_bits = 0;
     grid.indicator_bands.corner_top_start.custom_key.clear();
     grid.indicator_bands.corner_top_start.data.clear();
 }
@@ -534,7 +534,7 @@ fn setup_stress_grid(grid: &mut VolvoxGrid, data_rows: i32, cell_capacity: usize
     grid.allow_user_resizing = 3;
     grid.tab_behavior = 1;
     grid.edit_trigger_mode = 0; // read-only by default; host demos may enable edit
-    grid.dropdown_trigger = 1;
+    grid.dropdown_trigger = EDITOR_BUTTON_ALWAYS;
     grid.dropdown_search = false;
     grid.fling_enabled = true;
     grid.fling_impulse_gain = 220.0;

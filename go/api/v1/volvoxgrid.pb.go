@@ -23,7 +23,8 @@
 // 3. Two streaming interfaces.
 //    - RenderSession: bidirectional stream for the real-time render loop.
 //      The host sends input (viewport, pointer, key, buffer) and receives
-//      immediate render-coupled outputs (FrameDone, EditRequest, CursorChange).
+//      immediate render-coupled outputs (FrameDone, EditorSessionStarted,
+//      EditorSessionUpdated, CursorChange).
 //    - EventStream: server-streaming for semantic grid events (selection
 //      changed, before/after edit, sort, scroll, etc.).
 //    The split ensures that frame-rate-sensitive rendering is never blocked
@@ -291,6 +292,86 @@ func (BorderAppearance) EnumDescriptor() ([]byte, []int) {
 	return file_volvoxgrid_proto_rawDescGZIP(), []int{3}
 }
 
+// Built-in visual themes. Each preset is a complete look — when applied via
+// GridConfig.theme_preset it sets StyleConfig (cell/fixed/header colors,
+// alternate row, sheet, grid lines, border appearance), SelectionConfig
+// visual fields (selection/hover/active cell/indicator row+col styles),
+// ScrollBarConfig (appearance + colors), and IndicatorsConfig (appearance +
+// colors). Other fields (modes, sizes, visibility, behavior toggles) are
+// left untouched.
+//
+// Resolution: inside a single Configure() call, the engine first applies the
+// preset's baked palette, then merges any explicit GridConfig fields. Explicit
+// fields always win. The preset itself is not stored — GetConfig() returns
+// the resolved values.
+type ThemePreset int32
+
+const (
+	ThemePreset_THEME_NONE    ThemePreset = 0 // no-op — leave existing style fields alone
+	ThemePreset_THEME_CLASSIC ThemePreset = 1 // legacy datagrid look: raised borders,
+	// gray fixed cells, classic scrollbar/indicator,
+	// system-blue selection.
+	ThemePreset_THEME_LIGHT ThemePreset = 2 // clean modern light: flat borders, soft gray
+	// header (#F9FAFB), indigo accent (#6366F1),
+	// overlay scrollbar, modern indicator.
+	ThemePreset_THEME_DARK ThemePreset = 3 // clean modern dark: flat borders, #1E1E1E body,
+	// blue accent (#569CD6), modern scrollbar.
+	ThemePreset_THEME_HIGH_CONTRAST ThemePreset = 4 // accessibility: pure black/white/yellow palette,
+	// classic scrollbar+indicator (thick, solid).
+	ThemePreset_THEME_MONOKAI ThemePreset = 5 // editor-style dark: #272822 body, pink/cyan/olive
+	// accents, flat borders.
+	ThemePreset_THEME_AMBER ThemePreset = 6 // warm light theme: stone neutrals, amber accent
+)
+
+// Enum value maps for ThemePreset.
+var (
+	ThemePreset_name = map[int32]string{
+		0: "THEME_NONE",
+		1: "THEME_CLASSIC",
+		2: "THEME_LIGHT",
+		3: "THEME_DARK",
+		4: "THEME_HIGH_CONTRAST",
+		5: "THEME_MONOKAI",
+		6: "THEME_AMBER",
+	}
+	ThemePreset_value = map[string]int32{
+		"THEME_NONE":          0,
+		"THEME_CLASSIC":       1,
+		"THEME_LIGHT":         2,
+		"THEME_DARK":          3,
+		"THEME_HIGH_CONTRAST": 4,
+		"THEME_MONOKAI":       5,
+		"THEME_AMBER":         6,
+	}
+)
+
+func (x ThemePreset) Enum() *ThemePreset {
+	p := new(ThemePreset)
+	*p = x
+	return p
+}
+
+func (x ThemePreset) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ThemePreset) Descriptor() protoreflect.EnumDescriptor {
+	return file_volvoxgrid_proto_enumTypes[4].Descriptor()
+}
+
+func (ThemePreset) Type() protoreflect.EnumType {
+	return &file_volvoxgrid_proto_enumTypes[4]
+}
+
+func (x ThemePreset) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ThemePreset.Descriptor instead.
+func (ThemePreset) EnumDescriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{4}
+}
+
 type TextEffect int32
 
 const (
@@ -330,11 +411,11 @@ func (x TextEffect) String() string {
 }
 
 func (TextEffect) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[4].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[5].Descriptor()
 }
 
 func (TextEffect) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[4]
+	return &file_volvoxgrid_proto_enumTypes[5]
 }
 
 func (x TextEffect) Number() protoreflect.EnumNumber {
@@ -343,7 +424,7 @@ func (x TextEffect) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use TextEffect.Descriptor instead.
 func (TextEffect) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{4}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{5}
 }
 
 type TextRenderMode int32
@@ -382,11 +463,11 @@ func (x TextRenderMode) String() string {
 }
 
 func (TextRenderMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[5].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[6].Descriptor()
 }
 
 func (TextRenderMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[5]
+	return &file_volvoxgrid_proto_enumTypes[6]
 }
 
 func (x TextRenderMode) Number() protoreflect.EnumNumber {
@@ -395,7 +476,7 @@ func (x TextRenderMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use TextRenderMode.Descriptor instead.
 func (TextRenderMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{5}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{6}
 }
 
 type TextHintingMode int32
@@ -434,11 +515,11 @@ func (x TextHintingMode) String() string {
 }
 
 func (TextHintingMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[6].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[7].Descriptor()
 }
 
 func (TextHintingMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[6]
+	return &file_volvoxgrid_proto_enumTypes[7]
 }
 
 func (x TextHintingMode) Number() protoreflect.EnumNumber {
@@ -447,7 +528,7 @@ func (x TextHintingMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use TextHintingMode.Descriptor instead.
 func (TextHintingMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{6}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{7}
 }
 
 type TextBaseline int32
@@ -483,11 +564,11 @@ func (x TextBaseline) String() string {
 }
 
 func (TextBaseline) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[7].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[8].Descriptor()
 }
 
 func (TextBaseline) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[7]
+	return &file_volvoxgrid_proto_enumTypes[8]
 }
 
 func (x TextBaseline) Number() protoreflect.EnumNumber {
@@ -496,7 +577,7 @@ func (x TextBaseline) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use TextBaseline.Descriptor instead.
 func (TextBaseline) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{7}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{8}
 }
 
 // Cell text alignment: "horizontal_vertical".
@@ -558,11 +639,11 @@ func (x Align) String() string {
 }
 
 func (Align) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[8].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[9].Descriptor()
 }
 
 func (Align) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[8]
+	return &file_volvoxgrid_proto_enumTypes[9]
 }
 
 func (x Align) Number() protoreflect.EnumNumber {
@@ -571,7 +652,7 @@ func (x Align) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use Align.Descriptor instead.
 func (Align) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{8}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{9}
 }
 
 type ImageAlignment int32
@@ -631,11 +712,11 @@ func (x ImageAlignment) String() string {
 }
 
 func (ImageAlignment) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[9].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[10].Descriptor()
 }
 
 func (ImageAlignment) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[9]
+	return &file_volvoxgrid_proto_enumTypes[10]
 }
 
 func (x ImageAlignment) Number() protoreflect.EnumNumber {
@@ -644,7 +725,7 @@ func (x ImageAlignment) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ImageAlignment.Descriptor instead.
 func (ImageAlignment) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{9}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{10}
 }
 
 type BarcodeSymbology int32
@@ -713,11 +794,11 @@ func (x BarcodeSymbology) String() string {
 }
 
 func (BarcodeSymbology) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[10].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[11].Descriptor()
 }
 
 func (BarcodeSymbology) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[10]
+	return &file_volvoxgrid_proto_enumTypes[11]
 }
 
 func (x BarcodeSymbology) Number() protoreflect.EnumNumber {
@@ -726,7 +807,7 @@ func (x BarcodeSymbology) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use BarcodeSymbology.Descriptor instead.
 func (BarcodeSymbology) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{10}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{11}
 }
 
 type BarcodeCaptionPosition int32
@@ -762,11 +843,11 @@ func (x BarcodeCaptionPosition) String() string {
 }
 
 func (BarcodeCaptionPosition) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[11].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[12].Descriptor()
 }
 
 func (BarcodeCaptionPosition) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[11]
+	return &file_volvoxgrid_proto_enumTypes[12]
 }
 
 func (x BarcodeCaptionPosition) Number() protoreflect.EnumNumber {
@@ -775,7 +856,7 @@ func (x BarcodeCaptionPosition) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use BarcodeCaptionPosition.Descriptor instead.
 func (BarcodeCaptionPosition) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{11}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{12}
 }
 
 type BarcodeCheckDigitMode int32
@@ -813,11 +894,11 @@ func (x BarcodeCheckDigitMode) String() string {
 }
 
 func (BarcodeCheckDigitMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[12].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[13].Descriptor()
 }
 
 func (BarcodeCheckDigitMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[12]
+	return &file_volvoxgrid_proto_enumTypes[13]
 }
 
 func (x BarcodeCheckDigitMode) Number() protoreflect.EnumNumber {
@@ -826,7 +907,7 @@ func (x BarcodeCheckDigitMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use BarcodeCheckDigitMode.Descriptor instead.
 func (BarcodeCheckDigitMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{12}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{13}
 }
 
 type BarcodeTextEncoding int32
@@ -865,11 +946,11 @@ func (x BarcodeTextEncoding) String() string {
 }
 
 func (BarcodeTextEncoding) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[13].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[14].Descriptor()
 }
 
 func (BarcodeTextEncoding) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[13]
+	return &file_volvoxgrid_proto_enumTypes[14]
 }
 
 func (x BarcodeTextEncoding) Number() protoreflect.EnumNumber {
@@ -878,7 +959,7 @@ func (x BarcodeTextEncoding) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use BarcodeTextEncoding.Descriptor instead.
 func (BarcodeTextEncoding) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{13}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{14}
 }
 
 type BarcodeQrErrorCorrection int32
@@ -920,11 +1001,11 @@ func (x BarcodeQrErrorCorrection) String() string {
 }
 
 func (BarcodeQrErrorCorrection) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[14].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[15].Descriptor()
 }
 
 func (BarcodeQrErrorCorrection) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[14]
+	return &file_volvoxgrid_proto_enumTypes[15]
 }
 
 func (x BarcodeQrErrorCorrection) Number() protoreflect.EnumNumber {
@@ -933,7 +1014,7 @@ func (x BarcodeQrErrorCorrection) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use BarcodeQrErrorCorrection.Descriptor instead.
 func (BarcodeQrErrorCorrection) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{14}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{15}
 }
 
 type BarcodeRenderStatus int32
@@ -975,11 +1056,11 @@ func (x BarcodeRenderStatus) String() string {
 }
 
 func (BarcodeRenderStatus) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[15].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[16].Descriptor()
 }
 
 func (BarcodeRenderStatus) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[15]
+	return &file_volvoxgrid_proto_enumTypes[16]
 }
 
 func (x BarcodeRenderStatus) Number() protoreflect.EnumNumber {
@@ -988,7 +1069,7 @@ func (x BarcodeRenderStatus) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use BarcodeRenderStatus.Descriptor instead.
 func (BarcodeRenderStatus) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{15}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{16}
 }
 
 type CheckedState int32
@@ -1024,11 +1105,11 @@ func (x CheckedState) String() string {
 }
 
 func (CheckedState) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[16].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[17].Descriptor()
 }
 
 func (CheckedState) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[16]
+	return &file_volvoxgrid_proto_enumTypes[17]
 }
 
 func (x CheckedState) Number() protoreflect.EnumNumber {
@@ -1037,7 +1118,7 @@ func (x CheckedState) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use CheckedState.Descriptor instead.
 func (CheckedState) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{16}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{17}
 }
 
 type FillHandlePosition int32
@@ -1082,11 +1163,11 @@ func (x FillHandlePosition) String() string {
 }
 
 func (FillHandlePosition) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[17].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[18].Descriptor()
 }
 
 func (FillHandlePosition) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[17]
+	return &file_volvoxgrid_proto_enumTypes[18]
 }
 
 func (x FillHandlePosition) Number() protoreflect.EnumNumber {
@@ -1095,7 +1176,7 @@ func (x FillHandlePosition) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use FillHandlePosition.Descriptor instead.
 func (FillHandlePosition) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{17}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{18}
 }
 
 type ColumnDataType int32
@@ -1137,11 +1218,11 @@ func (x ColumnDataType) String() string {
 }
 
 func (ColumnDataType) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[18].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[19].Descriptor()
 }
 
 func (ColumnDataType) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[18]
+	return &file_volvoxgrid_proto_enumTypes[19]
 }
 
 func (x ColumnDataType) Number() protoreflect.EnumNumber {
@@ -1150,7 +1231,7 @@ func (x ColumnDataType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ColumnDataType.Descriptor instead.
 func (ColumnDataType) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{18}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{19}
 }
 
 // Type coercion strategy during cell writes and data loading.
@@ -1194,11 +1275,11 @@ func (x CoercionMode) String() string {
 }
 
 func (CoercionMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[19].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[20].Descriptor()
 }
 
 func (CoercionMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[19]
+	return &file_volvoxgrid_proto_enumTypes[20]
 }
 
 func (x CoercionMode) Number() protoreflect.EnumNumber {
@@ -1207,7 +1288,7 @@ func (x CoercionMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use CoercionMode.Descriptor instead.
 func (CoercionMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{19}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{20}
 }
 
 // What happens when a cell write fails type validation.
@@ -1251,11 +1332,11 @@ func (x WriteErrorMode) String() string {
 }
 
 func (WriteErrorMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[20].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[21].Descriptor()
 }
 
 func (WriteErrorMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[20]
+	return &file_volvoxgrid_proto_enumTypes[21]
 }
 
 func (x WriteErrorMode) Number() protoreflect.EnumNumber {
@@ -1264,7 +1345,7 @@ func (x WriteErrorMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use WriteErrorMode.Descriptor instead.
 func (WriteErrorMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{20}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{21}
 }
 
 type CellInteraction int32
@@ -1303,11 +1384,11 @@ func (x CellInteraction) String() string {
 }
 
 func (CellInteraction) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[21].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[22].Descriptor()
 }
 
 func (CellInteraction) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[21]
+	return &file_volvoxgrid_proto_enumTypes[22]
 }
 
 func (x CellInteraction) Number() protoreflect.EnumNumber {
@@ -1316,7 +1397,7 @@ func (x CellInteraction) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use CellInteraction.Descriptor instead.
 func (CellInteraction) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{21}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{22}
 }
 
 // How the first row of loaded data is interpreted.
@@ -1357,11 +1438,11 @@ func (x HeaderPolicy) String() string {
 }
 
 func (HeaderPolicy) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[22].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[23].Descriptor()
 }
 
 func (HeaderPolicy) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[22]
+	return &file_volvoxgrid_proto_enumTypes[23]
 }
 
 func (x HeaderPolicy) Number() protoreflect.EnumNumber {
@@ -1370,7 +1451,7 @@ func (x HeaderPolicy) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use HeaderPolicy.Descriptor instead.
 func (HeaderPolicy) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{22}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{23}
 }
 
 // Column type inference strategy during data loading.
@@ -1412,11 +1493,11 @@ func (x TypePolicy) String() string {
 }
 
 func (TypePolicy) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[23].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[24].Descriptor()
 }
 
 func (TypePolicy) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[23]
+	return &file_volvoxgrid_proto_enumTypes[24]
 }
 
 func (x TypePolicy) Number() protoreflect.EnumNumber {
@@ -1425,7 +1506,7 @@ func (x TypePolicy) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use TypePolicy.Descriptor instead.
 func (TypePolicy) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{23}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{24}
 }
 
 type LoadDataStatus int32
@@ -1461,11 +1542,11 @@ func (x LoadDataStatus) String() string {
 }
 
 func (LoadDataStatus) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[24].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[25].Descriptor()
 }
 
 func (LoadDataStatus) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[24]
+	return &file_volvoxgrid_proto_enumTypes[25]
 }
 
 func (x LoadDataStatus) Number() protoreflect.EnumNumber {
@@ -1474,7 +1555,7 @@ func (x LoadDataStatus) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use LoadDataStatus.Descriptor instead.
 func (LoadDataStatus) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{24}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{25}
 }
 
 // How user selection is interpreted. See engine/src/selection.rs.
@@ -1538,11 +1619,11 @@ func (x SelectionMode) String() string {
 }
 
 func (SelectionMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[25].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[26].Descriptor()
 }
 
 func (SelectionMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[25]
+	return &file_volvoxgrid_proto_enumTypes[26]
 }
 
 func (x SelectionMode) Number() protoreflect.EnumNumber {
@@ -1551,7 +1632,7 @@ func (x SelectionMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use SelectionMode.Descriptor instead.
 func (SelectionMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{25}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{26}
 }
 
 type FocusBorderStyle int32
@@ -1593,11 +1674,11 @@ func (x FocusBorderStyle) String() string {
 }
 
 func (FocusBorderStyle) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[26].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[27].Descriptor()
 }
 
 func (FocusBorderStyle) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[26]
+	return &file_volvoxgrid_proto_enumTypes[27]
 }
 
 func (x FocusBorderStyle) Number() protoreflect.EnumNumber {
@@ -1606,7 +1687,7 @@ func (x FocusBorderStyle) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use FocusBorderStyle.Descriptor instead.
 func (FocusBorderStyle) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{26}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{27}
 }
 
 type SelectionVisibility int32
@@ -1642,11 +1723,11 @@ func (x SelectionVisibility) String() string {
 }
 
 func (SelectionVisibility) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[27].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[28].Descriptor()
 }
 
 func (SelectionVisibility) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[27]
+	return &file_volvoxgrid_proto_enumTypes[28]
 }
 
 func (x SelectionVisibility) Number() protoreflect.EnumNumber {
@@ -1655,7 +1736,7 @@ func (x SelectionVisibility) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use SelectionVisibility.Descriptor instead.
 func (SelectionVisibility) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{27}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{28}
 }
 
 // Controls how cell editing is activated. See engine/src/input.rs.
@@ -1697,11 +1778,11 @@ func (x EditTrigger) String() string {
 }
 
 func (EditTrigger) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[28].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[29].Descriptor()
 }
 
 func (EditTrigger) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[28]
+	return &file_volvoxgrid_proto_enumTypes[29]
 }
 
 func (x EditTrigger) Number() protoreflect.EnumNumber {
@@ -1710,55 +1791,6 @@ func (x EditTrigger) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use EditTrigger.Descriptor instead.
 func (EditTrigger) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{28}
-}
-
-type DropdownTrigger int32
-
-const (
-	DropdownTrigger_DROPDOWN_NEVER   DropdownTrigger = 0
-	DropdownTrigger_DROPDOWN_ALWAYS  DropdownTrigger = 1
-	DropdownTrigger_DROPDOWN_ON_EDIT DropdownTrigger = 2
-)
-
-// Enum value maps for DropdownTrigger.
-var (
-	DropdownTrigger_name = map[int32]string{
-		0: "DROPDOWN_NEVER",
-		1: "DROPDOWN_ALWAYS",
-		2: "DROPDOWN_ON_EDIT",
-	}
-	DropdownTrigger_value = map[string]int32{
-		"DROPDOWN_NEVER":   0,
-		"DROPDOWN_ALWAYS":  1,
-		"DROPDOWN_ON_EDIT": 2,
-	}
-)
-
-func (x DropdownTrigger) Enum() *DropdownTrigger {
-	p := new(DropdownTrigger)
-	*p = x
-	return p
-}
-
-func (x DropdownTrigger) String() string {
-	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
-}
-
-func (DropdownTrigger) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[29].Descriptor()
-}
-
-func (DropdownTrigger) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[29]
-}
-
-func (x DropdownTrigger) Number() protoreflect.EnumNumber {
-	return protoreflect.EnumNumber(x)
-}
-
-// Deprecated: Use DropdownTrigger.Descriptor instead.
-func (DropdownTrigger) EnumDescriptor() ([]byte, []int) {
 	return file_volvoxgrid_proto_rawDescGZIP(), []int{29}
 }
 
@@ -1860,6 +1892,398 @@ func (TabBehavior) EnumDescriptor() ([]byte, []int) {
 	return file_volvoxgrid_proto_rawDescGZIP(), []int{31}
 }
 
+type EditorKind int32
+
+const (
+	EditorKind_EDITOR_KIND_UNSPECIFIED EditorKind = 0
+	EditorKind_EDITOR_TEXT             EditorKind = 1
+	EditorKind_EDITOR_MULTILINE_TEXT   EditorKind = 2
+	EditorKind_EDITOR_NUMBER           EditorKind = 3
+	EditorKind_EDITOR_CHECKBOX         EditorKind = 4
+	EditorKind_EDITOR_SELECT           EditorKind = 5 // read-only list/select; committed value must come from list
+	EditorKind_EDITOR_COMBO            EditorKind = 6 // editable dropdown/combobox; custom text is allowed
+	EditorKind_EDITOR_DATE_TIME        EditorKind = 7
+	EditorKind_EDITOR_BUTTON           EditorKind = 8
+	EditorKind_EDITOR_CUSTOM           EditorKind = 100
+)
+
+// Enum value maps for EditorKind.
+var (
+	EditorKind_name = map[int32]string{
+		0:   "EDITOR_KIND_UNSPECIFIED",
+		1:   "EDITOR_TEXT",
+		2:   "EDITOR_MULTILINE_TEXT",
+		3:   "EDITOR_NUMBER",
+		4:   "EDITOR_CHECKBOX",
+		5:   "EDITOR_SELECT",
+		6:   "EDITOR_COMBO",
+		7:   "EDITOR_DATE_TIME",
+		8:   "EDITOR_BUTTON",
+		100: "EDITOR_CUSTOM",
+	}
+	EditorKind_value = map[string]int32{
+		"EDITOR_KIND_UNSPECIFIED": 0,
+		"EDITOR_TEXT":             1,
+		"EDITOR_MULTILINE_TEXT":   2,
+		"EDITOR_NUMBER":           3,
+		"EDITOR_CHECKBOX":         4,
+		"EDITOR_SELECT":           5,
+		"EDITOR_COMBO":            6,
+		"EDITOR_DATE_TIME":        7,
+		"EDITOR_BUTTON":           8,
+		"EDITOR_CUSTOM":           100,
+	}
+)
+
+func (x EditorKind) Enum() *EditorKind {
+	p := new(EditorKind)
+	*p = x
+	return p
+}
+
+func (x EditorKind) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (EditorKind) Descriptor() protoreflect.EnumDescriptor {
+	return file_volvoxgrid_proto_enumTypes[32].Descriptor()
+}
+
+func (EditorKind) Type() protoreflect.EnumType {
+	return &file_volvoxgrid_proto_enumTypes[32]
+}
+
+func (x EditorKind) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use EditorKind.Descriptor instead.
+func (EditorKind) EnumDescriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{32}
+}
+
+type EditorOwner int32
+
+const (
+	EditorOwner_EDITOR_OWNER_ENGINE      EditorOwner = 0
+	EditorOwner_EDITOR_OWNER_HOST_NATIVE EditorOwner = 1
+	EditorOwner_EDITOR_OWNER_CUSTOM      EditorOwner = 2
+)
+
+// Enum value maps for EditorOwner.
+var (
+	EditorOwner_name = map[int32]string{
+		0: "EDITOR_OWNER_ENGINE",
+		1: "EDITOR_OWNER_HOST_NATIVE",
+		2: "EDITOR_OWNER_CUSTOM",
+	}
+	EditorOwner_value = map[string]int32{
+		"EDITOR_OWNER_ENGINE":      0,
+		"EDITOR_OWNER_HOST_NATIVE": 1,
+		"EDITOR_OWNER_CUSTOM":      2,
+	}
+)
+
+func (x EditorOwner) Enum() *EditorOwner {
+	p := new(EditorOwner)
+	*p = x
+	return p
+}
+
+func (x EditorOwner) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (EditorOwner) Descriptor() protoreflect.EnumDescriptor {
+	return file_volvoxgrid_proto_enumTypes[33].Descriptor()
+}
+
+func (EditorOwner) Type() protoreflect.EnumType {
+	return &file_volvoxgrid_proto_enumTypes[33]
+}
+
+func (x EditorOwner) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use EditorOwner.Descriptor instead.
+func (EditorOwner) EnumDescriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{33}
+}
+
+// Who renders the editor surface.
+//
+//	CANVAS: engine draws on canvas; host tracks session only (no overlay).
+//	INLINE / POPUP_* / MODAL: host mounts an overlay widget at viewport_rect.
+//
+// CANVAS is value 0 so that an unset/forgotten `presentation` field is the
+// safe default — no surprise host overlays.
+type EditorPresentation int32
+
+const (
+	EditorPresentation_EDITOR_CANVAS      EditorPresentation = 0 // engine-drawn; host MUST NOT mount an overlay
+	EditorPresentation_EDITOR_POPUP_OVER  EditorPresentation = 1 // host overlay anchored above the cell
+	EditorPresentation_EDITOR_POPUP_UNDER EditorPresentation = 2 // host overlay anchored below the cell
+	EditorPresentation_EDITOR_MODAL       EditorPresentation = 3 // host modal dialog (cell rect ignored)
+	EditorPresentation_EDITOR_INLINE      EditorPresentation = 4 // host overlay at the cell rect
+)
+
+// Enum value maps for EditorPresentation.
+var (
+	EditorPresentation_name = map[int32]string{
+		0: "EDITOR_CANVAS",
+		1: "EDITOR_POPUP_OVER",
+		2: "EDITOR_POPUP_UNDER",
+		3: "EDITOR_MODAL",
+		4: "EDITOR_INLINE",
+	}
+	EditorPresentation_value = map[string]int32{
+		"EDITOR_CANVAS":      0,
+		"EDITOR_POPUP_OVER":  1,
+		"EDITOR_POPUP_UNDER": 2,
+		"EDITOR_MODAL":       3,
+		"EDITOR_INLINE":      4,
+	}
+)
+
+func (x EditorPresentation) Enum() *EditorPresentation {
+	p := new(EditorPresentation)
+	*p = x
+	return p
+}
+
+func (x EditorPresentation) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (EditorPresentation) Descriptor() protoreflect.EnumDescriptor {
+	return file_volvoxgrid_proto_enumTypes[34].Descriptor()
+}
+
+func (EditorPresentation) Type() protoreflect.EnumType {
+	return &file_volvoxgrid_proto_enumTypes[34]
+}
+
+func (x EditorPresentation) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use EditorPresentation.Descriptor instead.
+func (EditorPresentation) EnumDescriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{34}
+}
+
+type ValidationMode int32
+
+const (
+	ValidationMode_VALIDATION_BLOCK         ValidationMode = 0
+	ValidationMode_VALIDATION_REVERT        ValidationMode = 1
+	ValidationMode_VALIDATION_ALLOW_INVALID ValidationMode = 2
+)
+
+// Enum value maps for ValidationMode.
+var (
+	ValidationMode_name = map[int32]string{
+		0: "VALIDATION_BLOCK",
+		1: "VALIDATION_REVERT",
+		2: "VALIDATION_ALLOW_INVALID",
+	}
+	ValidationMode_value = map[string]int32{
+		"VALIDATION_BLOCK":         0,
+		"VALIDATION_REVERT":        1,
+		"VALIDATION_ALLOW_INVALID": 2,
+	}
+)
+
+func (x ValidationMode) Enum() *ValidationMode {
+	p := new(ValidationMode)
+	*p = x
+	return p
+}
+
+func (x ValidationMode) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ValidationMode) Descriptor() protoreflect.EnumDescriptor {
+	return file_volvoxgrid_proto_enumTypes[35].Descriptor()
+}
+
+func (ValidationMode) Type() protoreflect.EnumType {
+	return &file_volvoxgrid_proto_enumTypes[35]
+}
+
+func (x ValidationMode) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ValidationMode.Descriptor instead.
+func (ValidationMode) EnumDescriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{35}
+}
+
+type ValidationTrigger int32
+
+const (
+	ValidationTrigger_VALIDATION_TRIGGER_ON_COMMIT     ValidationTrigger = 0
+	ValidationTrigger_VALIDATION_TRIGGER_ON_CHANGE     ValidationTrigger = 1
+	ValidationTrigger_VALIDATION_TRIGGER_ON_PAUSE      ValidationTrigger = 2
+	ValidationTrigger_VALIDATION_TRIGGER_ON_FOCUS_LOST ValidationTrigger = 3
+)
+
+// Enum value maps for ValidationTrigger.
+var (
+	ValidationTrigger_name = map[int32]string{
+		0: "VALIDATION_TRIGGER_ON_COMMIT",
+		1: "VALIDATION_TRIGGER_ON_CHANGE",
+		2: "VALIDATION_TRIGGER_ON_PAUSE",
+		3: "VALIDATION_TRIGGER_ON_FOCUS_LOST",
+	}
+	ValidationTrigger_value = map[string]int32{
+		"VALIDATION_TRIGGER_ON_COMMIT":     0,
+		"VALIDATION_TRIGGER_ON_CHANGE":     1,
+		"VALIDATION_TRIGGER_ON_PAUSE":      2,
+		"VALIDATION_TRIGGER_ON_FOCUS_LOST": 3,
+	}
+)
+
+func (x ValidationTrigger) Enum() *ValidationTrigger {
+	p := new(ValidationTrigger)
+	*p = x
+	return p
+}
+
+func (x ValidationTrigger) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ValidationTrigger) Descriptor() protoreflect.EnumDescriptor {
+	return file_volvoxgrid_proto_enumTypes[36].Descriptor()
+}
+
+func (ValidationTrigger) Type() protoreflect.EnumType {
+	return &file_volvoxgrid_proto_enumTypes[36]
+}
+
+func (x ValidationTrigger) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ValidationTrigger.Descriptor instead.
+func (ValidationTrigger) EnumDescriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{36}
+}
+
+type InputType int32
+
+const (
+	InputType_INPUT_TYPE_TEXT     InputType = 0
+	InputType_INPUT_TYPE_NUMBER   InputType = 1
+	InputType_INPUT_TYPE_EMAIL    InputType = 2
+	InputType_INPUT_TYPE_URL      InputType = 3
+	InputType_INPUT_TYPE_PHONE    InputType = 4
+	InputType_INPUT_TYPE_PASSWORD InputType = 5
+)
+
+// Enum value maps for InputType.
+var (
+	InputType_name = map[int32]string{
+		0: "INPUT_TYPE_TEXT",
+		1: "INPUT_TYPE_NUMBER",
+		2: "INPUT_TYPE_EMAIL",
+		3: "INPUT_TYPE_URL",
+		4: "INPUT_TYPE_PHONE",
+		5: "INPUT_TYPE_PASSWORD",
+	}
+	InputType_value = map[string]int32{
+		"INPUT_TYPE_TEXT":     0,
+		"INPUT_TYPE_NUMBER":   1,
+		"INPUT_TYPE_EMAIL":    2,
+		"INPUT_TYPE_URL":      3,
+		"INPUT_TYPE_PHONE":    4,
+		"INPUT_TYPE_PASSWORD": 5,
+	}
+)
+
+func (x InputType) Enum() *InputType {
+	p := new(InputType)
+	*p = x
+	return p
+}
+
+func (x InputType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (InputType) Descriptor() protoreflect.EnumDescriptor {
+	return file_volvoxgrid_proto_enumTypes[37].Descriptor()
+}
+
+func (InputType) Type() protoreflect.EnumType {
+	return &file_volvoxgrid_proto_enumTypes[37]
+}
+
+func (x InputType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use InputType.Descriptor instead.
+func (InputType) EnumDescriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{37}
+}
+
+type ButtonRole int32
+
+const (
+	ButtonRole_BUTTON_ROLE_DEFAULT  ButtonRole = 0
+	ButtonRole_BUTTON_ROLE_ELLIPSIS ButtonRole = 1
+	ButtonRole_BUTTON_ROLE_CLEAR    ButtonRole = 2
+	ButtonRole_BUTTON_ROLE_CUSTOM   ButtonRole = 3
+)
+
+// Enum value maps for ButtonRole.
+var (
+	ButtonRole_name = map[int32]string{
+		0: "BUTTON_ROLE_DEFAULT",
+		1: "BUTTON_ROLE_ELLIPSIS",
+		2: "BUTTON_ROLE_CLEAR",
+		3: "BUTTON_ROLE_CUSTOM",
+	}
+	ButtonRole_value = map[string]int32{
+		"BUTTON_ROLE_DEFAULT":  0,
+		"BUTTON_ROLE_ELLIPSIS": 1,
+		"BUTTON_ROLE_CLEAR":    2,
+		"BUTTON_ROLE_CUSTOM":   3,
+	}
+)
+
+func (x ButtonRole) Enum() *ButtonRole {
+	p := new(ButtonRole)
+	*p = x
+	return p
+}
+
+func (x ButtonRole) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ButtonRole) Descriptor() protoreflect.EnumDescriptor {
+	return file_volvoxgrid_proto_enumTypes[38].Descriptor()
+}
+
+func (ButtonRole) Type() protoreflect.EnumType {
+	return &file_volvoxgrid_proto_enumTypes[38]
+}
+
+func (x ButtonRole) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ButtonRole.Descriptor instead.
+func (ButtonRole) EnumDescriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{38}
+}
+
 type SortOrder int32
 
 const (
@@ -1893,11 +2317,11 @@ func (x SortOrder) String() string {
 }
 
 func (SortOrder) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[32].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[39].Descriptor()
 }
 
 func (SortOrder) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[32]
+	return &file_volvoxgrid_proto_enumTypes[39]
 }
 
 func (x SortOrder) Number() protoreflect.EnumNumber {
@@ -1906,7 +2330,7 @@ func (x SortOrder) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use SortOrder.Descriptor instead.
 func (SortOrder) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{32}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{39}
 }
 
 // Comparison strategy for sorting.
@@ -1961,11 +2385,11 @@ func (x SortType) String() string {
 }
 
 func (SortType) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[33].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[40].Descriptor()
 }
 
 func (SortType) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[33]
+	return &file_volvoxgrid_proto_enumTypes[40]
 }
 
 func (x SortType) Number() protoreflect.EnumNumber {
@@ -1974,7 +2398,7 @@ func (x SortType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use SortType.Descriptor instead.
 func (SortType) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{33}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{40}
 }
 
 type TreeIndicatorStyle int32
@@ -2016,11 +2440,11 @@ func (x TreeIndicatorStyle) String() string {
 }
 
 func (TreeIndicatorStyle) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[34].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[41].Descriptor()
 }
 
 func (TreeIndicatorStyle) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[34]
+	return &file_volvoxgrid_proto_enumTypes[41]
 }
 
 func (x TreeIndicatorStyle) Number() protoreflect.EnumNumber {
@@ -2029,7 +2453,7 @@ func (x TreeIndicatorStyle) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use TreeIndicatorStyle.Descriptor instead.
 func (TreeIndicatorStyle) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{34}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{41}
 }
 
 type GroupTotalPosition int32
@@ -2062,11 +2486,11 @@ func (x GroupTotalPosition) String() string {
 }
 
 func (GroupTotalPosition) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[35].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[42].Descriptor()
 }
 
 func (GroupTotalPosition) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[35]
+	return &file_volvoxgrid_proto_enumTypes[42]
 }
 
 func (x GroupTotalPosition) Number() protoreflect.EnumNumber {
@@ -2075,7 +2499,7 @@ func (x GroupTotalPosition) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use GroupTotalPosition.Descriptor instead.
 func (GroupTotalPosition) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{35}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{42}
 }
 
 // Aggregate functions for Subtotal() and Aggregate() RPCs.
@@ -2161,11 +2585,11 @@ func (x AggregateType) String() string {
 }
 
 func (AggregateType) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[36].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[43].Descriptor()
 }
 
 func (AggregateType) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[36]
+	return &file_volvoxgrid_proto_enumTypes[43]
 }
 
 func (x AggregateType) Number() protoreflect.EnumNumber {
@@ -2174,7 +2598,7 @@ func (x AggregateType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use AggregateType.Descriptor instead.
 func (AggregateType) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{36}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{43}
 }
 
 // Content-based cell merging. The engine compares adjacent cell values
@@ -2238,11 +2662,11 @@ func (x CellSpanMode) String() string {
 }
 
 func (CellSpanMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[37].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[44].Descriptor()
 }
 
 func (CellSpanMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[37]
+	return &file_volvoxgrid_proto_enumTypes[44]
 }
 
 func (x CellSpanMode) Number() protoreflect.EnumNumber {
@@ -2251,7 +2675,7 @@ func (x CellSpanMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use CellSpanMode.Descriptor instead.
 func (CellSpanMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{37}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{44}
 }
 
 // Text normalization used when comparing cells for content-based spans
@@ -2292,11 +2716,11 @@ func (x SpanCompareMode) String() string {
 }
 
 func (SpanCompareMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[38].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[45].Descriptor()
 }
 
 func (SpanCompareMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[38]
+	return &file_volvoxgrid_proto_enumTypes[45]
 }
 
 func (x SpanCompareMode) Number() protoreflect.EnumNumber {
@@ -2305,7 +2729,7 @@ func (x SpanCompareMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use SpanCompareMode.Descriptor instead.
 func (SpanCompareMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{38}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{45}
 }
 
 type ScrollBarsMode int32
@@ -2344,11 +2768,11 @@ func (x ScrollBarsMode) String() string {
 }
 
 func (ScrollBarsMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[39].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[46].Descriptor()
 }
 
 func (ScrollBarsMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[39]
+	return &file_volvoxgrid_proto_enumTypes[46]
 }
 
 func (x ScrollBarsMode) Number() protoreflect.EnumNumber {
@@ -2357,7 +2781,7 @@ func (x ScrollBarsMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ScrollBarsMode.Descriptor instead.
 func (ScrollBarsMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{39}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{46}
 }
 
 type ScrollBarMode int32
@@ -2393,11 +2817,11 @@ func (x ScrollBarMode) String() string {
 }
 
 func (ScrollBarMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[40].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[47].Descriptor()
 }
 
 func (ScrollBarMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[40]
+	return &file_volvoxgrid_proto_enumTypes[47]
 }
 
 func (x ScrollBarMode) Number() protoreflect.EnumNumber {
@@ -2406,7 +2830,7 @@ func (x ScrollBarMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ScrollBarMode.Descriptor instead.
 func (ScrollBarMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{40}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{47}
 }
 
 type ScrollBarAppearance int32
@@ -2445,11 +2869,11 @@ func (x ScrollBarAppearance) String() string {
 }
 
 func (ScrollBarAppearance) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[41].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[48].Descriptor()
 }
 
 func (ScrollBarAppearance) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[41]
+	return &file_volvoxgrid_proto_enumTypes[48]
 }
 
 func (x ScrollBarAppearance) Number() protoreflect.EnumNumber {
@@ -2458,7 +2882,7 @@ func (x ScrollBarAppearance) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ScrollBarAppearance.Descriptor instead.
 func (ScrollBarAppearance) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{41}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{48}
 }
 
 type IndicatorAppearance int32
@@ -2494,11 +2918,11 @@ func (x IndicatorAppearance) String() string {
 }
 
 func (IndicatorAppearance) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[42].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[49].Descriptor()
 }
 
 func (IndicatorAppearance) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[42]
+	return &file_volvoxgrid_proto_enumTypes[49]
 }
 
 func (x IndicatorAppearance) Number() protoreflect.EnumNumber {
@@ -2507,7 +2931,7 @@ func (x IndicatorAppearance) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use IndicatorAppearance.Descriptor instead.
 func (IndicatorAppearance) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{42}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{49}
 }
 
 type PinPosition int32
@@ -2543,11 +2967,11 @@ func (x PinPosition) String() string {
 }
 
 func (PinPosition) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[43].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[50].Descriptor()
 }
 
 func (PinPosition) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[43]
+	return &file_volvoxgrid_proto_enumTypes[50]
 }
 
 func (x PinPosition) Number() protoreflect.EnumNumber {
@@ -2556,7 +2980,7 @@ func (x PinPosition) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use PinPosition.Descriptor instead.
 func (PinPosition) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{43}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{50}
 }
 
 type StickyEdge int32
@@ -2601,11 +3025,11 @@ func (x StickyEdge) String() string {
 }
 
 func (StickyEdge) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[44].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[51].Descriptor()
 }
 
 func (StickyEdge) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[44]
+	return &file_volvoxgrid_proto_enumTypes[51]
 }
 
 func (x StickyEdge) Number() protoreflect.EnumNumber {
@@ -2614,7 +3038,7 @@ func (x StickyEdge) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use StickyEdge.Descriptor instead.
 func (StickyEdge) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{44}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{51}
 }
 
 // Type-ahead (incremental search) mode. See engine/src/search.rs.
@@ -2658,11 +3082,11 @@ func (x TypeAheadMode) String() string {
 }
 
 func (TypeAheadMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[45].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[52].Descriptor()
 }
 
 func (TypeAheadMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[45]
+	return &file_volvoxgrid_proto_enumTypes[52]
 }
 
 func (x TypeAheadMode) Number() protoreflect.EnumNumber {
@@ -2671,7 +3095,7 @@ func (x TypeAheadMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use TypeAheadMode.Descriptor instead.
 func (TypeAheadMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{45}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{52}
 }
 
 type AutoSizeMode int32
@@ -2707,11 +3131,11 @@ func (x AutoSizeMode) String() string {
 }
 
 func (AutoSizeMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[46].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[53].Descriptor()
 }
 
 func (AutoSizeMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[46]
+	return &file_volvoxgrid_proto_enumTypes[53]
 }
 
 func (x AutoSizeMode) Number() protoreflect.EnumNumber {
@@ -2720,7 +3144,7 @@ func (x AutoSizeMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use AutoSizeMode.Descriptor instead.
 func (AutoSizeMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{46}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{53}
 }
 
 type DragMode int32
@@ -2756,11 +3180,11 @@ func (x DragMode) String() string {
 }
 
 func (DragMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[47].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[54].Descriptor()
 }
 
 func (DragMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[47]
+	return &file_volvoxgrid_proto_enumTypes[54]
 }
 
 func (x DragMode) Number() protoreflect.EnumNumber {
@@ -2769,7 +3193,7 @@ func (x DragMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use DragMode.Descriptor instead.
 func (DragMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{47}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{54}
 }
 
 type DropMode int32
@@ -2805,11 +3229,11 @@ func (x DropMode) String() string {
 }
 
 func (DropMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[48].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[55].Descriptor()
 }
 
 func (DropMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[48]
+	return &file_volvoxgrid_proto_enumTypes[55]
 }
 
 func (x DropMode) Number() protoreflect.EnumNumber {
@@ -2818,7 +3242,7 @@ func (x DropMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use DropMode.Descriptor instead.
 func (DropMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{48}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{55}
 }
 
 type CustomRenderMode int32
@@ -2854,11 +3278,11 @@ func (x CustomRenderMode) String() string {
 }
 
 func (CustomRenderMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[49].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[56].Descriptor()
 }
 
 func (CustomRenderMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[49]
+	return &file_volvoxgrid_proto_enumTypes[56]
 }
 
 func (x CustomRenderMode) Number() protoreflect.EnumNumber {
@@ -2867,7 +3291,7 @@ func (x CustomRenderMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use CustomRenderMode.Descriptor instead.
 func (CustomRenderMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{49}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{56}
 }
 
 type ApplyScope int32
@@ -2900,11 +3324,11 @@ func (x ApplyScope) String() string {
 }
 
 func (ApplyScope) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[50].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[57].Descriptor()
 }
 
 func (ApplyScope) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[50]
+	return &file_volvoxgrid_proto_enumTypes[57]
 }
 
 func (x ApplyScope) Number() protoreflect.EnumNumber {
@@ -2913,7 +3337,7 @@ func (x ApplyScope) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ApplyScope.Descriptor instead.
 func (ApplyScope) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{50}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{57}
 }
 
 // Rendering backend selection. See GUI.md and TUI.md.
@@ -2980,11 +3404,11 @@ func (x RendererMode) String() string {
 }
 
 func (RendererMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[51].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[58].Descriptor()
 }
 
 func (RendererMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[51]
+	return &file_volvoxgrid_proto_enumTypes[58]
 }
 
 func (x RendererMode) Number() protoreflect.EnumNumber {
@@ -2993,7 +3417,7 @@ func (x RendererMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use RendererMode.Descriptor instead.
 func (RendererMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{51}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{58}
 }
 
 type PresentMode int32
@@ -3032,11 +3456,11 @@ func (x PresentMode) String() string {
 }
 
 func (PresentMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[52].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[59].Descriptor()
 }
 
 func (PresentMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[52]
+	return &file_volvoxgrid_proto_enumTypes[59]
 }
 
 func (x PresentMode) Number() protoreflect.EnumNumber {
@@ -3045,7 +3469,7 @@ func (x PresentMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use PresentMode.Descriptor instead.
 func (PresentMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{52}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{59}
 }
 
 type FramePacingMode int32
@@ -3084,11 +3508,11 @@ func (x FramePacingMode) String() string {
 }
 
 func (FramePacingMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[53].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[60].Descriptor()
 }
 
 func (FramePacingMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[53]
+	return &file_volvoxgrid_proto_enumTypes[60]
 }
 
 func (x FramePacingMode) Number() protoreflect.EnumNumber {
@@ -3097,7 +3521,7 @@ func (x FramePacingMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use FramePacingMode.Descriptor instead.
 func (FramePacingMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{53}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{60}
 }
 
 type ClearScope int32
@@ -3139,11 +3563,11 @@ func (x ClearScope) String() string {
 }
 
 func (ClearScope) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[54].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[61].Descriptor()
 }
 
 func (ClearScope) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[54]
+	return &file_volvoxgrid_proto_enumTypes[61]
 }
 
 func (x ClearScope) Number() protoreflect.EnumNumber {
@@ -3152,7 +3576,7 @@ func (x ClearScope) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ClearScope.Descriptor instead.
 func (ClearScope) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{54}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{61}
 }
 
 type ClearRegion int32
@@ -3200,11 +3624,11 @@ func (x ClearRegion) String() string {
 }
 
 func (ClearRegion) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[55].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[62].Descriptor()
 }
 
 func (ClearRegion) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[55]
+	return &file_volvoxgrid_proto_enumTypes[62]
 }
 
 func (x ClearRegion) Number() protoreflect.EnumNumber {
@@ -3213,7 +3637,7 @@ func (x ClearRegion) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ClearRegion.Descriptor instead.
 func (ClearRegion) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{55}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{62}
 }
 
 // Export formats. See engine/src/save.rs.
@@ -3269,11 +3693,11 @@ func (x ExportFormat) String() string {
 }
 
 func (ExportFormat) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[56].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[63].Descriptor()
 }
 
 func (ExportFormat) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[56]
+	return &file_volvoxgrid_proto_enumTypes[63]
 }
 
 func (x ExportFormat) Number() protoreflect.EnumNumber {
@@ -3282,7 +3706,7 @@ func (x ExportFormat) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ExportFormat.Descriptor instead.
 func (ExportFormat) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{56}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{63}
 }
 
 type ExportScope int32
@@ -3321,11 +3745,11 @@ func (x ExportScope) String() string {
 }
 
 func (ExportScope) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[57].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[64].Descriptor()
 }
 
 func (ExportScope) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[57]
+	return &file_volvoxgrid_proto_enumTypes[64]
 }
 
 func (x ExportScope) Number() protoreflect.EnumNumber {
@@ -3334,7 +3758,7 @@ func (x ExportScope) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ExportScope.Descriptor instead.
 func (ExportScope) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{57}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{64}
 }
 
 type PrintOrientation int32
@@ -3367,11 +3791,11 @@ func (x PrintOrientation) String() string {
 }
 
 func (PrintOrientation) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[58].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[65].Descriptor()
 }
 
 func (PrintOrientation) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[58]
+	return &file_volvoxgrid_proto_enumTypes[65]
 }
 
 func (x PrintOrientation) Number() protoreflect.EnumNumber {
@@ -3380,7 +3804,7 @@ func (x PrintOrientation) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use PrintOrientation.Descriptor instead.
 func (PrintOrientation) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{58}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{65}
 }
 
 type NodeRelation int32
@@ -3422,11 +3846,11 @@ func (x NodeRelation) String() string {
 }
 
 func (NodeRelation) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[59].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[66].Descriptor()
 }
 
 func (NodeRelation) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[59]
+	return &file_volvoxgrid_proto_enumTypes[66]
 }
 
 func (x NodeRelation) Number() protoreflect.EnumNumber {
@@ -3435,7 +3859,7 @@ func (x NodeRelation) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use NodeRelation.Descriptor instead.
 func (NodeRelation) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{59}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{66}
 }
 
 type IconAlign int32
@@ -3477,11 +3901,11 @@ func (x IconAlign) String() string {
 }
 
 func (IconAlign) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[60].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[67].Descriptor()
 }
 
 func (IconAlign) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[60]
+	return &file_volvoxgrid_proto_enumTypes[67]
 }
 
 func (x IconAlign) Number() protoreflect.EnumNumber {
@@ -3490,7 +3914,7 @@ func (x IconAlign) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use IconAlign.Descriptor instead.
 func (IconAlign) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{60}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{67}
 }
 
 // Which sub-element of a cell was hit. Used in ClickEvent to tell the
@@ -3538,11 +3962,11 @@ func (x CellHitArea) String() string {
 }
 
 func (CellHitArea) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[61].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[68].Descriptor()
 }
 
 func (CellHitArea) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[61]
+	return &file_volvoxgrid_proto_enumTypes[68]
 }
 
 func (x CellHitArea) Number() protoreflect.EnumNumber {
@@ -3551,7 +3975,7 @@ func (x CellHitArea) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use CellHitArea.Descriptor instead.
 func (CellHitArea) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{61}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{68}
 }
 
 // ── Scrolling ──
@@ -3588,11 +4012,11 @@ func (x PullToRefreshTheme) String() string {
 }
 
 func (PullToRefreshTheme) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[62].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[69].Descriptor()
 }
 
 func (PullToRefreshTheme) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[62]
+	return &file_volvoxgrid_proto_enumTypes[69]
 }
 
 func (x PullToRefreshTheme) Number() protoreflect.EnumNumber {
@@ -3601,7 +4025,7 @@ func (x PullToRefreshTheme) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use PullToRefreshTheme.Descriptor instead.
 func (PullToRefreshTheme) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{62}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{69}
 }
 
 // ── Render layer bit positions (for render_layer_mask bitmask) ──
@@ -3716,11 +4140,11 @@ func (x RenderLayerBit) String() string {
 }
 
 func (RenderLayerBit) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[63].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[70].Descriptor()
 }
 
 func (RenderLayerBit) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[63]
+	return &file_volvoxgrid_proto_enumTypes[70]
 }
 
 func (x RenderLayerBit) Number() protoreflect.EnumNumber {
@@ -3729,7 +4153,7 @@ func (x RenderLayerBit) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use RenderLayerBit.Descriptor instead.
 func (RenderLayerBit) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{63}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{70}
 }
 
 type GridTargetKind int32
@@ -3774,11 +4198,11 @@ func (x GridTargetKind) String() string {
 }
 
 func (GridTargetKind) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[64].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[71].Descriptor()
 }
 
 func (GridTargetKind) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[64]
+	return &file_volvoxgrid_proto_enumTypes[71]
 }
 
 func (x GridTargetKind) Number() protoreflect.EnumNumber {
@@ -3787,7 +4211,7 @@ func (x GridTargetKind) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use GridTargetKind.Descriptor instead.
 func (GridTargetKind) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{64}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{71}
 }
 
 type IndicatorBand int32
@@ -3841,11 +4265,11 @@ func (x IndicatorBand) String() string {
 }
 
 func (IndicatorBand) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[65].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[72].Descriptor()
 }
 
 func (IndicatorBand) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[65]
+	return &file_volvoxgrid_proto_enumTypes[72]
 }
 
 func (x IndicatorBand) Number() protoreflect.EnumNumber {
@@ -3854,7 +4278,7 @@ func (x IndicatorBand) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use IndicatorBand.Descriptor instead.
 func (IndicatorBand) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{65}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{72}
 }
 
 type RowIndicatorSlotKind int32
@@ -3875,6 +4299,9 @@ const (
 	RowIndicatorSlotKind_ROW_INDICATOR_SLOT_ACTION      RowIndicatorSlotKind = 12
 	RowIndicatorSlotKind_ROW_INDICATOR_SLOT_STATUS_ICON RowIndicatorSlotKind = 13
 	RowIndicatorSlotKind_ROW_INDICATOR_SLOT_CUSTOM      RowIndicatorSlotKind = 14
+	// Same as NUMBERS, but only counts/numbers real data rows.
+	// Subtotal and outline (grand-total / group) rows render text = "".
+	RowIndicatorSlotKind_ROW_INDICATOR_SLOT_NUMBERS_DATA_ONLY RowIndicatorSlotKind = 15
 )
 
 // Enum value maps for RowIndicatorSlotKind.
@@ -3895,23 +4322,25 @@ var (
 		12: "ROW_INDICATOR_SLOT_ACTION",
 		13: "ROW_INDICATOR_SLOT_STATUS_ICON",
 		14: "ROW_INDICATOR_SLOT_CUSTOM",
+		15: "ROW_INDICATOR_SLOT_NUMBERS_DATA_ONLY",
 	}
 	RowIndicatorSlotKind_value = map[string]int32{
-		"ROW_INDICATOR_SLOT_NONE":        0,
-		"ROW_INDICATOR_SLOT_NUMBERS":     1,
-		"ROW_INDICATOR_SLOT_CURRENT":     2,
-		"ROW_INDICATOR_SLOT_SELECTION":   3,
-		"ROW_INDICATOR_SLOT_CHECKBOX":    4,
-		"ROW_INDICATOR_SLOT_HANDLE":      5,
-		"ROW_INDICATOR_SLOT_EDITING":     6,
-		"ROW_INDICATOR_SLOT_MODIFIED":    7,
-		"ROW_INDICATOR_SLOT_ERROR":       8,
-		"ROW_INDICATOR_SLOT_NEW_ROW":     9,
-		"ROW_INDICATOR_SLOT_EXPANDER":    10,
-		"ROW_INDICATOR_SLOT_RESIZE":      11,
-		"ROW_INDICATOR_SLOT_ACTION":      12,
-		"ROW_INDICATOR_SLOT_STATUS_ICON": 13,
-		"ROW_INDICATOR_SLOT_CUSTOM":      14,
+		"ROW_INDICATOR_SLOT_NONE":              0,
+		"ROW_INDICATOR_SLOT_NUMBERS":           1,
+		"ROW_INDICATOR_SLOT_CURRENT":           2,
+		"ROW_INDICATOR_SLOT_SELECTION":         3,
+		"ROW_INDICATOR_SLOT_CHECKBOX":          4,
+		"ROW_INDICATOR_SLOT_HANDLE":            5,
+		"ROW_INDICATOR_SLOT_EDITING":           6,
+		"ROW_INDICATOR_SLOT_MODIFIED":          7,
+		"ROW_INDICATOR_SLOT_ERROR":             8,
+		"ROW_INDICATOR_SLOT_NEW_ROW":           9,
+		"ROW_INDICATOR_SLOT_EXPANDER":          10,
+		"ROW_INDICATOR_SLOT_RESIZE":            11,
+		"ROW_INDICATOR_SLOT_ACTION":            12,
+		"ROW_INDICATOR_SLOT_STATUS_ICON":       13,
+		"ROW_INDICATOR_SLOT_CUSTOM":            14,
+		"ROW_INDICATOR_SLOT_NUMBERS_DATA_ONLY": 15,
 	}
 )
 
@@ -3926,11 +4355,11 @@ func (x RowIndicatorSlotKind) String() string {
 }
 
 func (RowIndicatorSlotKind) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[66].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[73].Descriptor()
 }
 
 func (RowIndicatorSlotKind) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[66]
+	return &file_volvoxgrid_proto_enumTypes[73]
 }
 
 func (x RowIndicatorSlotKind) Number() protoreflect.EnumNumber {
@@ -3939,7 +4368,7 @@ func (x RowIndicatorSlotKind) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use RowIndicatorSlotKind.Descriptor instead.
 func (RowIndicatorSlotKind) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{66}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{73}
 }
 
 type ColIndicatorCellMode int32
@@ -4008,11 +4437,11 @@ func (x ColIndicatorCellMode) String() string {
 }
 
 func (ColIndicatorCellMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[67].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[74].Descriptor()
 }
 
 func (ColIndicatorCellMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[67]
+	return &file_volvoxgrid_proto_enumTypes[74]
 }
 
 func (x ColIndicatorCellMode) Number() protoreflect.EnumNumber {
@@ -4021,7 +4450,7 @@ func (x ColIndicatorCellMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ColIndicatorCellMode.Descriptor instead.
 func (ColIndicatorCellMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{67}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{74}
 }
 
 type CornerIndicatorSlotKind int32
@@ -4060,11 +4489,11 @@ func (x CornerIndicatorSlotKind) String() string {
 }
 
 func (CornerIndicatorSlotKind) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[68].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[75].Descriptor()
 }
 
 func (CornerIndicatorSlotKind) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[68]
+	return &file_volvoxgrid_proto_enumTypes[75]
 }
 
 func (x CornerIndicatorSlotKind) Number() protoreflect.EnumNumber {
@@ -4073,7 +4502,7 @@ func (x CornerIndicatorSlotKind) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use CornerIndicatorSlotKind.Descriptor instead.
 func (CornerIndicatorSlotKind) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{68}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{75}
 }
 
 // Bitmask values for GridEventTarget.status_flags. Combined per slot kind;
@@ -4141,11 +4570,11 @@ func (x GridEventTargetFlag) String() string {
 }
 
 func (GridEventTargetFlag) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[69].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[76].Descriptor()
 }
 
 func (GridEventTargetFlag) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[69]
+	return &file_volvoxgrid_proto_enumTypes[76]
 }
 
 func (x GridEventTargetFlag) Number() protoreflect.EnumNumber {
@@ -4154,7 +4583,7 @@ func (x GridEventTargetFlag) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use GridEventTargetFlag.Descriptor instead.
 func (GridEventTargetFlag) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{69}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{76}
 }
 
 type ComposeMethod int32
@@ -4193,11 +4622,11 @@ func (x ComposeMethod) String() string {
 }
 
 func (ComposeMethod) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[70].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[77].Descriptor()
 }
 
 func (ComposeMethod) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[70]
+	return &file_volvoxgrid_proto_enumTypes[77]
 }
 
 func (x ComposeMethod) Number() protoreflect.EnumNumber {
@@ -4206,7 +4635,7 @@ func (x ComposeMethod) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ComposeMethod.Descriptor instead.
 func (ComposeMethod) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{70}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{77}
 }
 
 // Edit UI mode. See engine/src/edit.rs EditUiMode.
@@ -4246,11 +4675,11 @@ func (x EditUiMode) String() string {
 }
 
 func (EditUiMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[71].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[78].Descriptor()
 }
 
 func (EditUiMode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[71]
+	return &file_volvoxgrid_proto_enumTypes[78]
 }
 
 func (x EditUiMode) Number() protoreflect.EnumNumber {
@@ -4259,7 +4688,7 @@ func (x EditUiMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use EditUiMode.Descriptor instead.
 func (EditUiMode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{71}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{78}
 }
 
 type ErrorCode int32
@@ -4313,11 +4742,11 @@ func (x ErrorCode) String() string {
 }
 
 func (ErrorCode) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[72].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[79].Descriptor()
 }
 
 func (ErrorCode) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[72]
+	return &file_volvoxgrid_proto_enumTypes[79]
 }
 
 func (x ErrorCode) Number() protoreflect.EnumNumber {
@@ -4326,7 +4755,7 @@ func (x ErrorCode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ErrorCode.Descriptor instead.
 func (ErrorCode) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{72}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{79}
 }
 
 type DemoDataFormat int32
@@ -4359,11 +4788,11 @@ func (x DemoDataFormat) String() string {
 }
 
 func (DemoDataFormat) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[73].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[80].Descriptor()
 }
 
 func (DemoDataFormat) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[73]
+	return &file_volvoxgrid_proto_enumTypes[80]
 }
 
 func (x DemoDataFormat) Number() protoreflect.EnumNumber {
@@ -4372,7 +4801,7 @@ func (x DemoDataFormat) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use DemoDataFormat.Descriptor instead.
 func (DemoDataFormat) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{73}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{80}
 }
 
 type TerminalColorLevel int32
@@ -4411,11 +4840,11 @@ func (x TerminalColorLevel) String() string {
 }
 
 func (TerminalColorLevel) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[74].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[81].Descriptor()
 }
 
 func (TerminalColorLevel) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[74]
+	return &file_volvoxgrid_proto_enumTypes[81]
 }
 
 func (x TerminalColorLevel) Number() protoreflect.EnumNumber {
@@ -4424,7 +4853,7 @@ func (x TerminalColorLevel) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use TerminalColorLevel.Descriptor instead.
 func (TerminalColorLevel) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{74}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{81}
 }
 
 type FrameKind int32
@@ -4460,11 +4889,11 @@ func (x FrameKind) String() string {
 }
 
 func (FrameKind) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[75].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[82].Descriptor()
 }
 
 func (FrameKind) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[75]
+	return &file_volvoxgrid_proto_enumTypes[82]
 }
 
 func (x FrameKind) Number() protoreflect.EnumNumber {
@@ -4473,7 +4902,7 @@ func (x FrameKind) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use FrameKind.Descriptor instead.
 func (FrameKind) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{75}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{82}
 }
 
 // Semantic cursor hint emitted by the engine. Adapters map this to their
@@ -4541,11 +4970,11 @@ func (x CursorType) String() string {
 }
 
 func (CursorType) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[76].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[83].Descriptor()
 }
 
 func (CursorType) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[76]
+	return &file_volvoxgrid_proto_enumTypes[83]
 }
 
 func (x CursorType) Number() protoreflect.EnumNumber {
@@ -4554,7 +4983,201 @@ func (x CursorType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use CursorType.Descriptor instead.
 func (CursorType) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{76}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{83}
+}
+
+// Gesture / source that initiated an edit. The engine derives EditUiMode from
+// this:
+//
+//	F2, DOUBLE_CLICK, CLICK_CARET → EDIT  (caret-positioned, no select-all)
+//	everything else               → ENTER (select-all, replace on first key)
+type EditStartReason int32
+
+const (
+	EditStartReason_EDIT_START_UNSPECIFIED     EditStartReason = 0
+	EditStartReason_EDIT_START_F2              EditStartReason = 1
+	EditStartReason_EDIT_START_DOUBLE_CLICK    EditStartReason = 2
+	EditStartReason_EDIT_START_CLICK_CARET     EditStartReason = 3
+	EditStartReason_EDIT_START_ENTER_KEY       EditStartReason = 4
+	EditStartReason_EDIT_START_PRINTABLE_KEY   EditStartReason = 5
+	EditStartReason_EDIT_START_IME_COMPOSITION EditStartReason = 6
+	EditStartReason_EDIT_START_DROPDOWN_BUTTON EditStartReason = 7
+	EditStartReason_EDIT_START_PROGRAMMATIC    EditStartReason = 8
+)
+
+// Enum value maps for EditStartReason.
+var (
+	EditStartReason_name = map[int32]string{
+		0: "EDIT_START_UNSPECIFIED",
+		1: "EDIT_START_F2",
+		2: "EDIT_START_DOUBLE_CLICK",
+		3: "EDIT_START_CLICK_CARET",
+		4: "EDIT_START_ENTER_KEY",
+		5: "EDIT_START_PRINTABLE_KEY",
+		6: "EDIT_START_IME_COMPOSITION",
+		7: "EDIT_START_DROPDOWN_BUTTON",
+		8: "EDIT_START_PROGRAMMATIC",
+	}
+	EditStartReason_value = map[string]int32{
+		"EDIT_START_UNSPECIFIED":     0,
+		"EDIT_START_F2":              1,
+		"EDIT_START_DOUBLE_CLICK":    2,
+		"EDIT_START_CLICK_CARET":     3,
+		"EDIT_START_ENTER_KEY":       4,
+		"EDIT_START_PRINTABLE_KEY":   5,
+		"EDIT_START_IME_COMPOSITION": 6,
+		"EDIT_START_DROPDOWN_BUTTON": 7,
+		"EDIT_START_PROGRAMMATIC":    8,
+	}
+)
+
+func (x EditStartReason) Enum() *EditStartReason {
+	p := new(EditStartReason)
+	*p = x
+	return p
+}
+
+func (x EditStartReason) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (EditStartReason) Descriptor() protoreflect.EnumDescriptor {
+	return file_volvoxgrid_proto_enumTypes[84].Descriptor()
+}
+
+func (EditStartReason) Type() protoreflect.EnumType {
+	return &file_volvoxgrid_proto_enumTypes[84]
+}
+
+func (x EditStartReason) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use EditStartReason.Descriptor instead.
+func (EditStartReason) EnumDescriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{84}
+}
+
+type EditEndReason int32
+
+const (
+	EditEndReason_EDIT_END_UNSPECIFIED      EditEndReason = 0
+	EditEndReason_EDIT_END_COMMITTED        EditEndReason = 1
+	EditEndReason_EDIT_END_CANCELED         EditEndReason = 2
+	EditEndReason_EDIT_END_REVERTED_INVALID EditEndReason = 3
+	EditEndReason_EDIT_END_FOCUS_LOST       EditEndReason = 4
+	EditEndReason_EDIT_END_CELL_REMOVED     EditEndReason = 5
+	EditEndReason_EDIT_END_GRID_DESTROYED   EditEndReason = 6
+)
+
+// Enum value maps for EditEndReason.
+var (
+	EditEndReason_name = map[int32]string{
+		0: "EDIT_END_UNSPECIFIED",
+		1: "EDIT_END_COMMITTED",
+		2: "EDIT_END_CANCELED",
+		3: "EDIT_END_REVERTED_INVALID",
+		4: "EDIT_END_FOCUS_LOST",
+		5: "EDIT_END_CELL_REMOVED",
+		6: "EDIT_END_GRID_DESTROYED",
+	}
+	EditEndReason_value = map[string]int32{
+		"EDIT_END_UNSPECIFIED":      0,
+		"EDIT_END_COMMITTED":        1,
+		"EDIT_END_CANCELED":         2,
+		"EDIT_END_REVERTED_INVALID": 3,
+		"EDIT_END_FOCUS_LOST":       4,
+		"EDIT_END_CELL_REMOVED":     5,
+		"EDIT_END_GRID_DESTROYED":   6,
+	}
+)
+
+func (x EditEndReason) Enum() *EditEndReason {
+	p := new(EditEndReason)
+	*p = x
+	return p
+}
+
+func (x EditEndReason) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (EditEndReason) Descriptor() protoreflect.EnumDescriptor {
+	return file_volvoxgrid_proto_enumTypes[85].Descriptor()
+}
+
+func (EditEndReason) Type() protoreflect.EnumType {
+	return &file_volvoxgrid_proto_enumTypes[85]
+}
+
+func (x EditEndReason) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use EditEndReason.Descriptor instead.
+func (EditEndReason) EnumDescriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{85}
+}
+
+type EditorUpdateReason int32
+
+const (
+	EditorUpdateReason_EDITOR_UPDATE_UNSPECIFIED        EditorUpdateReason = 0
+	EditorUpdateReason_EDITOR_UPDATE_GEOMETRY           EditorUpdateReason = 1
+	EditorUpdateReason_EDITOR_UPDATE_VALIDATION         EditorUpdateReason = 2
+	EditorUpdateReason_EDITOR_UPDATE_NORMALIZED_VALUE   EditorUpdateReason = 3
+	EditorUpdateReason_EDITOR_UPDATE_PROGRAMMATIC_VALUE EditorUpdateReason = 4
+	EditorUpdateReason_EDITOR_UPDATE_REMOTE_VALUE       EditorUpdateReason = 5
+	EditorUpdateReason_EDITOR_UPDATE_CUSTOM_PAYLOAD     EditorUpdateReason = 6
+)
+
+// Enum value maps for EditorUpdateReason.
+var (
+	EditorUpdateReason_name = map[int32]string{
+		0: "EDITOR_UPDATE_UNSPECIFIED",
+		1: "EDITOR_UPDATE_GEOMETRY",
+		2: "EDITOR_UPDATE_VALIDATION",
+		3: "EDITOR_UPDATE_NORMALIZED_VALUE",
+		4: "EDITOR_UPDATE_PROGRAMMATIC_VALUE",
+		5: "EDITOR_UPDATE_REMOTE_VALUE",
+		6: "EDITOR_UPDATE_CUSTOM_PAYLOAD",
+	}
+	EditorUpdateReason_value = map[string]int32{
+		"EDITOR_UPDATE_UNSPECIFIED":        0,
+		"EDITOR_UPDATE_GEOMETRY":           1,
+		"EDITOR_UPDATE_VALIDATION":         2,
+		"EDITOR_UPDATE_NORMALIZED_VALUE":   3,
+		"EDITOR_UPDATE_PROGRAMMATIC_VALUE": 4,
+		"EDITOR_UPDATE_REMOTE_VALUE":       5,
+		"EDITOR_UPDATE_CUSTOM_PAYLOAD":     6,
+	}
+)
+
+func (x EditorUpdateReason) Enum() *EditorUpdateReason {
+	p := new(EditorUpdateReason)
+	*p = x
+	return p
+}
+
+func (x EditorUpdateReason) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (EditorUpdateReason) Descriptor() protoreflect.EnumDescriptor {
+	return file_volvoxgrid_proto_enumTypes[86].Descriptor()
+}
+
+func (EditorUpdateReason) Type() protoreflect.EnumType {
+	return &file_volvoxgrid_proto_enumTypes[86]
+}
+
+func (x EditorUpdateReason) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use EditorUpdateReason.Descriptor instead.
+func (EditorUpdateReason) EnumDescriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{86}
 }
 
 type ArchiveRequest_Action int32
@@ -4596,11 +5219,11 @@ func (x ArchiveRequest_Action) String() string {
 }
 
 func (ArchiveRequest_Action) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[77].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[87].Descriptor()
 }
 
 func (ArchiveRequest_Action) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[77]
+	return &file_volvoxgrid_proto_enumTypes[87]
 }
 
 func (x ArchiveRequest_Action) Number() protoreflect.EnumNumber {
@@ -4609,7 +5232,7 @@ func (x ArchiveRequest_Action) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ArchiveRequest_Action.Descriptor instead.
 func (ArchiveRequest_Action) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{128, 0}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{148, 0}
 }
 
 type PointerEvent_Type int32
@@ -4648,11 +5271,11 @@ func (x PointerEvent_Type) String() string {
 }
 
 func (PointerEvent_Type) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[78].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[88].Descriptor()
 }
 
 func (PointerEvent_Type) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[78]
+	return &file_volvoxgrid_proto_enumTypes[88]
 }
 
 func (x PointerEvent_Type) Number() protoreflect.EnumNumber {
@@ -4661,7 +5284,7 @@ func (x PointerEvent_Type) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use PointerEvent_Type.Descriptor instead.
 func (PointerEvent_Type) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{176, 0}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{198, 0}
 }
 
 type ZoomEvent_Phase int32
@@ -4700,11 +5323,11 @@ func (x ZoomEvent_Phase) String() string {
 }
 
 func (ZoomEvent_Phase) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[79].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[89].Descriptor()
 }
 
 func (ZoomEvent_Phase) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[79]
+	return &file_volvoxgrid_proto_enumTypes[89]
 }
 
 func (x ZoomEvent_Phase) Number() protoreflect.EnumNumber {
@@ -4713,7 +5336,7 @@ func (x ZoomEvent_Phase) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ZoomEvent_Phase.Descriptor instead.
 func (ZoomEvent_Phase) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{178, 0}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{200, 0}
 }
 
 type KeyEvent_Type int32
@@ -4752,11 +5375,11 @@ func (x KeyEvent_Type) String() string {
 }
 
 func (KeyEvent_Type) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[80].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[90].Descriptor()
 }
 
 func (KeyEvent_Type) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[80]
+	return &file_volvoxgrid_proto_enumTypes[90]
 }
 
 func (x KeyEvent_Type) Number() protoreflect.EnumNumber {
@@ -4765,7 +5388,7 @@ func (x KeyEvent_Type) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use KeyEvent_Type.Descriptor instead.
 func (KeyEvent_Type) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{179, 0}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{201, 0}
 }
 
 type TerminalCommand_Kind int32
@@ -4798,11 +5421,11 @@ func (x TerminalCommand_Kind) String() string {
 }
 
 func (TerminalCommand_Kind) Descriptor() protoreflect.EnumDescriptor {
-	return file_volvoxgrid_proto_enumTypes[81].Descriptor()
+	return file_volvoxgrid_proto_enumTypes[91].Descriptor()
 }
 
 func (TerminalCommand_Kind) Type() protoreflect.EnumType {
-	return &file_volvoxgrid_proto_enumTypes[81]
+	return &file_volvoxgrid_proto_enumTypes[91]
 }
 
 func (x TerminalCommand_Kind) Number() protoreflect.EnumNumber {
@@ -4811,7 +5434,7 @@ func (x TerminalCommand_Kind) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use TerminalCommand_Kind.Descriptor instead.
 func (TerminalCommand_Kind) EnumDescriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{184, 0}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{206, 0}
 }
 
 // Font specification. Engine default: platform-default family, size 11.0,
@@ -5769,6 +6392,74 @@ func (x *CellRange) GetCol2() int32 {
 	return 0
 }
 
+type Rect struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	X             float32                `protobuf:"fixed32,1,opt,name=x,proto3" json:"x,omitempty"`
+	Y             float32                `protobuf:"fixed32,2,opt,name=y,proto3" json:"y,omitempty"`
+	Width         float32                `protobuf:"fixed32,3,opt,name=width,proto3" json:"width,omitempty"`
+	Height        float32                `protobuf:"fixed32,4,opt,name=height,proto3" json:"height,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Rect) Reset() {
+	*x = Rect{}
+	mi := &file_volvoxgrid_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Rect) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Rect) ProtoMessage() {}
+
+func (x *Rect) ProtoReflect() protoreflect.Message {
+	mi := &file_volvoxgrid_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Rect.ProtoReflect.Descriptor instead.
+func (*Rect) Descriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *Rect) GetX() float32 {
+	if x != nil {
+		return x.X
+	}
+	return 0
+}
+
+func (x *Rect) GetY() float32 {
+	if x != nil {
+		return x.Y
+	}
+	return 0
+}
+
+func (x *Rect) GetWidth() float32 {
+	if x != nil {
+		return x.Width
+	}
+	return 0
+}
+
+func (x *Rect) GetHeight() float32 {
+	if x != nil {
+		return x.Height
+	}
+	return 0
+}
+
 // Typed cell value. Maps to CellValueData in engine/src/cell.rs:
 //
 //	text → Text(String), number → Number(f64), flag → Bool(bool),
@@ -5792,7 +6483,7 @@ type CellValue struct {
 
 func (x *CellValue) Reset() {
 	*x = CellValue{}
-	mi := &file_volvoxgrid_proto_msgTypes[13]
+	mi := &file_volvoxgrid_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5804,7 +6495,7 @@ func (x *CellValue) String() string {
 func (*CellValue) ProtoMessage() {}
 
 func (x *CellValue) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[13]
+	mi := &file_volvoxgrid_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5817,7 +6508,7 @@ func (x *CellValue) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CellValue.ProtoReflect.Descriptor instead.
 func (*CellValue) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{13}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *CellValue) GetValue() isCellValue_Value {
@@ -5906,6 +6597,216 @@ func (*CellValue_Raw) isCellValue_Value() {}
 
 func (*CellValue_Timestamp) isCellValue_Value() {}
 
+type StructValue struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Fields        []*StructField         `protobuf:"bytes,1,rep,name=fields,proto3" json:"fields,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StructValue) Reset() {
+	*x = StructValue{}
+	mi := &file_volvoxgrid_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StructValue) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StructValue) ProtoMessage() {}
+
+func (x *StructValue) ProtoReflect() protoreflect.Message {
+	mi := &file_volvoxgrid_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StructValue.ProtoReflect.Descriptor instead.
+func (*StructValue) Descriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *StructValue) GetFields() []*StructField {
+	if x != nil {
+		return x.Fields
+	}
+	return nil
+}
+
+type StructField struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Value         *ScalarValue           `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StructField) Reset() {
+	*x = StructField{}
+	mi := &file_volvoxgrid_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StructField) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StructField) ProtoMessage() {}
+
+func (x *StructField) ProtoReflect() protoreflect.Message {
+	mi := &file_volvoxgrid_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StructField.ProtoReflect.Descriptor instead.
+func (*StructField) Descriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *StructField) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *StructField) GetValue() *ScalarValue {
+	if x != nil {
+		return x.Value
+	}
+	return nil
+}
+
+type ScalarValue struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Value:
+	//
+	//	*ScalarValue_StringValue
+	//	*ScalarValue_NumberValue
+	//	*ScalarValue_BoolValue
+	//	*ScalarValue_BytesValue
+	Value         isScalarValue_Value `protobuf_oneof:"value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ScalarValue) Reset() {
+	*x = ScalarValue{}
+	mi := &file_volvoxgrid_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ScalarValue) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ScalarValue) ProtoMessage() {}
+
+func (x *ScalarValue) ProtoReflect() protoreflect.Message {
+	mi := &file_volvoxgrid_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ScalarValue.ProtoReflect.Descriptor instead.
+func (*ScalarValue) Descriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *ScalarValue) GetValue() isScalarValue_Value {
+	if x != nil {
+		return x.Value
+	}
+	return nil
+}
+
+func (x *ScalarValue) GetStringValue() string {
+	if x != nil {
+		if x, ok := x.Value.(*ScalarValue_StringValue); ok {
+			return x.StringValue
+		}
+	}
+	return ""
+}
+
+func (x *ScalarValue) GetNumberValue() float64 {
+	if x != nil {
+		if x, ok := x.Value.(*ScalarValue_NumberValue); ok {
+			return x.NumberValue
+		}
+	}
+	return 0
+}
+
+func (x *ScalarValue) GetBoolValue() bool {
+	if x != nil {
+		if x, ok := x.Value.(*ScalarValue_BoolValue); ok {
+			return x.BoolValue
+		}
+	}
+	return false
+}
+
+func (x *ScalarValue) GetBytesValue() []byte {
+	if x != nil {
+		if x, ok := x.Value.(*ScalarValue_BytesValue); ok {
+			return x.BytesValue
+		}
+	}
+	return nil
+}
+
+type isScalarValue_Value interface {
+	isScalarValue_Value()
+}
+
+type ScalarValue_StringValue struct {
+	StringValue string `protobuf:"bytes,1,opt,name=string_value,json=stringValue,proto3,oneof"`
+}
+
+type ScalarValue_NumberValue struct {
+	NumberValue float64 `protobuf:"fixed64,2,opt,name=number_value,json=numberValue,proto3,oneof"`
+}
+
+type ScalarValue_BoolValue struct {
+	BoolValue bool `protobuf:"varint,3,opt,name=bool_value,json=boolValue,proto3,oneof"`
+}
+
+type ScalarValue_BytesValue struct {
+	BytesValue []byte `protobuf:"bytes,4,opt,name=bytes_value,json=bytesValue,proto3,oneof"`
+}
+
+func (*ScalarValue_StringValue) isScalarValue_Value() {}
+
+func (*ScalarValue_NumberValue) isScalarValue_Value() {}
+
+func (*ScalarValue_BoolValue) isScalarValue_Value() {}
+
+func (*ScalarValue_BytesValue) isScalarValue_Value() {}
+
 type RichText struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Runs          []*TextFormatRun       `protobuf:"bytes,1,rep,name=runs,proto3" json:"runs,omitempty"`
@@ -5915,7 +6816,7 @@ type RichText struct {
 
 func (x *RichText) Reset() {
 	*x = RichText{}
-	mi := &file_volvoxgrid_proto_msgTypes[14]
+	mi := &file_volvoxgrid_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5927,7 +6828,7 @@ func (x *RichText) String() string {
 func (*RichText) ProtoMessage() {}
 
 func (x *RichText) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[14]
+	mi := &file_volvoxgrid_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5940,7 +6841,7 @@ func (x *RichText) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RichText.ProtoReflect.Descriptor instead.
 func (*RichText) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{14}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *RichText) GetRuns() []*TextFormatRun {
@@ -5962,7 +6863,7 @@ type TextFormatRun struct {
 
 func (x *TextFormatRun) Reset() {
 	*x = TextFormatRun{}
-	mi := &file_volvoxgrid_proto_msgTypes[15]
+	mi := &file_volvoxgrid_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5974,7 +6875,7 @@ func (x *TextFormatRun) String() string {
 func (*TextFormatRun) ProtoMessage() {}
 
 func (x *TextFormatRun) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[15]
+	mi := &file_volvoxgrid_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5987,7 +6888,7 @@ func (x *TextFormatRun) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TextFormatRun.ProtoReflect.Descriptor instead.
 func (*TextFormatRun) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{15}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *TextFormatRun) GetStartIndex() uint32 {
@@ -6016,7 +6917,7 @@ type TextRunStyle struct {
 
 func (x *TextRunStyle) Reset() {
 	*x = TextRunStyle{}
-	mi := &file_volvoxgrid_proto_msgTypes[16]
+	mi := &file_volvoxgrid_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6028,7 +6929,7 @@ func (x *TextRunStyle) String() string {
 func (*TextRunStyle) ProtoMessage() {}
 
 func (x *TextRunStyle) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[16]
+	mi := &file_volvoxgrid_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6041,7 +6942,7 @@ func (x *TextRunStyle) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TextRunStyle.ProtoReflect.Descriptor instead.
 func (*TextRunStyle) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{16}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *TextRunStyle) GetForeground() uint32 {
@@ -6072,33 +6973,41 @@ func (x *TextRunStyle) GetLinkUrl() string {
 	return ""
 }
 
-type Dropdown struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	Items []*DropdownItem        `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
-	// When true, the user may type/commit a value not present in `items`.
-	AllowCustomValue bool               `protobuf:"varint,2,opt,name=allow_custom_value,json=allowCustomValue,proto3" json:"allow_custom_value,omitempty"`
-	ItemLayout       DropdownItemLayout `protobuf:"varint,3,opt,name=item_layout,json=itemLayout,proto3,enum=volvoxgrid.v1.DropdownItemLayout" json:"item_layout,omitempty"`
-	// Unset = use grid/global default; false/true override for this dropdown.
-	Searchable    *bool `protobuf:"varint,4,opt,name=searchable,proto3,oneof" json:"searchable,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+type EditorSpec struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	Kind                 EditorKind             `protobuf:"varint,1,opt,name=kind,proto3,enum=volvoxgrid.v1.EditorKind" json:"kind,omitempty"`
+	Owner                EditorOwner            `protobuf:"varint,2,opt,name=owner,proto3,enum=volvoxgrid.v1.EditorOwner" json:"owner,omitempty"`
+	Presentation         EditorPresentation     `protobuf:"varint,3,opt,name=presentation,proto3,enum=volvoxgrid.v1.EditorPresentation" json:"presentation,omitempty"`
+	ValidationMode       ValidationMode         `protobuf:"varint,4,opt,name=validation_mode,json=validationMode,proto3,enum=volvoxgrid.v1.ValidationMode" json:"validation_mode,omitempty"`
+	ValidationTrigger    ValidationTrigger      `protobuf:"varint,5,opt,name=validation_trigger,json=validationTrigger,proto3,enum=volvoxgrid.v1.ValidationTrigger" json:"validation_trigger,omitempty"`
+	ValidationDebounceMs int32                  `protobuf:"varint,6,opt,name=validation_debounce_ms,json=validationDebounceMs,proto3" json:"validation_debounce_ms,omitempty"`
+	CustomEditorId       *string                `protobuf:"bytes,10,opt,name=custom_editor_id,json=customEditorId,proto3,oneof" json:"custom_editor_id,omitempty"`
+	Text                 *TextEditorParams      `protobuf:"bytes,11,opt,name=text,proto3" json:"text,omitempty"`
+	Number               *NumberEditorParams    `protobuf:"bytes,12,opt,name=number,proto3" json:"number,omitempty"`
+	Checkbox             *CheckboxEditorParams  `protobuf:"bytes,13,opt,name=checkbox,proto3" json:"checkbox,omitempty"`
+	List                 *ListEditorParams      `protobuf:"bytes,14,opt,name=list,proto3" json:"list,omitempty"`
+	DateTime             *DateTimeEditorParams  `protobuf:"bytes,15,opt,name=date_time,json=dateTime,proto3" json:"date_time,omitempty"`
+	Actions              []*EditorAction        `protobuf:"bytes,16,rep,name=actions,proto3" json:"actions,omitempty"`
+	CustomProps          *StructValue           `protobuf:"bytes,17,opt,name=custom_props,json=customProps,proto3" json:"custom_props,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
-func (x *Dropdown) Reset() {
-	*x = Dropdown{}
-	mi := &file_volvoxgrid_proto_msgTypes[17]
+func (x *EditorSpec) Reset() {
+	*x = EditorSpec{}
+	mi := &file_volvoxgrid_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *Dropdown) String() string {
+func (x *EditorSpec) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*Dropdown) ProtoMessage() {}
+func (*EditorSpec) ProtoMessage() {}
 
-func (x *Dropdown) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[17]
+func (x *EditorSpec) ProtoReflect() protoreflect.Message {
+	mi := &file_volvoxgrid_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6109,67 +7018,551 @@ func (x *Dropdown) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Dropdown.ProtoReflect.Descriptor instead.
-func (*Dropdown) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{17}
+// Deprecated: Use EditorSpec.ProtoReflect.Descriptor instead.
+func (*EditorSpec) Descriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{21}
 }
 
-func (x *Dropdown) GetItems() []*DropdownItem {
+func (x *EditorSpec) GetKind() EditorKind {
 	if x != nil {
-		return x.Items
+		return x.Kind
+	}
+	return EditorKind_EDITOR_KIND_UNSPECIFIED
+}
+
+func (x *EditorSpec) GetOwner() EditorOwner {
+	if x != nil {
+		return x.Owner
+	}
+	return EditorOwner_EDITOR_OWNER_ENGINE
+}
+
+func (x *EditorSpec) GetPresentation() EditorPresentation {
+	if x != nil {
+		return x.Presentation
+	}
+	return EditorPresentation_EDITOR_CANVAS
+}
+
+func (x *EditorSpec) GetValidationMode() ValidationMode {
+	if x != nil {
+		return x.ValidationMode
+	}
+	return ValidationMode_VALIDATION_BLOCK
+}
+
+func (x *EditorSpec) GetValidationTrigger() ValidationTrigger {
+	if x != nil {
+		return x.ValidationTrigger
+	}
+	return ValidationTrigger_VALIDATION_TRIGGER_ON_COMMIT
+}
+
+func (x *EditorSpec) GetValidationDebounceMs() int32 {
+	if x != nil {
+		return x.ValidationDebounceMs
+	}
+	return 0
+}
+
+func (x *EditorSpec) GetCustomEditorId() string {
+	if x != nil && x.CustomEditorId != nil {
+		return *x.CustomEditorId
+	}
+	return ""
+}
+
+func (x *EditorSpec) GetText() *TextEditorParams {
+	if x != nil {
+		return x.Text
 	}
 	return nil
 }
 
-func (x *Dropdown) GetAllowCustomValue() bool {
+func (x *EditorSpec) GetNumber() *NumberEditorParams {
+	if x != nil {
+		return x.Number
+	}
+	return nil
+}
+
+func (x *EditorSpec) GetCheckbox() *CheckboxEditorParams {
+	if x != nil {
+		return x.Checkbox
+	}
+	return nil
+}
+
+func (x *EditorSpec) GetList() *ListEditorParams {
+	if x != nil {
+		return x.List
+	}
+	return nil
+}
+
+func (x *EditorSpec) GetDateTime() *DateTimeEditorParams {
+	if x != nil {
+		return x.DateTime
+	}
+	return nil
+}
+
+func (x *EditorSpec) GetActions() []*EditorAction {
+	if x != nil {
+		return x.Actions
+	}
+	return nil
+}
+
+func (x *EditorSpec) GetCustomProps() *StructValue {
+	if x != nil {
+		return x.CustomProps
+	}
+	return nil
+}
+
+type TextEditorParams struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	MaxLength     int32                  `protobuf:"varint,1,opt,name=max_length,json=maxLength,proto3" json:"max_length,omitempty"`
+	Mask          string                 `protobuf:"bytes,2,opt,name=mask,proto3" json:"mask,omitempty"`
+	AllowNewlines bool                   `protobuf:"varint,3,opt,name=allow_newlines,json=allowNewlines,proto3" json:"allow_newlines,omitempty"`
+	InputType     InputType              `protobuf:"varint,4,opt,name=input_type,json=inputType,proto3,enum=volvoxgrid.v1.InputType" json:"input_type,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TextEditorParams) Reset() {
+	*x = TextEditorParams{}
+	mi := &file_volvoxgrid_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TextEditorParams) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TextEditorParams) ProtoMessage() {}
+
+func (x *TextEditorParams) ProtoReflect() protoreflect.Message {
+	mi := &file_volvoxgrid_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TextEditorParams.ProtoReflect.Descriptor instead.
+func (*TextEditorParams) Descriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *TextEditorParams) GetMaxLength() int32 {
+	if x != nil {
+		return x.MaxLength
+	}
+	return 0
+}
+
+func (x *TextEditorParams) GetMask() string {
+	if x != nil {
+		return x.Mask
+	}
+	return ""
+}
+
+func (x *TextEditorParams) GetAllowNewlines() bool {
+	if x != nil {
+		return x.AllowNewlines
+	}
+	return false
+}
+
+func (x *TextEditorParams) GetInputType() InputType {
+	if x != nil {
+		return x.InputType
+	}
+	return InputType_INPUT_TYPE_TEXT
+}
+
+type NumberEditorParams struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Min           *float64               `protobuf:"fixed64,1,opt,name=min,proto3,oneof" json:"min,omitempty"`
+	Max           *float64               `protobuf:"fixed64,2,opt,name=max,proto3,oneof" json:"max,omitempty"`
+	Step          *float64               `protobuf:"fixed64,3,opt,name=step,proto3,oneof" json:"step,omitempty"`
+	Format        string                 `protobuf:"bytes,4,opt,name=format,proto3" json:"format,omitempty"`
+	Nullable      bool                   `protobuf:"varint,5,opt,name=nullable,proto3" json:"nullable,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NumberEditorParams) Reset() {
+	*x = NumberEditorParams{}
+	mi := &file_volvoxgrid_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NumberEditorParams) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NumberEditorParams) ProtoMessage() {}
+
+func (x *NumberEditorParams) ProtoReflect() protoreflect.Message {
+	mi := &file_volvoxgrid_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NumberEditorParams.ProtoReflect.Descriptor instead.
+func (*NumberEditorParams) Descriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *NumberEditorParams) GetMin() float64 {
+	if x != nil && x.Min != nil {
+		return *x.Min
+	}
+	return 0
+}
+
+func (x *NumberEditorParams) GetMax() float64 {
+	if x != nil && x.Max != nil {
+		return *x.Max
+	}
+	return 0
+}
+
+func (x *NumberEditorParams) GetStep() float64 {
+	if x != nil && x.Step != nil {
+		return *x.Step
+	}
+	return 0
+}
+
+func (x *NumberEditorParams) GetFormat() string {
+	if x != nil {
+		return x.Format
+	}
+	return ""
+}
+
+func (x *NumberEditorParams) GetNullable() bool {
+	if x != nil {
+		return x.Nullable
+	}
+	return false
+}
+
+type CheckboxEditorParams struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ThreeState    bool                   `protobuf:"varint,1,opt,name=three_state,json=threeState,proto3" json:"three_state,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CheckboxEditorParams) Reset() {
+	*x = CheckboxEditorParams{}
+	mi := &file_volvoxgrid_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CheckboxEditorParams) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CheckboxEditorParams) ProtoMessage() {}
+
+func (x *CheckboxEditorParams) ProtoReflect() protoreflect.Message {
+	mi := &file_volvoxgrid_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CheckboxEditorParams.ProtoReflect.Descriptor instead.
+func (*CheckboxEditorParams) Descriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *CheckboxEditorParams) GetThreeState() bool {
+	if x != nil {
+		return x.ThreeState
+	}
+	return false
+}
+
+type DateTimeEditorParams struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Format        string                 `protobuf:"bytes,1,opt,name=format,proto3" json:"format,omitempty"`
+	MinTimestamp  *int64                 `protobuf:"varint,2,opt,name=min_timestamp,json=minTimestamp,proto3,oneof" json:"min_timestamp,omitempty"`
+	MaxTimestamp  *int64                 `protobuf:"varint,3,opt,name=max_timestamp,json=maxTimestamp,proto3,oneof" json:"max_timestamp,omitempty"`
+	DateOnly      bool                   `protobuf:"varint,4,opt,name=date_only,json=dateOnly,proto3" json:"date_only,omitempty"`
+	TimeOnly      bool                   `protobuf:"varint,5,opt,name=time_only,json=timeOnly,proto3" json:"time_only,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DateTimeEditorParams) Reset() {
+	*x = DateTimeEditorParams{}
+	mi := &file_volvoxgrid_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DateTimeEditorParams) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DateTimeEditorParams) ProtoMessage() {}
+
+func (x *DateTimeEditorParams) ProtoReflect() protoreflect.Message {
+	mi := &file_volvoxgrid_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DateTimeEditorParams.ProtoReflect.Descriptor instead.
+func (*DateTimeEditorParams) Descriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *DateTimeEditorParams) GetFormat() string {
+	if x != nil {
+		return x.Format
+	}
+	return ""
+}
+
+func (x *DateTimeEditorParams) GetMinTimestamp() int64 {
+	if x != nil && x.MinTimestamp != nil {
+		return *x.MinTimestamp
+	}
+	return 0
+}
+
+func (x *DateTimeEditorParams) GetMaxTimestamp() int64 {
+	if x != nil && x.MaxTimestamp != nil {
+		return *x.MaxTimestamp
+	}
+	return 0
+}
+
+func (x *DateTimeEditorParams) GetDateOnly() bool {
+	if x != nil {
+		return x.DateOnly
+	}
+	return false
+}
+
+func (x *DateTimeEditorParams) GetTimeOnly() bool {
+	if x != nil {
+		return x.TimeOnly
+	}
+	return false
+}
+
+type EditorAction struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ActionId      string                 `protobuf:"bytes,1,opt,name=action_id,json=actionId,proto3" json:"action_id,omitempty"`
+	Label         string                 `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`
+	Role          ButtonRole             `protobuf:"varint,3,opt,name=role,proto3,enum=volvoxgrid.v1.ButtonRole" json:"role,omitempty"`
+	Icon          *ImageData             `protobuf:"bytes,4,opt,name=icon,proto3" json:"icon,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EditorAction) Reset() {
+	*x = EditorAction{}
+	mi := &file_volvoxgrid_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EditorAction) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EditorAction) ProtoMessage() {}
+
+func (x *EditorAction) ProtoReflect() protoreflect.Message {
+	mi := &file_volvoxgrid_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EditorAction.ProtoReflect.Descriptor instead.
+func (*EditorAction) Descriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *EditorAction) GetActionId() string {
+	if x != nil {
+		return x.ActionId
+	}
+	return ""
+}
+
+func (x *EditorAction) GetLabel() string {
+	if x != nil {
+		return x.Label
+	}
+	return ""
+}
+
+func (x *EditorAction) GetRole() ButtonRole {
+	if x != nil {
+		return x.Role
+	}
+	return ButtonRole_BUTTON_ROLE_DEFAULT
+}
+
+func (x *EditorAction) GetIcon() *ImageData {
+	if x != nil {
+		return x.Icon
+	}
+	return nil
+}
+
+type ListEditorParams struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	StaticItems []*ListItem            `protobuf:"bytes,1,rep,name=static_items,json=staticItems,proto3" json:"static_items,omitempty"`
+	DataSource  *ListDataSource        `protobuf:"bytes,2,opt,name=data_source,json=dataSource,proto3" json:"data_source,omitempty"`
+	// false => EDITOR_SELECT/read-only list; true => EDITOR_COMBO/editable dropdown.
+	AllowCustomValue bool               `protobuf:"varint,3,opt,name=allow_custom_value,json=allowCustomValue,proto3" json:"allow_custom_value,omitempty"`
+	Searchable       bool               `protobuf:"varint,4,opt,name=searchable,proto3" json:"searchable,omitempty"`
+	MultiSelect      bool               `protobuf:"varint,5,opt,name=multi_select,json=multiSelect,proto3" json:"multi_select,omitempty"`
+	ItemLayout       DropdownItemLayout `protobuf:"varint,6,opt,name=item_layout,json=itemLayout,proto3,enum=volvoxgrid.v1.DropdownItemLayout" json:"item_layout,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *ListEditorParams) Reset() {
+	*x = ListEditorParams{}
+	mi := &file_volvoxgrid_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListEditorParams) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListEditorParams) ProtoMessage() {}
+
+func (x *ListEditorParams) ProtoReflect() protoreflect.Message {
+	mi := &file_volvoxgrid_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListEditorParams.ProtoReflect.Descriptor instead.
+func (*ListEditorParams) Descriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *ListEditorParams) GetStaticItems() []*ListItem {
+	if x != nil {
+		return x.StaticItems
+	}
+	return nil
+}
+
+func (x *ListEditorParams) GetDataSource() *ListDataSource {
+	if x != nil {
+		return x.DataSource
+	}
+	return nil
+}
+
+func (x *ListEditorParams) GetAllowCustomValue() bool {
 	if x != nil {
 		return x.AllowCustomValue
 	}
 	return false
 }
 
-func (x *Dropdown) GetItemLayout() DropdownItemLayout {
+func (x *ListEditorParams) GetSearchable() bool {
+	if x != nil {
+		return x.Searchable
+	}
+	return false
+}
+
+func (x *ListEditorParams) GetMultiSelect() bool {
+	if x != nil {
+		return x.MultiSelect
+	}
+	return false
+}
+
+func (x *ListEditorParams) GetItemLayout() DropdownItemLayout {
 	if x != nil {
 		return x.ItemLayout
 	}
 	return DropdownItemLayout_DROPDOWN_ITEM_AUTO
 }
 
-func (x *Dropdown) GetSearchable() bool {
-	if x != nil && x.Searchable != nil {
-		return *x.Searchable
-	}
-	return false
-}
-
-type DropdownItem struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Value committed into the cell. If unset, commit `label`.
-	Value *string `protobuf:"bytes,1,opt,name=value,proto3,oneof" json:"value,omitempty"`
-	// Text shown to the user.
-	Label *string `protobuf:"bytes,2,opt,name=label,proto3,oneof" json:"label,omitempty"`
-	// Optional secondary/detail strings for richer host layouts.
-	Details       []string `protobuf:"bytes,3,rep,name=details,proto3" json:"details,omitempty"`
-	Disabled      bool     `protobuf:"varint,4,opt,name=disabled,proto3" json:"disabled,omitempty"`
+type ListItem struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Value         *CellValue             `protobuf:"bytes,1,opt,name=value,proto3" json:"value,omitempty"`
+	Label         string                 `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`
+	Details       []string               `protobuf:"bytes,3,rep,name=details,proto3" json:"details,omitempty"`
+	Disabled      bool                   `protobuf:"varint,4,opt,name=disabled,proto3" json:"disabled,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *DropdownItem) Reset() {
-	*x = DropdownItem{}
-	mi := &file_volvoxgrid_proto_msgTypes[18]
+func (x *ListItem) Reset() {
+	*x = ListItem{}
+	mi := &file_volvoxgrid_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *DropdownItem) String() string {
+func (x *ListItem) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*DropdownItem) ProtoMessage() {}
+func (*ListItem) ProtoMessage() {}
 
-func (x *DropdownItem) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[18]
+func (x *ListItem) ProtoReflect() protoreflect.Message {
+	mi := &file_volvoxgrid_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6180,35 +7573,359 @@ func (x *DropdownItem) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use DropdownItem.ProtoReflect.Descriptor instead.
-func (*DropdownItem) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{18}
+// Deprecated: Use ListItem.ProtoReflect.Descriptor instead.
+func (*ListItem) Descriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{28}
 }
 
-func (x *DropdownItem) GetValue() string {
-	if x != nil && x.Value != nil {
-		return *x.Value
+func (x *ListItem) GetValue() *CellValue {
+	if x != nil {
+		return x.Value
+	}
+	return nil
+}
+
+func (x *ListItem) GetLabel() string {
+	if x != nil {
+		return x.Label
 	}
 	return ""
 }
 
-func (x *DropdownItem) GetLabel() string {
-	if x != nil && x.Label != nil {
-		return *x.Label
-	}
-	return ""
-}
-
-func (x *DropdownItem) GetDetails() []string {
+func (x *ListItem) GetDetails() []string {
 	if x != nil {
 		return x.Details
 	}
 	return nil
 }
 
-func (x *DropdownItem) GetDisabled() bool {
+func (x *ListItem) GetDisabled() bool {
 	if x != nil {
 		return x.Disabled
+	}
+	return false
+}
+
+type ListDataSource struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DataSourceId  string                 `protobuf:"bytes,1,opt,name=data_source_id,json=dataSourceId,proto3" json:"data_source_id,omitempty"`
+	Filterable    bool                   `protobuf:"varint,2,opt,name=filterable,proto3" json:"filterable,omitempty"`
+	Pageable      bool                   `protobuf:"varint,3,opt,name=pageable,proto3" json:"pageable,omitempty"`
+	PageSize      int32                  `protobuf:"varint,4,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListDataSource) Reset() {
+	*x = ListDataSource{}
+	mi := &file_volvoxgrid_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListDataSource) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListDataSource) ProtoMessage() {}
+
+func (x *ListDataSource) ProtoReflect() protoreflect.Message {
+	mi := &file_volvoxgrid_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListDataSource.ProtoReflect.Descriptor instead.
+func (*ListDataSource) Descriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *ListDataSource) GetDataSourceId() string {
+	if x != nil {
+		return x.DataSourceId
+	}
+	return ""
+}
+
+func (x *ListDataSource) GetFilterable() bool {
+	if x != nil {
+		return x.Filterable
+	}
+	return false
+}
+
+func (x *ListDataSource) GetPageable() bool {
+	if x != nil {
+		return x.Pageable
+	}
+	return false
+}
+
+func (x *ListDataSource) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+type EditorValue struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Value         *CellValue             `protobuf:"bytes,1,opt,name=value,proto3" json:"value,omitempty"`
+	EditText      *string                `protobuf:"bytes,2,opt,name=edit_text,json=editText,proto3,oneof" json:"edit_text,omitempty"`
+	DisplayText   *string                `protobuf:"bytes,3,opt,name=display_text,json=displayText,proto3,oneof" json:"display_text,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EditorValue) Reset() {
+	*x = EditorValue{}
+	mi := &file_volvoxgrid_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EditorValue) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EditorValue) ProtoMessage() {}
+
+func (x *EditorValue) ProtoReflect() protoreflect.Message {
+	mi := &file_volvoxgrid_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EditorValue.ProtoReflect.Descriptor instead.
+func (*EditorValue) Descriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *EditorValue) GetValue() *CellValue {
+	if x != nil {
+		return x.Value
+	}
+	return nil
+}
+
+func (x *EditorValue) GetEditText() string {
+	if x != nil && x.EditText != nil {
+		return *x.EditText
+	}
+	return ""
+}
+
+func (x *EditorValue) GetDisplayText() string {
+	if x != nil && x.DisplayText != nil {
+		return *x.DisplayText
+	}
+	return ""
+}
+
+type TextSelection struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Start         int32                  `protobuf:"varint,1,opt,name=start,proto3" json:"start,omitempty"`
+	Length        int32                  `protobuf:"varint,2,opt,name=length,proto3" json:"length,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TextSelection) Reset() {
+	*x = TextSelection{}
+	mi := &file_volvoxgrid_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TextSelection) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TextSelection) ProtoMessage() {}
+
+func (x *TextSelection) ProtoReflect() protoreflect.Message {
+	mi := &file_volvoxgrid_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TextSelection.ProtoReflect.Descriptor instead.
+func (*TextSelection) Descriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *TextSelection) GetStart() int32 {
+	if x != nil {
+		return x.Start
+	}
+	return 0
+}
+
+func (x *TextSelection) GetLength() int32 {
+	if x != nil {
+		return x.Length
+	}
+	return 0
+}
+
+type ValidationError struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Code          string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	Blocking      bool                   `protobuf:"varint,3,opt,name=blocking,proto3" json:"blocking,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ValidationError) Reset() {
+	*x = ValidationError{}
+	mi := &file_volvoxgrid_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ValidationError) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ValidationError) ProtoMessage() {}
+
+func (x *ValidationError) ProtoReflect() protoreflect.Message {
+	mi := &file_volvoxgrid_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ValidationError.ProtoReflect.Descriptor instead.
+func (*ValidationError) Descriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *ValidationError) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *ValidationError) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *ValidationError) GetBlocking() bool {
+	if x != nil {
+		return x.Blocking
+	}
+	return false
+}
+
+type EditActivation struct {
+	state                    protoimpl.MessageState `protogen:"open.v1"`
+	Trigger                  *EditTrigger           `protobuf:"varint,1,opt,name=trigger,proto3,enum=volvoxgrid.v1.EditTrigger,oneof" json:"trigger,omitempty"`
+	TabBehavior              *TabBehavior           `protobuf:"varint,2,opt,name=tab_behavior,json=tabBehavior,proto3,enum=volvoxgrid.v1.TabBehavior,oneof" json:"tab_behavior,omitempty"`
+	SingleClickEdit          *bool                  `protobuf:"varint,3,opt,name=single_click_edit,json=singleClickEdit,proto3,oneof" json:"single_click_edit,omitempty"`
+	SuppressClickEdit        *bool                  `protobuf:"varint,4,opt,name=suppress_click_edit,json=suppressClickEdit,proto3,oneof" json:"suppress_click_edit,omitempty"`
+	CommitOnFocusLost        *bool                  `protobuf:"varint,5,opt,name=commit_on_focus_lost,json=commitOnFocusLost,proto3,oneof" json:"commit_on_focus_lost,omitempty"`
+	PreserveEditOnNavigation *bool                  `protobuf:"varint,6,opt,name=preserve_edit_on_navigation,json=preserveEditOnNavigation,proto3,oneof" json:"preserve_edit_on_navigation,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
+}
+
+func (x *EditActivation) Reset() {
+	*x = EditActivation{}
+	mi := &file_volvoxgrid_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EditActivation) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EditActivation) ProtoMessage() {}
+
+func (x *EditActivation) ProtoReflect() protoreflect.Message {
+	mi := &file_volvoxgrid_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EditActivation.ProtoReflect.Descriptor instead.
+func (*EditActivation) Descriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *EditActivation) GetTrigger() EditTrigger {
+	if x != nil && x.Trigger != nil {
+		return *x.Trigger
+	}
+	return EditTrigger_EDIT_TRIGGER_NONE
+}
+
+func (x *EditActivation) GetTabBehavior() TabBehavior {
+	if x != nil && x.TabBehavior != nil {
+		return *x.TabBehavior
+	}
+	return TabBehavior_TAB_CONTROLS
+}
+
+func (x *EditActivation) GetSingleClickEdit() bool {
+	if x != nil && x.SingleClickEdit != nil {
+		return *x.SingleClickEdit
+	}
+	return false
+}
+
+func (x *EditActivation) GetSuppressClickEdit() bool {
+	if x != nil && x.SuppressClickEdit != nil {
+		return *x.SuppressClickEdit
+	}
+	return false
+}
+
+func (x *EditActivation) GetCommitOnFocusLost() bool {
+	if x != nil && x.CommitOnFocusLost != nil {
+		return *x.CommitOnFocusLost
+	}
+	return false
+}
+
+func (x *EditActivation) GetPreserveEditOnNavigation() bool {
+	if x != nil && x.PreserveEditOnNavigation != nil {
+		return *x.PreserveEditOnNavigation
 	}
 	return false
 }
@@ -6227,7 +7944,7 @@ type ScrollBarColors struct {
 
 func (x *ScrollBarColors) Reset() {
 	*x = ScrollBarColors{}
-	mi := &file_volvoxgrid_proto_msgTypes[19]
+	mi := &file_volvoxgrid_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6239,7 +7956,7 @@ func (x *ScrollBarColors) String() string {
 func (*ScrollBarColors) ProtoMessage() {}
 
 func (x *ScrollBarColors) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[19]
+	mi := &file_volvoxgrid_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6252,7 +7969,7 @@ func (x *ScrollBarColors) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScrollBarColors.ProtoReflect.Descriptor instead.
 func (*ScrollBarColors) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{19}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *ScrollBarColors) GetThumb() uint32 {
@@ -6315,7 +8032,7 @@ type ScrollBarConfig struct {
 
 func (x *ScrollBarConfig) Reset() {
 	*x = ScrollBarConfig{}
-	mi := &file_volvoxgrid_proto_msgTypes[20]
+	mi := &file_volvoxgrid_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6327,7 +8044,7 @@ func (x *ScrollBarConfig) String() string {
 func (*ScrollBarConfig) ProtoMessage() {}
 
 func (x *ScrollBarConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[20]
+	mi := &file_volvoxgrid_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6340,7 +8057,7 @@ func (x *ScrollBarConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScrollBarConfig.ProtoReflect.Descriptor instead.
 func (*ScrollBarConfig) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{20}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *ScrollBarConfig) GetShowH() ScrollBarMode {
@@ -6430,7 +8147,7 @@ type RegionStyle struct {
 
 func (x *RegionStyle) Reset() {
 	*x = RegionStyle{}
-	mi := &file_volvoxgrid_proto_msgTypes[21]
+	mi := &file_volvoxgrid_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6442,7 +8159,7 @@ func (x *RegionStyle) String() string {
 func (*RegionStyle) ProtoMessage() {}
 
 func (x *RegionStyle) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[21]
+	mi := &file_volvoxgrid_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6455,7 +8172,7 @@ func (x *RegionStyle) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegionStyle.ProtoReflect.Descriptor instead.
 func (*RegionStyle) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{21}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *RegionStyle) GetBackground() uint32 {
@@ -6526,7 +8243,7 @@ type CellStyle struct {
 
 func (x *CellStyle) Reset() {
 	*x = CellStyle{}
-	mi := &file_volvoxgrid_proto_msgTypes[22]
+	mi := &file_volvoxgrid_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6538,7 +8255,7 @@ func (x *CellStyle) String() string {
 func (*CellStyle) ProtoMessage() {}
 
 func (x *CellStyle) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[22]
+	mi := &file_volvoxgrid_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6551,7 +8268,7 @@ func (x *CellStyle) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CellStyle.ProtoReflect.Descriptor instead.
 func (*CellStyle) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{22}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *CellStyle) GetBackground() uint32 {
@@ -6642,7 +8359,7 @@ type HighlightStyle struct {
 
 func (x *HighlightStyle) Reset() {
 	*x = HighlightStyle{}
-	mi := &file_volvoxgrid_proto_msgTypes[23]
+	mi := &file_volvoxgrid_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6654,7 +8371,7 @@ func (x *HighlightStyle) String() string {
 func (*HighlightStyle) ProtoMessage() {}
 
 func (x *HighlightStyle) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[23]
+	mi := &file_volvoxgrid_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6667,7 +8384,7 @@ func (x *HighlightStyle) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HighlightStyle.ProtoReflect.Descriptor instead.
 func (*HighlightStyle) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{23}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *HighlightStyle) GetBackground() uint32 {
@@ -6718,7 +8435,7 @@ type HeaderMarkSize struct {
 
 func (x *HeaderMarkSize) Reset() {
 	*x = HeaderMarkSize{}
-	mi := &file_volvoxgrid_proto_msgTypes[24]
+	mi := &file_volvoxgrid_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6730,7 +8447,7 @@ func (x *HeaderMarkSize) String() string {
 func (*HeaderMarkSize) ProtoMessage() {}
 
 func (x *HeaderMarkSize) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[24]
+	mi := &file_volvoxgrid_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6743,7 +8460,7 @@ func (x *HeaderMarkSize) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeaderMarkSize.ProtoReflect.Descriptor instead.
 func (*HeaderMarkSize) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{24}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *HeaderMarkSize) GetValue() isHeaderMarkSize_Value {
@@ -6803,7 +8520,7 @@ type HeaderSeparator struct {
 
 func (x *HeaderSeparator) Reset() {
 	*x = HeaderSeparator{}
-	mi := &file_volvoxgrid_proto_msgTypes[25]
+	mi := &file_volvoxgrid_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6815,7 +8532,7 @@ func (x *HeaderSeparator) String() string {
 func (*HeaderSeparator) ProtoMessage() {}
 
 func (x *HeaderSeparator) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[25]
+	mi := &file_volvoxgrid_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6828,7 +8545,7 @@ func (x *HeaderSeparator) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeaderSeparator.ProtoReflect.Descriptor instead.
 func (*HeaderSeparator) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{25}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *HeaderSeparator) GetEnabled() bool {
@@ -6881,7 +8598,7 @@ type HeaderResizeHandle struct {
 
 func (x *HeaderResizeHandle) Reset() {
 	*x = HeaderResizeHandle{}
-	mi := &file_volvoxgrid_proto_msgTypes[26]
+	mi := &file_volvoxgrid_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6893,7 +8610,7 @@ func (x *HeaderResizeHandle) String() string {
 func (*HeaderResizeHandle) ProtoMessage() {}
 
 func (x *HeaderResizeHandle) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[26]
+	mi := &file_volvoxgrid_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6906,7 +8623,7 @@ func (x *HeaderResizeHandle) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeaderResizeHandle.ProtoReflect.Descriptor instead.
 func (*HeaderResizeHandle) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{26}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *HeaderResizeHandle) GetEnabled() bool {
@@ -6961,7 +8678,7 @@ type HeaderStyle struct {
 
 func (x *HeaderStyle) Reset() {
 	*x = HeaderStyle{}
-	mi := &file_volvoxgrid_proto_msgTypes[27]
+	mi := &file_volvoxgrid_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6973,7 +8690,7 @@ func (x *HeaderStyle) String() string {
 func (*HeaderStyle) ProtoMessage() {}
 
 func (x *HeaderStyle) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[27]
+	mi := &file_volvoxgrid_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6986,7 +8703,7 @@ func (x *HeaderStyle) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeaderStyle.ProtoReflect.Descriptor instead.
 func (*HeaderStyle) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{27}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *HeaderStyle) GetSeparator() *HeaderSeparator {
@@ -7025,7 +8742,7 @@ type IconSlots struct {
 
 func (x *IconSlots) Reset() {
 	*x = IconSlots{}
-	mi := &file_volvoxgrid_proto_msgTypes[28]
+	mi := &file_volvoxgrid_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7037,7 +8754,7 @@ func (x *IconSlots) String() string {
 func (*IconSlots) ProtoMessage() {}
 
 func (x *IconSlots) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[28]
+	mi := &file_volvoxgrid_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7050,7 +8767,7 @@ func (x *IconSlots) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IconSlots.ProtoReflect.Descriptor instead.
 func (*IconSlots) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{28}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *IconSlots) GetSortAscending() string {
@@ -7157,7 +8874,7 @@ type IconStyle struct {
 
 func (x *IconStyle) Reset() {
 	*x = IconStyle{}
-	mi := &file_volvoxgrid_proto_msgTypes[29]
+	mi := &file_volvoxgrid_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7169,7 +8886,7 @@ func (x *IconStyle) String() string {
 func (*IconStyle) ProtoMessage() {}
 
 func (x *IconStyle) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[29]
+	mi := &file_volvoxgrid_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7182,7 +8899,7 @@ func (x *IconStyle) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IconStyle.ProtoReflect.Descriptor instead.
 func (*IconStyle) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{29}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *IconStyle) GetFont() *Font {
@@ -7235,7 +8952,7 @@ type IconSlotStyles struct {
 
 func (x *IconSlotStyles) Reset() {
 	*x = IconSlotStyles{}
-	mi := &file_volvoxgrid_proto_msgTypes[30]
+	mi := &file_volvoxgrid_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7247,7 +8964,7 @@ func (x *IconSlotStyles) String() string {
 func (*IconSlotStyles) ProtoMessage() {}
 
 func (x *IconSlotStyles) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[30]
+	mi := &file_volvoxgrid_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7260,7 +8977,7 @@ func (x *IconSlotStyles) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IconSlotStyles.ProtoReflect.Descriptor instead.
 func (*IconSlotStyles) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{30}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *IconSlotStyles) GetSortAscending() *IconStyle {
@@ -7370,7 +9087,7 @@ type IconPictures struct {
 
 func (x *IconPictures) Reset() {
 	*x = IconPictures{}
-	mi := &file_volvoxgrid_proto_msgTypes[31]
+	mi := &file_volvoxgrid_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7382,7 +9099,7 @@ func (x *IconPictures) String() string {
 func (*IconPictures) ProtoMessage() {}
 
 func (x *IconPictures) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[31]
+	mi := &file_volvoxgrid_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7395,7 +9112,7 @@ func (x *IconPictures) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IconPictures.ProtoReflect.Descriptor instead.
 func (*IconPictures) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{31}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *IconPictures) GetSortAscending() *ImageData {
@@ -7459,7 +9176,7 @@ type IconTheme struct {
 
 func (x *IconTheme) Reset() {
 	*x = IconTheme{}
-	mi := &file_volvoxgrid_proto_msgTypes[32]
+	mi := &file_volvoxgrid_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7471,7 +9188,7 @@ func (x *IconTheme) String() string {
 func (*IconTheme) ProtoMessage() {}
 
 func (x *IconTheme) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[32]
+	mi := &file_volvoxgrid_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7484,7 +9201,7 @@ func (x *IconTheme) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IconTheme.ProtoReflect.Descriptor instead.
 func (*IconTheme) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{32}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *IconTheme) GetSlots() *IconSlots {
@@ -7533,7 +9250,7 @@ type HoverConfig struct {
 
 func (x *HoverConfig) Reset() {
 	*x = HoverConfig{}
-	mi := &file_volvoxgrid_proto_msgTypes[33]
+	mi := &file_volvoxgrid_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7545,7 +9262,7 @@ func (x *HoverConfig) String() string {
 func (*HoverConfig) ProtoMessage() {}
 
 func (x *HoverConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[33]
+	mi := &file_volvoxgrid_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7558,7 +9275,7 @@ func (x *HoverConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HoverConfig.ProtoReflect.Descriptor instead.
 func (*HoverConfig) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{33}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{48}
 }
 
 func (x *HoverConfig) GetRow() bool {
@@ -7614,7 +9331,7 @@ type ResizePolicy struct {
 
 func (x *ResizePolicy) Reset() {
 	*x = ResizePolicy{}
-	mi := &file_volvoxgrid_proto_msgTypes[34]
+	mi := &file_volvoxgrid_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7626,7 +9343,7 @@ func (x *ResizePolicy) String() string {
 func (*ResizePolicy) ProtoMessage() {}
 
 func (x *ResizePolicy) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[34]
+	mi := &file_volvoxgrid_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7639,7 +9356,7 @@ func (x *ResizePolicy) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResizePolicy.ProtoReflect.Descriptor instead.
 func (*ResizePolicy) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{34}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{49}
 }
 
 func (x *ResizePolicy) GetColumns() bool {
@@ -7673,7 +9390,7 @@ type FreezePolicy struct {
 
 func (x *FreezePolicy) Reset() {
 	*x = FreezePolicy{}
-	mi := &file_volvoxgrid_proto_msgTypes[35]
+	mi := &file_volvoxgrid_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7685,7 +9402,7 @@ func (x *FreezePolicy) String() string {
 func (*FreezePolicy) ProtoMessage() {}
 
 func (x *FreezePolicy) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[35]
+	mi := &file_volvoxgrid_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7698,7 +9415,7 @@ func (x *FreezePolicy) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FreezePolicy.ProtoReflect.Descriptor instead.
 func (*FreezePolicy) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{35}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{50}
 }
 
 func (x *FreezePolicy) GetColumns() bool {
@@ -7726,7 +9443,7 @@ type HeaderFeatures struct {
 
 func (x *HeaderFeatures) Reset() {
 	*x = HeaderFeatures{}
-	mi := &file_volvoxgrid_proto_msgTypes[36]
+	mi := &file_volvoxgrid_proto_msgTypes[51]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7738,7 +9455,7 @@ func (x *HeaderFeatures) String() string {
 func (*HeaderFeatures) ProtoMessage() {}
 
 func (x *HeaderFeatures) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[36]
+	mi := &file_volvoxgrid_proto_msgTypes[51]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7751,7 +9468,7 @@ func (x *HeaderFeatures) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeaderFeatures.ProtoReflect.Descriptor instead.
 func (*HeaderFeatures) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{36}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{51}
 }
 
 func (x *HeaderFeatures) GetSort() bool {
@@ -7776,25 +9493,29 @@ func (x *HeaderFeatures) GetChooser() bool {
 }
 
 type GridConfig struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Layout        *LayoutConfig          `protobuf:"bytes,1,opt,name=layout,proto3" json:"layout,omitempty"`
-	Style         *StyleConfig           `protobuf:"bytes,2,opt,name=style,proto3" json:"style,omitempty"`
-	Selection     *SelectionConfig       `protobuf:"bytes,3,opt,name=selection,proto3" json:"selection,omitempty"`
-	Editing       *EditConfig            `protobuf:"bytes,4,opt,name=editing,proto3" json:"editing,omitempty"`
-	Scrolling     *ScrollConfig          `protobuf:"bytes,5,opt,name=scrolling,proto3" json:"scrolling,omitempty"`
-	Outline       *OutlineConfig         `protobuf:"bytes,6,opt,name=outline,proto3" json:"outline,omitempty"`
-	Span          *SpanConfig            `protobuf:"bytes,7,opt,name=span,proto3" json:"span,omitempty"`
-	Interaction   *InteractionConfig     `protobuf:"bytes,8,opt,name=interaction,proto3" json:"interaction,omitempty"`
-	Rendering     *RenderConfig          `protobuf:"bytes,9,opt,name=rendering,proto3" json:"rendering,omitempty"`
-	Version       string                 `protobuf:"bytes,10,opt,name=version,proto3" json:"version,omitempty"`
-	Indicators    *IndicatorsConfig      `protobuf:"bytes,11,opt,name=indicators,proto3" json:"indicators,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Layout      *LayoutConfig          `protobuf:"bytes,1,opt,name=layout,proto3" json:"layout,omitempty"`
+	Style       *StyleConfig           `protobuf:"bytes,2,opt,name=style,proto3" json:"style,omitempty"`
+	Selection   *SelectionConfig       `protobuf:"bytes,3,opt,name=selection,proto3" json:"selection,omitempty"`
+	Editing     *EditConfig            `protobuf:"bytes,4,opt,name=editing,proto3" json:"editing,omitempty"`
+	Scrolling   *ScrollConfig          `protobuf:"bytes,5,opt,name=scrolling,proto3" json:"scrolling,omitempty"`
+	Outline     *OutlineConfig         `protobuf:"bytes,6,opt,name=outline,proto3" json:"outline,omitempty"`
+	Span        *SpanConfig            `protobuf:"bytes,7,opt,name=span,proto3" json:"span,omitempty"`
+	Interaction *InteractionConfig     `protobuf:"bytes,8,opt,name=interaction,proto3" json:"interaction,omitempty"`
+	Rendering   *RenderConfig          `protobuf:"bytes,9,opt,name=rendering,proto3" json:"rendering,omitempty"`
+	Version     string                 `protobuf:"bytes,10,opt,name=version,proto3" json:"version,omitempty"`
+	Indicators  *IndicatorsConfig      `protobuf:"bytes,11,opt,name=indicators,proto3" json:"indicators,omitempty"`
+	// Apply a built-in visual theme before the other fields in this Configure()
+	// call. See ThemePreset for resolution rules. Not stored — GetConfig()
+	// returns the resolved style/selection/scrolling/indicators.
+	ThemePreset   *ThemePreset `protobuf:"varint,12,opt,name=theme_preset,json=themePreset,proto3,enum=volvoxgrid.v1.ThemePreset,oneof" json:"theme_preset,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GridConfig) Reset() {
 	*x = GridConfig{}
-	mi := &file_volvoxgrid_proto_msgTypes[37]
+	mi := &file_volvoxgrid_proto_msgTypes[52]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7806,7 +9527,7 @@ func (x *GridConfig) String() string {
 func (*GridConfig) ProtoMessage() {}
 
 func (x *GridConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[37]
+	mi := &file_volvoxgrid_proto_msgTypes[52]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7819,7 +9540,7 @@ func (x *GridConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GridConfig.ProtoReflect.Descriptor instead.
 func (*GridConfig) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{37}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{52}
 }
 
 func (x *GridConfig) GetLayout() *LayoutConfig {
@@ -7899,6 +9620,13 @@ func (x *GridConfig) GetIndicators() *IndicatorsConfig {
 	return nil
 }
 
+func (x *GridConfig) GetThemePreset() ThemePreset {
+	if x != nil && x.ThemePreset != nil {
+		return *x.ThemePreset
+	}
+	return ThemePreset_THEME_NONE
+}
+
 // ── Layout ──
 // Pure structural dimensions. Text defaults moved to StyleConfig.
 //
@@ -7932,7 +9660,7 @@ type LayoutConfig struct {
 
 func (x *LayoutConfig) Reset() {
 	*x = LayoutConfig{}
-	mi := &file_volvoxgrid_proto_msgTypes[38]
+	mi := &file_volvoxgrid_proto_msgTypes[53]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7944,7 +9672,7 @@ func (x *LayoutConfig) String() string {
 func (*LayoutConfig) ProtoMessage() {}
 
 func (x *LayoutConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[38]
+	mi := &file_volvoxgrid_proto_msgTypes[53]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7957,7 +9685,7 @@ func (x *LayoutConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LayoutConfig.ProtoReflect.Descriptor instead.
 func (*LayoutConfig) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{38}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{53}
 }
 
 func (x *LayoutConfig) GetRows() int32 {
@@ -8091,7 +9819,7 @@ type StyleConfig struct {
 
 func (x *StyleConfig) Reset() {
 	*x = StyleConfig{}
-	mi := &file_volvoxgrid_proto_msgTypes[39]
+	mi := &file_volvoxgrid_proto_msgTypes[54]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8103,7 +9831,7 @@ func (x *StyleConfig) String() string {
 func (*StyleConfig) ProtoMessage() {}
 
 func (x *StyleConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[39]
+	mi := &file_volvoxgrid_proto_msgTypes[54]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8116,7 +9844,7 @@ func (x *StyleConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StyleConfig.ProtoReflect.Descriptor instead.
 func (*StyleConfig) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{39}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{54}
 }
 
 func (x *StyleConfig) GetBackground() uint32 {
@@ -8320,7 +10048,7 @@ type SelectionConfig struct {
 
 func (x *SelectionConfig) Reset() {
 	*x = SelectionConfig{}
-	mi := &file_volvoxgrid_proto_msgTypes[40]
+	mi := &file_volvoxgrid_proto_msgTypes[55]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8332,7 +10060,7 @@ func (x *SelectionConfig) String() string {
 func (*SelectionConfig) ProtoMessage() {}
 
 func (x *SelectionConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[40]
+	mi := &file_volvoxgrid_proto_msgTypes[55]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8345,7 +10073,7 @@ func (x *SelectionConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SelectionConfig.ProtoReflect.Descriptor instead.
 func (*SelectionConfig) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{40}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{55}
 }
 
 func (x *SelectionConfig) GetMode() SelectionMode {
@@ -8419,39 +10147,21 @@ func (x *SelectionConfig) GetActiveCellStyle() *HighlightStyle {
 }
 
 // ── Editing ──
-// The engine maintains a full edit state machine (engine/src/edit.rs).
-// Two UI modes exist:
-//
-//	EnterMode (default): Enter commits and moves cursor down.
-//	  Character keys auto-replace cell content and start editing.
-//	EditMode (F2):       Caret placed at end. Escape cancels.
-//	  Enter commits. Arrow keys move caret within text.
+// Edit defaults used when a column/cell does not provide a more specific
+// EditorSpec. Wrappers normally expose simpler high-level editor builders and
+// keep owner/presentation policy internal.
 type EditConfig struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	Trigger         *EditTrigger           `protobuf:"varint,1,opt,name=trigger,proto3,enum=volvoxgrid.v1.EditTrigger,oneof" json:"trigger,omitempty"`
-	TabBehavior     *TabBehavior           `protobuf:"varint,2,opt,name=tab_behavior,json=tabBehavior,proto3,enum=volvoxgrid.v1.TabBehavior,oneof" json:"tab_behavior,omitempty"`
-	DropdownTrigger *DropdownTrigger       `protobuf:"varint,3,opt,name=dropdown_trigger,json=dropdownTrigger,proto3,enum=volvoxgrid.v1.DropdownTrigger,oneof" json:"dropdown_trigger,omitempty"`
-	// When true, typing in a dropdown cell searches the list items.
-	DropdownSearch *bool   `protobuf:"varint,4,opt,name=dropdown_search,json=dropdownSearch,proto3,oneof" json:"dropdown_search,omitempty"`
-	MaxLength      *int32  `protobuf:"varint,5,opt,name=max_length,json=maxLength,proto3,oneof" json:"max_length,omitempty"` // 0 = unlimited
-	Mask           *string `protobuf:"bytes,6,opt,name=mask,proto3,oneof" json:"mask,omitempty"`                             // global edit mask, e.g. "(999) 999-9999"
-	// When true, the engine stops handling edit-action keys; the host
-	// adapter drives editing via RPC (EditCommand) instead.
-	HostKeyDispatch *bool `protobuf:"varint,7,opt,name=host_key_dispatch,json=hostKeyDispatch,proto3,oneof" json:"host_key_dispatch,omitempty"`
-	// When true, the engine stops handling pointer-driven selection/edit;
-	// the host adapter drives via RPC.
-	HostPointerDispatch *bool `protobuf:"varint,8,opt,name=host_pointer_dispatch,json=hostPointerDispatch,proto3,oneof" json:"host_pointer_dispatch,omitempty"`
-	// Enables engine-side compose for platforms without a host IME.
-	EngineCompose *bool `protobuf:"varint,9,opt,name=engine_compose,json=engineCompose,proto3,oneof" json:"engine_compose,omitempty"`
-	// Selects the active engine-side compose algorithm.
-	ComposeMethod *ComposeMethod `protobuf:"varint,10,opt,name=compose_method,json=composeMethod,proto3,enum=volvoxgrid.v1.ComposeMethod,oneof" json:"compose_method,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Activation    *EditActivation        `protobuf:"bytes,1,opt,name=activation,proto3" json:"activation,omitempty"`
+	DefaultEditor *EditorSpec            `protobuf:"bytes,2,opt,name=default_editor,json=defaultEditor,proto3" json:"default_editor,omitempty"`
+	ComposeMethod *ComposeMethod         `protobuf:"varint,3,opt,name=compose_method,json=composeMethod,proto3,enum=volvoxgrid.v1.ComposeMethod,oneof" json:"compose_method,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *EditConfig) Reset() {
 	*x = EditConfig{}
-	mi := &file_volvoxgrid_proto_msgTypes[41]
+	mi := &file_volvoxgrid_proto_msgTypes[56]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8463,7 +10173,7 @@ func (x *EditConfig) String() string {
 func (*EditConfig) ProtoMessage() {}
 
 func (x *EditConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[41]
+	mi := &file_volvoxgrid_proto_msgTypes[56]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8476,70 +10186,21 @@ func (x *EditConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EditConfig.ProtoReflect.Descriptor instead.
 func (*EditConfig) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{41}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{56}
 }
 
-func (x *EditConfig) GetTrigger() EditTrigger {
-	if x != nil && x.Trigger != nil {
-		return *x.Trigger
+func (x *EditConfig) GetActivation() *EditActivation {
+	if x != nil {
+		return x.Activation
 	}
-	return EditTrigger_EDIT_TRIGGER_NONE
+	return nil
 }
 
-func (x *EditConfig) GetTabBehavior() TabBehavior {
-	if x != nil && x.TabBehavior != nil {
-		return *x.TabBehavior
+func (x *EditConfig) GetDefaultEditor() *EditorSpec {
+	if x != nil {
+		return x.DefaultEditor
 	}
-	return TabBehavior_TAB_CONTROLS
-}
-
-func (x *EditConfig) GetDropdownTrigger() DropdownTrigger {
-	if x != nil && x.DropdownTrigger != nil {
-		return *x.DropdownTrigger
-	}
-	return DropdownTrigger_DROPDOWN_NEVER
-}
-
-func (x *EditConfig) GetDropdownSearch() bool {
-	if x != nil && x.DropdownSearch != nil {
-		return *x.DropdownSearch
-	}
-	return false
-}
-
-func (x *EditConfig) GetMaxLength() int32 {
-	if x != nil && x.MaxLength != nil {
-		return *x.MaxLength
-	}
-	return 0
-}
-
-func (x *EditConfig) GetMask() string {
-	if x != nil && x.Mask != nil {
-		return *x.Mask
-	}
-	return ""
-}
-
-func (x *EditConfig) GetHostKeyDispatch() bool {
-	if x != nil && x.HostKeyDispatch != nil {
-		return *x.HostKeyDispatch
-	}
-	return false
-}
-
-func (x *EditConfig) GetHostPointerDispatch() bool {
-	if x != nil && x.HostPointerDispatch != nil {
-		return *x.HostPointerDispatch
-	}
-	return false
-}
-
-func (x *EditConfig) GetEngineCompose() bool {
-	if x != nil && x.EngineCompose != nil {
-		return *x.EngineCompose
-	}
-	return false
+	return nil
 }
 
 func (x *EditConfig) GetComposeMethod() ComposeMethod {
@@ -8561,7 +10222,7 @@ type PullToRefreshConfig struct {
 
 func (x *PullToRefreshConfig) Reset() {
 	*x = PullToRefreshConfig{}
-	mi := &file_volvoxgrid_proto_msgTypes[42]
+	mi := &file_volvoxgrid_proto_msgTypes[57]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8573,7 +10234,7 @@ func (x *PullToRefreshConfig) String() string {
 func (*PullToRefreshConfig) ProtoMessage() {}
 
 func (x *PullToRefreshConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[42]
+	mi := &file_volvoxgrid_proto_msgTypes[57]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8586,7 +10247,7 @@ func (x *PullToRefreshConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PullToRefreshConfig.ProtoReflect.Descriptor instead.
 func (*PullToRefreshConfig) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{42}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{57}
 }
 
 func (x *PullToRefreshConfig) GetEnabled() bool {
@@ -8641,7 +10302,7 @@ type ScrollConfig struct {
 
 func (x *ScrollConfig) Reset() {
 	*x = ScrollConfig{}
-	mi := &file_volvoxgrid_proto_msgTypes[43]
+	mi := &file_volvoxgrid_proto_msgTypes[58]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8653,7 +10314,7 @@ func (x *ScrollConfig) String() string {
 func (*ScrollConfig) ProtoMessage() {}
 
 func (x *ScrollConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[43]
+	mi := &file_volvoxgrid_proto_msgTypes[58]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8666,7 +10327,7 @@ func (x *ScrollConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScrollConfig.ProtoReflect.Descriptor instead.
 func (*ScrollConfig) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{43}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{58}
 }
 
 func (x *ScrollConfig) GetScrollBar() *ScrollBarConfig {
@@ -8748,24 +10409,24 @@ func (x *ScrollConfig) GetPullToRefresh() *PullToRefreshConfig {
 type OutlineConfig struct {
 	state              protoimpl.MessageState `protogen:"open.v1"`
 	TreeIndicator      *TreeIndicatorStyle    `protobuf:"varint,1,opt,name=tree_indicator,json=treeIndicator,proto3,enum=volvoxgrid.v1.TreeIndicatorStyle,oneof" json:"tree_indicator,omitempty"`
-	TreeColor          *uint32                `protobuf:"varint,3,opt,name=tree_color,json=treeColor,proto3,oneof" json:"tree_color,omitempty"`                                                                    // ARGB; default 0xFF808080
-	GroupTotalPosition *GroupTotalPosition    `protobuf:"varint,4,opt,name=group_total_position,json=groupTotalPosition,proto3,enum=volvoxgrid.v1.GroupTotalPosition,oneof" json:"group_total_position,omitempty"` // ABOVE or BELOW the group
+	TreeColor          *uint32                `protobuf:"varint,2,opt,name=tree_color,json=treeColor,proto3,oneof" json:"tree_color,omitempty"`                                                                    // ARGB; default 0xFF808080
+	GroupTotalPosition *GroupTotalPosition    `protobuf:"varint,3,opt,name=group_total_position,json=groupTotalPosition,proto3,enum=volvoxgrid.v1.GroupTotalPosition,oneof" json:"group_total_position,omitempty"` // ABOVE or BELOW the group
 	// When true, repeated Subtotal() calls with the same group_on_col
 	// reuse existing subtotal rows instead of inserting new ones, allowing
 	// multiple aggregate columns (e.g. Sales + Cost) in a single row.
-	MultiTotals      *bool  `protobuf:"varint,5,opt,name=multi_totals,json=multiTotals,proto3,oneof" json:"multi_totals,omitempty"`
-	IndicatorIndent  *int32 `protobuf:"varint,6,opt,name=indicator_indent,json=indicatorIndent,proto3,oneof" json:"indicator_indent,omitempty"`      // px per outline level; default = row height
-	MaxLevels        *int32 `protobuf:"varint,7,opt,name=max_levels,json=maxLevels,proto3,oneof" json:"max_levels,omitempty"`                        // highest corner level button (0..N)
-	ShowLevelButtons *bool  `protobuf:"varint,8,opt,name=show_level_buttons,json=showLevelButtons,proto3,oneof" json:"show_level_buttons,omitempty"` // enable corner outline level controls
-	LabelColumn      *int32 `protobuf:"varint,9,opt,name=label_column,json=labelColumn,proto3,oneof" json:"label_column,omitempty"`                  // column sourcing EXPANDER text label
-	IconColumn       *int32 `protobuf:"varint,10,opt,name=icon_column,json=iconColumn,proto3,oneof" json:"icon_column,omitempty"`                    // column sourcing EXPANDER icon text
+	MultiTotals      *bool  `protobuf:"varint,4,opt,name=multi_totals,json=multiTotals,proto3,oneof" json:"multi_totals,omitempty"`
+	IndicatorIndent  *int32 `protobuf:"varint,5,opt,name=indicator_indent,json=indicatorIndent,proto3,oneof" json:"indicator_indent,omitempty"`      // px per outline level; default = row height
+	MaxLevels        *int32 `protobuf:"varint,6,opt,name=max_levels,json=maxLevels,proto3,oneof" json:"max_levels,omitempty"`                        // highest corner level button (0..N)
+	ShowLevelButtons *bool  `protobuf:"varint,7,opt,name=show_level_buttons,json=showLevelButtons,proto3,oneof" json:"show_level_buttons,omitempty"` // enable corner outline level controls
+	LabelColumn      *int32 `protobuf:"varint,8,opt,name=label_column,json=labelColumn,proto3,oneof" json:"label_column,omitempty"`                  // column sourcing EXPANDER text label
+	IconColumn       *int32 `protobuf:"varint,9,opt,name=icon_column,json=iconColumn,proto3,oneof" json:"icon_column,omitempty"`                     // column sourcing EXPANDER icon text
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
 
 func (x *OutlineConfig) Reset() {
 	*x = OutlineConfig{}
-	mi := &file_volvoxgrid_proto_msgTypes[44]
+	mi := &file_volvoxgrid_proto_msgTypes[59]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8777,7 +10438,7 @@ func (x *OutlineConfig) String() string {
 func (*OutlineConfig) ProtoMessage() {}
 
 func (x *OutlineConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[44]
+	mi := &file_volvoxgrid_proto_msgTypes[59]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8790,7 +10451,7 @@ func (x *OutlineConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OutlineConfig.ProtoReflect.Descriptor instead.
 func (*OutlineConfig) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{44}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{59}
 }
 
 func (x *OutlineConfig) GetTreeIndicator() TreeIndicatorStyle {
@@ -8870,7 +10531,7 @@ type SpanConfig struct {
 
 func (x *SpanConfig) Reset() {
 	*x = SpanConfig{}
-	mi := &file_volvoxgrid_proto_msgTypes[45]
+	mi := &file_volvoxgrid_proto_msgTypes[60]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8882,7 +10543,7 @@ func (x *SpanConfig) String() string {
 func (*SpanConfig) ProtoMessage() {}
 
 func (x *SpanConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[45]
+	mi := &file_volvoxgrid_proto_msgTypes[60]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8895,7 +10556,7 @@ func (x *SpanConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SpanConfig.ProtoReflect.Descriptor instead.
 func (*SpanConfig) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{45}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{60}
 }
 
 func (x *SpanConfig) GetCellSpan() CellSpanMode {
@@ -8958,7 +10619,7 @@ type InteractionConfig struct {
 
 func (x *InteractionConfig) Reset() {
 	*x = InteractionConfig{}
-	mi := &file_volvoxgrid_proto_msgTypes[46]
+	mi := &file_volvoxgrid_proto_msgTypes[61]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8970,7 +10631,7 @@ func (x *InteractionConfig) String() string {
 func (*InteractionConfig) ProtoMessage() {}
 
 func (x *InteractionConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[46]
+	mi := &file_volvoxgrid_proto_msgTypes[61]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8983,7 +10644,7 @@ func (x *InteractionConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InteractionConfig.ProtoReflect.Descriptor instead.
 func (*InteractionConfig) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{46}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{61}
 }
 
 func (x *InteractionConfig) GetResize() *ResizePolicy {
@@ -9090,14 +10751,18 @@ type RenderConfig struct {
 	// CPU scroll-blit optimization: reuses previously-rendered pixels
 	// when only scroll position changes. Only valid when no animation,
 	// no editing, no background image, and not right-to-left.
-	ScrollBlit    *bool `protobuf:"varint,11,opt,name=scroll_blit,json=scrollBlit,proto3,oneof" json:"scroll_blit,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	ScrollBlit *bool `protobuf:"varint,11,opt,name=scroll_blit,json=scrollBlit,proto3,oneof" json:"scroll_blit,omitempty"`
+	// Enables font fallback for missing glyphs. When false, missing glyphs are
+	// skipped instead of using host/OS fallback or the engine's final tofu fallback.
+	// The debug overlay always uses its internal diagnostic font.
+	FontFallbackEnabled *bool `protobuf:"varint,12,opt,name=font_fallback_enabled,json=fontFallbackEnabled,proto3,oneof" json:"font_fallback_enabled,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *RenderConfig) Reset() {
 	*x = RenderConfig{}
-	mi := &file_volvoxgrid_proto_msgTypes[47]
+	mi := &file_volvoxgrid_proto_msgTypes[62]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9109,7 +10774,7 @@ func (x *RenderConfig) String() string {
 func (*RenderConfig) ProtoMessage() {}
 
 func (x *RenderConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[47]
+	mi := &file_volvoxgrid_proto_msgTypes[62]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9122,7 +10787,7 @@ func (x *RenderConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RenderConfig.ProtoReflect.Descriptor instead.
 func (*RenderConfig) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{47}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{62}
 }
 
 func (x *RenderConfig) GetRendererMode() RendererMode {
@@ -9202,6 +10867,57 @@ func (x *RenderConfig) GetScrollBlit() bool {
 	return false
 }
 
+func (x *RenderConfig) GetFontFallbackEnabled() bool {
+	if x != nil && x.FontFallbackEnabled != nil {
+		return *x.FontFallbackEnabled
+	}
+	return false
+}
+
+type ColIndicatorCellModes struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Modes         []ColIndicatorCellMode `protobuf:"varint,1,rep,packed,name=modes,proto3,enum=volvoxgrid.v1.ColIndicatorCellMode" json:"modes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ColIndicatorCellModes) Reset() {
+	*x = ColIndicatorCellModes{}
+	mi := &file_volvoxgrid_proto_msgTypes[63]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ColIndicatorCellModes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ColIndicatorCellModes) ProtoMessage() {}
+
+func (x *ColIndicatorCellModes) ProtoReflect() protoreflect.Message {
+	mi := &file_volvoxgrid_proto_msgTypes[63]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ColIndicatorCellModes.ProtoReflect.Descriptor instead.
+func (*ColIndicatorCellModes) Descriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{63}
+}
+
+func (x *ColIndicatorCellModes) GetModes() []ColIndicatorCellMode {
+	if x != nil {
+		return x.Modes
+	}
+	return nil
+}
+
 type RowIndicatorSlot struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Kind          *RowIndicatorSlotKind  `protobuf:"varint,1,opt,name=kind,proto3,enum=volvoxgrid.v1.RowIndicatorSlotKind,oneof" json:"kind,omitempty"`
@@ -9215,7 +10931,7 @@ type RowIndicatorSlot struct {
 
 func (x *RowIndicatorSlot) Reset() {
 	*x = RowIndicatorSlot{}
-	mi := &file_volvoxgrid_proto_msgTypes[48]
+	mi := &file_volvoxgrid_proto_msgTypes[64]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9227,7 +10943,7 @@ func (x *RowIndicatorSlot) String() string {
 func (*RowIndicatorSlot) ProtoMessage() {}
 
 func (x *RowIndicatorSlot) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[48]
+	mi := &file_volvoxgrid_proto_msgTypes[64]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9240,7 +10956,7 @@ func (x *RowIndicatorSlot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RowIndicatorSlot.ProtoReflect.Descriptor instead.
 func (*RowIndicatorSlot) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{48}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{64}
 }
 
 func (x *RowIndicatorSlot) GetKind() RowIndicatorSlotKind {
@@ -9282,22 +10998,22 @@ type RowIndicatorConfig struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Visible       *bool                  `protobuf:"varint,1,opt,name=visible,proto3,oneof" json:"visible,omitempty"`
 	Width         *int32                 `protobuf:"varint,2,opt,name=width,proto3,oneof" json:"width,omitempty"`
-	Background    *uint32                `protobuf:"varint,4,opt,name=background,proto3,oneof" json:"background,omitempty"`
-	Foreground    *uint32                `protobuf:"varint,5,opt,name=foreground,proto3,oneof" json:"foreground,omitempty"`
-	GridLines     *GridLineStyle         `protobuf:"varint,6,opt,name=grid_lines,json=gridLines,proto3,enum=volvoxgrid.v1.GridLineStyle,oneof" json:"grid_lines,omitempty"`
-	GridColor     *uint32                `protobuf:"varint,7,opt,name=grid_color,json=gridColor,proto3,oneof" json:"grid_color,omitempty"`
-	AutoSize      *bool                  `protobuf:"varint,8,opt,name=auto_size,json=autoSize,proto3,oneof" json:"auto_size,omitempty"`
-	AllowResize   *bool                  `protobuf:"varint,9,opt,name=allow_resize,json=allowResize,proto3,oneof" json:"allow_resize,omitempty"`
-	AllowSelect   *bool                  `protobuf:"varint,10,opt,name=allow_select,json=allowSelect,proto3,oneof" json:"allow_select,omitempty"`
-	AllowReorder  *bool                  `protobuf:"varint,11,opt,name=allow_reorder,json=allowReorder,proto3,oneof" json:"allow_reorder,omitempty"`
-	Slots         []*RowIndicatorSlot    `protobuf:"bytes,12,rep,name=slots,proto3" json:"slots,omitempty"`
+	Background    *uint32                `protobuf:"varint,3,opt,name=background,proto3,oneof" json:"background,omitempty"`
+	Foreground    *uint32                `protobuf:"varint,4,opt,name=foreground,proto3,oneof" json:"foreground,omitempty"`
+	GridLines     *GridLineStyle         `protobuf:"varint,5,opt,name=grid_lines,json=gridLines,proto3,enum=volvoxgrid.v1.GridLineStyle,oneof" json:"grid_lines,omitempty"`
+	GridColor     *uint32                `protobuf:"varint,6,opt,name=grid_color,json=gridColor,proto3,oneof" json:"grid_color,omitempty"`
+	AutoSize      *bool                  `protobuf:"varint,7,opt,name=auto_size,json=autoSize,proto3,oneof" json:"auto_size,omitempty"`
+	AllowResize   *bool                  `protobuf:"varint,8,opt,name=allow_resize,json=allowResize,proto3,oneof" json:"allow_resize,omitempty"`
+	AllowSelect   *bool                  `protobuf:"varint,9,opt,name=allow_select,json=allowSelect,proto3,oneof" json:"allow_select,omitempty"`
+	AllowReorder  *bool                  `protobuf:"varint,10,opt,name=allow_reorder,json=allowReorder,proto3,oneof" json:"allow_reorder,omitempty"`
+	Slots         []*RowIndicatorSlot    `protobuf:"bytes,11,rep,name=slots,proto3" json:"slots,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RowIndicatorConfig) Reset() {
 	*x = RowIndicatorConfig{}
-	mi := &file_volvoxgrid_proto_msgTypes[49]
+	mi := &file_volvoxgrid_proto_msgTypes[65]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9309,7 +11025,7 @@ func (x *RowIndicatorConfig) String() string {
 func (*RowIndicatorConfig) ProtoMessage() {}
 
 func (x *RowIndicatorConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[49]
+	mi := &file_volvoxgrid_proto_msgTypes[65]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9322,7 +11038,7 @@ func (x *RowIndicatorConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RowIndicatorConfig.ProtoReflect.Descriptor instead.
 func (*RowIndicatorConfig) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{49}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{65}
 }
 
 func (x *RowIndicatorConfig) GetVisible() bool {
@@ -9412,7 +11128,7 @@ type ColIndicatorRowDef struct {
 
 func (x *ColIndicatorRowDef) Reset() {
 	*x = ColIndicatorRowDef{}
-	mi := &file_volvoxgrid_proto_msgTypes[50]
+	mi := &file_volvoxgrid_proto_msgTypes[66]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9424,7 +11140,7 @@ func (x *ColIndicatorRowDef) String() string {
 func (*ColIndicatorRowDef) ProtoMessage() {}
 
 func (x *ColIndicatorRowDef) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[50]
+	mi := &file_volvoxgrid_proto_msgTypes[66]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9437,7 +11153,7 @@ func (x *ColIndicatorRowDef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ColIndicatorRowDef.ProtoReflect.Descriptor instead.
 func (*ColIndicatorRowDef) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{50}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{66}
 }
 
 func (x *ColIndicatorRowDef) GetIndex() int32 {
@@ -9461,16 +11177,16 @@ type ColIndicatorCell struct {
 	Col1          *int32                 `protobuf:"varint,3,opt,name=col1,proto3,oneof" json:"col1,omitempty"`
 	Col2          *int32                 `protobuf:"varint,4,opt,name=col2,proto3,oneof" json:"col2,omitempty"`
 	Text          *string                `protobuf:"bytes,5,opt,name=text,proto3,oneof" json:"text,omitempty"`
-	ModeBits      *uint32                `protobuf:"varint,6,opt,name=mode_bits,json=modeBits,proto3,oneof" json:"mode_bits,omitempty"`
-	CustomKey     *string                `protobuf:"bytes,7,opt,name=custom_key,json=customKey,proto3,oneof" json:"custom_key,omitempty"`
-	Data          []byte                 `protobuf:"bytes,8,opt,name=data,proto3,oneof" json:"data,omitempty"`
+	CustomKey     *string                `protobuf:"bytes,6,opt,name=custom_key,json=customKey,proto3,oneof" json:"custom_key,omitempty"`
+	Data          []byte                 `protobuf:"bytes,7,opt,name=data,proto3,oneof" json:"data,omitempty"`
+	Modes         *ColIndicatorCellModes `protobuf:"bytes,8,opt,name=modes,proto3,oneof" json:"modes,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ColIndicatorCell) Reset() {
 	*x = ColIndicatorCell{}
-	mi := &file_volvoxgrid_proto_msgTypes[51]
+	mi := &file_volvoxgrid_proto_msgTypes[67]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9482,7 +11198,7 @@ func (x *ColIndicatorCell) String() string {
 func (*ColIndicatorCell) ProtoMessage() {}
 
 func (x *ColIndicatorCell) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[51]
+	mi := &file_volvoxgrid_proto_msgTypes[67]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9495,7 +11211,7 @@ func (x *ColIndicatorCell) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ColIndicatorCell.ProtoReflect.Descriptor instead.
 func (*ColIndicatorCell) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{51}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{67}
 }
 
 func (x *ColIndicatorCell) GetRow1() int32 {
@@ -9533,13 +11249,6 @@ func (x *ColIndicatorCell) GetText() string {
 	return ""
 }
 
-func (x *ColIndicatorCell) GetModeBits() uint32 {
-	if x != nil && x.ModeBits != nil {
-		return *x.ModeBits
-	}
-	return 0
-}
-
 func (x *ColIndicatorCell) GetCustomKey() string {
 	if x != nil && x.CustomKey != nil {
 		return *x.CustomKey
@@ -9554,29 +11263,36 @@ func (x *ColIndicatorCell) GetData() []byte {
 	return nil
 }
 
+func (x *ColIndicatorCell) GetModes() *ColIndicatorCellModes {
+	if x != nil {
+		return x.Modes
+	}
+	return nil
+}
+
 type ColIndicatorConfig struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	Visible          *bool                  `protobuf:"varint,1,opt,name=visible,proto3,oneof" json:"visible,omitempty"`
 	DefaultRowHeight *int32                 `protobuf:"varint,2,opt,name=default_row_height,json=defaultRowHeight,proto3,oneof" json:"default_row_height,omitempty"`
 	BandRows         *int32                 `protobuf:"varint,3,opt,name=band_rows,json=bandRows,proto3,oneof" json:"band_rows,omitempty"`
-	ModeBits         *uint32                `protobuf:"varint,4,opt,name=mode_bits,json=modeBits,proto3,oneof" json:"mode_bits,omitempty"`
-	Background       *uint32                `protobuf:"varint,5,opt,name=background,proto3,oneof" json:"background,omitempty"`
-	Foreground       *uint32                `protobuf:"varint,6,opt,name=foreground,proto3,oneof" json:"foreground,omitempty"`
-	GridLines        *GridLineStyle         `protobuf:"varint,7,opt,name=grid_lines,json=gridLines,proto3,enum=volvoxgrid.v1.GridLineStyle,oneof" json:"grid_lines,omitempty"`
-	GridColor        *uint32                `protobuf:"varint,8,opt,name=grid_color,json=gridColor,proto3,oneof" json:"grid_color,omitempty"`
-	AutoSize         *bool                  `protobuf:"varint,9,opt,name=auto_size,json=autoSize,proto3,oneof" json:"auto_size,omitempty"`
-	AllowResize      *bool                  `protobuf:"varint,10,opt,name=allow_resize,json=allowResize,proto3,oneof" json:"allow_resize,omitempty"`
-	AllowReorder     *bool                  `protobuf:"varint,11,opt,name=allow_reorder,json=allowReorder,proto3,oneof" json:"allow_reorder,omitempty"`
-	AllowMenu        *bool                  `protobuf:"varint,12,opt,name=allow_menu,json=allowMenu,proto3,oneof" json:"allow_menu,omitempty"`
-	RowDefs          []*ColIndicatorRowDef  `protobuf:"bytes,13,rep,name=row_defs,json=rowDefs,proto3" json:"row_defs,omitempty"`
-	Cells            []*ColIndicatorCell    `protobuf:"bytes,14,rep,name=cells,proto3" json:"cells,omitempty"`
+	Background       *uint32                `protobuf:"varint,4,opt,name=background,proto3,oneof" json:"background,omitempty"`
+	Foreground       *uint32                `protobuf:"varint,5,opt,name=foreground,proto3,oneof" json:"foreground,omitempty"`
+	GridLines        *GridLineStyle         `protobuf:"varint,6,opt,name=grid_lines,json=gridLines,proto3,enum=volvoxgrid.v1.GridLineStyle,oneof" json:"grid_lines,omitempty"`
+	GridColor        *uint32                `protobuf:"varint,7,opt,name=grid_color,json=gridColor,proto3,oneof" json:"grid_color,omitempty"`
+	AutoSize         *bool                  `protobuf:"varint,8,opt,name=auto_size,json=autoSize,proto3,oneof" json:"auto_size,omitempty"`
+	AllowResize      *bool                  `protobuf:"varint,9,opt,name=allow_resize,json=allowResize,proto3,oneof" json:"allow_resize,omitempty"`
+	AllowReorder     *bool                  `protobuf:"varint,10,opt,name=allow_reorder,json=allowReorder,proto3,oneof" json:"allow_reorder,omitempty"`
+	AllowMenu        *bool                  `protobuf:"varint,11,opt,name=allow_menu,json=allowMenu,proto3,oneof" json:"allow_menu,omitempty"`
+	RowDefs          []*ColIndicatorRowDef  `protobuf:"bytes,12,rep,name=row_defs,json=rowDefs,proto3" json:"row_defs,omitempty"`
+	Cells            []*ColIndicatorCell    `protobuf:"bytes,13,rep,name=cells,proto3" json:"cells,omitempty"`
+	CellModes        *ColIndicatorCellModes `protobuf:"bytes,14,opt,name=cell_modes,json=cellModes,proto3,oneof" json:"cell_modes,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
 
 func (x *ColIndicatorConfig) Reset() {
 	*x = ColIndicatorConfig{}
-	mi := &file_volvoxgrid_proto_msgTypes[52]
+	mi := &file_volvoxgrid_proto_msgTypes[68]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9588,7 +11304,7 @@ func (x *ColIndicatorConfig) String() string {
 func (*ColIndicatorConfig) ProtoMessage() {}
 
 func (x *ColIndicatorConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[52]
+	mi := &file_volvoxgrid_proto_msgTypes[68]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9601,7 +11317,7 @@ func (x *ColIndicatorConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ColIndicatorConfig.ProtoReflect.Descriptor instead.
 func (*ColIndicatorConfig) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{52}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{68}
 }
 
 func (x *ColIndicatorConfig) GetVisible() bool {
@@ -9621,13 +11337,6 @@ func (x *ColIndicatorConfig) GetDefaultRowHeight() int32 {
 func (x *ColIndicatorConfig) GetBandRows() int32 {
 	if x != nil && x.BandRows != nil {
 		return *x.BandRows
-	}
-	return 0
-}
-
-func (x *ColIndicatorConfig) GetModeBits() uint32 {
-	if x != nil && x.ModeBits != nil {
-		return *x.ModeBits
 	}
 	return 0
 }
@@ -9702,6 +11411,13 @@ func (x *ColIndicatorConfig) GetCells() []*ColIndicatorCell {
 	return nil
 }
 
+func (x *ColIndicatorConfig) GetCellModes() *ColIndicatorCellModes {
+	if x != nil {
+		return x.CellModes
+	}
+	return nil
+}
+
 type CornerIndicatorSlot struct {
 	state         protoimpl.MessageState   `protogen:"open.v1"`
 	Kind          *CornerIndicatorSlotKind `protobuf:"varint,1,opt,name=kind,proto3,enum=volvoxgrid.v1.CornerIndicatorSlotKind,oneof" json:"kind,omitempty"`
@@ -9716,7 +11432,7 @@ type CornerIndicatorSlot struct {
 
 func (x *CornerIndicatorSlot) Reset() {
 	*x = CornerIndicatorSlot{}
-	mi := &file_volvoxgrid_proto_msgTypes[53]
+	mi := &file_volvoxgrid_proto_msgTypes[69]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9728,7 +11444,7 @@ func (x *CornerIndicatorSlot) String() string {
 func (*CornerIndicatorSlot) ProtoMessage() {}
 
 func (x *CornerIndicatorSlot) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[53]
+	mi := &file_volvoxgrid_proto_msgTypes[69]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9741,7 +11457,7 @@ func (x *CornerIndicatorSlot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CornerIndicatorSlot.ProtoReflect.Descriptor instead.
 func (*CornerIndicatorSlot) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{53}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{69}
 }
 
 func (x *CornerIndicatorSlot) GetKind() CornerIndicatorSlotKind {
@@ -9789,19 +11505,18 @@ func (x *CornerIndicatorSlot) GetLabelText() string {
 type CornerIndicatorConfig struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Visible       *bool                  `protobuf:"varint,1,opt,name=visible,proto3,oneof" json:"visible,omitempty"`
-	ModeBits      *uint32                `protobuf:"varint,2,opt,name=mode_bits,json=modeBits,proto3,oneof" json:"mode_bits,omitempty"`
-	Background    *uint32                `protobuf:"varint,3,opt,name=background,proto3,oneof" json:"background,omitempty"`
-	Foreground    *uint32                `protobuf:"varint,4,opt,name=foreground,proto3,oneof" json:"foreground,omitempty"`
-	CustomKey     *string                `protobuf:"bytes,5,opt,name=custom_key,json=customKey,proto3,oneof" json:"custom_key,omitempty"`
-	Data          []byte                 `protobuf:"bytes,6,opt,name=data,proto3,oneof" json:"data,omitempty"`
-	Slots         []*CornerIndicatorSlot `protobuf:"bytes,7,rep,name=slots,proto3" json:"slots,omitempty"`
+	Background    *uint32                `protobuf:"varint,2,opt,name=background,proto3,oneof" json:"background,omitempty"`
+	Foreground    *uint32                `protobuf:"varint,3,opt,name=foreground,proto3,oneof" json:"foreground,omitempty"`
+	CustomKey     *string                `protobuf:"bytes,4,opt,name=custom_key,json=customKey,proto3,oneof" json:"custom_key,omitempty"`
+	Data          []byte                 `protobuf:"bytes,5,opt,name=data,proto3,oneof" json:"data,omitempty"`
+	Slots         []*CornerIndicatorSlot `protobuf:"bytes,6,rep,name=slots,proto3" json:"slots,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CornerIndicatorConfig) Reset() {
 	*x = CornerIndicatorConfig{}
-	mi := &file_volvoxgrid_proto_msgTypes[54]
+	mi := &file_volvoxgrid_proto_msgTypes[70]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9813,7 +11528,7 @@ func (x *CornerIndicatorConfig) String() string {
 func (*CornerIndicatorConfig) ProtoMessage() {}
 
 func (x *CornerIndicatorConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[54]
+	mi := &file_volvoxgrid_proto_msgTypes[70]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9826,7 +11541,7 @@ func (x *CornerIndicatorConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CornerIndicatorConfig.ProtoReflect.Descriptor instead.
 func (*CornerIndicatorConfig) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{54}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{70}
 }
 
 func (x *CornerIndicatorConfig) GetVisible() bool {
@@ -9834,13 +11549,6 @@ func (x *CornerIndicatorConfig) GetVisible() bool {
 		return *x.Visible
 	}
 	return false
-}
-
-func (x *CornerIndicatorConfig) GetModeBits() uint32 {
-	if x != nil && x.ModeBits != nil {
-		return *x.ModeBits
-	}
-	return 0
 }
 
 func (x *CornerIndicatorConfig) GetBackground() uint32 {
@@ -9899,7 +11607,7 @@ type IndicatorColors struct {
 
 func (x *IndicatorColors) Reset() {
 	*x = IndicatorColors{}
-	mi := &file_volvoxgrid_proto_msgTypes[55]
+	mi := &file_volvoxgrid_proto_msgTypes[71]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9911,7 +11619,7 @@ func (x *IndicatorColors) String() string {
 func (*IndicatorColors) ProtoMessage() {}
 
 func (x *IndicatorColors) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[55]
+	mi := &file_volvoxgrid_proto_msgTypes[71]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9924,7 +11632,7 @@ func (x *IndicatorColors) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IndicatorColors.ProtoReflect.Descriptor instead.
 func (*IndicatorColors) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{55}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{71}
 }
 
 func (x *IndicatorColors) GetBackground() uint32 {
@@ -10022,6 +11730,8 @@ func (x *IndicatorColors) GetButtonHoverBorder() uint32 {
 // the engine fills in based on slot_kind:
 //
 //	ROW_INDICATOR_SLOT_NUMBERS       text = row number, int_value = row, status_flags |= SELECTED
+//	ROW_INDICATOR_SLOT_NUMBERS_DATA_ONLY  same as NUMBERS but counts data rows only;
+//	                                      subtotal/outline rows: text = "", int_value = -1
 //	ROW_INDICATOR_SLOT_CURRENT       status_flags |= SELECTED on cursor row
 //	ROW_INDICATOR_SLOT_SELECTION     status_flags |= SELECTED when row in selection
 //	ROW_INDICATOR_SLOT_CHECKBOX      status_flags |= CHECKED when row in selection
@@ -10038,21 +11748,21 @@ type GridEventTarget struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Kind          GridTargetKind         `protobuf:"varint,1,opt,name=kind,proto3,enum=volvoxgrid.v1.GridTargetKind" json:"kind,omitempty"`
 	Band          IndicatorBand          `protobuf:"varint,2,opt,name=band,proto3,enum=volvoxgrid.v1.IndicatorBand" json:"band,omitempty"`
-	SlotIndex     int32                  `protobuf:"varint,3,opt,name=slot_index,json=slotIndex,proto3" json:"slot_index,omitempty"`         // -1 when not associated with a configured slot/cell.
-	SlotKind      int32                  `protobuf:"varint,4,opt,name=slot_kind,json=slotKind,proto3" json:"slot_kind,omitempty"`            // RowIndicatorSlotKind, CornerIndicatorSlotKind, or ColIndicatorCellMode value.
-	SubModeBits   uint32                 `protobuf:"varint,5,opt,name=sub_mode_bits,json=subModeBits,proto3" json:"sub_mode_bits,omitempty"` // Col indicator sub-hit; 0 means the cell as a whole.
-	CustomKey     string                 `protobuf:"bytes,6,opt,name=custom_key,json=customKey,proto3" json:"custom_key,omitempty"`
-	Text          string                 `protobuf:"bytes,7,opt,name=text,proto3" json:"text,omitempty"`                                   // Human-readable label for this target (see comment above for per-kind meaning).
-	IntValue      int64                  `protobuf:"varint,8,opt,name=int_value,json=intValue,proto3" json:"int_value,omitempty"`          // Numeric value for this target (row number, sort priority, depth).
-	StatusFlags   uint32                 `protobuf:"varint,9,opt,name=status_flags,json=statusFlags,proto3" json:"status_flags,omitempty"` // Bitmask of GridEventTargetFlag values.
-	Data          []byte                 `protobuf:"bytes,10,opt,name=data,proto3" json:"data,omitempty"`                                  // Opaque payload, mirrors the slot's `data` field.
+	SlotIndex     int32                  `protobuf:"varint,3,opt,name=slot_index,json=slotIndex,proto3" json:"slot_index,omitempty"` // -1 when not associated with a configured slot/cell.
+	SlotKind      int32                  `protobuf:"varint,4,opt,name=slot_kind,json=slotKind,proto3" json:"slot_kind,omitempty"`    // RowIndicatorSlotKind, CornerIndicatorSlotKind, or ColIndicatorCellMode value.
+	CustomKey     string                 `protobuf:"bytes,5,opt,name=custom_key,json=customKey,proto3" json:"custom_key,omitempty"`
+	Text          string                 `protobuf:"bytes,6,opt,name=text,proto3" json:"text,omitempty"`                                   // Human-readable label for this target (see comment above for per-kind meaning).
+	IntValue      int64                  `protobuf:"varint,7,opt,name=int_value,json=intValue,proto3" json:"int_value,omitempty"`          // Numeric value for this target (row number, sort priority, depth).
+	StatusFlags   uint32                 `protobuf:"varint,8,opt,name=status_flags,json=statusFlags,proto3" json:"status_flags,omitempty"` // Bitmask of GridEventTargetFlag values.
+	Data          []byte                 `protobuf:"bytes,9,opt,name=data,proto3" json:"data,omitempty"`                                   // Opaque payload, mirrors the slot's `data` field.
+	SubMode       int32                  `protobuf:"varint,10,opt,name=sub_mode,json=subMode,proto3" json:"sub_mode,omitempty"`            // ColIndicatorCellMode for a sub-hit; 0 means the cell as a whole.
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GridEventTarget) Reset() {
 	*x = GridEventTarget{}
-	mi := &file_volvoxgrid_proto_msgTypes[56]
+	mi := &file_volvoxgrid_proto_msgTypes[72]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10064,7 +11774,7 @@ func (x *GridEventTarget) String() string {
 func (*GridEventTarget) ProtoMessage() {}
 
 func (x *GridEventTarget) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[56]
+	mi := &file_volvoxgrid_proto_msgTypes[72]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10077,7 +11787,7 @@ func (x *GridEventTarget) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GridEventTarget.ProtoReflect.Descriptor instead.
 func (*GridEventTarget) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{56}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{72}
 }
 
 func (x *GridEventTarget) GetKind() GridTargetKind {
@@ -10104,13 +11814,6 @@ func (x *GridEventTarget) GetSlotIndex() int32 {
 func (x *GridEventTarget) GetSlotKind() int32 {
 	if x != nil {
 		return x.SlotKind
-	}
-	return 0
-}
-
-func (x *GridEventTarget) GetSubModeBits() uint32 {
-	if x != nil {
-		return x.SubModeBits
 	}
 	return 0
 }
@@ -10150,6 +11853,13 @@ func (x *GridEventTarget) GetData() []byte {
 	return nil
 }
 
+func (x *GridEventTarget) GetSubMode() int32 {
+	if x != nil {
+		return x.SubMode
+	}
+	return 0
+}
+
 type IndicatorFocusConfig struct {
 	state               protoimpl.MessageState `protogen:"open.v1"`
 	EnableKeyboardFocus *bool                  `protobuf:"varint,1,opt,name=enable_keyboard_focus,json=enableKeyboardFocus,proto3,oneof" json:"enable_keyboard_focus,omitempty"`
@@ -10161,7 +11871,7 @@ type IndicatorFocusConfig struct {
 
 func (x *IndicatorFocusConfig) Reset() {
 	*x = IndicatorFocusConfig{}
-	mi := &file_volvoxgrid_proto_msgTypes[57]
+	mi := &file_volvoxgrid_proto_msgTypes[73]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10173,7 +11883,7 @@ func (x *IndicatorFocusConfig) String() string {
 func (*IndicatorFocusConfig) ProtoMessage() {}
 
 func (x *IndicatorFocusConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[57]
+	mi := &file_volvoxgrid_proto_msgTypes[73]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10186,7 +11896,7 @@ func (x *IndicatorFocusConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IndicatorFocusConfig.ProtoReflect.Descriptor instead.
 func (*IndicatorFocusConfig) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{57}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{73}
 }
 
 func (x *IndicatorFocusConfig) GetEnableKeyboardFocus() bool {
@@ -10229,7 +11939,7 @@ type IndicatorsConfig struct {
 
 func (x *IndicatorsConfig) Reset() {
 	*x = IndicatorsConfig{}
-	mi := &file_volvoxgrid_proto_msgTypes[58]
+	mi := &file_volvoxgrid_proto_msgTypes[74]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10241,7 +11951,7 @@ func (x *IndicatorsConfig) String() string {
 func (*IndicatorsConfig) ProtoMessage() {}
 
 func (x *IndicatorsConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[58]
+	mi := &file_volvoxgrid_proto_msgTypes[74]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10254,7 +11964,7 @@ func (x *IndicatorsConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IndicatorsConfig.ProtoReflect.Descriptor instead.
 func (*IndicatorsConfig) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{58}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{74}
 }
 
 func (x *IndicatorsConfig) GetRowStart() *RowIndicatorConfig {
@@ -10348,28 +12058,27 @@ type ColumnDef struct {
 	Key           *string                `protobuf:"bytes,10,opt,name=key,proto3,oneof" json:"key,omitempty"`
 	SortOrder     *SortOrder             `protobuf:"varint,11,opt,name=sort_order,json=sortOrder,proto3,enum=volvoxgrid.v1.SortOrder,oneof" json:"sort_order,omitempty"`
 	SortType      *SortType              `protobuf:"varint,12,opt,name=sort_type,json=sortType,proto3,enum=volvoxgrid.v1.SortType,oneof" json:"sort_type,omitempty"`
-	Dropdown      *Dropdown              `protobuf:"bytes,13,opt,name=dropdown,proto3,oneof" json:"dropdown,omitempty"`
-	EditMask      *string                `protobuf:"bytes,14,opt,name=edit_mask,json=editMask,proto3,oneof" json:"edit_mask,omitempty"`
-	Indent        *int32                 `protobuf:"varint,15,opt,name=indent,proto3,oneof" json:"indent,omitempty"`
-	Hidden        *bool                  `protobuf:"varint,16,opt,name=hidden,proto3,oneof" json:"hidden,omitempty"`
-	Span          *bool                  `protobuf:"varint,17,opt,name=span,proto3,oneof" json:"span,omitempty"`
-	ImageList     []*ImageData           `protobuf:"bytes,18,rep,name=image_list,json=imageList,proto3" json:"image_list,omitempty"`
-	Data          []byte                 `protobuf:"bytes,19,opt,name=data,proto3,oneof" json:"data,omitempty"`
-	Sticky        *StickyEdge            `protobuf:"varint,20,opt,name=sticky,proto3,enum=volvoxgrid.v1.StickyEdge,oneof" json:"sticky,omitempty"`
-	Padding       *Padding               `protobuf:"bytes,21,opt,name=padding,proto3" json:"padding,omitempty"`
-	FixedPadding  *Padding               `protobuf:"bytes,22,opt,name=fixed_padding,json=fixedPadding,proto3" json:"fixed_padding,omitempty"`
-	Nullable      *bool                  `protobuf:"varint,23,opt,name=nullable,proto3,oneof" json:"nullable,omitempty"`
-	CoercionMode  *CoercionMode          `protobuf:"varint,24,opt,name=coercion_mode,json=coercionMode,proto3,enum=volvoxgrid.v1.CoercionMode,oneof" json:"coercion_mode,omitempty"`
-	ErrorMode     *WriteErrorMode        `protobuf:"varint,25,opt,name=error_mode,json=errorMode,proto3,enum=volvoxgrid.v1.WriteErrorMode,oneof" json:"error_mode,omitempty"`
-	Interaction   *CellInteraction       `protobuf:"varint,26,opt,name=interaction,proto3,enum=volvoxgrid.v1.CellInteraction,oneof" json:"interaction,omitempty"`
-	ProgressColor *uint32                `protobuf:"varint,27,opt,name=progress_color,json=progressColor,proto3,oneof" json:"progress_color,omitempty"`
+	Editor        *EditorSpec            `protobuf:"bytes,13,opt,name=editor,proto3" json:"editor,omitempty"`
+	Indent        *int32                 `protobuf:"varint,14,opt,name=indent,proto3,oneof" json:"indent,omitempty"`
+	Hidden        *bool                  `protobuf:"varint,15,opt,name=hidden,proto3,oneof" json:"hidden,omitempty"`
+	Span          *bool                  `protobuf:"varint,16,opt,name=span,proto3,oneof" json:"span,omitempty"`
+	ImageList     []*ImageData           `protobuf:"bytes,17,rep,name=image_list,json=imageList,proto3" json:"image_list,omitempty"`
+	Data          []byte                 `protobuf:"bytes,18,opt,name=data,proto3,oneof" json:"data,omitempty"`
+	Sticky        *StickyEdge            `protobuf:"varint,19,opt,name=sticky,proto3,enum=volvoxgrid.v1.StickyEdge,oneof" json:"sticky,omitempty"`
+	Padding       *Padding               `protobuf:"bytes,20,opt,name=padding,proto3" json:"padding,omitempty"`
+	FixedPadding  *Padding               `protobuf:"bytes,21,opt,name=fixed_padding,json=fixedPadding,proto3" json:"fixed_padding,omitempty"`
+	Nullable      *bool                  `protobuf:"varint,22,opt,name=nullable,proto3,oneof" json:"nullable,omitempty"`
+	CoercionMode  *CoercionMode          `protobuf:"varint,23,opt,name=coercion_mode,json=coercionMode,proto3,enum=volvoxgrid.v1.CoercionMode,oneof" json:"coercion_mode,omitempty"`
+	ErrorMode     *WriteErrorMode        `protobuf:"varint,24,opt,name=error_mode,json=errorMode,proto3,enum=volvoxgrid.v1.WriteErrorMode,oneof" json:"error_mode,omitempty"`
+	Interaction   *CellInteraction       `protobuf:"varint,25,opt,name=interaction,proto3,enum=volvoxgrid.v1.CellInteraction,oneof" json:"interaction,omitempty"`
+	ProgressColor *uint32                `protobuf:"varint,26,opt,name=progress_color,json=progressColor,proto3,oneof" json:"progress_color,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ColumnDef) Reset() {
 	*x = ColumnDef{}
-	mi := &file_volvoxgrid_proto_msgTypes[59]
+	mi := &file_volvoxgrid_proto_msgTypes[75]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10381,7 +12090,7 @@ func (x *ColumnDef) String() string {
 func (*ColumnDef) ProtoMessage() {}
 
 func (x *ColumnDef) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[59]
+	mi := &file_volvoxgrid_proto_msgTypes[75]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10394,7 +12103,7 @@ func (x *ColumnDef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ColumnDef.ProtoReflect.Descriptor instead.
 func (*ColumnDef) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{59}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{75}
 }
 
 func (x *ColumnDef) GetIndex() int32 {
@@ -10481,18 +12190,11 @@ func (x *ColumnDef) GetSortType() SortType {
 	return SortType_SORT_TYPE_AUTO
 }
 
-func (x *ColumnDef) GetDropdown() *Dropdown {
+func (x *ColumnDef) GetEditor() *EditorSpec {
 	if x != nil {
-		return x.Dropdown
+		return x.Editor
 	}
 	return nil
-}
-
-func (x *ColumnDef) GetEditMask() string {
-	if x != nil && x.EditMask != nil {
-		return *x.EditMask
-	}
-	return ""
 }
 
 func (x *ColumnDef) GetIndent() int32 {
@@ -10596,7 +12298,7 @@ type DefineColumnsRequest struct {
 
 func (x *DefineColumnsRequest) Reset() {
 	*x = DefineColumnsRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[60]
+	mi := &file_volvoxgrid_proto_msgTypes[76]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10608,7 +12310,7 @@ func (x *DefineColumnsRequest) String() string {
 func (*DefineColumnsRequest) ProtoMessage() {}
 
 func (x *DefineColumnsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[60]
+	mi := &file_volvoxgrid_proto_msgTypes[76]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10621,7 +12323,7 @@ func (x *DefineColumnsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DefineColumnsRequest.ProtoReflect.Descriptor instead.
 func (*DefineColumnsRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{60}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{76}
 }
 
 func (x *DefineColumnsRequest) GetGridId() int64 {
@@ -10647,7 +12349,7 @@ type SchemaResponse struct {
 
 func (x *SchemaResponse) Reset() {
 	*x = SchemaResponse{}
-	mi := &file_volvoxgrid_proto_msgTypes[61]
+	mi := &file_volvoxgrid_proto_msgTypes[77]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10659,7 +12361,7 @@ func (x *SchemaResponse) String() string {
 func (*SchemaResponse) ProtoMessage() {}
 
 func (x *SchemaResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[61]
+	mi := &file_volvoxgrid_proto_msgTypes[77]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10672,7 +12374,7 @@ func (x *SchemaResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SchemaResponse.ProtoReflect.Descriptor instead.
 func (*SchemaResponse) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{61}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{77}
 }
 
 func (x *SchemaResponse) GetColumns() []*ColumnDef {
@@ -10701,7 +12403,7 @@ type RowDef struct {
 
 func (x *RowDef) Reset() {
 	*x = RowDef{}
-	mi := &file_volvoxgrid_proto_msgTypes[62]
+	mi := &file_volvoxgrid_proto_msgTypes[78]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10713,7 +12415,7 @@ func (x *RowDef) String() string {
 func (*RowDef) ProtoMessage() {}
 
 func (x *RowDef) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[62]
+	mi := &file_volvoxgrid_proto_msgTypes[78]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10726,7 +12428,7 @@ func (x *RowDef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RowDef.ProtoReflect.Descriptor instead.
 func (*RowDef) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{62}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{78}
 }
 
 func (x *RowDef) GetIndex() int32 {
@@ -10819,7 +12521,7 @@ type RowStatus struct {
 
 func (x *RowStatus) Reset() {
 	*x = RowStatus{}
-	mi := &file_volvoxgrid_proto_msgTypes[63]
+	mi := &file_volvoxgrid_proto_msgTypes[79]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10831,7 +12533,7 @@ func (x *RowStatus) String() string {
 func (*RowStatus) ProtoMessage() {}
 
 func (x *RowStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[63]
+	mi := &file_volvoxgrid_proto_msgTypes[79]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10844,7 +12546,7 @@ func (x *RowStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RowStatus.ProtoReflect.Descriptor instead.
 func (*RowStatus) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{63}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{79}
 }
 
 func (x *RowStatus) GetDomain() string {
@@ -10871,7 +12573,7 @@ type DefineRowsRequest struct {
 
 func (x *DefineRowsRequest) Reset() {
 	*x = DefineRowsRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[64]
+	mi := &file_volvoxgrid_proto_msgTypes[80]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10883,7 +12585,7 @@ func (x *DefineRowsRequest) String() string {
 func (*DefineRowsRequest) ProtoMessage() {}
 
 func (x *DefineRowsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[64]
+	mi := &file_volvoxgrid_proto_msgTypes[80]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10896,7 +12598,7 @@ func (x *DefineRowsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DefineRowsRequest.ProtoReflect.Descriptor instead.
 func (*DefineRowsRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{64}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{80}
 }
 
 func (x *DefineRowsRequest) GetGridId() int64 {
@@ -10923,7 +12625,7 @@ type CellUpdate struct {
 	Picture       *ImageData             `protobuf:"bytes,6,opt,name=picture,proto3" json:"picture,omitempty"`
 	PictureAlign  *ImageAlignment        `protobuf:"varint,7,opt,name=picture_align,json=pictureAlign,proto3,enum=volvoxgrid.v1.ImageAlignment,oneof" json:"picture_align,omitempty"`
 	ButtonPicture *ImageData             `protobuf:"bytes,8,opt,name=button_picture,json=buttonPicture,proto3" json:"button_picture,omitempty"`
-	Dropdown      *Dropdown              `protobuf:"bytes,9,opt,name=dropdown,proto3,oneof" json:"dropdown,omitempty"`
+	Editor        *EditorSpec            `protobuf:"bytes,9,opt,name=editor,proto3" json:"editor,omitempty"`
 	StickyRow     *StickyEdge            `protobuf:"varint,10,opt,name=sticky_row,json=stickyRow,proto3,enum=volvoxgrid.v1.StickyEdge,oneof" json:"sticky_row,omitempty"`
 	StickyCol     *StickyEdge            `protobuf:"varint,11,opt,name=sticky_col,json=stickyCol,proto3,enum=volvoxgrid.v1.StickyEdge,oneof" json:"sticky_col,omitempty"`
 	Interaction   *CellInteraction       `protobuf:"varint,12,opt,name=interaction,proto3,enum=volvoxgrid.v1.CellInteraction,oneof" json:"interaction,omitempty"`
@@ -10938,7 +12640,7 @@ type CellUpdate struct {
 
 func (x *CellUpdate) Reset() {
 	*x = CellUpdate{}
-	mi := &file_volvoxgrid_proto_msgTypes[65]
+	mi := &file_volvoxgrid_proto_msgTypes[81]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10950,7 +12652,7 @@ func (x *CellUpdate) String() string {
 func (*CellUpdate) ProtoMessage() {}
 
 func (x *CellUpdate) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[65]
+	mi := &file_volvoxgrid_proto_msgTypes[81]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10963,7 +12665,7 @@ func (x *CellUpdate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CellUpdate.ProtoReflect.Descriptor instead.
 func (*CellUpdate) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{65}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{81}
 }
 
 func (x *CellUpdate) GetRow() int32 {
@@ -11022,9 +12724,9 @@ func (x *CellUpdate) GetButtonPicture() *ImageData {
 	return nil
 }
 
-func (x *CellUpdate) GetDropdown() *Dropdown {
+func (x *CellUpdate) GetEditor() *EditorSpec {
 	if x != nil {
-		return x.Dropdown
+		return x.Editor
 	}
 	return nil
 }
@@ -11077,7 +12779,7 @@ type UpdateCellsRequest struct {
 
 func (x *UpdateCellsRequest) Reset() {
 	*x = UpdateCellsRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[66]
+	mi := &file_volvoxgrid_proto_msgTypes[82]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11089,7 +12791,7 @@ func (x *UpdateCellsRequest) String() string {
 func (*UpdateCellsRequest) ProtoMessage() {}
 
 func (x *UpdateCellsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[66]
+	mi := &file_volvoxgrid_proto_msgTypes[82]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11102,7 +12804,7 @@ func (x *UpdateCellsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateCellsRequest.ProtoReflect.Descriptor instead.
 func (*UpdateCellsRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{66}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{82}
 }
 
 func (x *UpdateCellsRequest) GetGridId() int64 {
@@ -11146,7 +12848,7 @@ type GetCellsRequest struct {
 
 func (x *GetCellsRequest) Reset() {
 	*x = GetCellsRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[67]
+	mi := &file_volvoxgrid_proto_msgTypes[83]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11158,7 +12860,7 @@ func (x *GetCellsRequest) String() string {
 func (*GetCellsRequest) ProtoMessage() {}
 
 func (x *GetCellsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[67]
+	mi := &file_volvoxgrid_proto_msgTypes[83]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11171,7 +12873,7 @@ func (x *GetCellsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCellsRequest.ProtoReflect.Descriptor instead.
 func (*GetCellsRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{67}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{83}
 }
 
 func (x *GetCellsRequest) GetGridId() int64 {
@@ -11265,7 +12967,7 @@ type CellData struct {
 
 func (x *CellData) Reset() {
 	*x = CellData{}
-	mi := &file_volvoxgrid_proto_msgTypes[68]
+	mi := &file_volvoxgrid_proto_msgTypes[84]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11277,7 +12979,7 @@ func (x *CellData) String() string {
 func (*CellData) ProtoMessage() {}
 
 func (x *CellData) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[68]
+	mi := &file_volvoxgrid_proto_msgTypes[84]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11290,7 +12992,7 @@ func (x *CellData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CellData.ProtoReflect.Descriptor instead.
 func (*CellData) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{68}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{84}
 }
 
 func (x *CellData) GetRow() int32 {
@@ -11365,7 +13067,7 @@ type CellsResponse struct {
 
 func (x *CellsResponse) Reset() {
 	*x = CellsResponse{}
-	mi := &file_volvoxgrid_proto_msgTypes[69]
+	mi := &file_volvoxgrid_proto_msgTypes[85]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11377,7 +13079,7 @@ func (x *CellsResponse) String() string {
 func (*CellsResponse) ProtoMessage() {}
 
 func (x *CellsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[69]
+	mi := &file_volvoxgrid_proto_msgTypes[85]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11390,7 +13092,7 @@ func (x *CellsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CellsResponse.ProtoReflect.Descriptor instead.
 func (*CellsResponse) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{69}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{85}
 }
 
 func (x *CellsResponse) GetCells() []*CellData {
@@ -11413,7 +13115,7 @@ type TypeViolation struct {
 
 func (x *TypeViolation) Reset() {
 	*x = TypeViolation{}
-	mi := &file_volvoxgrid_proto_msgTypes[70]
+	mi := &file_volvoxgrid_proto_msgTypes[86]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11425,7 +13127,7 @@ func (x *TypeViolation) String() string {
 func (*TypeViolation) ProtoMessage() {}
 
 func (x *TypeViolation) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[70]
+	mi := &file_volvoxgrid_proto_msgTypes[86]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11438,7 +13140,7 @@ func (x *TypeViolation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TypeViolation.ProtoReflect.Descriptor instead.
 func (*TypeViolation) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{70}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{86}
 }
 
 func (x *TypeViolation) GetRow() int32 {
@@ -11487,7 +13189,7 @@ type WriteResult struct {
 
 func (x *WriteResult) Reset() {
 	*x = WriteResult{}
-	mi := &file_volvoxgrid_proto_msgTypes[71]
+	mi := &file_volvoxgrid_proto_msgTypes[87]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11499,7 +13201,7 @@ func (x *WriteResult) String() string {
 func (*WriteResult) ProtoMessage() {}
 
 func (x *WriteResult) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[71]
+	mi := &file_volvoxgrid_proto_msgTypes[87]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11512,7 +13214,7 @@ func (x *WriteResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WriteResult.ProtoReflect.Descriptor instead.
 func (*WriteResult) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{71}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{87}
 }
 
 func (x *WriteResult) GetWrittenCount() int32 {
@@ -11551,7 +13253,7 @@ type LoadTableRequest struct {
 
 func (x *LoadTableRequest) Reset() {
 	*x = LoadTableRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[72]
+	mi := &file_volvoxgrid_proto_msgTypes[88]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11563,7 +13265,7 @@ func (x *LoadTableRequest) String() string {
 func (*LoadTableRequest) ProtoMessage() {}
 
 func (x *LoadTableRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[72]
+	mi := &file_volvoxgrid_proto_msgTypes[88]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11576,7 +13278,7 @@ func (x *LoadTableRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoadTableRequest.ProtoReflect.Descriptor instead.
 func (*LoadTableRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{72}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{88}
 }
 
 func (x *LoadTableRequest) GetGridId() int64 {
@@ -11628,7 +13330,7 @@ type FieldMapping struct {
 
 func (x *FieldMapping) Reset() {
 	*x = FieldMapping{}
-	mi := &file_volvoxgrid_proto_msgTypes[73]
+	mi := &file_volvoxgrid_proto_msgTypes[89]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11640,7 +13342,7 @@ func (x *FieldMapping) String() string {
 func (*FieldMapping) ProtoMessage() {}
 
 func (x *FieldMapping) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[73]
+	mi := &file_volvoxgrid_proto_msgTypes[89]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11653,7 +13355,7 @@ func (x *FieldMapping) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FieldMapping.ProtoReflect.Descriptor instead.
 func (*FieldMapping) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{73}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{89}
 }
 
 func (x *FieldMapping) GetField() string {
@@ -11715,7 +13417,7 @@ type CsvOptions struct {
 
 func (x *CsvOptions) Reset() {
 	*x = CsvOptions{}
-	mi := &file_volvoxgrid_proto_msgTypes[74]
+	mi := &file_volvoxgrid_proto_msgTypes[90]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11727,7 +13429,7 @@ func (x *CsvOptions) String() string {
 func (*CsvOptions) ProtoMessage() {}
 
 func (x *CsvOptions) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[74]
+	mi := &file_volvoxgrid_proto_msgTypes[90]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11740,7 +13442,7 @@ func (x *CsvOptions) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CsvOptions.ProtoReflect.Descriptor instead.
 func (*CsvOptions) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{74}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{90}
 }
 
 func (x *CsvOptions) GetDelimiter() string {
@@ -11773,7 +13475,7 @@ type JsonOptions struct {
 
 func (x *JsonOptions) Reset() {
 	*x = JsonOptions{}
-	mi := &file_volvoxgrid_proto_msgTypes[75]
+	mi := &file_volvoxgrid_proto_msgTypes[91]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11785,7 +13487,7 @@ func (x *JsonOptions) String() string {
 func (*JsonOptions) ProtoMessage() {}
 
 func (x *JsonOptions) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[75]
+	mi := &file_volvoxgrid_proto_msgTypes[91]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11798,7 +13500,7 @@ func (x *JsonOptions) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use JsonOptions.ProtoReflect.Descriptor instead.
 func (*JsonOptions) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{75}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{91}
 }
 
 func (x *JsonOptions) GetDataPath() string {
@@ -11832,7 +13534,7 @@ type LoadDataOptions struct {
 
 func (x *LoadDataOptions) Reset() {
 	*x = LoadDataOptions{}
-	mi := &file_volvoxgrid_proto_msgTypes[76]
+	mi := &file_volvoxgrid_proto_msgTypes[92]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11844,7 +13546,7 @@ func (x *LoadDataOptions) String() string {
 func (*LoadDataOptions) ProtoMessage() {}
 
 func (x *LoadDataOptions) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[76]
+	mi := &file_volvoxgrid_proto_msgTypes[92]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11857,7 +13559,7 @@ func (x *LoadDataOptions) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoadDataOptions.ProtoReflect.Descriptor instead.
 func (*LoadDataOptions) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{76}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{92}
 }
 
 func (x *LoadDataOptions) GetFormat() isLoadDataOptions_Format {
@@ -11996,7 +13698,7 @@ type LoadDataRequest struct {
 
 func (x *LoadDataRequest) Reset() {
 	*x = LoadDataRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[77]
+	mi := &file_volvoxgrid_proto_msgTypes[93]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12008,7 +13710,7 @@ func (x *LoadDataRequest) String() string {
 func (*LoadDataRequest) ProtoMessage() {}
 
 func (x *LoadDataRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[77]
+	mi := &file_volvoxgrid_proto_msgTypes[93]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12021,7 +13723,7 @@ func (x *LoadDataRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoadDataRequest.ProtoReflect.Descriptor instead.
 func (*LoadDataRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{77}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{93}
 }
 
 func (x *LoadDataRequest) GetGridId() int64 {
@@ -12057,7 +13759,7 @@ type AppendDataRequest struct {
 
 func (x *AppendDataRequest) Reset() {
 	*x = AppendDataRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[78]
+	mi := &file_volvoxgrid_proto_msgTypes[94]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12069,7 +13771,7 @@ func (x *AppendDataRequest) String() string {
 func (*AppendDataRequest) ProtoMessage() {}
 
 func (x *AppendDataRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[78]
+	mi := &file_volvoxgrid_proto_msgTypes[94]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12082,7 +13784,7 @@ func (x *AppendDataRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AppendDataRequest.ProtoReflect.Descriptor instead.
 func (*AppendDataRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{78}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{94}
 }
 
 func (x *AppendDataRequest) GetGridId() int64 {
@@ -12121,7 +13823,7 @@ type LoadDataResult struct {
 
 func (x *LoadDataResult) Reset() {
 	*x = LoadDataResult{}
-	mi := &file_volvoxgrid_proto_msgTypes[79]
+	mi := &file_volvoxgrid_proto_msgTypes[95]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12133,7 +13835,7 @@ func (x *LoadDataResult) String() string {
 func (*LoadDataResult) ProtoMessage() {}
 
 func (x *LoadDataResult) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[79]
+	mi := &file_volvoxgrid_proto_msgTypes[95]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12146,7 +13848,7 @@ func (x *LoadDataResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoadDataResult.ProtoReflect.Descriptor instead.
 func (*LoadDataResult) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{79}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{95}
 }
 
 func (x *LoadDataResult) GetStatus() LoadDataStatus {
@@ -12209,7 +13911,7 @@ type ClearRequest struct {
 
 func (x *ClearRequest) Reset() {
 	*x = ClearRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[80]
+	mi := &file_volvoxgrid_proto_msgTypes[96]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12221,7 +13923,7 @@ func (x *ClearRequest) String() string {
 func (*ClearRequest) ProtoMessage() {}
 
 func (x *ClearRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[80]
+	mi := &file_volvoxgrid_proto_msgTypes[96]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12234,7 +13936,7 @@ func (x *ClearRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClearRequest.ProtoReflect.Descriptor instead.
 func (*ClearRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{80}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{96}
 }
 
 func (x *ClearRequest) GetGridId() int64 {
@@ -12270,7 +13972,7 @@ type InsertRowsRequest struct {
 
 func (x *InsertRowsRequest) Reset() {
 	*x = InsertRowsRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[81]
+	mi := &file_volvoxgrid_proto_msgTypes[97]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12282,7 +13984,7 @@ func (x *InsertRowsRequest) String() string {
 func (*InsertRowsRequest) ProtoMessage() {}
 
 func (x *InsertRowsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[81]
+	mi := &file_volvoxgrid_proto_msgTypes[97]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12295,7 +13997,7 @@ func (x *InsertRowsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InsertRowsRequest.ProtoReflect.Descriptor instead.
 func (*InsertRowsRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{81}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{97}
 }
 
 func (x *InsertRowsRequest) GetGridId() int64 {
@@ -12337,7 +14039,7 @@ type RemoveRowsRequest struct {
 
 func (x *RemoveRowsRequest) Reset() {
 	*x = RemoveRowsRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[82]
+	mi := &file_volvoxgrid_proto_msgTypes[98]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12349,7 +14051,7 @@ func (x *RemoveRowsRequest) String() string {
 func (*RemoveRowsRequest) ProtoMessage() {}
 
 func (x *RemoveRowsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[82]
+	mi := &file_volvoxgrid_proto_msgTypes[98]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12362,7 +14064,7 @@ func (x *RemoveRowsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveRowsRequest.ProtoReflect.Descriptor instead.
 func (*RemoveRowsRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{82}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{98}
 }
 
 func (x *RemoveRowsRequest) GetGridId() int64 {
@@ -12397,7 +14099,7 @@ type MoveColumnRequest struct {
 
 func (x *MoveColumnRequest) Reset() {
 	*x = MoveColumnRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[83]
+	mi := &file_volvoxgrid_proto_msgTypes[99]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12409,7 +14111,7 @@ func (x *MoveColumnRequest) String() string {
 func (*MoveColumnRequest) ProtoMessage() {}
 
 func (x *MoveColumnRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[83]
+	mi := &file_volvoxgrid_proto_msgTypes[99]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12422,7 +14124,7 @@ func (x *MoveColumnRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MoveColumnRequest.ProtoReflect.Descriptor instead.
 func (*MoveColumnRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{83}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{99}
 }
 
 func (x *MoveColumnRequest) GetGridId() int64 {
@@ -12457,7 +14159,7 @@ type MoveRowRequest struct {
 
 func (x *MoveRowRequest) Reset() {
 	*x = MoveRowRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[84]
+	mi := &file_volvoxgrid_proto_msgTypes[100]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12469,7 +14171,7 @@ func (x *MoveRowRequest) String() string {
 func (*MoveRowRequest) ProtoMessage() {}
 
 func (x *MoveRowRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[84]
+	mi := &file_volvoxgrid_proto_msgTypes[100]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12482,7 +14184,7 @@ func (x *MoveRowRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MoveRowRequest.ProtoReflect.Descriptor instead.
 func (*MoveRowRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{84}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{100}
 }
 
 func (x *MoveRowRequest) GetGridId() int64 {
@@ -12519,7 +14221,7 @@ type SelectRequest struct {
 
 func (x *SelectRequest) Reset() {
 	*x = SelectRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[85]
+	mi := &file_volvoxgrid_proto_msgTypes[101]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12531,7 +14233,7 @@ func (x *SelectRequest) String() string {
 func (*SelectRequest) ProtoMessage() {}
 
 func (x *SelectRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[85]
+	mi := &file_volvoxgrid_proto_msgTypes[101]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12544,7 +14246,7 @@ func (x *SelectRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SelectRequest.ProtoReflect.Descriptor instead.
 func (*SelectRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{85}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{101}
 }
 
 func (x *SelectRequest) GetGridId() int64 {
@@ -12599,7 +14301,7 @@ type SelectionState struct {
 
 func (x *SelectionState) Reset() {
 	*x = SelectionState{}
-	mi := &file_volvoxgrid_proto_msgTypes[86]
+	mi := &file_volvoxgrid_proto_msgTypes[102]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12611,7 +14313,7 @@ func (x *SelectionState) String() string {
 func (*SelectionState) ProtoMessage() {}
 
 func (x *SelectionState) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[86]
+	mi := &file_volvoxgrid_proto_msgTypes[102]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12624,7 +14326,7 @@ func (x *SelectionState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SelectionState.ProtoReflect.Descriptor instead.
 func (*SelectionState) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{86}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{102}
 }
 
 func (x *SelectionState) GetActiveRow() int32 {
@@ -12703,7 +14405,7 @@ type HighlightRegion struct {
 
 func (x *HighlightRegion) Reset() {
 	*x = HighlightRegion{}
-	mi := &file_volvoxgrid_proto_msgTypes[87]
+	mi := &file_volvoxgrid_proto_msgTypes[103]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12715,7 +14417,7 @@ func (x *HighlightRegion) String() string {
 func (*HighlightRegion) ProtoMessage() {}
 
 func (x *HighlightRegion) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[87]
+	mi := &file_volvoxgrid_proto_msgTypes[103]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12728,7 +14430,7 @@ func (x *HighlightRegion) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HighlightRegion.ProtoReflect.Descriptor instead.
 func (*HighlightRegion) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{87}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{103}
 }
 
 func (x *HighlightRegion) GetRange() *CellRange {
@@ -12775,7 +14477,7 @@ type EditSetHighlights struct {
 
 func (x *EditSetHighlights) Reset() {
 	*x = EditSetHighlights{}
-	mi := &file_volvoxgrid_proto_msgTypes[88]
+	mi := &file_volvoxgrid_proto_msgTypes[104]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12787,7 +14489,7 @@ func (x *EditSetHighlights) String() string {
 func (*EditSetHighlights) ProtoMessage() {}
 
 func (x *EditSetHighlights) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[88]
+	mi := &file_volvoxgrid_proto_msgTypes[104]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12800,7 +14502,7 @@ func (x *EditSetHighlights) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EditSetHighlights.ProtoReflect.Descriptor instead.
 func (*EditSetHighlights) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{88}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{104}
 }
 
 func (x *EditSetHighlights) GetRegions() []*HighlightRegion {
@@ -12816,13 +14518,8 @@ type EditCommand struct {
 	// Types that are valid to be assigned to Command:
 	//
 	//	*EditCommand_Start
-	//	*EditCommand_Commit
-	//	*EditCommand_Cancel
-	//	*EditCommand_SetText
-	//	*EditCommand_SetSelection
-	//	*EditCommand_Finish
-	//	*EditCommand_SetHighlights
-	//	*EditCommand_SetPreedit
+	//	*EditCommand_Session
+	//	*EditCommand_GetState
 	Command       isEditCommand_Command `protobuf_oneof:"command"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -12830,7 +14527,7 @@ type EditCommand struct {
 
 func (x *EditCommand) Reset() {
 	*x = EditCommand{}
-	mi := &file_volvoxgrid_proto_msgTypes[89]
+	mi := &file_volvoxgrid_proto_msgTypes[105]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12842,7 +14539,7 @@ func (x *EditCommand) String() string {
 func (*EditCommand) ProtoMessage() {}
 
 func (x *EditCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[89]
+	mi := &file_volvoxgrid_proto_msgTypes[105]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12855,7 +14552,7 @@ func (x *EditCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EditCommand.ProtoReflect.Descriptor instead.
 func (*EditCommand) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{89}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{105}
 }
 
 func (x *EditCommand) GetGridId() int64 {
@@ -12881,64 +14578,19 @@ func (x *EditCommand) GetStart() *EditStart {
 	return nil
 }
 
-func (x *EditCommand) GetCommit() *EditCommit {
+func (x *EditCommand) GetSession() *EditorSessionCommand {
 	if x != nil {
-		if x, ok := x.Command.(*EditCommand_Commit); ok {
-			return x.Commit
+		if x, ok := x.Command.(*EditCommand_Session); ok {
+			return x.Session
 		}
 	}
 	return nil
 }
 
-func (x *EditCommand) GetCancel() *EditCancel {
+func (x *EditCommand) GetGetState() *EditGetState {
 	if x != nil {
-		if x, ok := x.Command.(*EditCommand_Cancel); ok {
-			return x.Cancel
-		}
-	}
-	return nil
-}
-
-func (x *EditCommand) GetSetText() *EditSetText {
-	if x != nil {
-		if x, ok := x.Command.(*EditCommand_SetText); ok {
-			return x.SetText
-		}
-	}
-	return nil
-}
-
-func (x *EditCommand) GetSetSelection() *EditSetSelection {
-	if x != nil {
-		if x, ok := x.Command.(*EditCommand_SetSelection); ok {
-			return x.SetSelection
-		}
-	}
-	return nil
-}
-
-func (x *EditCommand) GetFinish() *EditFinish {
-	if x != nil {
-		if x, ok := x.Command.(*EditCommand_Finish); ok {
-			return x.Finish
-		}
-	}
-	return nil
-}
-
-func (x *EditCommand) GetSetHighlights() *EditSetHighlights {
-	if x != nil {
-		if x, ok := x.Command.(*EditCommand_SetHighlights); ok {
-			return x.SetHighlights
-		}
-	}
-	return nil
-}
-
-func (x *EditCommand) GetSetPreedit() *EditSetPreedit {
-	if x != nil {
-		if x, ok := x.Command.(*EditCommand_SetPreedit); ok {
-			return x.SetPreedit
+		if x, ok := x.Command.(*EditCommand_GetState); ok {
+			return x.GetState
 		}
 	}
 	return nil
@@ -12952,65 +14604,50 @@ type EditCommand_Start struct {
 	Start *EditStart `protobuf:"bytes,2,opt,name=start,proto3,oneof"`
 }
 
-type EditCommand_Commit struct {
-	Commit *EditCommit `protobuf:"bytes,3,opt,name=commit,proto3,oneof"`
+type EditCommand_Session struct {
+	Session *EditorSessionCommand `protobuf:"bytes,3,opt,name=session,proto3,oneof"`
 }
 
-type EditCommand_Cancel struct {
-	Cancel *EditCancel `protobuf:"bytes,4,opt,name=cancel,proto3,oneof"`
-}
-
-type EditCommand_SetText struct {
-	SetText *EditSetText `protobuf:"bytes,5,opt,name=set_text,json=setText,proto3,oneof"`
-}
-
-type EditCommand_SetSelection struct {
-	SetSelection *EditSetSelection `protobuf:"bytes,6,opt,name=set_selection,json=setSelection,proto3,oneof"`
-}
-
-type EditCommand_Finish struct {
-	Finish *EditFinish `protobuf:"bytes,7,opt,name=finish,proto3,oneof"`
-}
-
-type EditCommand_SetHighlights struct {
-	SetHighlights *EditSetHighlights `protobuf:"bytes,8,opt,name=set_highlights,json=setHighlights,proto3,oneof"`
-}
-
-type EditCommand_SetPreedit struct {
-	SetPreedit *EditSetPreedit `protobuf:"bytes,9,opt,name=set_preedit,json=setPreedit,proto3,oneof"`
+type EditCommand_GetState struct {
+	GetState *EditGetState `protobuf:"bytes,4,opt,name=get_state,json=getState,proto3,oneof"`
 }
 
 func (*EditCommand_Start) isEditCommand_Command() {}
 
-func (*EditCommand_Commit) isEditCommand_Command() {}
+func (*EditCommand_Session) isEditCommand_Command() {}
 
-func (*EditCommand_Cancel) isEditCommand_Command() {}
+func (*EditCommand_GetState) isEditCommand_Command() {}
 
-func (*EditCommand_SetText) isEditCommand_Command() {}
-
-func (*EditCommand_SetSelection) isEditCommand_Command() {}
-
-func (*EditCommand_Finish) isEditCommand_Command() {}
-
-func (*EditCommand_SetHighlights) isEditCommand_Command() {}
-
-func (*EditCommand_SetPreedit) isEditCommand_Command() {}
-
+// Begin an edit session. The host MUST set `reason` to the gesture / source
+// that initiated the edit; the engine derives EditUiMode and the initial
+// selection from the reason:
+//
+//	F2 / DOUBLE_CLICK / CLICK_CARET → EDIT  (caret-positioned, no select-all)
+//	everything else                 → ENTER (select-all, replace on first key)
+//
+// Leaving `reason` as EDIT_START_UNSPECIFIED is treated as PROGRAMMATIC by the
+// engine but is a contract violation — hosts that drive edits from a user
+// gesture should always pass the matching enum value so audit logs and
+// telemetry can attribute sessions correctly.
+//
+// `caret_position` is consulted only when reason == EDIT_START_CLICK_CARET and
+// names the desired caret offset (UTF-16 code units) into the cell's text.
+// `seed_value` is used by IME / printable-key paths to push the keystroke
+// that triggered the session into the new editor's buffer.
 type EditStart struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Row           int32                  `protobuf:"varint,1,opt,name=row,proto3" json:"row,omitempty"`
 	Col           int32                  `protobuf:"varint,2,opt,name=col,proto3" json:"col,omitempty"`
-	SelectAll     *bool                  `protobuf:"varint,3,opt,name=select_all,json=selectAll,proto3,oneof" json:"select_all,omitempty"`
-	CaretEnd      *bool                  `protobuf:"varint,4,opt,name=caret_end,json=caretEnd,proto3,oneof" json:"caret_end,omitempty"`
-	SeedText      *string                `protobuf:"bytes,5,opt,name=seed_text,json=seedText,proto3,oneof" json:"seed_text,omitempty"`
-	FormulaMode   *bool                  `protobuf:"varint,6,opt,name=formula_mode,json=formulaMode,proto3,oneof" json:"formula_mode,omitempty"`
+	Reason        EditStartReason        `protobuf:"varint,3,opt,name=reason,proto3,enum=volvoxgrid.v1.EditStartReason" json:"reason,omitempty"`
+	SeedValue     *EditorValue           `protobuf:"bytes,4,opt,name=seed_value,json=seedValue,proto3" json:"seed_value,omitempty"`
+	CaretPosition *int32                 `protobuf:"varint,5,opt,name=caret_position,json=caretPosition,proto3,oneof" json:"caret_position,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *EditStart) Reset() {
 	*x = EditStart{}
-	mi := &file_volvoxgrid_proto_msgTypes[90]
+	mi := &file_volvoxgrid_proto_msgTypes[106]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13022,7 +14659,7 @@ func (x *EditStart) String() string {
 func (*EditStart) ProtoMessage() {}
 
 func (x *EditStart) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[90]
+	mi := &file_volvoxgrid_proto_msgTypes[106]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13035,7 +14672,7 @@ func (x *EditStart) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EditStart.ProtoReflect.Descriptor instead.
 func (*EditStart) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{90}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{106}
 }
 
 func (x *EditStart) GetRow() int32 {
@@ -13052,44 +14689,387 @@ func (x *EditStart) GetCol() int32 {
 	return 0
 }
 
-func (x *EditStart) GetSelectAll() bool {
-	if x != nil && x.SelectAll != nil {
-		return *x.SelectAll
+func (x *EditStart) GetReason() EditStartReason {
+	if x != nil {
+		return x.Reason
 	}
-	return false
+	return EditStartReason_EDIT_START_UNSPECIFIED
 }
 
-func (x *EditStart) GetCaretEnd() bool {
-	if x != nil && x.CaretEnd != nil {
-		return *x.CaretEnd
+func (x *EditStart) GetSeedValue() *EditorValue {
+	if x != nil {
+		return x.SeedValue
 	}
-	return false
+	return nil
 }
 
-func (x *EditStart) GetSeedText() string {
-	if x != nil && x.SeedText != nil {
-		return *x.SeedText
+func (x *EditStart) GetCaretPosition() int32 {
+	if x != nil && x.CaretPosition != nil {
+		return *x.CaretPosition
+	}
+	return 0
+}
+
+type EditGetState struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EditGetState) Reset() {
+	*x = EditGetState{}
+	mi := &file_volvoxgrid_proto_msgTypes[107]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EditGetState) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EditGetState) ProtoMessage() {}
+
+func (x *EditGetState) ProtoReflect() protoreflect.Message {
+	mi := &file_volvoxgrid_proto_msgTypes[107]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EditGetState.ProtoReflect.Descriptor instead.
+func (*EditGetState) Descriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{107}
+}
+
+type EditorSessionCommand struct {
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	SessionId    int64                  `protobuf:"varint,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	StateVersion uint64                 `protobuf:"varint,2,opt,name=state_version,json=stateVersion,proto3" json:"state_version,omitempty"`
+	// Types that are valid to be assigned to Command:
+	//
+	//	*EditorSessionCommand_ValueChanged
+	//	*EditorSessionCommand_SelectionChanged
+	//	*EditorSessionCommand_PreeditChanged
+	//	*EditorSessionCommand_Commit
+	//	*EditorSessionCommand_Cancel
+	//	*EditorSessionCommand_CustomAction
+	Command       isEditorSessionCommand_Command `protobuf_oneof:"command"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EditorSessionCommand) Reset() {
+	*x = EditorSessionCommand{}
+	mi := &file_volvoxgrid_proto_msgTypes[108]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EditorSessionCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EditorSessionCommand) ProtoMessage() {}
+
+func (x *EditorSessionCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_volvoxgrid_proto_msgTypes[108]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EditorSessionCommand.ProtoReflect.Descriptor instead.
+func (*EditorSessionCommand) Descriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{108}
+}
+
+func (x *EditorSessionCommand) GetSessionId() int64 {
+	if x != nil {
+		return x.SessionId
+	}
+	return 0
+}
+
+func (x *EditorSessionCommand) GetStateVersion() uint64 {
+	if x != nil {
+		return x.StateVersion
+	}
+	return 0
+}
+
+func (x *EditorSessionCommand) GetCommand() isEditorSessionCommand_Command {
+	if x != nil {
+		return x.Command
+	}
+	return nil
+}
+
+func (x *EditorSessionCommand) GetValueChanged() *EditorValueChanged {
+	if x != nil {
+		if x, ok := x.Command.(*EditorSessionCommand_ValueChanged); ok {
+			return x.ValueChanged
+		}
+	}
+	return nil
+}
+
+func (x *EditorSessionCommand) GetSelectionChanged() *TextSelectionChanged {
+	if x != nil {
+		if x, ok := x.Command.(*EditorSessionCommand_SelectionChanged); ok {
+			return x.SelectionChanged
+		}
+	}
+	return nil
+}
+
+func (x *EditorSessionCommand) GetPreeditChanged() *EditorPreeditChanged {
+	if x != nil {
+		if x, ok := x.Command.(*EditorSessionCommand_PreeditChanged); ok {
+			return x.PreeditChanged
+		}
+	}
+	return nil
+}
+
+func (x *EditorSessionCommand) GetCommit() *EditCommit {
+	if x != nil {
+		if x, ok := x.Command.(*EditorSessionCommand_Commit); ok {
+			return x.Commit
+		}
+	}
+	return nil
+}
+
+func (x *EditorSessionCommand) GetCancel() *EditCancel {
+	if x != nil {
+		if x, ok := x.Command.(*EditorSessionCommand_Cancel); ok {
+			return x.Cancel
+		}
+	}
+	return nil
+}
+
+func (x *EditorSessionCommand) GetCustomAction() *CustomEditorAction {
+	if x != nil {
+		if x, ok := x.Command.(*EditorSessionCommand_CustomAction); ok {
+			return x.CustomAction
+		}
+	}
+	return nil
+}
+
+type isEditorSessionCommand_Command interface {
+	isEditorSessionCommand_Command()
+}
+
+type EditorSessionCommand_ValueChanged struct {
+	ValueChanged *EditorValueChanged `protobuf:"bytes,3,opt,name=value_changed,json=valueChanged,proto3,oneof"`
+}
+
+type EditorSessionCommand_SelectionChanged struct {
+	SelectionChanged *TextSelectionChanged `protobuf:"bytes,4,opt,name=selection_changed,json=selectionChanged,proto3,oneof"`
+}
+
+type EditorSessionCommand_PreeditChanged struct {
+	PreeditChanged *EditorPreeditChanged `protobuf:"bytes,5,opt,name=preedit_changed,json=preeditChanged,proto3,oneof"`
+}
+
+type EditorSessionCommand_Commit struct {
+	Commit *EditCommit `protobuf:"bytes,6,opt,name=commit,proto3,oneof"`
+}
+
+type EditorSessionCommand_Cancel struct {
+	Cancel *EditCancel `protobuf:"bytes,7,opt,name=cancel,proto3,oneof"`
+}
+
+type EditorSessionCommand_CustomAction struct {
+	CustomAction *CustomEditorAction `protobuf:"bytes,8,opt,name=custom_action,json=customAction,proto3,oneof"`
+}
+
+func (*EditorSessionCommand_ValueChanged) isEditorSessionCommand_Command() {}
+
+func (*EditorSessionCommand_SelectionChanged) isEditorSessionCommand_Command() {}
+
+func (*EditorSessionCommand_PreeditChanged) isEditorSessionCommand_Command() {}
+
+func (*EditorSessionCommand_Commit) isEditorSessionCommand_Command() {}
+
+func (*EditorSessionCommand_Cancel) isEditorSessionCommand_Command() {}
+
+func (*EditorSessionCommand_CustomAction) isEditorSessionCommand_Command() {}
+
+type EditorValueChanged struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Value         *EditorValue           `protobuf:"bytes,1,opt,name=value,proto3" json:"value,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EditorValueChanged) Reset() {
+	*x = EditorValueChanged{}
+	mi := &file_volvoxgrid_proto_msgTypes[109]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EditorValueChanged) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EditorValueChanged) ProtoMessage() {}
+
+func (x *EditorValueChanged) ProtoReflect() protoreflect.Message {
+	mi := &file_volvoxgrid_proto_msgTypes[109]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EditorValueChanged.ProtoReflect.Descriptor instead.
+func (*EditorValueChanged) Descriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{109}
+}
+
+func (x *EditorValueChanged) GetValue() *EditorValue {
+	if x != nil {
+		return x.Value
+	}
+	return nil
+}
+
+type TextSelectionChanged struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Selection     *TextSelection         `protobuf:"bytes,1,opt,name=selection,proto3" json:"selection,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TextSelectionChanged) Reset() {
+	*x = TextSelectionChanged{}
+	mi := &file_volvoxgrid_proto_msgTypes[110]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TextSelectionChanged) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TextSelectionChanged) ProtoMessage() {}
+
+func (x *TextSelectionChanged) ProtoReflect() protoreflect.Message {
+	mi := &file_volvoxgrid_proto_msgTypes[110]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TextSelectionChanged.ProtoReflect.Descriptor instead.
+func (*TextSelectionChanged) Descriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{110}
+}
+
+func (x *TextSelectionChanged) GetSelection() *TextSelection {
+	if x != nil {
+		return x.Selection
+	}
+	return nil
+}
+
+type EditorPreeditChanged struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Text          string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
+	Cursor        int32                  `protobuf:"varint,2,opt,name=cursor,proto3" json:"cursor,omitempty"`
+	Commit        bool                   `protobuf:"varint,3,opt,name=commit,proto3" json:"commit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EditorPreeditChanged) Reset() {
+	*x = EditorPreeditChanged{}
+	mi := &file_volvoxgrid_proto_msgTypes[111]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EditorPreeditChanged) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EditorPreeditChanged) ProtoMessage() {}
+
+func (x *EditorPreeditChanged) ProtoReflect() protoreflect.Message {
+	mi := &file_volvoxgrid_proto_msgTypes[111]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EditorPreeditChanged.ProtoReflect.Descriptor instead.
+func (*EditorPreeditChanged) Descriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{111}
+}
+
+func (x *EditorPreeditChanged) GetText() string {
+	if x != nil {
+		return x.Text
 	}
 	return ""
 }
 
-func (x *EditStart) GetFormulaMode() bool {
-	if x != nil && x.FormulaMode != nil {
-		return *x.FormulaMode
+func (x *EditorPreeditChanged) GetCursor() int32 {
+	if x != nil {
+		return x.Cursor
+	}
+	return 0
+}
+
+func (x *EditorPreeditChanged) GetCommit() bool {
+	if x != nil {
+		return x.Commit
 	}
 	return false
 }
 
+// Commit the active editor. When `value` is unset, the engine commits the
+// editor's current in-flight buffer (the last value_changed / preedit_changed
+// it accepted). Setting `value` overrides that buffer, used by hosts that
+// maintain their own text widget and want to push the final string at commit.
 type EditCommit struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Text          *string                `protobuf:"bytes,1,opt,name=text,proto3,oneof" json:"text,omitempty"`
+	Value         *EditorValue           `protobuf:"bytes,1,opt,name=value,proto3,oneof" json:"value,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *EditCommit) Reset() {
 	*x = EditCommit{}
-	mi := &file_volvoxgrid_proto_msgTypes[91]
+	mi := &file_volvoxgrid_proto_msgTypes[112]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13101,7 +15081,7 @@ func (x *EditCommit) String() string {
 func (*EditCommit) ProtoMessage() {}
 
 func (x *EditCommit) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[91]
+	mi := &file_volvoxgrid_proto_msgTypes[112]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13114,14 +15094,14 @@ func (x *EditCommit) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EditCommit.ProtoReflect.Descriptor instead.
 func (*EditCommit) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{91}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{112}
 }
 
-func (x *EditCommit) GetText() string {
-	if x != nil && x.Text != nil {
-		return *x.Text
+func (x *EditCommit) GetValue() *EditorValue {
+	if x != nil {
+		return x.Value
 	}
-	return ""
+	return nil
 }
 
 type EditCancel struct {
@@ -13132,7 +15112,7 @@ type EditCancel struct {
 
 func (x *EditCancel) Reset() {
 	*x = EditCancel{}
-	mi := &file_volvoxgrid_proto_msgTypes[92]
+	mi := &file_volvoxgrid_proto_msgTypes[113]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13144,7 +15124,7 @@ func (x *EditCancel) String() string {
 func (*EditCancel) ProtoMessage() {}
 
 func (x *EditCancel) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[92]
+	mi := &file_volvoxgrid_proto_msgTypes[113]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13157,31 +15137,32 @@ func (x *EditCancel) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EditCancel.ProtoReflect.Descriptor instead.
 func (*EditCancel) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{92}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{113}
 }
 
-type EditSetText struct {
+type CustomEditorAction struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Text          string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
+	ActionId      string                 `protobuf:"bytes,1,opt,name=action_id,json=actionId,proto3" json:"action_id,omitempty"`
+	Payload       *StructValue           `protobuf:"bytes,2,opt,name=payload,proto3" json:"payload,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *EditSetText) Reset() {
-	*x = EditSetText{}
-	mi := &file_volvoxgrid_proto_msgTypes[93]
+func (x *CustomEditorAction) Reset() {
+	*x = CustomEditorAction{}
+	mi := &file_volvoxgrid_proto_msgTypes[114]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *EditSetText) String() string {
+func (x *CustomEditorAction) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*EditSetText) ProtoMessage() {}
+func (*CustomEditorAction) ProtoMessage() {}
 
-func (x *EditSetText) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[93]
+func (x *CustomEditorAction) ProtoReflect() protoreflect.Message {
+	mi := &file_volvoxgrid_proto_msgTypes[114]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13192,41 +15173,84 @@ func (x *EditSetText) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use EditSetText.ProtoReflect.Descriptor instead.
-func (*EditSetText) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{93}
+// Deprecated: Use CustomEditorAction.ProtoReflect.Descriptor instead.
+func (*CustomEditorAction) Descriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{114}
 }
 
-func (x *EditSetText) GetText() string {
+func (x *CustomEditorAction) GetActionId() string {
 	if x != nil {
-		return x.Text
+		return x.ActionId
 	}
 	return ""
 }
 
-type EditSetSelection struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Start         int32                  `protobuf:"varint,1,opt,name=start,proto3" json:"start,omitempty"`
-	Length        int32                  `protobuf:"varint,2,opt,name=length,proto3" json:"length,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+func (x *CustomEditorAction) GetPayload() *StructValue {
+	if x != nil {
+		return x.Payload
+	}
+	return nil
 }
 
-func (x *EditSetSelection) Reset() {
-	*x = EditSetSelection{}
-	mi := &file_volvoxgrid_proto_msgTypes[94]
+// Canonical edit session shape. Carried by EditorSessionStarted (lifecycle)
+// and EditState (current state snapshot). All fields the engine has agreed
+// with the host on at session start, plus mutable runtime state.
+//
+// Wire-type note: `session_id` and `state_version` are 64-bit on the wire.
+// Use the binding's native 64-bit integer type and do NOT re-wrap:
+//
+//	Rust prost  → i64 / u64
+//	Java/Kotlin → long
+//	.NET        → long / ulong
+//	Dart        → $fixnum.Int64 (already wrapped by protobuf-dart)
+//	JS / TS     → bigint
+//
+// Immutability:
+//   - session_id, row, col, editor, ui_mode, capabilities, reason are fixed
+//     for the lifetime of the session and never change between Started and
+//     subsequent Updated deltas.
+//   - viewport_rect, value, selection, composing, preedit_text, state_version,
+//     validation_errors are mutable and can change via EditorSessionUpdated.
+//
+// Presentation contract: when `editor.presentation == EDITOR_CANVAS`,
+// `viewport_rect` is meaningless (engine draws the editor on the canvas
+// itself). Hosts MUST NOT mount an overlay widget in that case; they MUST
+// still track the session for clipboard / keyboard routing.
+type EditorSession struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	SessionId        int64                  `protobuf:"varint,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Row              int32                  `protobuf:"varint,2,opt,name=row,proto3" json:"row,omitempty"`
+	Col              int32                  `protobuf:"varint,3,opt,name=col,proto3" json:"col,omitempty"`
+	ViewportRect     *Rect                  `protobuf:"bytes,4,opt,name=viewport_rect,json=viewportRect,proto3" json:"viewport_rect,omitempty"`
+	Editor           *EditorSpec            `protobuf:"bytes,5,opt,name=editor,proto3" json:"editor,omitempty"`
+	Value            *EditorValue           `protobuf:"bytes,6,opt,name=value,proto3" json:"value,omitempty"`
+	Selection        *TextSelection         `protobuf:"bytes,7,opt,name=selection,proto3" json:"selection,omitempty"`
+	UiMode           EditUiMode             `protobuf:"varint,8,opt,name=ui_mode,json=uiMode,proto3,enum=volvoxgrid.v1.EditUiMode" json:"ui_mode,omitempty"`
+	Capabilities     *EditorCapabilities    `protobuf:"bytes,9,opt,name=capabilities,proto3" json:"capabilities,omitempty"`
+	Reason           EditStartReason        `protobuf:"varint,10,opt,name=reason,proto3,enum=volvoxgrid.v1.EditStartReason" json:"reason,omitempty"`
+	StateVersion     uint64                 `protobuf:"varint,11,opt,name=state_version,json=stateVersion,proto3" json:"state_version,omitempty"`
+	Composing        bool                   `protobuf:"varint,12,opt,name=composing,proto3" json:"composing,omitempty"`
+	PreeditText      string                 `protobuf:"bytes,13,opt,name=preedit_text,json=preeditText,proto3" json:"preedit_text,omitempty"`
+	ValidationErrors []*ValidationError     `protobuf:"bytes,14,rep,name=validation_errors,json=validationErrors,proto3" json:"validation_errors,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *EditorSession) Reset() {
+	*x = EditorSession{}
+	mi := &file_volvoxgrid_proto_msgTypes[115]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *EditSetSelection) String() string {
+func (x *EditorSession) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*EditSetSelection) ProtoMessage() {}
+func (*EditorSession) ProtoMessage() {}
 
-func (x *EditSetSelection) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[94]
+func (x *EditorSession) ProtoReflect() protoreflect.Message {
+	mi := &file_volvoxgrid_proto_msgTypes[115]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13237,106 +15261,138 @@ func (x *EditSetSelection) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use EditSetSelection.ProtoReflect.Descriptor instead.
-func (*EditSetSelection) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{94}
+// Deprecated: Use EditorSession.ProtoReflect.Descriptor instead.
+func (*EditorSession) Descriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{115}
 }
 
-func (x *EditSetSelection) GetStart() int32 {
+func (x *EditorSession) GetSessionId() int64 {
 	if x != nil {
-		return x.Start
+		return x.SessionId
 	}
 	return 0
 }
 
-func (x *EditSetSelection) GetLength() int32 {
+func (x *EditorSession) GetRow() int32 {
 	if x != nil {
-		return x.Length
+		return x.Row
 	}
 	return 0
 }
 
-type EditSetPreedit struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Text          string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
-	Cursor        int32                  `protobuf:"varint,2,opt,name=cursor,proto3" json:"cursor,omitempty"`
-	Commit        bool                   `protobuf:"varint,3,opt,name=commit,proto3" json:"commit,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *EditSetPreedit) Reset() {
-	*x = EditSetPreedit{}
-	mi := &file_volvoxgrid_proto_msgTypes[95]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *EditSetPreedit) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*EditSetPreedit) ProtoMessage() {}
-
-func (x *EditSetPreedit) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[95]
+func (x *EditorSession) GetCol() int32 {
 	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use EditSetPreedit.ProtoReflect.Descriptor instead.
-func (*EditSetPreedit) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{95}
-}
-
-func (x *EditSetPreedit) GetText() string {
-	if x != nil {
-		return x.Text
-	}
-	return ""
-}
-
-func (x *EditSetPreedit) GetCursor() int32 {
-	if x != nil {
-		return x.Cursor
+		return x.Col
 	}
 	return 0
 }
 
-func (x *EditSetPreedit) GetCommit() bool {
+func (x *EditorSession) GetViewportRect() *Rect {
 	if x != nil {
-		return x.Commit
+		return x.ViewportRect
+	}
+	return nil
+}
+
+func (x *EditorSession) GetEditor() *EditorSpec {
+	if x != nil {
+		return x.Editor
+	}
+	return nil
+}
+
+func (x *EditorSession) GetValue() *EditorValue {
+	if x != nil {
+		return x.Value
+	}
+	return nil
+}
+
+func (x *EditorSession) GetSelection() *TextSelection {
+	if x != nil {
+		return x.Selection
+	}
+	return nil
+}
+
+func (x *EditorSession) GetUiMode() EditUiMode {
+	if x != nil {
+		return x.UiMode
+	}
+	return EditUiMode_EDIT_UI_MODE_ENTER
+}
+
+func (x *EditorSession) GetCapabilities() *EditorCapabilities {
+	if x != nil {
+		return x.Capabilities
+	}
+	return nil
+}
+
+func (x *EditorSession) GetReason() EditStartReason {
+	if x != nil {
+		return x.Reason
+	}
+	return EditStartReason_EDIT_START_UNSPECIFIED
+}
+
+func (x *EditorSession) GetStateVersion() uint64 {
+	if x != nil {
+		return x.StateVersion
+	}
+	return 0
+}
+
+func (x *EditorSession) GetComposing() bool {
+	if x != nil {
+		return x.Composing
 	}
 	return false
 }
 
-type EditFinish struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+func (x *EditorSession) GetPreeditText() string {
+	if x != nil {
+		return x.PreeditText
+	}
+	return ""
 }
 
-func (x *EditFinish) Reset() {
-	*x = EditFinish{}
-	mi := &file_volvoxgrid_proto_msgTypes[96]
+func (x *EditorSession) GetValidationErrors() []*ValidationError {
+	if x != nil {
+		return x.ValidationErrors
+	}
+	return nil
+}
+
+// Engine-declared editor capabilities. Derived once from
+// (EditorSpec.kind, EditorSpec.owner, ListEditorParams.allow_custom_value, …)
+// so every host gates UI affordances against the same truth.
+type EditorCapabilities struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	AcceptsTextInput  bool                   `protobuf:"varint,1,opt,name=accepts_text_input,json=acceptsTextInput,proto3" json:"accepts_text_input,omitempty"`  // user can type freely into a mutable buffer
+	SupportsSelection bool                   `protobuf:"varint,2,opt,name=supports_selection,json=supportsSelection,proto3" json:"supports_selection,omitempty"` // caret/selection can move within text
+	SupportsCut       bool                   `protobuf:"varint,3,opt,name=supports_cut,json=supportsCut,proto3" json:"supports_cut,omitempty"`
+	SupportsPaste     bool                   `protobuf:"varint,4,opt,name=supports_paste,json=supportsPaste,proto3" json:"supports_paste,omitempty"`
+	SupportsUndo      bool                   `protobuf:"varint,5,opt,name=supports_undo,json=supportsUndo,proto3" json:"supports_undo,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *EditorCapabilities) Reset() {
+	*x = EditorCapabilities{}
+	mi := &file_volvoxgrid_proto_msgTypes[116]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *EditFinish) String() string {
+func (x *EditorCapabilities) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*EditFinish) ProtoMessage() {}
+func (*EditorCapabilities) ProtoMessage() {}
 
-func (x *EditFinish) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[96]
+func (x *EditorCapabilities) ProtoReflect() protoreflect.Message {
+	mi := &file_volvoxgrid_proto_msgTypes[116]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13347,35 +15403,72 @@ func (x *EditFinish) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use EditFinish.ProtoReflect.Descriptor instead.
-func (*EditFinish) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{96}
+// Deprecated: Use EditorCapabilities.ProtoReflect.Descriptor instead.
+func (*EditorCapabilities) Descriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{116}
 }
 
-// Returned by Edit() RPC. Reflects the engine's current edit state.
+func (x *EditorCapabilities) GetAcceptsTextInput() bool {
+	if x != nil {
+		return x.AcceptsTextInput
+	}
+	return false
+}
+
+func (x *EditorCapabilities) GetSupportsSelection() bool {
+	if x != nil {
+		return x.SupportsSelection
+	}
+	return false
+}
+
+func (x *EditorCapabilities) GetSupportsCut() bool {
+	if x != nil {
+		return x.SupportsCut
+	}
+	return false
+}
+
+func (x *EditorCapabilities) GetSupportsPaste() bool {
+	if x != nil {
+		return x.SupportsPaste
+	}
+	return false
+}
+
+func (x *EditorCapabilities) GetSupportsUndo() bool {
+	if x != nil {
+		return x.SupportsUndo
+	}
+	return false
+}
+
+// Returned by Edit() RPC as a synchronous snapshot of the current edit
+// session, or its absence.
+//
+// `active == false` → no session is open; `session` is left at its proto
+//
+//	default (do not read its fields).
+//
+// `active == true`  → `session` carries the full current state (same shape
+//
+//	as EditorSessionStarted.session). Field-level
+//	invariants documented on EditorSession apply.
+//
+// Hosts that need to compose follow-up commands should read the session's
+// `session_id` + `state_version` and pass them to EditorSessionCommand for
+// optimistic concurrency.
 type EditState struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Active        bool                   `protobuf:"varint,1,opt,name=active,proto3" json:"active,omitempty"`                             // true if a cell is being edited
-	Row           int32                  `protobuf:"varint,2,opt,name=row,proto3" json:"row,omitempty"`                                   // row being edited
-	Col           int32                  `protobuf:"varint,3,opt,name=col,proto3" json:"col,omitempty"`                                   // column being edited
-	Text          string                 `protobuf:"bytes,4,opt,name=text,proto3" json:"text,omitempty"`                                  // current editor text
-	SelStart      int32                  `protobuf:"varint,5,opt,name=sel_start,json=selStart,proto3" json:"sel_start,omitempty"`         // caret/selection start position
-	SelLength     int32                  `protobuf:"varint,6,opt,name=sel_length,json=selLength,proto3" json:"sel_length,omitempty"`      // selection length (0 = caret only)
-	Composing     bool                   `protobuf:"varint,7,opt,name=composing,proto3" json:"composing,omitempty"`                       // true during IME composition
-	PreeditText   string                 `protobuf:"bytes,8,opt,name=preedit_text,json=preeditText,proto3" json:"preedit_text,omitempty"` // IME preedit string
-	UiMode        EditUiMode             `protobuf:"varint,9,opt,name=ui_mode,json=uiMode,proto3,enum=volvoxgrid.v1.EditUiMode" json:"ui_mode,omitempty"`
-	X             float32                `protobuf:"fixed32,10,opt,name=x,proto3" json:"x,omitempty"`                                 // viewport-local cell rect X
-	Y             float32                `protobuf:"fixed32,11,opt,name=y,proto3" json:"y,omitempty"`                                 // viewport-local cell rect Y
-	Width         float32                `protobuf:"fixed32,12,opt,name=width,proto3" json:"width,omitempty"`                         // cell rect width
-	Height        float32                `protobuf:"fixed32,13,opt,name=height,proto3" json:"height,omitempty"`                       // cell rect height
-	MaxLength     int32                  `protobuf:"varint,14,opt,name=max_length,json=maxLength,proto3" json:"max_length,omitempty"` // 0 = unlimited
+	Active        bool                   `protobuf:"varint,1,opt,name=active,proto3" json:"active,omitempty"`
+	Session       *EditorSession         `protobuf:"bytes,2,opt,name=session,proto3" json:"session,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *EditState) Reset() {
 	*x = EditState{}
-	mi := &file_volvoxgrid_proto_msgTypes[97]
+	mi := &file_volvoxgrid_proto_msgTypes[117]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13387,7 +15480,7 @@ func (x *EditState) String() string {
 func (*EditState) ProtoMessage() {}
 
 func (x *EditState) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[97]
+	mi := &file_volvoxgrid_proto_msgTypes[117]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13400,7 +15493,7 @@ func (x *EditState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EditState.ProtoReflect.Descriptor instead.
 func (*EditState) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{97}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{117}
 }
 
 func (x *EditState) GetActive() bool {
@@ -13410,95 +15503,11 @@ func (x *EditState) GetActive() bool {
 	return false
 }
 
-func (x *EditState) GetRow() int32 {
+func (x *EditState) GetSession() *EditorSession {
 	if x != nil {
-		return x.Row
+		return x.Session
 	}
-	return 0
-}
-
-func (x *EditState) GetCol() int32 {
-	if x != nil {
-		return x.Col
-	}
-	return 0
-}
-
-func (x *EditState) GetText() string {
-	if x != nil {
-		return x.Text
-	}
-	return ""
-}
-
-func (x *EditState) GetSelStart() int32 {
-	if x != nil {
-		return x.SelStart
-	}
-	return 0
-}
-
-func (x *EditState) GetSelLength() int32 {
-	if x != nil {
-		return x.SelLength
-	}
-	return 0
-}
-
-func (x *EditState) GetComposing() bool {
-	if x != nil {
-		return x.Composing
-	}
-	return false
-}
-
-func (x *EditState) GetPreeditText() string {
-	if x != nil {
-		return x.PreeditText
-	}
-	return ""
-}
-
-func (x *EditState) GetUiMode() EditUiMode {
-	if x != nil {
-		return x.UiMode
-	}
-	return EditUiMode_EDIT_UI_MODE_ENTER
-}
-
-func (x *EditState) GetX() float32 {
-	if x != nil {
-		return x.X
-	}
-	return 0
-}
-
-func (x *EditState) GetY() float32 {
-	if x != nil {
-		return x.Y
-	}
-	return 0
-}
-
-func (x *EditState) GetWidth() float32 {
-	if x != nil {
-		return x.Width
-	}
-	return 0
-}
-
-func (x *EditState) GetHeight() float32 {
-	if x != nil {
-		return x.Height
-	}
-	return 0
-}
-
-func (x *EditState) GetMaxLength() int32 {
-	if x != nil {
-		return x.MaxLength
-	}
-	return 0
+	return nil
 }
 
 type SortColumn struct {
@@ -13512,7 +15521,7 @@ type SortColumn struct {
 
 func (x *SortColumn) Reset() {
 	*x = SortColumn{}
-	mi := &file_volvoxgrid_proto_msgTypes[98]
+	mi := &file_volvoxgrid_proto_msgTypes[118]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13524,7 +15533,7 @@ func (x *SortColumn) String() string {
 func (*SortColumn) ProtoMessage() {}
 
 func (x *SortColumn) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[98]
+	mi := &file_volvoxgrid_proto_msgTypes[118]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13537,7 +15546,7 @@ func (x *SortColumn) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SortColumn.ProtoReflect.Descriptor instead.
 func (*SortColumn) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{98}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{118}
 }
 
 func (x *SortColumn) GetCol() int32 {
@@ -13575,7 +15584,7 @@ type SortRequest struct {
 
 func (x *SortRequest) Reset() {
 	*x = SortRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[99]
+	mi := &file_volvoxgrid_proto_msgTypes[119]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13587,7 +15596,7 @@ func (x *SortRequest) String() string {
 func (*SortRequest) ProtoMessage() {}
 
 func (x *SortRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[99]
+	mi := &file_volvoxgrid_proto_msgTypes[119]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13600,7 +15609,7 @@ func (x *SortRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SortRequest.ProtoReflect.Descriptor instead.
 func (*SortRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{99}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{119}
 }
 
 func (x *SortRequest) GetGridId() int64 {
@@ -13638,7 +15647,7 @@ type SubtotalRequest struct {
 
 func (x *SubtotalRequest) Reset() {
 	*x = SubtotalRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[100]
+	mi := &file_volvoxgrid_proto_msgTypes[120]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13650,7 +15659,7 @@ func (x *SubtotalRequest) String() string {
 func (*SubtotalRequest) ProtoMessage() {}
 
 func (x *SubtotalRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[100]
+	mi := &file_volvoxgrid_proto_msgTypes[120]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13663,7 +15672,7 @@ func (x *SubtotalRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubtotalRequest.ProtoReflect.Descriptor instead.
 func (*SubtotalRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{100}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{120}
 }
 
 func (x *SubtotalRequest) GetGridId() int64 {
@@ -13738,7 +15747,7 @@ type SubtotalResult struct {
 
 func (x *SubtotalResult) Reset() {
 	*x = SubtotalResult{}
-	mi := &file_volvoxgrid_proto_msgTypes[101]
+	mi := &file_volvoxgrid_proto_msgTypes[121]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13750,7 +15759,7 @@ func (x *SubtotalResult) String() string {
 func (*SubtotalResult) ProtoMessage() {}
 
 func (x *SubtotalResult) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[101]
+	mi := &file_volvoxgrid_proto_msgTypes[121]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13763,7 +15772,7 @@ func (x *SubtotalResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubtotalResult.ProtoReflect.Descriptor instead.
 func (*SubtotalResult) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{101}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{121}
 }
 
 func (x *SubtotalResult) GetRows() []int32 {
@@ -13786,7 +15795,7 @@ type AutoSizeRequest struct {
 
 func (x *AutoSizeRequest) Reset() {
 	*x = AutoSizeRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[102]
+	mi := &file_volvoxgrid_proto_msgTypes[122]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13798,7 +15807,7 @@ func (x *AutoSizeRequest) String() string {
 func (*AutoSizeRequest) ProtoMessage() {}
 
 func (x *AutoSizeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[102]
+	mi := &file_volvoxgrid_proto_msgTypes[122]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13811,7 +15820,7 @@ func (x *AutoSizeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AutoSizeRequest.ProtoReflect.Descriptor instead.
 func (*AutoSizeRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{102}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{122}
 }
 
 func (x *AutoSizeRequest) GetGridId() int64 {
@@ -13859,7 +15868,7 @@ type OutlineRequest struct {
 
 func (x *OutlineRequest) Reset() {
 	*x = OutlineRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[103]
+	mi := &file_volvoxgrid_proto_msgTypes[123]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13871,7 +15880,7 @@ func (x *OutlineRequest) String() string {
 func (*OutlineRequest) ProtoMessage() {}
 
 func (x *OutlineRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[103]
+	mi := &file_volvoxgrid_proto_msgTypes[123]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13884,7 +15893,7 @@ func (x *OutlineRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OutlineRequest.ProtoReflect.Descriptor instead.
 func (*OutlineRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{103}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{123}
 }
 
 func (x *OutlineRequest) GetGridId() int64 {
@@ -13912,7 +15921,7 @@ type GetNodeRequest struct {
 
 func (x *GetNodeRequest) Reset() {
 	*x = GetNodeRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[104]
+	mi := &file_volvoxgrid_proto_msgTypes[124]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13924,7 +15933,7 @@ func (x *GetNodeRequest) String() string {
 func (*GetNodeRequest) ProtoMessage() {}
 
 func (x *GetNodeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[104]
+	mi := &file_volvoxgrid_proto_msgTypes[124]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -13937,7 +15946,7 @@ func (x *GetNodeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetNodeRequest.ProtoReflect.Descriptor instead.
 func (*GetNodeRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{104}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{124}
 }
 
 func (x *GetNodeRequest) GetGridId() int64 {
@@ -13976,7 +15985,7 @@ type NodeInfo struct {
 
 func (x *NodeInfo) Reset() {
 	*x = NodeInfo{}
-	mi := &file_volvoxgrid_proto_msgTypes[105]
+	mi := &file_volvoxgrid_proto_msgTypes[125]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -13988,7 +15997,7 @@ func (x *NodeInfo) String() string {
 func (*NodeInfo) ProtoMessage() {}
 
 func (x *NodeInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[105]
+	mi := &file_volvoxgrid_proto_msgTypes[125]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14001,7 +16010,7 @@ func (x *NodeInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodeInfo.ProtoReflect.Descriptor instead.
 func (*NodeInfo) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{105}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{125}
 }
 
 func (x *NodeInfo) GetRow() int32 {
@@ -14069,7 +16078,7 @@ type FindRequest struct {
 
 func (x *FindRequest) Reset() {
 	*x = FindRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[106]
+	mi := &file_volvoxgrid_proto_msgTypes[126]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14081,7 +16090,7 @@ func (x *FindRequest) String() string {
 func (*FindRequest) ProtoMessage() {}
 
 func (x *FindRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[106]
+	mi := &file_volvoxgrid_proto_msgTypes[126]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14094,7 +16103,7 @@ func (x *FindRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FindRequest.ProtoReflect.Descriptor instead.
 func (*FindRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{106}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{126}
 }
 
 func (x *FindRequest) GetGridId() int64 {
@@ -14170,7 +16179,7 @@ type TextQuery struct {
 
 func (x *TextQuery) Reset() {
 	*x = TextQuery{}
-	mi := &file_volvoxgrid_proto_msgTypes[107]
+	mi := &file_volvoxgrid_proto_msgTypes[127]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14182,7 +16191,7 @@ func (x *TextQuery) String() string {
 func (*TextQuery) ProtoMessage() {}
 
 func (x *TextQuery) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[107]
+	mi := &file_volvoxgrid_proto_msgTypes[127]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14195,7 +16204,7 @@ func (x *TextQuery) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TextQuery.ProtoReflect.Descriptor instead.
 func (*TextQuery) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{107}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{127}
 }
 
 func (x *TextQuery) GetText() string {
@@ -14228,7 +16237,7 @@ type RegexQuery struct {
 
 func (x *RegexQuery) Reset() {
 	*x = RegexQuery{}
-	mi := &file_volvoxgrid_proto_msgTypes[108]
+	mi := &file_volvoxgrid_proto_msgTypes[128]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14240,7 +16249,7 @@ func (x *RegexQuery) String() string {
 func (*RegexQuery) ProtoMessage() {}
 
 func (x *RegexQuery) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[108]
+	mi := &file_volvoxgrid_proto_msgTypes[128]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14253,7 +16262,7 @@ func (x *RegexQuery) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegexQuery.ProtoReflect.Descriptor instead.
 func (*RegexQuery) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{108}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{128}
 }
 
 func (x *RegexQuery) GetPattern() string {
@@ -14272,7 +16281,7 @@ type FindResponse struct {
 
 func (x *FindResponse) Reset() {
 	*x = FindResponse{}
-	mi := &file_volvoxgrid_proto_msgTypes[109]
+	mi := &file_volvoxgrid_proto_msgTypes[129]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14284,7 +16293,7 @@ func (x *FindResponse) String() string {
 func (*FindResponse) ProtoMessage() {}
 
 func (x *FindResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[109]
+	mi := &file_volvoxgrid_proto_msgTypes[129]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14297,7 +16306,7 @@ func (x *FindResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FindResponse.ProtoReflect.Descriptor instead.
 func (*FindResponse) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{109}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{129}
 }
 
 func (x *FindResponse) GetRow() int32 {
@@ -14321,7 +16330,7 @@ type AggregateRequest struct {
 
 func (x *AggregateRequest) Reset() {
 	*x = AggregateRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[110]
+	mi := &file_volvoxgrid_proto_msgTypes[130]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14333,7 +16342,7 @@ func (x *AggregateRequest) String() string {
 func (*AggregateRequest) ProtoMessage() {}
 
 func (x *AggregateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[110]
+	mi := &file_volvoxgrid_proto_msgTypes[130]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14346,7 +16355,7 @@ func (x *AggregateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AggregateRequest.ProtoReflect.Descriptor instead.
 func (*AggregateRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{110}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{130}
 }
 
 func (x *AggregateRequest) GetGridId() int64 {
@@ -14400,7 +16409,7 @@ type AggregateResponse struct {
 
 func (x *AggregateResponse) Reset() {
 	*x = AggregateResponse{}
-	mi := &file_volvoxgrid_proto_msgTypes[111]
+	mi := &file_volvoxgrid_proto_msgTypes[131]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14412,7 +16421,7 @@ func (x *AggregateResponse) String() string {
 func (*AggregateResponse) ProtoMessage() {}
 
 func (x *AggregateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[111]
+	mi := &file_volvoxgrid_proto_msgTypes[131]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14425,7 +16434,7 @@ func (x *AggregateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AggregateResponse.ProtoReflect.Descriptor instead.
 func (*AggregateResponse) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{111}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{131}
 }
 
 func (x *AggregateResponse) GetValue() float64 {
@@ -14446,7 +16455,7 @@ type GetMergedRangeRequest struct {
 
 func (x *GetMergedRangeRequest) Reset() {
 	*x = GetMergedRangeRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[112]
+	mi := &file_volvoxgrid_proto_msgTypes[132]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14458,7 +16467,7 @@ func (x *GetMergedRangeRequest) String() string {
 func (*GetMergedRangeRequest) ProtoMessage() {}
 
 func (x *GetMergedRangeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[112]
+	mi := &file_volvoxgrid_proto_msgTypes[132]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14471,7 +16480,7 @@ func (x *GetMergedRangeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetMergedRangeRequest.ProtoReflect.Descriptor instead.
 func (*GetMergedRangeRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{112}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{132}
 }
 
 func (x *GetMergedRangeRequest) GetGridId() int64 {
@@ -14508,7 +16517,7 @@ type MergeCellsRequest struct {
 
 func (x *MergeCellsRequest) Reset() {
 	*x = MergeCellsRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[113]
+	mi := &file_volvoxgrid_proto_msgTypes[133]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14520,7 +16529,7 @@ func (x *MergeCellsRequest) String() string {
 func (*MergeCellsRequest) ProtoMessage() {}
 
 func (x *MergeCellsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[113]
+	mi := &file_volvoxgrid_proto_msgTypes[133]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14533,7 +16542,7 @@ func (x *MergeCellsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MergeCellsRequest.ProtoReflect.Descriptor instead.
 func (*MergeCellsRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{113}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{133}
 }
 
 func (x *MergeCellsRequest) GetGridId() int64 {
@@ -14560,7 +16569,7 @@ type UnmergeCellsRequest struct {
 
 func (x *UnmergeCellsRequest) Reset() {
 	*x = UnmergeCellsRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[114]
+	mi := &file_volvoxgrid_proto_msgTypes[134]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14572,7 +16581,7 @@ func (x *UnmergeCellsRequest) String() string {
 func (*UnmergeCellsRequest) ProtoMessage() {}
 
 func (x *UnmergeCellsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[114]
+	mi := &file_volvoxgrid_proto_msgTypes[134]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14585,7 +16594,7 @@ func (x *UnmergeCellsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnmergeCellsRequest.ProtoReflect.Descriptor instead.
 func (*UnmergeCellsRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{114}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{134}
 }
 
 func (x *UnmergeCellsRequest) GetGridId() int64 {
@@ -14611,7 +16620,7 @@ type MergedRegionsResponse struct {
 
 func (x *MergedRegionsResponse) Reset() {
 	*x = MergedRegionsResponse{}
-	mi := &file_volvoxgrid_proto_msgTypes[115]
+	mi := &file_volvoxgrid_proto_msgTypes[135]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14623,7 +16632,7 @@ func (x *MergedRegionsResponse) String() string {
 func (*MergedRegionsResponse) ProtoMessage() {}
 
 func (x *MergedRegionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[115]
+	mi := &file_volvoxgrid_proto_msgTypes[135]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14636,7 +16645,7 @@ func (x *MergedRegionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MergedRegionsResponse.ProtoReflect.Descriptor instead.
 func (*MergedRegionsResponse) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{115}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{135}
 }
 
 func (x *MergedRegionsResponse) GetRanges() []*CellRange {
@@ -14668,7 +16677,7 @@ type MemoryUsageResponse struct {
 
 func (x *MemoryUsageResponse) Reset() {
 	*x = MemoryUsageResponse{}
-	mi := &file_volvoxgrid_proto_msgTypes[116]
+	mi := &file_volvoxgrid_proto_msgTypes[136]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14680,7 +16689,7 @@ func (x *MemoryUsageResponse) String() string {
 func (*MemoryUsageResponse) ProtoMessage() {}
 
 func (x *MemoryUsageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[116]
+	mi := &file_volvoxgrid_proto_msgTypes[136]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14693,7 +16702,7 @@ func (x *MemoryUsageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MemoryUsageResponse.ProtoReflect.Descriptor instead.
 func (*MemoryUsageResponse) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{116}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{136}
 }
 
 func (x *MemoryUsageResponse) GetTotalBytes() int64 {
@@ -14810,7 +16819,7 @@ type ClipboardCommand struct {
 
 func (x *ClipboardCommand) Reset() {
 	*x = ClipboardCommand{}
-	mi := &file_volvoxgrid_proto_msgTypes[117]
+	mi := &file_volvoxgrid_proto_msgTypes[137]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14822,7 +16831,7 @@ func (x *ClipboardCommand) String() string {
 func (*ClipboardCommand) ProtoMessage() {}
 
 func (x *ClipboardCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[117]
+	mi := &file_volvoxgrid_proto_msgTypes[137]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14835,7 +16844,7 @@ func (x *ClipboardCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClipboardCommand.ProtoReflect.Descriptor instead.
 func (*ClipboardCommand) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{117}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{137}
 }
 
 func (x *ClipboardCommand) GetGridId() int64 {
@@ -14924,7 +16933,7 @@ type ClipboardCopy struct {
 
 func (x *ClipboardCopy) Reset() {
 	*x = ClipboardCopy{}
-	mi := &file_volvoxgrid_proto_msgTypes[118]
+	mi := &file_volvoxgrid_proto_msgTypes[138]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14936,7 +16945,7 @@ func (x *ClipboardCopy) String() string {
 func (*ClipboardCopy) ProtoMessage() {}
 
 func (x *ClipboardCopy) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[118]
+	mi := &file_volvoxgrid_proto_msgTypes[138]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14949,7 +16958,7 @@ func (x *ClipboardCopy) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClipboardCopy.ProtoReflect.Descriptor instead.
 func (*ClipboardCopy) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{118}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{138}
 }
 
 type ClipboardCut struct {
@@ -14960,7 +16969,7 @@ type ClipboardCut struct {
 
 func (x *ClipboardCut) Reset() {
 	*x = ClipboardCut{}
-	mi := &file_volvoxgrid_proto_msgTypes[119]
+	mi := &file_volvoxgrid_proto_msgTypes[139]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -14972,7 +16981,7 @@ func (x *ClipboardCut) String() string {
 func (*ClipboardCut) ProtoMessage() {}
 
 func (x *ClipboardCut) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[119]
+	mi := &file_volvoxgrid_proto_msgTypes[139]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -14985,7 +16994,7 @@ func (x *ClipboardCut) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClipboardCut.ProtoReflect.Descriptor instead.
 func (*ClipboardCut) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{119}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{139}
 }
 
 type ClipboardPaste struct {
@@ -14998,7 +17007,7 @@ type ClipboardPaste struct {
 
 func (x *ClipboardPaste) Reset() {
 	*x = ClipboardPaste{}
-	mi := &file_volvoxgrid_proto_msgTypes[120]
+	mi := &file_volvoxgrid_proto_msgTypes[140]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15010,7 +17019,7 @@ func (x *ClipboardPaste) String() string {
 func (*ClipboardPaste) ProtoMessage() {}
 
 func (x *ClipboardPaste) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[120]
+	mi := &file_volvoxgrid_proto_msgTypes[140]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15023,7 +17032,7 @@ func (x *ClipboardPaste) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClipboardPaste.ProtoReflect.Descriptor instead.
 func (*ClipboardPaste) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{120}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{140}
 }
 
 func (x *ClipboardPaste) GetText() string {
@@ -15048,7 +17057,7 @@ type ClipboardDelete struct {
 
 func (x *ClipboardDelete) Reset() {
 	*x = ClipboardDelete{}
-	mi := &file_volvoxgrid_proto_msgTypes[121]
+	mi := &file_volvoxgrid_proto_msgTypes[141]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15060,7 +17069,7 @@ func (x *ClipboardDelete) String() string {
 func (*ClipboardDelete) ProtoMessage() {}
 
 func (x *ClipboardDelete) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[121]
+	mi := &file_volvoxgrid_proto_msgTypes[141]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15073,7 +17082,7 @@ func (x *ClipboardDelete) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClipboardDelete.ProtoReflect.Descriptor instead.
 func (*ClipboardDelete) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{121}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{141}
 }
 
 type ClipboardResponse struct {
@@ -15086,7 +17095,7 @@ type ClipboardResponse struct {
 
 func (x *ClipboardResponse) Reset() {
 	*x = ClipboardResponse{}
-	mi := &file_volvoxgrid_proto_msgTypes[122]
+	mi := &file_volvoxgrid_proto_msgTypes[142]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15098,7 +17107,7 @@ func (x *ClipboardResponse) String() string {
 func (*ClipboardResponse) ProtoMessage() {}
 
 func (x *ClipboardResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[122]
+	mi := &file_volvoxgrid_proto_msgTypes[142]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15111,7 +17120,7 @@ func (x *ClipboardResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClipboardResponse.ProtoReflect.Descriptor instead.
 func (*ClipboardResponse) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{122}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{142}
 }
 
 func (x *ClipboardResponse) GetText() string {
@@ -15139,7 +17148,7 @@ type ExportRequest struct {
 
 func (x *ExportRequest) Reset() {
 	*x = ExportRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[123]
+	mi := &file_volvoxgrid_proto_msgTypes[143]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15151,7 +17160,7 @@ func (x *ExportRequest) String() string {
 func (*ExportRequest) ProtoMessage() {}
 
 func (x *ExportRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[123]
+	mi := &file_volvoxgrid_proto_msgTypes[143]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15164,7 +17173,7 @@ func (x *ExportRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExportRequest.ProtoReflect.Descriptor instead.
 func (*ExportRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{123}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{143}
 }
 
 func (x *ExportRequest) GetGridId() int64 {
@@ -15198,7 +17207,7 @@ type ExportResponse struct {
 
 func (x *ExportResponse) Reset() {
 	*x = ExportResponse{}
-	mi := &file_volvoxgrid_proto_msgTypes[124]
+	mi := &file_volvoxgrid_proto_msgTypes[144]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15210,7 +17219,7 @@ func (x *ExportResponse) String() string {
 func (*ExportResponse) ProtoMessage() {}
 
 func (x *ExportResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[124]
+	mi := &file_volvoxgrid_proto_msgTypes[144]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15223,7 +17232,7 @@ func (x *ExportResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExportResponse.ProtoReflect.Descriptor instead.
 func (*ExportResponse) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{124}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{144}
 }
 
 func (x *ExportResponse) GetData() []byte {
@@ -15257,7 +17266,7 @@ type PrintRequest struct {
 
 func (x *PrintRequest) Reset() {
 	*x = PrintRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[125]
+	mi := &file_volvoxgrid_proto_msgTypes[145]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15269,7 +17278,7 @@ func (x *PrintRequest) String() string {
 func (*PrintRequest) ProtoMessage() {}
 
 func (x *PrintRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[125]
+	mi := &file_volvoxgrid_proto_msgTypes[145]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15282,7 +17291,7 @@ func (x *PrintRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PrintRequest.ProtoReflect.Descriptor instead.
 func (*PrintRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{125}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{145}
 }
 
 func (x *PrintRequest) GetGridId() int64 {
@@ -15357,7 +17366,7 @@ type PrintResponse struct {
 
 func (x *PrintResponse) Reset() {
 	*x = PrintResponse{}
-	mi := &file_volvoxgrid_proto_msgTypes[126]
+	mi := &file_volvoxgrid_proto_msgTypes[146]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15369,7 +17378,7 @@ func (x *PrintResponse) String() string {
 func (*PrintResponse) ProtoMessage() {}
 
 func (x *PrintResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[126]
+	mi := &file_volvoxgrid_proto_msgTypes[146]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15382,7 +17391,7 @@ func (x *PrintResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PrintResponse.ProtoReflect.Descriptor instead.
 func (*PrintResponse) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{126}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{146}
 }
 
 func (x *PrintResponse) GetPages() []*PrintPage {
@@ -15407,7 +17416,7 @@ type PrintPage struct {
 
 func (x *PrintPage) Reset() {
 	*x = PrintPage{}
-	mi := &file_volvoxgrid_proto_msgTypes[127]
+	mi := &file_volvoxgrid_proto_msgTypes[147]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15419,7 +17428,7 @@ func (x *PrintPage) String() string {
 func (*PrintPage) ProtoMessage() {}
 
 func (x *PrintPage) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[127]
+	mi := &file_volvoxgrid_proto_msgTypes[147]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15432,7 +17441,7 @@ func (x *PrintPage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PrintPage.ProtoReflect.Descriptor instead.
 func (*PrintPage) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{127}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{147}
 }
 
 func (x *PrintPage) GetPageNumber() int32 {
@@ -15483,7 +17492,7 @@ type ArchiveRequest struct {
 
 func (x *ArchiveRequest) Reset() {
 	*x = ArchiveRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[128]
+	mi := &file_volvoxgrid_proto_msgTypes[148]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15495,7 +17504,7 @@ func (x *ArchiveRequest) String() string {
 func (*ArchiveRequest) ProtoMessage() {}
 
 func (x *ArchiveRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[128]
+	mi := &file_volvoxgrid_proto_msgTypes[148]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15508,7 +17517,7 @@ func (x *ArchiveRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ArchiveRequest.ProtoReflect.Descriptor instead.
 func (*ArchiveRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{128}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{148}
 }
 
 func (x *ArchiveRequest) GetGridId() int64 {
@@ -15549,7 +17558,7 @@ type ArchiveResponse struct {
 
 func (x *ArchiveResponse) Reset() {
 	*x = ArchiveResponse{}
-	mi := &file_volvoxgrid_proto_msgTypes[129]
+	mi := &file_volvoxgrid_proto_msgTypes[149]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15561,7 +17570,7 @@ func (x *ArchiveResponse) String() string {
 func (*ArchiveResponse) ProtoMessage() {}
 
 func (x *ArchiveResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[129]
+	mi := &file_volvoxgrid_proto_msgTypes[149]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15574,7 +17583,7 @@ func (x *ArchiveResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ArchiveResponse.ProtoReflect.Descriptor instead.
 func (*ArchiveResponse) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{129}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{149}
 }
 
 func (x *ArchiveResponse) GetData() []byte {
@@ -15605,7 +17614,7 @@ type CreateRequest struct {
 
 func (x *CreateRequest) Reset() {
 	*x = CreateRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[130]
+	mi := &file_volvoxgrid_proto_msgTypes[150]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15617,7 +17626,7 @@ func (x *CreateRequest) String() string {
 func (*CreateRequest) ProtoMessage() {}
 
 func (x *CreateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[130]
+	mi := &file_volvoxgrid_proto_msgTypes[150]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15630,7 +17639,7 @@ func (x *CreateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateRequest.ProtoReflect.Descriptor instead.
 func (*CreateRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{130}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{150}
 }
 
 func (x *CreateRequest) GetViewportWidth() int32 {
@@ -15671,7 +17680,7 @@ type CreateResponse struct {
 
 func (x *CreateResponse) Reset() {
 	*x = CreateResponse{}
-	mi := &file_volvoxgrid_proto_msgTypes[131]
+	mi := &file_volvoxgrid_proto_msgTypes[151]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15683,7 +17692,7 @@ func (x *CreateResponse) String() string {
 func (*CreateResponse) ProtoMessage() {}
 
 func (x *CreateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[131]
+	mi := &file_volvoxgrid_proto_msgTypes[151]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15696,7 +17705,7 @@ func (x *CreateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateResponse.ProtoReflect.Descriptor instead.
 func (*CreateResponse) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{131}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{151}
 }
 
 func (x *CreateResponse) GetGridId() int64 {
@@ -15722,7 +17731,7 @@ type DestroyRequest struct {
 
 func (x *DestroyRequest) Reset() {
 	*x = DestroyRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[132]
+	mi := &file_volvoxgrid_proto_msgTypes[152]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15734,7 +17743,7 @@ func (x *DestroyRequest) String() string {
 func (*DestroyRequest) ProtoMessage() {}
 
 func (x *DestroyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[132]
+	mi := &file_volvoxgrid_proto_msgTypes[152]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15747,7 +17756,7 @@ func (x *DestroyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DestroyRequest.ProtoReflect.Descriptor instead.
 func (*DestroyRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{132}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{152}
 }
 
 func (x *DestroyRequest) GetGridId() int64 {
@@ -15766,7 +17775,7 @@ type GetConfigRequest struct {
 
 func (x *GetConfigRequest) Reset() {
 	*x = GetConfigRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[133]
+	mi := &file_volvoxgrid_proto_msgTypes[153]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15778,7 +17787,7 @@ func (x *GetConfigRequest) String() string {
 func (*GetConfigRequest) ProtoMessage() {}
 
 func (x *GetConfigRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[133]
+	mi := &file_volvoxgrid_proto_msgTypes[153]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15791,7 +17800,7 @@ func (x *GetConfigRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetConfigRequest.ProtoReflect.Descriptor instead.
 func (*GetConfigRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{133}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{153}
 }
 
 func (x *GetConfigRequest) GetGridId() int64 {
@@ -15810,7 +17819,7 @@ type GetSchemaRequest struct {
 
 func (x *GetSchemaRequest) Reset() {
 	*x = GetSchemaRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[134]
+	mi := &file_volvoxgrid_proto_msgTypes[154]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15822,7 +17831,7 @@ func (x *GetSchemaRequest) String() string {
 func (*GetSchemaRequest) ProtoMessage() {}
 
 func (x *GetSchemaRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[134]
+	mi := &file_volvoxgrid_proto_msgTypes[154]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15835,7 +17844,7 @@ func (x *GetSchemaRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSchemaRequest.ProtoReflect.Descriptor instead.
 func (*GetSchemaRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{134}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{154}
 }
 
 func (x *GetSchemaRequest) GetGridId() int64 {
@@ -15854,7 +17863,7 @@ type GetSelectionRequest struct {
 
 func (x *GetSelectionRequest) Reset() {
 	*x = GetSelectionRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[135]
+	mi := &file_volvoxgrid_proto_msgTypes[155]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15866,7 +17875,7 @@ func (x *GetSelectionRequest) String() string {
 func (*GetSelectionRequest) ProtoMessage() {}
 
 func (x *GetSelectionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[135]
+	mi := &file_volvoxgrid_proto_msgTypes[155]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15879,7 +17888,7 @@ func (x *GetSelectionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSelectionRequest.ProtoReflect.Descriptor instead.
 func (*GetSelectionRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{135}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{155}
 }
 
 func (x *GetSelectionRequest) GetGridId() int64 {
@@ -15898,7 +17907,7 @@ type GetMergedRegionsRequest struct {
 
 func (x *GetMergedRegionsRequest) Reset() {
 	*x = GetMergedRegionsRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[136]
+	mi := &file_volvoxgrid_proto_msgTypes[156]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15910,7 +17919,7 @@ func (x *GetMergedRegionsRequest) String() string {
 func (*GetMergedRegionsRequest) ProtoMessage() {}
 
 func (x *GetMergedRegionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[136]
+	mi := &file_volvoxgrid_proto_msgTypes[156]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15923,7 +17932,7 @@ func (x *GetMergedRegionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetMergedRegionsRequest.ProtoReflect.Descriptor instead.
 func (*GetMergedRegionsRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{136}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{156}
 }
 
 func (x *GetMergedRegionsRequest) GetGridId() int64 {
@@ -15942,7 +17951,7 @@ type GetMemoryUsageRequest struct {
 
 func (x *GetMemoryUsageRequest) Reset() {
 	*x = GetMemoryUsageRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[137]
+	mi := &file_volvoxgrid_proto_msgTypes[157]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15954,7 +17963,7 @@ func (x *GetMemoryUsageRequest) String() string {
 func (*GetMemoryUsageRequest) ProtoMessage() {}
 
 func (x *GetMemoryUsageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[137]
+	mi := &file_volvoxgrid_proto_msgTypes[157]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -15967,7 +17976,7 @@ func (x *GetMemoryUsageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetMemoryUsageRequest.ProtoReflect.Descriptor instead.
 func (*GetMemoryUsageRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{137}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{157}
 }
 
 func (x *GetMemoryUsageRequest) GetGridId() int64 {
@@ -15986,7 +17995,7 @@ type RefreshRequest struct {
 
 func (x *RefreshRequest) Reset() {
 	*x = RefreshRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[138]
+	mi := &file_volvoxgrid_proto_msgTypes[158]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -15998,7 +18007,7 @@ func (x *RefreshRequest) String() string {
 func (*RefreshRequest) ProtoMessage() {}
 
 func (x *RefreshRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[138]
+	mi := &file_volvoxgrid_proto_msgTypes[158]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16011,7 +18020,7 @@ func (x *RefreshRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RefreshRequest.ProtoReflect.Descriptor instead.
 func (*RefreshRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{138}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{158}
 }
 
 func (x *RefreshRequest) GetGridId() int64 {
@@ -16030,7 +18039,7 @@ type EventStreamRequest struct {
 
 func (x *EventStreamRequest) Reset() {
 	*x = EventStreamRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[139]
+	mi := &file_volvoxgrid_proto_msgTypes[159]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16042,7 +18051,7 @@ func (x *EventStreamRequest) String() string {
 func (*EventStreamRequest) ProtoMessage() {}
 
 func (x *EventStreamRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[139]
+	mi := &file_volvoxgrid_proto_msgTypes[159]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16055,7 +18064,7 @@ func (x *EventStreamRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EventStreamRequest.ProtoReflect.Descriptor instead.
 func (*EventStreamRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{139}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{159}
 }
 
 func (x *EventStreamRequest) GetGridId() int64 {
@@ -16076,7 +18085,7 @@ type ResizeViewportRequest struct {
 
 func (x *ResizeViewportRequest) Reset() {
 	*x = ResizeViewportRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[140]
+	mi := &file_volvoxgrid_proto_msgTypes[160]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16088,7 +18097,7 @@ func (x *ResizeViewportRequest) String() string {
 func (*ResizeViewportRequest) ProtoMessage() {}
 
 func (x *ResizeViewportRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[140]
+	mi := &file_volvoxgrid_proto_msgTypes[160]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16101,7 +18110,7 @@ func (x *ResizeViewportRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResizeViewportRequest.ProtoReflect.Descriptor instead.
 func (*ResizeViewportRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{140}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{160}
 }
 
 func (x *ResizeViewportRequest) GetGridId() int64 {
@@ -16136,7 +18145,7 @@ type ShowCellRequest struct {
 
 func (x *ShowCellRequest) Reset() {
 	*x = ShowCellRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[141]
+	mi := &file_volvoxgrid_proto_msgTypes[161]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16148,7 +18157,7 @@ func (x *ShowCellRequest) String() string {
 func (*ShowCellRequest) ProtoMessage() {}
 
 func (x *ShowCellRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[141]
+	mi := &file_volvoxgrid_proto_msgTypes[161]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16161,7 +18170,7 @@ func (x *ShowCellRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ShowCellRequest.ProtoReflect.Descriptor instead.
 func (*ShowCellRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{141}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{161}
 }
 
 func (x *ShowCellRequest) GetGridId() int64 {
@@ -16195,7 +18204,7 @@ type SetRowRequest struct {
 
 func (x *SetRowRequest) Reset() {
 	*x = SetRowRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[142]
+	mi := &file_volvoxgrid_proto_msgTypes[162]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16207,7 +18216,7 @@ func (x *SetRowRequest) String() string {
 func (*SetRowRequest) ProtoMessage() {}
 
 func (x *SetRowRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[142]
+	mi := &file_volvoxgrid_proto_msgTypes[162]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16220,7 +18229,7 @@ func (x *SetRowRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetRowRequest.ProtoReflect.Descriptor instead.
 func (*SetRowRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{142}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{162}
 }
 
 func (x *SetRowRequest) GetGridId() int64 {
@@ -16247,7 +18256,7 @@ type SetColRequest struct {
 
 func (x *SetColRequest) Reset() {
 	*x = SetColRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[143]
+	mi := &file_volvoxgrid_proto_msgTypes[163]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16259,7 +18268,7 @@ func (x *SetColRequest) String() string {
 func (*SetColRequest) ProtoMessage() {}
 
 func (x *SetColRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[143]
+	mi := &file_volvoxgrid_proto_msgTypes[163]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16272,7 +18281,7 @@ func (x *SetColRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetColRequest.ProtoReflect.Descriptor instead.
 func (*SetColRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{143}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{163}
 }
 
 func (x *SetColRequest) GetGridId() int64 {
@@ -16303,7 +18312,7 @@ type SetRedrawRequest struct {
 
 func (x *SetRedrawRequest) Reset() {
 	*x = SetRedrawRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[144]
+	mi := &file_volvoxgrid_proto_msgTypes[164]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16315,7 +18324,7 @@ func (x *SetRedrawRequest) String() string {
 func (*SetRedrawRequest) ProtoMessage() {}
 
 func (x *SetRedrawRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[144]
+	mi := &file_volvoxgrid_proto_msgTypes[164]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16328,7 +18337,7 @@ func (x *SetRedrawRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetRedrawRequest.ProtoReflect.Descriptor instead.
 func (*SetRedrawRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{144}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{164}
 }
 
 func (x *SetRedrawRequest) GetGridId() int64 {
@@ -16355,7 +18364,7 @@ type ConfigureRequest struct {
 
 func (x *ConfigureRequest) Reset() {
 	*x = ConfigureRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[145]
+	mi := &file_volvoxgrid_proto_msgTypes[165]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16367,7 +18376,7 @@ func (x *ConfigureRequest) String() string {
 func (*ConfigureRequest) ProtoMessage() {}
 
 func (x *ConfigureRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[145]
+	mi := &file_volvoxgrid_proto_msgTypes[165]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16380,7 +18389,7 @@ func (x *ConfigureRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConfigureRequest.ProtoReflect.Descriptor instead.
 func (*ConfigureRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{145}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{165}
 }
 
 func (x *ConfigureRequest) GetGridId() int64 {
@@ -16408,7 +18417,7 @@ type LoadFontDataRequest struct {
 
 func (x *LoadFontDataRequest) Reset() {
 	*x = LoadFontDataRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[146]
+	mi := &file_volvoxgrid_proto_msgTypes[166]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16420,7 +18429,7 @@ func (x *LoadFontDataRequest) String() string {
 func (*LoadFontDataRequest) ProtoMessage() {}
 
 func (x *LoadFontDataRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[146]
+	mi := &file_volvoxgrid_proto_msgTypes[166]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16433,7 +18442,7 @@ func (x *LoadFontDataRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoadFontDataRequest.ProtoReflect.Descriptor instead.
 func (*LoadFontDataRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{146}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{166}
 }
 
 func (x *LoadFontDataRequest) GetData() []byte {
@@ -16467,7 +18476,7 @@ type LoadDemoRequest struct {
 
 func (x *LoadDemoRequest) Reset() {
 	*x = LoadDemoRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[147]
+	mi := &file_volvoxgrid_proto_msgTypes[167]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16479,7 +18488,7 @@ func (x *LoadDemoRequest) String() string {
 func (*LoadDemoRequest) ProtoMessage() {}
 
 func (x *LoadDemoRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[147]
+	mi := &file_volvoxgrid_proto_msgTypes[167]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16492,7 +18501,7 @@ func (x *LoadDemoRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoadDemoRequest.ProtoReflect.Descriptor instead.
 func (*LoadDemoRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{147}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{167}
 }
 
 func (x *LoadDemoRequest) GetGridId() int64 {
@@ -16518,7 +18527,7 @@ type GetDemoDataRequest struct {
 
 func (x *GetDemoDataRequest) Reset() {
 	*x = GetDemoDataRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[148]
+	mi := &file_volvoxgrid_proto_msgTypes[168]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16530,7 +18539,7 @@ func (x *GetDemoDataRequest) String() string {
 func (*GetDemoDataRequest) ProtoMessage() {}
 
 func (x *GetDemoDataRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[148]
+	mi := &file_volvoxgrid_proto_msgTypes[168]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16543,7 +18552,7 @@ func (x *GetDemoDataRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDemoDataRequest.ProtoReflect.Descriptor instead.
 func (*GetDemoDataRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{148}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{168}
 }
 
 func (x *GetDemoDataRequest) GetDemo() string {
@@ -16564,7 +18573,7 @@ type GetDemoDataResponse struct {
 
 func (x *GetDemoDataResponse) Reset() {
 	*x = GetDemoDataResponse{}
-	mi := &file_volvoxgrid_proto_msgTypes[149]
+	mi := &file_volvoxgrid_proto_msgTypes[169]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16576,7 +18585,7 @@ func (x *GetDemoDataResponse) String() string {
 func (*GetDemoDataResponse) ProtoMessage() {}
 
 func (x *GetDemoDataResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[149]
+	mi := &file_volvoxgrid_proto_msgTypes[169]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16589,7 +18598,7 @@ func (x *GetDemoDataResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDemoDataResponse.ProtoReflect.Descriptor instead.
 func (*GetDemoDataResponse) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{149}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{169}
 }
 
 func (x *GetDemoDataResponse) GetDemo() string {
@@ -16621,7 +18630,7 @@ type DestroyResponse struct {
 
 func (x *DestroyResponse) Reset() {
 	*x = DestroyResponse{}
-	mi := &file_volvoxgrid_proto_msgTypes[150]
+	mi := &file_volvoxgrid_proto_msgTypes[170]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16633,7 +18642,7 @@ func (x *DestroyResponse) String() string {
 func (*DestroyResponse) ProtoMessage() {}
 
 func (x *DestroyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[150]
+	mi := &file_volvoxgrid_proto_msgTypes[170]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16646,7 +18655,7 @@ func (x *DestroyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DestroyResponse.ProtoReflect.Descriptor instead.
 func (*DestroyResponse) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{150}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{170}
 }
 
 type ConfigureResponse struct {
@@ -16657,7 +18666,7 @@ type ConfigureResponse struct {
 
 func (x *ConfigureResponse) Reset() {
 	*x = ConfigureResponse{}
-	mi := &file_volvoxgrid_proto_msgTypes[151]
+	mi := &file_volvoxgrid_proto_msgTypes[171]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16669,7 +18678,7 @@ func (x *ConfigureResponse) String() string {
 func (*ConfigureResponse) ProtoMessage() {}
 
 func (x *ConfigureResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[151]
+	mi := &file_volvoxgrid_proto_msgTypes[171]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16682,7 +18691,7 @@ func (x *ConfigureResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConfigureResponse.ProtoReflect.Descriptor instead.
 func (*ConfigureResponse) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{151}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{171}
 }
 
 type LoadFontDataResponse struct {
@@ -16693,7 +18702,7 @@ type LoadFontDataResponse struct {
 
 func (x *LoadFontDataResponse) Reset() {
 	*x = LoadFontDataResponse{}
-	mi := &file_volvoxgrid_proto_msgTypes[152]
+	mi := &file_volvoxgrid_proto_msgTypes[172]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16705,7 +18714,7 @@ func (x *LoadFontDataResponse) String() string {
 func (*LoadFontDataResponse) ProtoMessage() {}
 
 func (x *LoadFontDataResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[152]
+	mi := &file_volvoxgrid_proto_msgTypes[172]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16718,7 +18727,7 @@ func (x *LoadFontDataResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoadFontDataResponse.ProtoReflect.Descriptor instead.
 func (*LoadFontDataResponse) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{152}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{172}
 }
 
 type DefineColumnsResponse struct {
@@ -16729,7 +18738,7 @@ type DefineColumnsResponse struct {
 
 func (x *DefineColumnsResponse) Reset() {
 	*x = DefineColumnsResponse{}
-	mi := &file_volvoxgrid_proto_msgTypes[153]
+	mi := &file_volvoxgrid_proto_msgTypes[173]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16741,7 +18750,7 @@ func (x *DefineColumnsResponse) String() string {
 func (*DefineColumnsResponse) ProtoMessage() {}
 
 func (x *DefineColumnsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[153]
+	mi := &file_volvoxgrid_proto_msgTypes[173]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16754,7 +18763,7 @@ func (x *DefineColumnsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DefineColumnsResponse.ProtoReflect.Descriptor instead.
 func (*DefineColumnsResponse) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{153}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{173}
 }
 
 type DefineRowsResponse struct {
@@ -16765,7 +18774,7 @@ type DefineRowsResponse struct {
 
 func (x *DefineRowsResponse) Reset() {
 	*x = DefineRowsResponse{}
-	mi := &file_volvoxgrid_proto_msgTypes[154]
+	mi := &file_volvoxgrid_proto_msgTypes[174]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16777,7 +18786,7 @@ func (x *DefineRowsResponse) String() string {
 func (*DefineRowsResponse) ProtoMessage() {}
 
 func (x *DefineRowsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[154]
+	mi := &file_volvoxgrid_proto_msgTypes[174]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16790,7 +18799,7 @@ func (x *DefineRowsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DefineRowsResponse.ProtoReflect.Descriptor instead.
 func (*DefineRowsResponse) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{154}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{174}
 }
 
 type InsertRowsResponse struct {
@@ -16804,7 +18813,7 @@ type InsertRowsResponse struct {
 
 func (x *InsertRowsResponse) Reset() {
 	*x = InsertRowsResponse{}
-	mi := &file_volvoxgrid_proto_msgTypes[155]
+	mi := &file_volvoxgrid_proto_msgTypes[175]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16816,7 +18825,7 @@ func (x *InsertRowsResponse) String() string {
 func (*InsertRowsResponse) ProtoMessage() {}
 
 func (x *InsertRowsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[155]
+	mi := &file_volvoxgrid_proto_msgTypes[175]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16829,7 +18838,7 @@ func (x *InsertRowsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InsertRowsResponse.ProtoReflect.Descriptor instead.
 func (*InsertRowsResponse) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{155}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{175}
 }
 
 func (x *InsertRowsResponse) GetInsertedCount() int32 {
@@ -16863,7 +18872,7 @@ type RemoveRowsResponse struct {
 
 func (x *RemoveRowsResponse) Reset() {
 	*x = RemoveRowsResponse{}
-	mi := &file_volvoxgrid_proto_msgTypes[156]
+	mi := &file_volvoxgrid_proto_msgTypes[176]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16875,7 +18884,7 @@ func (x *RemoveRowsResponse) String() string {
 func (*RemoveRowsResponse) ProtoMessage() {}
 
 func (x *RemoveRowsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[156]
+	mi := &file_volvoxgrid_proto_msgTypes[176]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16888,7 +18897,7 @@ func (x *RemoveRowsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveRowsResponse.ProtoReflect.Descriptor instead.
 func (*RemoveRowsResponse) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{156}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{176}
 }
 
 func (x *RemoveRowsResponse) GetRemovedCount() int32 {
@@ -16913,7 +18922,7 @@ type MoveColumnResponse struct {
 
 func (x *MoveColumnResponse) Reset() {
 	*x = MoveColumnResponse{}
-	mi := &file_volvoxgrid_proto_msgTypes[157]
+	mi := &file_volvoxgrid_proto_msgTypes[177]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16925,7 +18934,7 @@ func (x *MoveColumnResponse) String() string {
 func (*MoveColumnResponse) ProtoMessage() {}
 
 func (x *MoveColumnResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[157]
+	mi := &file_volvoxgrid_proto_msgTypes[177]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16938,7 +18947,7 @@ func (x *MoveColumnResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MoveColumnResponse.ProtoReflect.Descriptor instead.
 func (*MoveColumnResponse) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{157}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{177}
 }
 
 type MoveRowResponse struct {
@@ -16949,7 +18958,7 @@ type MoveRowResponse struct {
 
 func (x *MoveRowResponse) Reset() {
 	*x = MoveRowResponse{}
-	mi := &file_volvoxgrid_proto_msgTypes[158]
+	mi := &file_volvoxgrid_proto_msgTypes[178]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16961,7 +18970,7 @@ func (x *MoveRowResponse) String() string {
 func (*MoveRowResponse) ProtoMessage() {}
 
 func (x *MoveRowResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[158]
+	mi := &file_volvoxgrid_proto_msgTypes[178]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -16974,7 +18983,7 @@ func (x *MoveRowResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MoveRowResponse.ProtoReflect.Descriptor instead.
 func (*MoveRowResponse) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{158}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{178}
 }
 
 type ClearResponse struct {
@@ -16986,7 +18995,7 @@ type ClearResponse struct {
 
 func (x *ClearResponse) Reset() {
 	*x = ClearResponse{}
-	mi := &file_volvoxgrid_proto_msgTypes[159]
+	mi := &file_volvoxgrid_proto_msgTypes[179]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -16998,7 +19007,7 @@ func (x *ClearResponse) String() string {
 func (*ClearResponse) ProtoMessage() {}
 
 func (x *ClearResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[159]
+	mi := &file_volvoxgrid_proto_msgTypes[179]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -17011,7 +19020,7 @@ func (x *ClearResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClearResponse.ProtoReflect.Descriptor instead.
 func (*ClearResponse) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{159}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{179}
 }
 
 func (x *ClearResponse) GetClearedCount() int32 {
@@ -17030,7 +19039,7 @@ type SelectResponse struct {
 
 func (x *SelectResponse) Reset() {
 	*x = SelectResponse{}
-	mi := &file_volvoxgrid_proto_msgTypes[160]
+	mi := &file_volvoxgrid_proto_msgTypes[180]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -17042,7 +19051,7 @@ func (x *SelectResponse) String() string {
 func (*SelectResponse) ProtoMessage() {}
 
 func (x *SelectResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[160]
+	mi := &file_volvoxgrid_proto_msgTypes[180]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -17055,7 +19064,7 @@ func (x *SelectResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SelectResponse.ProtoReflect.Descriptor instead.
 func (*SelectResponse) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{160}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{180}
 }
 
 func (x *SelectResponse) GetSelection() *SelectionState {
@@ -17075,7 +19084,7 @@ type ShowCellResponse struct {
 
 func (x *ShowCellResponse) Reset() {
 	*x = ShowCellResponse{}
-	mi := &file_volvoxgrid_proto_msgTypes[161]
+	mi := &file_volvoxgrid_proto_msgTypes[181]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -17087,7 +19096,7 @@ func (x *ShowCellResponse) String() string {
 func (*ShowCellResponse) ProtoMessage() {}
 
 func (x *ShowCellResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[161]
+	mi := &file_volvoxgrid_proto_msgTypes[181]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -17100,7 +19109,7 @@ func (x *ShowCellResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ShowCellResponse.ProtoReflect.Descriptor instead.
 func (*ShowCellResponse) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{161}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{181}
 }
 
 func (x *ShowCellResponse) GetTopRow() int32 {
@@ -17126,7 +19135,7 @@ type SetTopRowResponse struct {
 
 func (x *SetTopRowResponse) Reset() {
 	*x = SetTopRowResponse{}
-	mi := &file_volvoxgrid_proto_msgTypes[162]
+	mi := &file_volvoxgrid_proto_msgTypes[182]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -17138,7 +19147,7 @@ func (x *SetTopRowResponse) String() string {
 func (*SetTopRowResponse) ProtoMessage() {}
 
 func (x *SetTopRowResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[162]
+	mi := &file_volvoxgrid_proto_msgTypes[182]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -17151,7 +19160,7 @@ func (x *SetTopRowResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetTopRowResponse.ProtoReflect.Descriptor instead.
 func (*SetTopRowResponse) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{162}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{182}
 }
 
 func (x *SetTopRowResponse) GetTopRow() int32 {
@@ -17170,7 +19179,7 @@ type SetLeftColResponse struct {
 
 func (x *SetLeftColResponse) Reset() {
 	*x = SetLeftColResponse{}
-	mi := &file_volvoxgrid_proto_msgTypes[163]
+	mi := &file_volvoxgrid_proto_msgTypes[183]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -17182,7 +19191,7 @@ func (x *SetLeftColResponse) String() string {
 func (*SetLeftColResponse) ProtoMessage() {}
 
 func (x *SetLeftColResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[163]
+	mi := &file_volvoxgrid_proto_msgTypes[183]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -17195,7 +19204,7 @@ func (x *SetLeftColResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetLeftColResponse.ProtoReflect.Descriptor instead.
 func (*SetLeftColResponse) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{163}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{183}
 }
 
 func (x *SetLeftColResponse) GetLeftCol() int32 {
@@ -17213,7 +19222,7 @@ type SortResponse struct {
 
 func (x *SortResponse) Reset() {
 	*x = SortResponse{}
-	mi := &file_volvoxgrid_proto_msgTypes[164]
+	mi := &file_volvoxgrid_proto_msgTypes[184]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -17225,7 +19234,7 @@ func (x *SortResponse) String() string {
 func (*SortResponse) ProtoMessage() {}
 
 func (x *SortResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[164]
+	mi := &file_volvoxgrid_proto_msgTypes[184]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -17238,7 +19247,7 @@ func (x *SortResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SortResponse.ProtoReflect.Descriptor instead.
 func (*SortResponse) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{164}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{184}
 }
 
 type AutoSizeResponse struct {
@@ -17249,7 +19258,7 @@ type AutoSizeResponse struct {
 
 func (x *AutoSizeResponse) Reset() {
 	*x = AutoSizeResponse{}
-	mi := &file_volvoxgrid_proto_msgTypes[165]
+	mi := &file_volvoxgrid_proto_msgTypes[185]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -17261,7 +19270,7 @@ func (x *AutoSizeResponse) String() string {
 func (*AutoSizeResponse) ProtoMessage() {}
 
 func (x *AutoSizeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[165]
+	mi := &file_volvoxgrid_proto_msgTypes[185]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -17274,7 +19283,7 @@ func (x *AutoSizeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AutoSizeResponse.ProtoReflect.Descriptor instead.
 func (*AutoSizeResponse) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{165}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{185}
 }
 
 type OutlineResponse struct {
@@ -17285,7 +19294,7 @@ type OutlineResponse struct {
 
 func (x *OutlineResponse) Reset() {
 	*x = OutlineResponse{}
-	mi := &file_volvoxgrid_proto_msgTypes[166]
+	mi := &file_volvoxgrid_proto_msgTypes[186]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -17297,7 +19306,7 @@ func (x *OutlineResponse) String() string {
 func (*OutlineResponse) ProtoMessage() {}
 
 func (x *OutlineResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[166]
+	mi := &file_volvoxgrid_proto_msgTypes[186]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -17310,7 +19319,7 @@ func (x *OutlineResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OutlineResponse.ProtoReflect.Descriptor instead.
 func (*OutlineResponse) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{166}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{186}
 }
 
 type MergeCellsResponse struct {
@@ -17322,7 +19331,7 @@ type MergeCellsResponse struct {
 
 func (x *MergeCellsResponse) Reset() {
 	*x = MergeCellsResponse{}
-	mi := &file_volvoxgrid_proto_msgTypes[167]
+	mi := &file_volvoxgrid_proto_msgTypes[187]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -17334,7 +19343,7 @@ func (x *MergeCellsResponse) String() string {
 func (*MergeCellsResponse) ProtoMessage() {}
 
 func (x *MergeCellsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[167]
+	mi := &file_volvoxgrid_proto_msgTypes[187]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -17347,7 +19356,7 @@ func (x *MergeCellsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MergeCellsResponse.ProtoReflect.Descriptor instead.
 func (*MergeCellsResponse) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{167}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{187}
 }
 
 func (x *MergeCellsResponse) GetMerged() *CellRange {
@@ -17366,7 +19375,7 @@ type UnmergeCellsResponse struct {
 
 func (x *UnmergeCellsResponse) Reset() {
 	*x = UnmergeCellsResponse{}
-	mi := &file_volvoxgrid_proto_msgTypes[168]
+	mi := &file_volvoxgrid_proto_msgTypes[188]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -17378,7 +19387,7 @@ func (x *UnmergeCellsResponse) String() string {
 func (*UnmergeCellsResponse) ProtoMessage() {}
 
 func (x *UnmergeCellsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[168]
+	mi := &file_volvoxgrid_proto_msgTypes[188]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -17391,7 +19400,7 @@ func (x *UnmergeCellsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnmergeCellsResponse.ProtoReflect.Descriptor instead.
 func (*UnmergeCellsResponse) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{168}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{188}
 }
 
 func (x *UnmergeCellsResponse) GetUnmergedCount() int32 {
@@ -17411,7 +19420,7 @@ type ResizeViewportResponse struct {
 
 func (x *ResizeViewportResponse) Reset() {
 	*x = ResizeViewportResponse{}
-	mi := &file_volvoxgrid_proto_msgTypes[169]
+	mi := &file_volvoxgrid_proto_msgTypes[189]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -17423,7 +19432,7 @@ func (x *ResizeViewportResponse) String() string {
 func (*ResizeViewportResponse) ProtoMessage() {}
 
 func (x *ResizeViewportResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[169]
+	mi := &file_volvoxgrid_proto_msgTypes[189]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -17436,7 +19445,7 @@ func (x *ResizeViewportResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResizeViewportResponse.ProtoReflect.Descriptor instead.
 func (*ResizeViewportResponse) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{169}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{189}
 }
 
 func (x *ResizeViewportResponse) GetViewportWidth() int32 {
@@ -17461,7 +19470,7 @@ type SetRedrawResponse struct {
 
 func (x *SetRedrawResponse) Reset() {
 	*x = SetRedrawResponse{}
-	mi := &file_volvoxgrid_proto_msgTypes[170]
+	mi := &file_volvoxgrid_proto_msgTypes[190]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -17473,7 +19482,7 @@ func (x *SetRedrawResponse) String() string {
 func (*SetRedrawResponse) ProtoMessage() {}
 
 func (x *SetRedrawResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[170]
+	mi := &file_volvoxgrid_proto_msgTypes[190]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -17486,7 +19495,7 @@ func (x *SetRedrawResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetRedrawResponse.ProtoReflect.Descriptor instead.
 func (*SetRedrawResponse) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{170}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{190}
 }
 
 type RefreshResponse struct {
@@ -17497,7 +19506,7 @@ type RefreshResponse struct {
 
 func (x *RefreshResponse) Reset() {
 	*x = RefreshResponse{}
-	mi := &file_volvoxgrid_proto_msgTypes[171]
+	mi := &file_volvoxgrid_proto_msgTypes[191]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -17509,7 +19518,7 @@ func (x *RefreshResponse) String() string {
 func (*RefreshResponse) ProtoMessage() {}
 
 func (x *RefreshResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[171]
+	mi := &file_volvoxgrid_proto_msgTypes[191]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -17522,7 +19531,7 @@ func (x *RefreshResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RefreshResponse.ProtoReflect.Descriptor instead.
 func (*RefreshResponse) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{171}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{191}
 }
 
 type LoadDemoResponse struct {
@@ -17533,7 +19542,7 @@ type LoadDemoResponse struct {
 
 func (x *LoadDemoResponse) Reset() {
 	*x = LoadDemoResponse{}
-	mi := &file_volvoxgrid_proto_msgTypes[172]
+	mi := &file_volvoxgrid_proto_msgTypes[192]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -17545,7 +19554,7 @@ func (x *LoadDemoResponse) String() string {
 func (*LoadDemoResponse) ProtoMessage() {}
 
 func (x *LoadDemoResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[172]
+	mi := &file_volvoxgrid_proto_msgTypes[192]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -17558,7 +19567,7 @@ func (x *LoadDemoResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoadDemoResponse.ProtoReflect.Descriptor instead.
 func (*LoadDemoResponse) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{172}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{192}
 }
 
 type RenderInput struct {
@@ -17579,6 +19588,8 @@ type RenderInput struct {
 	//	*RenderInput_TerminalViewport
 	//	*RenderInput_TerminalCommand
 	//	*RenderInput_CompareResponse
+	//	*RenderInput_EditValidationResponse
+	//	*RenderInput_EditorListItemsResponse
 	Input         isRenderInput_Input `protobuf_oneof:"input"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -17586,7 +19597,7 @@ type RenderInput struct {
 
 func (x *RenderInput) Reset() {
 	*x = RenderInput{}
-	mi := &file_volvoxgrid_proto_msgTypes[173]
+	mi := &file_volvoxgrid_proto_msgTypes[193]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -17598,7 +19609,7 @@ func (x *RenderInput) String() string {
 func (*RenderInput) ProtoMessage() {}
 
 func (x *RenderInput) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[173]
+	mi := &file_volvoxgrid_proto_msgTypes[193]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -17611,7 +19622,7 @@ func (x *RenderInput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RenderInput.ProtoReflect.Descriptor instead.
 func (*RenderInput) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{173}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{193}
 }
 
 func (x *RenderInput) GetGridId() int64 {
@@ -17745,6 +19756,24 @@ func (x *RenderInput) GetCompareResponse() *CompareResponse {
 	return nil
 }
 
+func (x *RenderInput) GetEditValidationResponse() *EditValidationResponse {
+	if x != nil {
+		if x, ok := x.Input.(*RenderInput_EditValidationResponse); ok {
+			return x.EditValidationResponse
+		}
+	}
+	return nil
+}
+
+func (x *RenderInput) GetEditorListItemsResponse() *EditorListItemsResponse {
+	if x != nil {
+		if x, ok := x.Input.(*RenderInput_EditorListItemsResponse); ok {
+			return x.EditorListItemsResponse
+		}
+	}
+	return nil
+}
+
 type isRenderInput_Input interface {
 	isRenderInput_Input()
 }
@@ -17801,6 +19830,14 @@ type RenderInput_CompareResponse struct {
 	CompareResponse *CompareResponse `protobuf:"bytes,14,opt,name=compare_response,json=compareResponse,proto3,oneof"`
 }
 
+type RenderInput_EditValidationResponse struct {
+	EditValidationResponse *EditValidationResponse `protobuf:"bytes,15,opt,name=edit_validation_response,json=editValidationResponse,proto3,oneof"`
+}
+
+type RenderInput_EditorListItemsResponse struct {
+	EditorListItemsResponse *EditorListItemsResponse `protobuf:"bytes,16,opt,name=editor_list_items_response,json=editorListItemsResponse,proto3,oneof"`
+}
+
 func (*RenderInput_Viewport) isRenderInput_Input() {}
 
 func (*RenderInput_Pointer) isRenderInput_Input() {}
@@ -17827,6 +19864,10 @@ func (*RenderInput_TerminalCommand) isRenderInput_Input() {}
 
 func (*RenderInput_CompareResponse) isRenderInput_Input() {}
 
+func (*RenderInput_EditValidationResponse) isRenderInput_Input() {}
+
+func (*RenderInput_EditorListItemsResponse) isRenderInput_Input() {}
+
 // Host response to a CompareEvent emitted on EventStream during
 // SORT_TYPE_CUSTOM. result: <0 = row1 before row2, 0 = equal,
 // >0 = row1 after row2. request_id must echo the CompareEvent.
@@ -17840,7 +19881,7 @@ type CompareResponse struct {
 
 func (x *CompareResponse) Reset() {
 	*x = CompareResponse{}
-	mi := &file_volvoxgrid_proto_msgTypes[174]
+	mi := &file_volvoxgrid_proto_msgTypes[194]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -17852,7 +19893,7 @@ func (x *CompareResponse) String() string {
 func (*CompareResponse) ProtoMessage() {}
 
 func (x *CompareResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[174]
+	mi := &file_volvoxgrid_proto_msgTypes[194]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -17865,7 +19906,7 @@ func (x *CompareResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CompareResponse.ProtoReflect.Descriptor instead.
 func (*CompareResponse) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{174}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{194}
 }
 
 func (x *CompareResponse) GetRequestId() int64 {
@@ -17882,6 +19923,142 @@ func (x *CompareResponse) GetResult() int32 {
 	return 0
 }
 
+type EditValidationResponse struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	RequestId       int64                  `protobuf:"varint,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	SessionId       int64                  `protobuf:"varint,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Errors          []*ValidationError     `protobuf:"bytes,3,rep,name=errors,proto3" json:"errors,omitempty"`
+	NormalizedValue *EditorValue           `protobuf:"bytes,4,opt,name=normalized_value,json=normalizedValue,proto3,oneof" json:"normalized_value,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *EditValidationResponse) Reset() {
+	*x = EditValidationResponse{}
+	mi := &file_volvoxgrid_proto_msgTypes[195]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EditValidationResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EditValidationResponse) ProtoMessage() {}
+
+func (x *EditValidationResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_volvoxgrid_proto_msgTypes[195]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EditValidationResponse.ProtoReflect.Descriptor instead.
+func (*EditValidationResponse) Descriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{195}
+}
+
+func (x *EditValidationResponse) GetRequestId() int64 {
+	if x != nil {
+		return x.RequestId
+	}
+	return 0
+}
+
+func (x *EditValidationResponse) GetSessionId() int64 {
+	if x != nil {
+		return x.SessionId
+	}
+	return 0
+}
+
+func (x *EditValidationResponse) GetErrors() []*ValidationError {
+	if x != nil {
+		return x.Errors
+	}
+	return nil
+}
+
+func (x *EditValidationResponse) GetNormalizedValue() *EditorValue {
+	if x != nil {
+		return x.NormalizedValue
+	}
+	return nil
+}
+
+type EditorListItemsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RequestId     int64                  `protobuf:"varint,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	SessionId     int64                  `protobuf:"varint,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Items         []*ListItem            `protobuf:"bytes,3,rep,name=items,proto3" json:"items,omitempty"`
+	HasMore       bool                   `protobuf:"varint,4,opt,name=has_more,json=hasMore,proto3" json:"has_more,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EditorListItemsResponse) Reset() {
+	*x = EditorListItemsResponse{}
+	mi := &file_volvoxgrid_proto_msgTypes[196]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EditorListItemsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EditorListItemsResponse) ProtoMessage() {}
+
+func (x *EditorListItemsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_volvoxgrid_proto_msgTypes[196]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EditorListItemsResponse.ProtoReflect.Descriptor instead.
+func (*EditorListItemsResponse) Descriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{196}
+}
+
+func (x *EditorListItemsResponse) GetRequestId() int64 {
+	if x != nil {
+		return x.RequestId
+	}
+	return 0
+}
+
+func (x *EditorListItemsResponse) GetSessionId() int64 {
+	if x != nil {
+		return x.SessionId
+	}
+	return 0
+}
+
+func (x *EditorListItemsResponse) GetItems() []*ListItem {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+func (x *EditorListItemsResponse) GetHasMore() bool {
+	if x != nil {
+		return x.HasMore
+	}
+	return false
+}
+
 type ViewportState struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ScrollX       float32                `protobuf:"fixed32,1,opt,name=scroll_x,json=scrollX,proto3" json:"scroll_x,omitempty"`
@@ -17894,7 +20071,7 @@ type ViewportState struct {
 
 func (x *ViewportState) Reset() {
 	*x = ViewportState{}
-	mi := &file_volvoxgrid_proto_msgTypes[175]
+	mi := &file_volvoxgrid_proto_msgTypes[197]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -17906,7 +20083,7 @@ func (x *ViewportState) String() string {
 func (*ViewportState) ProtoMessage() {}
 
 func (x *ViewportState) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[175]
+	mi := &file_volvoxgrid_proto_msgTypes[197]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -17919,7 +20096,7 @@ func (x *ViewportState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ViewportState.ProtoReflect.Descriptor instead.
 func (*ViewportState) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{175}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{197}
 }
 
 func (x *ViewportState) GetScrollX() float32 {
@@ -17966,7 +20143,7 @@ type PointerEvent struct {
 
 func (x *PointerEvent) Reset() {
 	*x = PointerEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[176]
+	mi := &file_volvoxgrid_proto_msgTypes[198]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -17978,7 +20155,7 @@ func (x *PointerEvent) String() string {
 func (*PointerEvent) ProtoMessage() {}
 
 func (x *PointerEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[176]
+	mi := &file_volvoxgrid_proto_msgTypes[198]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -17991,7 +20168,7 @@ func (x *PointerEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PointerEvent.ProtoReflect.Descriptor instead.
 func (*PointerEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{176}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{198}
 }
 
 func (x *PointerEvent) GetType() PointerEvent_Type {
@@ -18046,7 +20223,7 @@ type ScrollEvent struct {
 
 func (x *ScrollEvent) Reset() {
 	*x = ScrollEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[177]
+	mi := &file_volvoxgrid_proto_msgTypes[199]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18058,7 +20235,7 @@ func (x *ScrollEvent) String() string {
 func (*ScrollEvent) ProtoMessage() {}
 
 func (x *ScrollEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[177]
+	mi := &file_volvoxgrid_proto_msgTypes[199]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18071,7 +20248,7 @@ func (x *ScrollEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScrollEvent.ProtoReflect.Descriptor instead.
 func (*ScrollEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{177}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{199}
 }
 
 func (x *ScrollEvent) GetDeltaX() float32 {
@@ -18100,7 +20277,7 @@ type ZoomEvent struct {
 
 func (x *ZoomEvent) Reset() {
 	*x = ZoomEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[178]
+	mi := &file_volvoxgrid_proto_msgTypes[200]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18112,7 +20289,7 @@ func (x *ZoomEvent) String() string {
 func (*ZoomEvent) ProtoMessage() {}
 
 func (x *ZoomEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[178]
+	mi := &file_volvoxgrid_proto_msgTypes[200]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18125,7 +20302,7 @@ func (x *ZoomEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ZoomEvent.ProtoReflect.Descriptor instead.
 func (*ZoomEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{178}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{200}
 }
 
 func (x *ZoomEvent) GetPhase() ZoomEvent_Phase {
@@ -18176,7 +20353,7 @@ type KeyEvent struct {
 
 func (x *KeyEvent) Reset() {
 	*x = KeyEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[179]
+	mi := &file_volvoxgrid_proto_msgTypes[201]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18188,7 +20365,7 @@ func (x *KeyEvent) String() string {
 func (*KeyEvent) ProtoMessage() {}
 
 func (x *KeyEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[179]
+	mi := &file_volvoxgrid_proto_msgTypes[201]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18201,7 +20378,7 @@ func (x *KeyEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KeyEvent.ProtoReflect.Descriptor instead.
 func (*KeyEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{179}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{201}
 }
 
 func (x *KeyEvent) GetType() KeyEvent_Type {
@@ -18249,7 +20426,7 @@ type BufferReady struct {
 
 func (x *BufferReady) Reset() {
 	*x = BufferReady{}
-	mi := &file_volvoxgrid_proto_msgTypes[180]
+	mi := &file_volvoxgrid_proto_msgTypes[202]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18261,7 +20438,7 @@ func (x *BufferReady) String() string {
 func (*BufferReady) ProtoMessage() {}
 
 func (x *BufferReady) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[180]
+	mi := &file_volvoxgrid_proto_msgTypes[202]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18274,7 +20451,7 @@ func (x *BufferReady) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BufferReady.ProtoReflect.Descriptor instead.
 func (*BufferReady) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{180}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{202}
 }
 
 func (x *BufferReady) GetHandle() int64 {
@@ -18321,7 +20498,7 @@ type TerminalInputBytes struct {
 
 func (x *TerminalInputBytes) Reset() {
 	*x = TerminalInputBytes{}
-	mi := &file_volvoxgrid_proto_msgTypes[181]
+	mi := &file_volvoxgrid_proto_msgTypes[203]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18333,7 +20510,7 @@ func (x *TerminalInputBytes) String() string {
 func (*TerminalInputBytes) ProtoMessage() {}
 
 func (x *TerminalInputBytes) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[181]
+	mi := &file_volvoxgrid_proto_msgTypes[203]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18346,7 +20523,7 @@ func (x *TerminalInputBytes) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TerminalInputBytes.ProtoReflect.Descriptor instead.
 func (*TerminalInputBytes) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{181}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{203}
 }
 
 func (x *TerminalInputBytes) GetData() []byte {
@@ -18368,7 +20545,7 @@ type TerminalCapabilities struct {
 
 func (x *TerminalCapabilities) Reset() {
 	*x = TerminalCapabilities{}
-	mi := &file_volvoxgrid_proto_msgTypes[182]
+	mi := &file_volvoxgrid_proto_msgTypes[204]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18380,7 +20557,7 @@ func (x *TerminalCapabilities) String() string {
 func (*TerminalCapabilities) ProtoMessage() {}
 
 func (x *TerminalCapabilities) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[182]
+	mi := &file_volvoxgrid_proto_msgTypes[204]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18393,7 +20570,7 @@ func (x *TerminalCapabilities) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TerminalCapabilities.ProtoReflect.Descriptor instead.
 func (*TerminalCapabilities) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{182}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{204}
 }
 
 func (x *TerminalCapabilities) GetColorLevel() TerminalColorLevel {
@@ -18437,7 +20614,7 @@ type TerminalViewport struct {
 
 func (x *TerminalViewport) Reset() {
 	*x = TerminalViewport{}
-	mi := &file_volvoxgrid_proto_msgTypes[183]
+	mi := &file_volvoxgrid_proto_msgTypes[205]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18449,7 +20626,7 @@ func (x *TerminalViewport) String() string {
 func (*TerminalViewport) ProtoMessage() {}
 
 func (x *TerminalViewport) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[183]
+	mi := &file_volvoxgrid_proto_msgTypes[205]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18462,7 +20639,7 @@ func (x *TerminalViewport) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TerminalViewport.ProtoReflect.Descriptor instead.
 func (*TerminalViewport) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{183}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{205}
 }
 
 func (x *TerminalViewport) GetOriginX() int32 {
@@ -18509,7 +20686,7 @@ type TerminalCommand struct {
 
 func (x *TerminalCommand) Reset() {
 	*x = TerminalCommand{}
-	mi := &file_volvoxgrid_proto_msgTypes[184]
+	mi := &file_volvoxgrid_proto_msgTypes[206]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18521,7 +20698,7 @@ func (x *TerminalCommand) String() string {
 func (*TerminalCommand) ProtoMessage() {}
 
 func (x *TerminalCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[184]
+	mi := &file_volvoxgrid_proto_msgTypes[206]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18534,7 +20711,7 @@ func (x *TerminalCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TerminalCommand.ProtoReflect.Descriptor instead.
 func (*TerminalCommand) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{184}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{206}
 }
 
 func (x *TerminalCommand) GetKind() TerminalCommand_Kind {
@@ -18559,7 +20736,7 @@ type GpuSurfaceReady struct {
 
 func (x *GpuSurfaceReady) Reset() {
 	*x = GpuSurfaceReady{}
-	mi := &file_volvoxgrid_proto_msgTypes[185]
+	mi := &file_volvoxgrid_proto_msgTypes[207]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18571,7 +20748,7 @@ func (x *GpuSurfaceReady) String() string {
 func (*GpuSurfaceReady) ProtoMessage() {}
 
 func (x *GpuSurfaceReady) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[185]
+	mi := &file_volvoxgrid_proto_msgTypes[207]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18584,7 +20761,7 @@ func (x *GpuSurfaceReady) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GpuSurfaceReady.ProtoReflect.Descriptor instead.
 func (*GpuSurfaceReady) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{185}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{207}
 }
 
 func (x *GpuSurfaceReady) GetSurfaceHandle() int64 {
@@ -18614,7 +20791,7 @@ func (x *GpuSurfaceReady) GetHeight() int32 {
 // InteractionConfig.decision_timeout_ms with a finite value to enable a
 // watchdog; on timeout the engine emits ErrorEvent and auto-allows.
 //
-// Cancelable events: BeforeEdit, BeforeDropdownOpen, CellEditValidate, BeforeSort,
+// Cancelable events: BeforeEdit, CellEditValidate, BeforeSort,
 // BeforeNodeToggle, BeforeScroll, BeforeUserResize, BeforeMoveColumn,
 // BeforeMoveRow, BeforeMouseDown. Print-only BeforePageBreak is emitted
 // during synchronous rendering and is informational in this API.
@@ -18629,7 +20806,7 @@ type EventDecision struct {
 
 func (x *EventDecision) Reset() {
 	*x = EventDecision{}
-	mi := &file_volvoxgrid_proto_msgTypes[186]
+	mi := &file_volvoxgrid_proto_msgTypes[208]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18641,7 +20818,7 @@ func (x *EventDecision) String() string {
 func (*EventDecision) ProtoMessage() {}
 
 func (x *EventDecision) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[186]
+	mi := &file_volvoxgrid_proto_msgTypes[208]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18654,7 +20831,7 @@ func (x *EventDecision) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EventDecision.ProtoReflect.Descriptor instead.
 func (*EventDecision) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{186}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{208}
 }
 
 func (x *EventDecision) GetGridId() int64 {
@@ -18693,8 +20870,9 @@ type RenderOutput struct {
 	//	*RenderOutput_FrameDone
 	//	*RenderOutput_Selection
 	//	*RenderOutput_Cursor
-	//	*RenderOutput_EditRequest
-	//	*RenderOutput_DropdownRequest
+	//	*RenderOutput_EditorStarted
+	//	*RenderOutput_EditorUpdated
+	//	*RenderOutput_EditorEnded
 	//	*RenderOutput_TooltipRequest
 	//	*RenderOutput_GpuFrameDone
 	Event         isRenderOutput_Event `protobuf_oneof:"event"`
@@ -18704,7 +20882,7 @@ type RenderOutput struct {
 
 func (x *RenderOutput) Reset() {
 	*x = RenderOutput{}
-	mi := &file_volvoxgrid_proto_msgTypes[187]
+	mi := &file_volvoxgrid_proto_msgTypes[209]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18716,7 +20894,7 @@ func (x *RenderOutput) String() string {
 func (*RenderOutput) ProtoMessage() {}
 
 func (x *RenderOutput) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[187]
+	mi := &file_volvoxgrid_proto_msgTypes[209]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18729,7 +20907,7 @@ func (x *RenderOutput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RenderOutput.ProtoReflect.Descriptor instead.
 func (*RenderOutput) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{187}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{209}
 }
 
 func (x *RenderOutput) GetRendered() bool {
@@ -18773,19 +20951,28 @@ func (x *RenderOutput) GetCursor() *CursorChange {
 	return nil
 }
 
-func (x *RenderOutput) GetEditRequest() *EditRequest {
+func (x *RenderOutput) GetEditorStarted() *EditorSessionStarted {
 	if x != nil {
-		if x, ok := x.Event.(*RenderOutput_EditRequest); ok {
-			return x.EditRequest
+		if x, ok := x.Event.(*RenderOutput_EditorStarted); ok {
+			return x.EditorStarted
 		}
 	}
 	return nil
 }
 
-func (x *RenderOutput) GetDropdownRequest() *DropdownRequest {
+func (x *RenderOutput) GetEditorUpdated() *EditorSessionUpdated {
 	if x != nil {
-		if x, ok := x.Event.(*RenderOutput_DropdownRequest); ok {
-			return x.DropdownRequest
+		if x, ok := x.Event.(*RenderOutput_EditorUpdated); ok {
+			return x.EditorUpdated
+		}
+	}
+	return nil
+}
+
+func (x *RenderOutput) GetEditorEnded() *EditorSessionEnded {
+	if x != nil {
+		if x, ok := x.Event.(*RenderOutput_EditorEnded); ok {
+			return x.EditorEnded
 		}
 	}
 	return nil
@@ -18825,20 +21012,24 @@ type RenderOutput_Cursor struct {
 	Cursor *CursorChange `protobuf:"bytes,4,opt,name=cursor,proto3,oneof"`
 }
 
-type RenderOutput_EditRequest struct {
-	EditRequest *EditRequest `protobuf:"bytes,5,opt,name=edit_request,json=editRequest,proto3,oneof"`
+type RenderOutput_EditorStarted struct {
+	EditorStarted *EditorSessionStarted `protobuf:"bytes,5,opt,name=editor_started,json=editorStarted,proto3,oneof"`
 }
 
-type RenderOutput_DropdownRequest struct {
-	DropdownRequest *DropdownRequest `protobuf:"bytes,6,opt,name=dropdown_request,json=dropdownRequest,proto3,oneof"`
+type RenderOutput_EditorUpdated struct {
+	EditorUpdated *EditorSessionUpdated `protobuf:"bytes,6,opt,name=editor_updated,json=editorUpdated,proto3,oneof"`
+}
+
+type RenderOutput_EditorEnded struct {
+	EditorEnded *EditorSessionEnded `protobuf:"bytes,7,opt,name=editor_ended,json=editorEnded,proto3,oneof"`
 }
 
 type RenderOutput_TooltipRequest struct {
-	TooltipRequest *TooltipRequest `protobuf:"bytes,7,opt,name=tooltip_request,json=tooltipRequest,proto3,oneof"`
+	TooltipRequest *TooltipRequest `protobuf:"bytes,8,opt,name=tooltip_request,json=tooltipRequest,proto3,oneof"`
 }
 
 type RenderOutput_GpuFrameDone struct {
-	GpuFrameDone *GpuFrameDone `protobuf:"bytes,8,opt,name=gpu_frame_done,json=gpuFrameDone,proto3,oneof"`
+	GpuFrameDone *GpuFrameDone `protobuf:"bytes,9,opt,name=gpu_frame_done,json=gpuFrameDone,proto3,oneof"`
 }
 
 func (*RenderOutput_FrameDone) isRenderOutput_Event() {}
@@ -18847,9 +21038,11 @@ func (*RenderOutput_Selection) isRenderOutput_Event() {}
 
 func (*RenderOutput_Cursor) isRenderOutput_Event() {}
 
-func (*RenderOutput_EditRequest) isRenderOutput_Event() {}
+func (*RenderOutput_EditorStarted) isRenderOutput_Event() {}
 
-func (*RenderOutput_DropdownRequest) isRenderOutput_Event() {}
+func (*RenderOutput_EditorUpdated) isRenderOutput_Event() {}
+
+func (*RenderOutput_EditorEnded) isRenderOutput_Event() {}
 
 func (*RenderOutput_TooltipRequest) isRenderOutput_Event() {}
 
@@ -18875,7 +21068,7 @@ type FrameDone struct {
 
 func (x *FrameDone) Reset() {
 	*x = FrameDone{}
-	mi := &file_volvoxgrid_proto_msgTypes[188]
+	mi := &file_volvoxgrid_proto_msgTypes[210]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18887,7 +21080,7 @@ func (x *FrameDone) String() string {
 func (*FrameDone) ProtoMessage() {}
 
 func (x *FrameDone) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[188]
+	mi := &file_volvoxgrid_proto_msgTypes[210]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18900,7 +21093,7 @@ func (x *FrameDone) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FrameDone.ProtoReflect.Descriptor instead.
 func (*FrameDone) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{188}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{210}
 }
 
 func (x *FrameDone) GetHandle() int64 {
@@ -18979,7 +21172,7 @@ type GpuFrameDone struct {
 
 func (x *GpuFrameDone) Reset() {
 	*x = GpuFrameDone{}
-	mi := &file_volvoxgrid_proto_msgTypes[189]
+	mi := &file_volvoxgrid_proto_msgTypes[211]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18991,7 +21184,7 @@ func (x *GpuFrameDone) String() string {
 func (*GpuFrameDone) ProtoMessage() {}
 
 func (x *GpuFrameDone) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[189]
+	mi := &file_volvoxgrid_proto_msgTypes[211]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -19004,7 +21197,7 @@ func (x *GpuFrameDone) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GpuFrameDone.ProtoReflect.Descriptor instead.
 func (*GpuFrameDone) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{189}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{211}
 }
 
 func (x *GpuFrameDone) GetDirtyX() int32 {
@@ -19056,7 +21249,7 @@ type FrameMetrics struct {
 
 func (x *FrameMetrics) Reset() {
 	*x = FrameMetrics{}
-	mi := &file_volvoxgrid_proto_msgTypes[190]
+	mi := &file_volvoxgrid_proto_msgTypes[212]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -19068,7 +21261,7 @@ func (x *FrameMetrics) String() string {
 func (*FrameMetrics) ProtoMessage() {}
 
 func (x *FrameMetrics) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[190]
+	mi := &file_volvoxgrid_proto_msgTypes[212]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -19081,7 +21274,7 @@ func (x *FrameMetrics) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FrameMetrics.ProtoReflect.Descriptor instead.
 func (*FrameMetrics) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{190}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{212}
 }
 
 func (x *FrameMetrics) GetFrameTimeMs() float32 {
@@ -19130,7 +21323,7 @@ type SelectionUpdate struct {
 
 func (x *SelectionUpdate) Reset() {
 	*x = SelectionUpdate{}
-	mi := &file_volvoxgrid_proto_msgTypes[191]
+	mi := &file_volvoxgrid_proto_msgTypes[213]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -19142,7 +21335,7 @@ func (x *SelectionUpdate) String() string {
 func (*SelectionUpdate) ProtoMessage() {}
 
 func (x *SelectionUpdate) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[191]
+	mi := &file_volvoxgrid_proto_msgTypes[213]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -19155,7 +21348,7 @@ func (x *SelectionUpdate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SelectionUpdate.ProtoReflect.Descriptor instead.
 func (*SelectionUpdate) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{191}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{213}
 }
 
 func (x *SelectionUpdate) GetActiveRow() int32 {
@@ -19188,7 +21381,7 @@ type CursorChange struct {
 
 func (x *CursorChange) Reset() {
 	*x = CursorChange{}
-	mi := &file_volvoxgrid_proto_msgTypes[192]
+	mi := &file_volvoxgrid_proto_msgTypes[214]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -19200,7 +21393,7 @@ func (x *CursorChange) String() string {
 func (*CursorChange) ProtoMessage() {}
 
 func (x *CursorChange) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[192]
+	mi := &file_volvoxgrid_proto_msgTypes[214]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -19213,7 +21406,7 @@ func (x *CursorChange) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CursorChange.ProtoReflect.Descriptor instead.
 func (*CursorChange) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{192}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{214}
 }
 
 func (x *CursorChange) GetCursor() CursorType {
@@ -19223,45 +21416,33 @@ func (x *CursorChange) GetCursor() CursorType {
 	return CursorType_CURSOR_DEFAULT
 }
 
-// Emitted on RenderOutput when the engine wants the host to show an
-// edit overlay. The host should position a native text input at (x,y)
-// with the given dimensions and pre-fill it with current_value.
-// See runtime/src/lib.rs build_edit_request().
-type EditRequest struct {
-	state        protoimpl.MessageState `protogen:"open.v1"`
-	Row          int32                  `protobuf:"varint,1,opt,name=row,proto3" json:"row,omitempty"`
-	Col          int32                  `protobuf:"varint,2,opt,name=col,proto3" json:"col,omitempty"`
-	X            float32                `protobuf:"fixed32,3,opt,name=x,proto3" json:"x,omitempty"`                                         // viewport-local cell rect X
-	Y            float32                `protobuf:"fixed32,4,opt,name=y,proto3" json:"y,omitempty"`                                         // viewport-local cell rect Y
-	Width        float32                `protobuf:"fixed32,5,opt,name=width,proto3" json:"width,omitempty"`                                 // cell rect width
-	Height       float32                `protobuf:"fixed32,6,opt,name=height,proto3" json:"height,omitempty"`                               // cell rect height
-	CurrentValue string                 `protobuf:"bytes,7,opt,name=current_value,json=currentValue,proto3" json:"current_value,omitempty"` // text to pre-fill
-	EditMask     string                 `protobuf:"bytes,8,opt,name=edit_mask,json=editMask,proto3" json:"edit_mask,omitempty"`             // format mask, e.g. "(999) 999-9999"
-	MaxLength    int32                  `protobuf:"varint,9,opt,name=max_length,json=maxLength,proto3" json:"max_length,omitempty"`         // 0 = unlimited
-	SelStart     int32                  `protobuf:"varint,10,opt,name=sel_start,json=selStart,proto3" json:"sel_start,omitempty"`           // text selection start (caret position)
-	SelLength    int32                  `protobuf:"varint,11,opt,name=sel_length,json=selLength,proto3" json:"sel_length,omitempty"`        // text selection length
-	// ENTER (0): Enter commits and moves cursor. Character keys replace content.
-	// EDIT (1):  F2 mode. Caret at end. Escape cancels.
-	UiMode        EditUiMode `protobuf:"varint,12,opt,name=ui_mode,json=uiMode,proto3,enum=volvoxgrid.v1.EditUiMode" json:"ui_mode,omitempty"`
+// Engine → host. Begins an editor session on the host side. Carries the full
+// EditorSession snapshot. For engine-drawn editors the EditorSpec inside
+// `session.editor` will have presentation = EDITOR_CANVAS; the host MUST
+// track the session for clipboard / keyboard routing but MUST NOT show an
+// overlay.
+type EditorSessionStarted struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Session       *EditorSession         `protobuf:"bytes,1,opt,name=session,proto3" json:"session,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *EditRequest) Reset() {
-	*x = EditRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[193]
+func (x *EditorSessionStarted) Reset() {
+	*x = EditorSessionStarted{}
+	mi := &file_volvoxgrid_proto_msgTypes[215]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *EditRequest) String() string {
+func (x *EditorSessionStarted) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*EditRequest) ProtoMessage() {}
+func (*EditorSessionStarted) ProtoMessage() {}
 
-func (x *EditRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[193]
+func (x *EditorSessionStarted) ProtoReflect() protoreflect.Message {
+	mi := &file_volvoxgrid_proto_msgTypes[215]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -19272,202 +21453,212 @@ func (x *EditRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use EditRequest.ProtoReflect.Descriptor instead.
-func (*EditRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{193}
+// Deprecated: Use EditorSessionStarted.ProtoReflect.Descriptor instead.
+func (*EditorSessionStarted) Descriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{215}
 }
 
-func (x *EditRequest) GetRow() int32 {
+func (x *EditorSessionStarted) GetSession() *EditorSession {
 	if x != nil {
-		return x.Row
-	}
-	return 0
-}
-
-func (x *EditRequest) GetCol() int32 {
-	if x != nil {
-		return x.Col
-	}
-	return 0
-}
-
-func (x *EditRequest) GetX() float32 {
-	if x != nil {
-		return x.X
-	}
-	return 0
-}
-
-func (x *EditRequest) GetY() float32 {
-	if x != nil {
-		return x.Y
-	}
-	return 0
-}
-
-func (x *EditRequest) GetWidth() float32 {
-	if x != nil {
-		return x.Width
-	}
-	return 0
-}
-
-func (x *EditRequest) GetHeight() float32 {
-	if x != nil {
-		return x.Height
-	}
-	return 0
-}
-
-func (x *EditRequest) GetCurrentValue() string {
-	if x != nil {
-		return x.CurrentValue
-	}
-	return ""
-}
-
-func (x *EditRequest) GetEditMask() string {
-	if x != nil {
-		return x.EditMask
-	}
-	return ""
-}
-
-func (x *EditRequest) GetMaxLength() int32 {
-	if x != nil {
-		return x.MaxLength
-	}
-	return 0
-}
-
-func (x *EditRequest) GetSelStart() int32 {
-	if x != nil {
-		return x.SelStart
-	}
-	return 0
-}
-
-func (x *EditRequest) GetSelLength() int32 {
-	if x != nil {
-		return x.SelLength
-	}
-	return 0
-}
-
-func (x *EditRequest) GetUiMode() EditUiMode {
-	if x != nil {
-		return x.UiMode
-	}
-	return EditUiMode_EDIT_UI_MODE_ENTER
-}
-
-type DropdownRequest struct {
-	state    protoimpl.MessageState `protogen:"open.v1"`
-	Row      int32                  `protobuf:"varint,1,opt,name=row,proto3" json:"row,omitempty"`
-	Col      int32                  `protobuf:"varint,2,opt,name=col,proto3" json:"col,omitempty"`
-	X        float32                `protobuf:"fixed32,3,opt,name=x,proto3" json:"x,omitempty"`
-	Y        float32                `protobuf:"fixed32,4,opt,name=y,proto3" json:"y,omitempty"`
-	Width    float32                `protobuf:"fixed32,5,opt,name=width,proto3" json:"width,omitempty"`
-	Height   float32                `protobuf:"fixed32,6,opt,name=height,proto3" json:"height,omitempty"`
-	Items    []string               `protobuf:"bytes,7,rep,name=items,proto3" json:"items,omitempty"`
-	Selected int32                  `protobuf:"varint,8,opt,name=selected,proto3" json:"selected,omitempty"`
-	// True if free-form text entry is allowed.
-	Editable      bool `protobuf:"varint,9,opt,name=editable,proto3" json:"editable,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *DropdownRequest) Reset() {
-	*x = DropdownRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[194]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *DropdownRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*DropdownRequest) ProtoMessage() {}
-
-func (x *DropdownRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[194]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use DropdownRequest.ProtoReflect.Descriptor instead.
-func (*DropdownRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{194}
-}
-
-func (x *DropdownRequest) GetRow() int32 {
-	if x != nil {
-		return x.Row
-	}
-	return 0
-}
-
-func (x *DropdownRequest) GetCol() int32 {
-	if x != nil {
-		return x.Col
-	}
-	return 0
-}
-
-func (x *DropdownRequest) GetX() float32 {
-	if x != nil {
-		return x.X
-	}
-	return 0
-}
-
-func (x *DropdownRequest) GetY() float32 {
-	if x != nil {
-		return x.Y
-	}
-	return 0
-}
-
-func (x *DropdownRequest) GetWidth() float32 {
-	if x != nil {
-		return x.Width
-	}
-	return 0
-}
-
-func (x *DropdownRequest) GetHeight() float32 {
-	if x != nil {
-		return x.Height
-	}
-	return 0
-}
-
-func (x *DropdownRequest) GetItems() []string {
-	if x != nil {
-		return x.Items
+		return x.Session
 	}
 	return nil
 }
 
-func (x *DropdownRequest) GetSelected() int32 {
+// Engine → host. Sparse delta against the last known session. Any field left
+// unset is unchanged; `validation_errors` is always authoritative when present.
+//
+// Why this is flat (not nested in `session` like EditorSessionStarted): this
+// is a partial update against a previously-Started snapshot, not a fresh
+// snapshot. Nesting it inside an EditorSession submessage would force every
+// reader to handle the "field present but inner field unset" case for each
+// mutable field, with no benefit since the immutable fields (row, col,
+// editor, ui_mode, …) are guaranteed unchanged.
+type EditorSessionUpdated struct {
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	SessionId    int64                  `protobuf:"varint,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	StateVersion uint64                 `protobuf:"varint,2,opt,name=state_version,json=stateVersion,proto3" json:"state_version,omitempty"`
+	Reason       EditorUpdateReason     `protobuf:"varint,3,opt,name=reason,proto3,enum=volvoxgrid.v1.EditorUpdateReason" json:"reason,omitempty"`
+	ViewportRect *Rect                  `protobuf:"bytes,4,opt,name=viewport_rect,json=viewportRect,proto3,oneof" json:"viewport_rect,omitempty"`
+	Value        *EditorValue           `protobuf:"bytes,5,opt,name=value,proto3,oneof" json:"value,omitempty"`
+	Selection    *TextSelection         `protobuf:"bytes,6,opt,name=selection,proto3,oneof" json:"selection,omitempty"`
+	Visible      *bool                  `protobuf:"varint,7,opt,name=visible,proto3,oneof" json:"visible,omitempty"`
+	// Edge-triggered: when true, the host should re-focus its overlay widget on
+	// the next tick. Stale Updateds replayed across reconnect are gated by
+	// `state_version`.
+	ForceRefocus     *bool              `protobuf:"varint,8,opt,name=force_refocus,json=forceRefocus,proto3,oneof" json:"force_refocus,omitempty"`
+	ValidationErrors []*ValidationError `protobuf:"bytes,9,rep,name=validation_errors,json=validationErrors,proto3" json:"validation_errors,omitempty"`
+	CustomPayload    *StructValue       `protobuf:"bytes,10,opt,name=custom_payload,json=customPayload,proto3" json:"custom_payload,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *EditorSessionUpdated) Reset() {
+	*x = EditorSessionUpdated{}
+	mi := &file_volvoxgrid_proto_msgTypes[216]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EditorSessionUpdated) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EditorSessionUpdated) ProtoMessage() {}
+
+func (x *EditorSessionUpdated) ProtoReflect() protoreflect.Message {
+	mi := &file_volvoxgrid_proto_msgTypes[216]
 	if x != nil {
-		return x.Selected
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EditorSessionUpdated.ProtoReflect.Descriptor instead.
+func (*EditorSessionUpdated) Descriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{216}
+}
+
+func (x *EditorSessionUpdated) GetSessionId() int64 {
+	if x != nil {
+		return x.SessionId
 	}
 	return 0
 }
 
-func (x *DropdownRequest) GetEditable() bool {
+func (x *EditorSessionUpdated) GetStateVersion() uint64 {
 	if x != nil {
-		return x.Editable
+		return x.StateVersion
+	}
+	return 0
+}
+
+func (x *EditorSessionUpdated) GetReason() EditorUpdateReason {
+	if x != nil {
+		return x.Reason
+	}
+	return EditorUpdateReason_EDITOR_UPDATE_UNSPECIFIED
+}
+
+func (x *EditorSessionUpdated) GetViewportRect() *Rect {
+	if x != nil {
+		return x.ViewportRect
+	}
+	return nil
+}
+
+func (x *EditorSessionUpdated) GetValue() *EditorValue {
+	if x != nil {
+		return x.Value
+	}
+	return nil
+}
+
+func (x *EditorSessionUpdated) GetSelection() *TextSelection {
+	if x != nil {
+		return x.Selection
+	}
+	return nil
+}
+
+func (x *EditorSessionUpdated) GetVisible() bool {
+	if x != nil && x.Visible != nil {
+		return *x.Visible
 	}
 	return false
+}
+
+func (x *EditorSessionUpdated) GetForceRefocus() bool {
+	if x != nil && x.ForceRefocus != nil {
+		return *x.ForceRefocus
+	}
+	return false
+}
+
+func (x *EditorSessionUpdated) GetValidationErrors() []*ValidationError {
+	if x != nil {
+		return x.ValidationErrors
+	}
+	return nil
+}
+
+func (x *EditorSessionUpdated) GetCustomPayload() *StructValue {
+	if x != nil {
+		return x.CustomPayload
+	}
+	return nil
+}
+
+type EditorSessionEnded struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	SessionId      int64                  `protobuf:"varint,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Reason         EditEndReason          `protobuf:"varint,2,opt,name=reason,proto3,enum=volvoxgrid.v1.EditEndReason" json:"reason,omitempty"`
+	CommittedValue *EditorValue           `protobuf:"bytes,3,opt,name=committed_value,json=committedValue,proto3" json:"committed_value,omitempty"`
+	StateVersion   uint64                 `protobuf:"varint,4,opt,name=state_version,json=stateVersion,proto3" json:"state_version,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *EditorSessionEnded) Reset() {
+	*x = EditorSessionEnded{}
+	mi := &file_volvoxgrid_proto_msgTypes[217]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EditorSessionEnded) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EditorSessionEnded) ProtoMessage() {}
+
+func (x *EditorSessionEnded) ProtoReflect() protoreflect.Message {
+	mi := &file_volvoxgrid_proto_msgTypes[217]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EditorSessionEnded.ProtoReflect.Descriptor instead.
+func (*EditorSessionEnded) Descriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{217}
+}
+
+func (x *EditorSessionEnded) GetSessionId() int64 {
+	if x != nil {
+		return x.SessionId
+	}
+	return 0
+}
+
+func (x *EditorSessionEnded) GetReason() EditEndReason {
+	if x != nil {
+		return x.Reason
+	}
+	return EditEndReason_EDIT_END_UNSPECIFIED
+}
+
+func (x *EditorSessionEnded) GetCommittedValue() *EditorValue {
+	if x != nil {
+		return x.CommittedValue
+	}
+	return nil
+}
+
+func (x *EditorSessionEnded) GetStateVersion() uint64 {
+	if x != nil {
+		return x.StateVersion
+	}
+	return 0
 }
 
 type TooltipRequest struct {
@@ -19481,7 +21672,7 @@ type TooltipRequest struct {
 
 func (x *TooltipRequest) Reset() {
 	*x = TooltipRequest{}
-	mi := &file_volvoxgrid_proto_msgTypes[195]
+	mi := &file_volvoxgrid_proto_msgTypes[218]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -19493,7 +21684,7 @@ func (x *TooltipRequest) String() string {
 func (*TooltipRequest) ProtoMessage() {}
 
 func (x *TooltipRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[195]
+	mi := &file_volvoxgrid_proto_msgTypes[218]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -19506,7 +21697,7 @@ func (x *TooltipRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TooltipRequest.ProtoReflect.Descriptor instead.
 func (*TooltipRequest) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{195}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{218}
 }
 
 func (x *TooltipRequest) GetX() float32 {
@@ -19552,10 +21743,9 @@ type GridEvent struct {
 	//	*GridEvent_KeyDownEdit
 	//	*GridEvent_KeyPressEdit
 	//	*GridEvent_KeyUpEdit
-	//	*GridEvent_CellEditConfigureStyle
-	//	*GridEvent_CellEditConfigureWindow
-	//	*GridEvent_DropdownClosed
-	//	*GridEvent_DropdownOpened
+	//	*GridEvent_EditValidationRequest
+	//	*GridEvent_EditorListItemsRequest
+	//	*GridEvent_CustomEditorAction
 	//	*GridEvent_CellChanged
 	//	*GridEvent_RowStatusChange
 	//	*GridEvent_BeforeSort
@@ -19598,7 +21788,6 @@ type GridEvent struct {
 	//	*GridEvent_GetHeaderRow
 	//	*GridEvent_PullToRefreshTriggered
 	//	*GridEvent_PullToRefreshCanceled
-	//	*GridEvent_BeforeDropdownOpen
 	//	*GridEvent_TreeChildrenRequested
 	//	*GridEvent_BeforeTreeNodeToggle
 	//	*GridEvent_AfterTreeNodeToggle
@@ -19611,7 +21800,7 @@ type GridEvent struct {
 
 func (x *GridEvent) Reset() {
 	*x = GridEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[196]
+	mi := &file_volvoxgrid_proto_msgTypes[219]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -19623,7 +21812,7 @@ func (x *GridEvent) String() string {
 func (*GridEvent) ProtoMessage() {}
 
 func (x *GridEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[196]
+	mi := &file_volvoxgrid_proto_msgTypes[219]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -19636,7 +21825,7 @@ func (x *GridEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GridEvent.ProtoReflect.Descriptor instead.
 func (*GridEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{196}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{219}
 }
 
 func (x *GridEvent) GetGridId() int64 {
@@ -19786,37 +21975,28 @@ func (x *GridEvent) GetKeyUpEdit() *KeyUpEditEvent {
 	return nil
 }
 
-func (x *GridEvent) GetCellEditConfigureStyle() *CellEditConfigureStyleEvent {
+func (x *GridEvent) GetEditValidationRequest() *EditValidationRequest {
 	if x != nil {
-		if x, ok := x.Event.(*GridEvent_CellEditConfigureStyle); ok {
-			return x.CellEditConfigureStyle
+		if x, ok := x.Event.(*GridEvent_EditValidationRequest); ok {
+			return x.EditValidationRequest
 		}
 	}
 	return nil
 }
 
-func (x *GridEvent) GetCellEditConfigureWindow() *CellEditConfigureWindowEvent {
+func (x *GridEvent) GetEditorListItemsRequest() *EditorListItemsRequest {
 	if x != nil {
-		if x, ok := x.Event.(*GridEvent_CellEditConfigureWindow); ok {
-			return x.CellEditConfigureWindow
+		if x, ok := x.Event.(*GridEvent_EditorListItemsRequest); ok {
+			return x.EditorListItemsRequest
 		}
 	}
 	return nil
 }
 
-func (x *GridEvent) GetDropdownClosed() *DropdownClosedEvent {
+func (x *GridEvent) GetCustomEditorAction() *CustomEditorActionEvent {
 	if x != nil {
-		if x, ok := x.Event.(*GridEvent_DropdownClosed); ok {
-			return x.DropdownClosed
-		}
-	}
-	return nil
-}
-
-func (x *GridEvent) GetDropdownOpened() *DropdownOpenedEvent {
-	if x != nil {
-		if x, ok := x.Event.(*GridEvent_DropdownOpened); ok {
-			return x.DropdownOpened
+		if x, ok := x.Event.(*GridEvent_CustomEditorAction); ok {
+			return x.CustomEditorAction
 		}
 	}
 	return nil
@@ -20200,15 +22380,6 @@ func (x *GridEvent) GetPullToRefreshCanceled() *PullToRefreshCanceledEvent {
 	return nil
 }
 
-func (x *GridEvent) GetBeforeDropdownOpen() *BeforeDropdownOpenEvent {
-	if x != nil {
-		if x, ok := x.Event.(*GridEvent_BeforeDropdownOpen); ok {
-			return x.BeforeDropdownOpen
-		}
-	}
-	return nil
-}
-
 func (x *GridEvent) GetTreeChildrenRequested() *TreeChildrenRequestedEvent {
 	if x != nil {
 		if x, ok := x.Event.(*GridEvent_TreeChildrenRequested); ok {
@@ -20305,239 +22476,231 @@ type GridEvent_CellEditChange struct {
 }
 
 type GridEvent_KeyDownEdit struct {
-	KeyDownEdit *KeyDownEditEvent `protobuf:"bytes,14,opt,name=key_down_edit,json=keyDownEdit,proto3,oneof"`
+	KeyDownEdit *KeyDownEditEvent `protobuf:"bytes,13,opt,name=key_down_edit,json=keyDownEdit,proto3,oneof"`
 }
 
 type GridEvent_KeyPressEdit struct {
-	KeyPressEdit *KeyPressEditEvent `protobuf:"bytes,15,opt,name=key_press_edit,json=keyPressEdit,proto3,oneof"`
+	KeyPressEdit *KeyPressEditEvent `protobuf:"bytes,14,opt,name=key_press_edit,json=keyPressEdit,proto3,oneof"`
 }
 
 type GridEvent_KeyUpEdit struct {
-	KeyUpEdit *KeyUpEditEvent `protobuf:"bytes,16,opt,name=key_up_edit,json=keyUpEdit,proto3,oneof"`
+	KeyUpEdit *KeyUpEditEvent `protobuf:"bytes,15,opt,name=key_up_edit,json=keyUpEdit,proto3,oneof"`
 }
 
-type GridEvent_CellEditConfigureStyle struct {
-	CellEditConfigureStyle *CellEditConfigureStyleEvent `protobuf:"bytes,17,opt,name=cell_edit_configure_style,json=cellEditConfigureStyle,proto3,oneof"`
+type GridEvent_EditValidationRequest struct {
+	EditValidationRequest *EditValidationRequest `protobuf:"bytes,16,opt,name=edit_validation_request,json=editValidationRequest,proto3,oneof"`
 }
 
-type GridEvent_CellEditConfigureWindow struct {
-	CellEditConfigureWindow *CellEditConfigureWindowEvent `protobuf:"bytes,18,opt,name=cell_edit_configure_window,json=cellEditConfigureWindow,proto3,oneof"`
+type GridEvent_EditorListItemsRequest struct {
+	EditorListItemsRequest *EditorListItemsRequest `protobuf:"bytes,17,opt,name=editor_list_items_request,json=editorListItemsRequest,proto3,oneof"`
 }
 
-type GridEvent_DropdownClosed struct {
-	DropdownClosed *DropdownClosedEvent `protobuf:"bytes,19,opt,name=dropdown_closed,json=dropdownClosed,proto3,oneof"`
-}
-
-type GridEvent_DropdownOpened struct {
-	DropdownOpened *DropdownOpenedEvent `protobuf:"bytes,20,opt,name=dropdown_opened,json=dropdownOpened,proto3,oneof"`
+type GridEvent_CustomEditorAction struct {
+	CustomEditorAction *CustomEditorActionEvent `protobuf:"bytes,18,opt,name=custom_editor_action,json=customEditorAction,proto3,oneof"`
 }
 
 type GridEvent_CellChanged struct {
 	// Data
-	CellChanged *CellChangedEvent `protobuf:"bytes,21,opt,name=cell_changed,json=cellChanged,proto3,oneof"`
+	CellChanged *CellChangedEvent `protobuf:"bytes,19,opt,name=cell_changed,json=cellChanged,proto3,oneof"`
 }
 
 type GridEvent_RowStatusChange struct {
-	RowStatusChange *RowStatusChangeEvent `protobuf:"bytes,22,opt,name=row_status_change,json=rowStatusChange,proto3,oneof"`
+	RowStatusChange *RowStatusChangeEvent `protobuf:"bytes,20,opt,name=row_status_change,json=rowStatusChange,proto3,oneof"`
 }
 
 type GridEvent_BeforeSort struct {
 	// Sort
-	BeforeSort *BeforeSortEvent `protobuf:"bytes,23,opt,name=before_sort,json=beforeSort,proto3,oneof"`
+	BeforeSort *BeforeSortEvent `protobuf:"bytes,21,opt,name=before_sort,json=beforeSort,proto3,oneof"`
 }
 
 type GridEvent_AfterSort struct {
-	AfterSort *AfterSortEvent `protobuf:"bytes,24,opt,name=after_sort,json=afterSort,proto3,oneof"`
+	AfterSort *AfterSortEvent `protobuf:"bytes,22,opt,name=after_sort,json=afterSort,proto3,oneof"`
 }
 
 type GridEvent_Compare struct {
-	Compare *CompareEvent `protobuf:"bytes,25,opt,name=compare,proto3,oneof"`
+	Compare *CompareEvent `protobuf:"bytes,23,opt,name=compare,proto3,oneof"`
 }
 
 type GridEvent_BeforeNodeToggle struct {
 	// Outline
-	BeforeNodeToggle *BeforeNodeToggleEvent `protobuf:"bytes,26,opt,name=before_node_toggle,json=beforeNodeToggle,proto3,oneof"`
+	BeforeNodeToggle *BeforeNodeToggleEvent `protobuf:"bytes,24,opt,name=before_node_toggle,json=beforeNodeToggle,proto3,oneof"`
 }
 
 type GridEvent_AfterNodeToggle struct {
-	AfterNodeToggle *AfterNodeToggleEvent `protobuf:"bytes,27,opt,name=after_node_toggle,json=afterNodeToggle,proto3,oneof"`
+	AfterNodeToggle *AfterNodeToggleEvent `protobuf:"bytes,25,opt,name=after_node_toggle,json=afterNodeToggle,proto3,oneof"`
 }
 
 type GridEvent_BeforeScroll struct {
 	// Scroll
-	BeforeScroll *BeforeScrollEvent `protobuf:"bytes,28,opt,name=before_scroll,json=beforeScroll,proto3,oneof"`
+	BeforeScroll *BeforeScrollEvent `protobuf:"bytes,26,opt,name=before_scroll,json=beforeScroll,proto3,oneof"`
 }
 
 type GridEvent_AfterScroll struct {
-	AfterScroll *AfterScrollEvent `protobuf:"bytes,29,opt,name=after_scroll,json=afterScroll,proto3,oneof"`
+	AfterScroll *AfterScrollEvent `protobuf:"bytes,27,opt,name=after_scroll,json=afterScroll,proto3,oneof"`
 }
 
 type GridEvent_ScrollTooltip struct {
-	ScrollTooltip *ScrollTooltipEvent `protobuf:"bytes,30,opt,name=scroll_tooltip,json=scrollTooltip,proto3,oneof"`
+	ScrollTooltip *ScrollTooltipEvent `protobuf:"bytes,28,opt,name=scroll_tooltip,json=scrollTooltip,proto3,oneof"`
 }
 
 type GridEvent_BeforeUserResize struct {
 	// Resize & Freeze
-	BeforeUserResize *BeforeUserResizeEvent `protobuf:"bytes,31,opt,name=before_user_resize,json=beforeUserResize,proto3,oneof"`
+	BeforeUserResize *BeforeUserResizeEvent `protobuf:"bytes,29,opt,name=before_user_resize,json=beforeUserResize,proto3,oneof"`
 }
 
 type GridEvent_AfterUserResize struct {
-	AfterUserResize *AfterUserResizeEvent `protobuf:"bytes,32,opt,name=after_user_resize,json=afterUserResize,proto3,oneof"`
+	AfterUserResize *AfterUserResizeEvent `protobuf:"bytes,30,opt,name=after_user_resize,json=afterUserResize,proto3,oneof"`
 }
 
 type GridEvent_AfterUserFreeze struct {
-	AfterUserFreeze *AfterUserFreezeEvent `protobuf:"bytes,33,opt,name=after_user_freeze,json=afterUserFreeze,proto3,oneof"`
+	AfterUserFreeze *AfterUserFreezeEvent `protobuf:"bytes,31,opt,name=after_user_freeze,json=afterUserFreeze,proto3,oneof"`
 }
 
 type GridEvent_BeforeMoveColumn struct {
 	// Column/Row move
-	BeforeMoveColumn *BeforeMoveColumnEvent `protobuf:"bytes,34,opt,name=before_move_column,json=beforeMoveColumn,proto3,oneof"`
+	BeforeMoveColumn *BeforeMoveColumnEvent `protobuf:"bytes,32,opt,name=before_move_column,json=beforeMoveColumn,proto3,oneof"`
 }
 
 type GridEvent_AfterMoveColumn struct {
-	AfterMoveColumn *AfterMoveColumnEvent `protobuf:"bytes,35,opt,name=after_move_column,json=afterMoveColumn,proto3,oneof"`
+	AfterMoveColumn *AfterMoveColumnEvent `protobuf:"bytes,33,opt,name=after_move_column,json=afterMoveColumn,proto3,oneof"`
 }
 
 type GridEvent_BeforeMoveRow struct {
-	BeforeMoveRow *BeforeMoveRowEvent `protobuf:"bytes,36,opt,name=before_move_row,json=beforeMoveRow,proto3,oneof"`
+	BeforeMoveRow *BeforeMoveRowEvent `protobuf:"bytes,34,opt,name=before_move_row,json=beforeMoveRow,proto3,oneof"`
 }
 
 type GridEvent_AfterMoveRow struct {
-	AfterMoveRow *AfterMoveRowEvent `protobuf:"bytes,37,opt,name=after_move_row,json=afterMoveRow,proto3,oneof"`
+	AfterMoveRow *AfterMoveRowEvent `protobuf:"bytes,35,opt,name=after_move_row,json=afterMoveRow,proto3,oneof"`
 }
 
 type GridEvent_BeforeMouseDown struct {
 	// Mouse
-	BeforeMouseDown *BeforeMouseDownEvent `protobuf:"bytes,38,opt,name=before_mouse_down,json=beforeMouseDown,proto3,oneof"`
+	BeforeMouseDown *BeforeMouseDownEvent `protobuf:"bytes,36,opt,name=before_mouse_down,json=beforeMouseDown,proto3,oneof"`
 }
 
 type GridEvent_MouseDown struct {
-	MouseDown *MouseDownEvent `protobuf:"bytes,39,opt,name=mouse_down,json=mouseDown,proto3,oneof"`
+	MouseDown *MouseDownEvent `protobuf:"bytes,37,opt,name=mouse_down,json=mouseDown,proto3,oneof"`
 }
 
 type GridEvent_MouseUp struct {
-	MouseUp *MouseUpEvent `protobuf:"bytes,40,opt,name=mouse_up,json=mouseUp,proto3,oneof"`
+	MouseUp *MouseUpEvent `protobuf:"bytes,38,opt,name=mouse_up,json=mouseUp,proto3,oneof"`
 }
 
 type GridEvent_MouseMove struct {
-	MouseMove *MouseMoveEvent `protobuf:"bytes,41,opt,name=mouse_move,json=mouseMove,proto3,oneof"`
+	MouseMove *MouseMoveEvent `protobuf:"bytes,39,opt,name=mouse_move,json=mouseMove,proto3,oneof"`
 }
 
 type GridEvent_Click struct {
-	Click *ClickEvent `protobuf:"bytes,42,opt,name=click,proto3,oneof"`
+	Click *ClickEvent `protobuf:"bytes,40,opt,name=click,proto3,oneof"`
 }
 
 type GridEvent_DblClick struct {
-	DblClick *DblClickEvent `protobuf:"bytes,43,opt,name=dbl_click,json=dblClick,proto3,oneof"`
+	DblClick *DblClickEvent `protobuf:"bytes,41,opt,name=dbl_click,json=dblClick,proto3,oneof"`
 }
 
 type GridEvent_KeyDown struct {
 	// Keyboard
-	KeyDown *KeyDownEvent `protobuf:"bytes,44,opt,name=key_down,json=keyDown,proto3,oneof"`
+	KeyDown *KeyDownEvent `protobuf:"bytes,42,opt,name=key_down,json=keyDown,proto3,oneof"`
 }
 
 type GridEvent_KeyPress struct {
-	KeyPress *KeyPressEvent `protobuf:"bytes,45,opt,name=key_press,json=keyPress,proto3,oneof"`
+	KeyPress *KeyPressEvent `protobuf:"bytes,43,opt,name=key_press,json=keyPress,proto3,oneof"`
 }
 
 type GridEvent_KeyUp struct {
-	KeyUp *KeyUpEvent `protobuf:"bytes,46,opt,name=key_up,json=keyUp,proto3,oneof"`
+	KeyUp *KeyUpEvent `protobuf:"bytes,44,opt,name=key_up,json=keyUp,proto3,oneof"`
 }
 
 type GridEvent_CustomRenderCell struct {
 	// Drawing
-	CustomRenderCell *CustomRenderCellEvent `protobuf:"bytes,47,opt,name=custom_render_cell,json=customRenderCell,proto3,oneof"`
+	CustomRenderCell *CustomRenderCellEvent `protobuf:"bytes,45,opt,name=custom_render_cell,json=customRenderCell,proto3,oneof"`
 }
 
 type GridEvent_DragStart struct {
 	// Drag & Drop
-	DragStart *DragStartEvent `protobuf:"bytes,48,opt,name=drag_start,json=dragStart,proto3,oneof"`
+	DragStart *DragStartEvent `protobuf:"bytes,46,opt,name=drag_start,json=dragStart,proto3,oneof"`
 }
 
 type GridEvent_DragOver struct {
-	DragOver *DragOverEvent `protobuf:"bytes,49,opt,name=drag_over,json=dragOver,proto3,oneof"`
+	DragOver *DragOverEvent `protobuf:"bytes,47,opt,name=drag_over,json=dragOver,proto3,oneof"`
 }
 
 type GridEvent_DragDrop struct {
-	DragDrop *DragDropEvent `protobuf:"bytes,50,opt,name=drag_drop,json=dragDrop,proto3,oneof"`
+	DragDrop *DragDropEvent `protobuf:"bytes,48,opt,name=drag_drop,json=dragDrop,proto3,oneof"`
 }
 
 type GridEvent_DragComplete struct {
-	DragComplete *DragCompleteEvent `protobuf:"bytes,51,opt,name=drag_complete,json=dragComplete,proto3,oneof"`
+	DragComplete *DragCompleteEvent `protobuf:"bytes,49,opt,name=drag_complete,json=dragComplete,proto3,oneof"`
 }
 
 type GridEvent_TypeAheadStarted struct {
 	// Search
-	TypeAheadStarted *TypeAheadStartedEvent `protobuf:"bytes,52,opt,name=type_ahead_started,json=typeAheadStarted,proto3,oneof"`
+	TypeAheadStarted *TypeAheadStartedEvent `protobuf:"bytes,50,opt,name=type_ahead_started,json=typeAheadStarted,proto3,oneof"`
 }
 
 type GridEvent_TypeAheadEnded struct {
-	TypeAheadEnded *TypeAheadEndedEvent `protobuf:"bytes,53,opt,name=type_ahead_ended,json=typeAheadEnded,proto3,oneof"`
+	TypeAheadEnded *TypeAheadEndedEvent `protobuf:"bytes,51,opt,name=type_ahead_ended,json=typeAheadEnded,proto3,oneof"`
 }
 
 type GridEvent_DataRefreshing struct {
 	// Data refresh
-	DataRefreshing *DataRefreshingEvent `protobuf:"bytes,54,opt,name=data_refreshing,json=dataRefreshing,proto3,oneof"`
+	DataRefreshing *DataRefreshingEvent `protobuf:"bytes,52,opt,name=data_refreshing,json=dataRefreshing,proto3,oneof"`
 }
 
 type GridEvent_DataRefreshed struct {
-	DataRefreshed *DataRefreshedEvent `protobuf:"bytes,55,opt,name=data_refreshed,json=dataRefreshed,proto3,oneof"`
+	DataRefreshed *DataRefreshedEvent `protobuf:"bytes,53,opt,name=data_refreshed,json=dataRefreshed,proto3,oneof"`
 }
 
 type GridEvent_FilterData struct {
-	FilterData *FilterDataEvent `protobuf:"bytes,56,opt,name=filter_data,json=filterData,proto3,oneof"`
+	FilterData *FilterDataEvent `protobuf:"bytes,54,opt,name=filter_data,json=filterData,proto3,oneof"`
 }
 
 type GridEvent_Error struct {
 	// Error
-	Error *ErrorEvent `protobuf:"bytes,57,opt,name=error,proto3,oneof"`
+	Error *ErrorEvent `protobuf:"bytes,55,opt,name=error,proto3,oneof"`
 }
 
 type GridEvent_BeforePageBreak struct {
 	// Print
-	BeforePageBreak *BeforePageBreakEvent `protobuf:"bytes,58,opt,name=before_page_break,json=beforePageBreak,proto3,oneof"`
+	BeforePageBreak *BeforePageBreakEvent `protobuf:"bytes,56,opt,name=before_page_break,json=beforePageBreak,proto3,oneof"`
 }
 
 type GridEvent_StartPage struct {
-	StartPage *StartPageEvent `protobuf:"bytes,59,opt,name=start_page,json=startPage,proto3,oneof"`
+	StartPage *StartPageEvent `protobuf:"bytes,57,opt,name=start_page,json=startPage,proto3,oneof"`
 }
 
 type GridEvent_GetHeaderRow struct {
-	GetHeaderRow *GetHeaderRowEvent `protobuf:"bytes,60,opt,name=get_header_row,json=getHeaderRow,proto3,oneof"`
+	GetHeaderRow *GetHeaderRowEvent `protobuf:"bytes,58,opt,name=get_header_row,json=getHeaderRow,proto3,oneof"`
 }
 
 type GridEvent_PullToRefreshTriggered struct {
 	// Pull to refresh
-	PullToRefreshTriggered *PullToRefreshTriggeredEvent `protobuf:"bytes,61,opt,name=pull_to_refresh_triggered,json=pullToRefreshTriggered,proto3,oneof"`
+	PullToRefreshTriggered *PullToRefreshTriggeredEvent `protobuf:"bytes,59,opt,name=pull_to_refresh_triggered,json=pullToRefreshTriggered,proto3,oneof"`
 }
 
 type GridEvent_PullToRefreshCanceled struct {
-	PullToRefreshCanceled *PullToRefreshCanceledEvent `protobuf:"bytes,62,opt,name=pull_to_refresh_canceled,json=pullToRefreshCanceled,proto3,oneof"`
-}
-
-type GridEvent_BeforeDropdownOpen struct {
-	BeforeDropdownOpen *BeforeDropdownOpenEvent `protobuf:"bytes,63,opt,name=before_dropdown_open,json=beforeDropdownOpen,proto3,oneof"`
+	PullToRefreshCanceled *PullToRefreshCanceledEvent `protobuf:"bytes,60,opt,name=pull_to_refresh_canceled,json=pullToRefreshCanceled,proto3,oneof"`
 }
 
 type GridEvent_TreeChildrenRequested struct {
 	// Native tree model
-	TreeChildrenRequested *TreeChildrenRequestedEvent `protobuf:"bytes,64,opt,name=tree_children_requested,json=treeChildrenRequested,proto3,oneof"`
+	TreeChildrenRequested *TreeChildrenRequestedEvent `protobuf:"bytes,61,opt,name=tree_children_requested,json=treeChildrenRequested,proto3,oneof"`
 }
 
 type GridEvent_BeforeTreeNodeToggle struct {
-	BeforeTreeNodeToggle *BeforeTreeNodeToggleEvent `protobuf:"bytes,65,opt,name=before_tree_node_toggle,json=beforeTreeNodeToggle,proto3,oneof"`
+	BeforeTreeNodeToggle *BeforeTreeNodeToggleEvent `protobuf:"bytes,62,opt,name=before_tree_node_toggle,json=beforeTreeNodeToggle,proto3,oneof"`
 }
 
 type GridEvent_AfterTreeNodeToggle struct {
-	AfterTreeNodeToggle *AfterTreeNodeToggleEvent `protobuf:"bytes,66,opt,name=after_tree_node_toggle,json=afterTreeNodeToggle,proto3,oneof"`
+	AfterTreeNodeToggle *AfterTreeNodeToggleEvent `protobuf:"bytes,63,opt,name=after_tree_node_toggle,json=afterTreeNodeToggle,proto3,oneof"`
 }
 
 type GridEvent_TreeNodeActivate struct {
-	TreeNodeActivate *TreeNodeActivateEvent `protobuf:"bytes,67,opt,name=tree_node_activate,json=treeNodeActivate,proto3,oneof"`
+	TreeNodeActivate *TreeNodeActivateEvent `protobuf:"bytes,64,opt,name=tree_node_activate,json=treeNodeActivate,proto3,oneof"`
 }
 
 type GridEvent_TreeNodeContextMenu struct {
-	TreeNodeContextMenu *TreeNodeContextMenuEvent `protobuf:"bytes,68,opt,name=tree_node_context_menu,json=treeNodeContextMenu,proto3,oneof"`
+	TreeNodeContextMenu *TreeNodeContextMenuEvent `protobuf:"bytes,65,opt,name=tree_node_context_menu,json=treeNodeContextMenu,proto3,oneof"`
 }
 
 func (*GridEvent_CellFocusChanging) isGridEvent_Event() {}
@@ -20568,13 +22731,11 @@ func (*GridEvent_KeyPressEdit) isGridEvent_Event() {}
 
 func (*GridEvent_KeyUpEdit) isGridEvent_Event() {}
 
-func (*GridEvent_CellEditConfigureStyle) isGridEvent_Event() {}
+func (*GridEvent_EditValidationRequest) isGridEvent_Event() {}
 
-func (*GridEvent_CellEditConfigureWindow) isGridEvent_Event() {}
+func (*GridEvent_EditorListItemsRequest) isGridEvent_Event() {}
 
-func (*GridEvent_DropdownClosed) isGridEvent_Event() {}
-
-func (*GridEvent_DropdownOpened) isGridEvent_Event() {}
+func (*GridEvent_CustomEditorAction) isGridEvent_Event() {}
 
 func (*GridEvent_CellChanged) isGridEvent_Event() {}
 
@@ -20660,8 +22821,6 @@ func (*GridEvent_PullToRefreshTriggered) isGridEvent_Event() {}
 
 func (*GridEvent_PullToRefreshCanceled) isGridEvent_Event() {}
 
-func (*GridEvent_BeforeDropdownOpen) isGridEvent_Event() {}
-
 func (*GridEvent_TreeChildrenRequested) isGridEvent_Event() {}
 
 func (*GridEvent_BeforeTreeNodeToggle) isGridEvent_Event() {}
@@ -20685,7 +22844,7 @@ type CellFocusChangingEvent struct {
 
 func (x *CellFocusChangingEvent) Reset() {
 	*x = CellFocusChangingEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[197]
+	mi := &file_volvoxgrid_proto_msgTypes[220]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -20697,7 +22856,7 @@ func (x *CellFocusChangingEvent) String() string {
 func (*CellFocusChangingEvent) ProtoMessage() {}
 
 func (x *CellFocusChangingEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[197]
+	mi := &file_volvoxgrid_proto_msgTypes[220]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -20710,7 +22869,7 @@ func (x *CellFocusChangingEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CellFocusChangingEvent.ProtoReflect.Descriptor instead.
 func (*CellFocusChangingEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{197}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{220}
 }
 
 func (x *CellFocusChangingEvent) GetOldRow() int32 {
@@ -20753,7 +22912,7 @@ type CellFocusChangedEvent struct {
 
 func (x *CellFocusChangedEvent) Reset() {
 	*x = CellFocusChangedEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[198]
+	mi := &file_volvoxgrid_proto_msgTypes[221]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -20765,7 +22924,7 @@ func (x *CellFocusChangedEvent) String() string {
 func (*CellFocusChangedEvent) ProtoMessage() {}
 
 func (x *CellFocusChangedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[198]
+	mi := &file_volvoxgrid_proto_msgTypes[221]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -20778,7 +22937,7 @@ func (x *CellFocusChangedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CellFocusChangedEvent.ProtoReflect.Descriptor instead.
 func (*CellFocusChangedEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{198}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{221}
 }
 
 func (x *CellFocusChangedEvent) GetOldRow() int32 {
@@ -20821,7 +22980,7 @@ type SelectionChangingEvent struct {
 
 func (x *SelectionChangingEvent) Reset() {
 	*x = SelectionChangingEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[199]
+	mi := &file_volvoxgrid_proto_msgTypes[222]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -20833,7 +22992,7 @@ func (x *SelectionChangingEvent) String() string {
 func (*SelectionChangingEvent) ProtoMessage() {}
 
 func (x *SelectionChangingEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[199]
+	mi := &file_volvoxgrid_proto_msgTypes[222]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -20846,7 +23005,7 @@ func (x *SelectionChangingEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SelectionChangingEvent.ProtoReflect.Descriptor instead.
 func (*SelectionChangingEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{199}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{222}
 }
 
 func (x *SelectionChangingEvent) GetOldRanges() []*CellRange {
@@ -20889,7 +23048,7 @@ type SelectionChangedEvent struct {
 
 func (x *SelectionChangedEvent) Reset() {
 	*x = SelectionChangedEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[200]
+	mi := &file_volvoxgrid_proto_msgTypes[223]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -20901,7 +23060,7 @@ func (x *SelectionChangedEvent) String() string {
 func (*SelectionChangedEvent) ProtoMessage() {}
 
 func (x *SelectionChangedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[200]
+	mi := &file_volvoxgrid_proto_msgTypes[223]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -20914,7 +23073,7 @@ func (x *SelectionChangedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SelectionChangedEvent.ProtoReflect.Descriptor instead.
 func (*SelectionChangedEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{200}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{223}
 }
 
 func (x *SelectionChangedEvent) GetOldRanges() []*CellRange {
@@ -20956,7 +23115,7 @@ type EnterCellEvent struct {
 
 func (x *EnterCellEvent) Reset() {
 	*x = EnterCellEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[201]
+	mi := &file_volvoxgrid_proto_msgTypes[224]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -20968,7 +23127,7 @@ func (x *EnterCellEvent) String() string {
 func (*EnterCellEvent) ProtoMessage() {}
 
 func (x *EnterCellEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[201]
+	mi := &file_volvoxgrid_proto_msgTypes[224]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -20981,7 +23140,7 @@ func (x *EnterCellEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EnterCellEvent.ProtoReflect.Descriptor instead.
 func (*EnterCellEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{201}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{224}
 }
 
 func (x *EnterCellEvent) GetRow() int32 {
@@ -21016,7 +23175,7 @@ type LeaveCellEvent struct {
 
 func (x *LeaveCellEvent) Reset() {
 	*x = LeaveCellEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[202]
+	mi := &file_volvoxgrid_proto_msgTypes[225]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -21028,7 +23187,7 @@ func (x *LeaveCellEvent) String() string {
 func (*LeaveCellEvent) ProtoMessage() {}
 
 func (x *LeaveCellEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[202]
+	mi := &file_volvoxgrid_proto_msgTypes[225]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -21041,7 +23200,7 @@ func (x *LeaveCellEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LeaveCellEvent.ProtoReflect.Descriptor instead.
 func (*LeaveCellEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{202}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{225}
 }
 
 func (x *LeaveCellEvent) GetRow() int32 {
@@ -21076,7 +23235,7 @@ type BeforeEditEvent struct {
 
 func (x *BeforeEditEvent) Reset() {
 	*x = BeforeEditEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[203]
+	mi := &file_volvoxgrid_proto_msgTypes[226]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -21088,7 +23247,7 @@ func (x *BeforeEditEvent) String() string {
 func (*BeforeEditEvent) ProtoMessage() {}
 
 func (x *BeforeEditEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[203]
+	mi := &file_volvoxgrid_proto_msgTypes[226]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -21101,7 +23260,7 @@ func (x *BeforeEditEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BeforeEditEvent.ProtoReflect.Descriptor instead.
 func (*BeforeEditEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{203}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{226}
 }
 
 func (x *BeforeEditEvent) GetRow() int32 {
@@ -21128,7 +23287,7 @@ type StartEditEvent struct {
 
 func (x *StartEditEvent) Reset() {
 	*x = StartEditEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[204]
+	mi := &file_volvoxgrid_proto_msgTypes[227]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -21140,7 +23299,7 @@ func (x *StartEditEvent) String() string {
 func (*StartEditEvent) ProtoMessage() {}
 
 func (x *StartEditEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[204]
+	mi := &file_volvoxgrid_proto_msgTypes[227]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -21153,7 +23312,7 @@ func (x *StartEditEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartEditEvent.ProtoReflect.Descriptor instead.
 func (*StartEditEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{204}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{227}
 }
 
 func (x *StartEditEvent) GetRow() int32 {
@@ -21182,7 +23341,7 @@ type AfterEditEvent struct {
 
 func (x *AfterEditEvent) Reset() {
 	*x = AfterEditEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[205]
+	mi := &file_volvoxgrid_proto_msgTypes[228]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -21194,7 +23353,7 @@ func (x *AfterEditEvent) String() string {
 func (*AfterEditEvent) ProtoMessage() {}
 
 func (x *AfterEditEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[205]
+	mi := &file_volvoxgrid_proto_msgTypes[228]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -21207,7 +23366,7 @@ func (x *AfterEditEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AfterEditEvent.ProtoReflect.Descriptor instead.
 func (*AfterEditEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{205}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{228}
 }
 
 func (x *AfterEditEvent) GetRow() int32 {
@@ -21249,7 +23408,7 @@ type CellEditValidateEvent struct {
 
 func (x *CellEditValidateEvent) Reset() {
 	*x = CellEditValidateEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[206]
+	mi := &file_volvoxgrid_proto_msgTypes[229]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -21261,7 +23420,7 @@ func (x *CellEditValidateEvent) String() string {
 func (*CellEditValidateEvent) ProtoMessage() {}
 
 func (x *CellEditValidateEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[206]
+	mi := &file_volvoxgrid_proto_msgTypes[229]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -21274,7 +23433,7 @@ func (x *CellEditValidateEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CellEditValidateEvent.ProtoReflect.Descriptor instead.
 func (*CellEditValidateEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{206}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{229}
 }
 
 func (x *CellEditValidateEvent) GetRow() int32 {
@@ -21307,7 +23466,7 @@ type CellEditChangeEvent struct {
 
 func (x *CellEditChangeEvent) Reset() {
 	*x = CellEditChangeEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[207]
+	mi := &file_volvoxgrid_proto_msgTypes[230]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -21319,7 +23478,7 @@ func (x *CellEditChangeEvent) String() string {
 func (*CellEditChangeEvent) ProtoMessage() {}
 
 func (x *CellEditChangeEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[207]
+	mi := &file_volvoxgrid_proto_msgTypes[230]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -21332,7 +23491,7 @@ func (x *CellEditChangeEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CellEditChangeEvent.ProtoReflect.Descriptor instead.
 func (*CellEditChangeEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{207}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{230}
 }
 
 func (x *CellEditChangeEvent) GetText() string {
@@ -21344,15 +23503,16 @@ func (x *CellEditChangeEvent) GetText() string {
 
 type KeyDownEditEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	KeyCode       int32                  `protobuf:"varint,1,opt,name=key_code,json=keyCode,proto3" json:"key_code,omitempty"`
-	Modifier      int32                  `protobuf:"varint,2,opt,name=modifier,proto3" json:"modifier,omitempty"`
+	SessionId     int64                  `protobuf:"varint,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	KeyCode       int32                  `protobuf:"varint,2,opt,name=key_code,json=keyCode,proto3" json:"key_code,omitempty"`
+	Modifier      int32                  `protobuf:"varint,3,opt,name=modifier,proto3" json:"modifier,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *KeyDownEditEvent) Reset() {
 	*x = KeyDownEditEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[208]
+	mi := &file_volvoxgrid_proto_msgTypes[231]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -21364,7 +23524,7 @@ func (x *KeyDownEditEvent) String() string {
 func (*KeyDownEditEvent) ProtoMessage() {}
 
 func (x *KeyDownEditEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[208]
+	mi := &file_volvoxgrid_proto_msgTypes[231]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -21377,7 +23537,14 @@ func (x *KeyDownEditEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KeyDownEditEvent.ProtoReflect.Descriptor instead.
 func (*KeyDownEditEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{208}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{231}
+}
+
+func (x *KeyDownEditEvent) GetSessionId() int64 {
+	if x != nil {
+		return x.SessionId
+	}
+	return 0
 }
 
 func (x *KeyDownEditEvent) GetKeyCode() int32 {
@@ -21396,14 +23563,15 @@ func (x *KeyDownEditEvent) GetModifier() int32 {
 
 type KeyPressEditEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	KeyAscii      int32                  `protobuf:"varint,1,opt,name=key_ascii,json=keyAscii,proto3" json:"key_ascii,omitempty"`
+	SessionId     int64                  `protobuf:"varint,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	KeyAscii      int32                  `protobuf:"varint,2,opt,name=key_ascii,json=keyAscii,proto3" json:"key_ascii,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *KeyPressEditEvent) Reset() {
 	*x = KeyPressEditEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[209]
+	mi := &file_volvoxgrid_proto_msgTypes[232]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -21415,7 +23583,7 @@ func (x *KeyPressEditEvent) String() string {
 func (*KeyPressEditEvent) ProtoMessage() {}
 
 func (x *KeyPressEditEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[209]
+	mi := &file_volvoxgrid_proto_msgTypes[232]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -21428,7 +23596,14 @@ func (x *KeyPressEditEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KeyPressEditEvent.ProtoReflect.Descriptor instead.
 func (*KeyPressEditEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{209}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{232}
+}
+
+func (x *KeyPressEditEvent) GetSessionId() int64 {
+	if x != nil {
+		return x.SessionId
+	}
+	return 0
 }
 
 func (x *KeyPressEditEvent) GetKeyAscii() int32 {
@@ -21440,15 +23615,16 @@ func (x *KeyPressEditEvent) GetKeyAscii() int32 {
 
 type KeyUpEditEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	KeyCode       int32                  `protobuf:"varint,1,opt,name=key_code,json=keyCode,proto3" json:"key_code,omitempty"`
-	Modifier      int32                  `protobuf:"varint,2,opt,name=modifier,proto3" json:"modifier,omitempty"`
+	SessionId     int64                  `protobuf:"varint,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	KeyCode       int32                  `protobuf:"varint,2,opt,name=key_code,json=keyCode,proto3" json:"key_code,omitempty"`
+	Modifier      int32                  `protobuf:"varint,3,opt,name=modifier,proto3" json:"modifier,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *KeyUpEditEvent) Reset() {
 	*x = KeyUpEditEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[210]
+	mi := &file_volvoxgrid_proto_msgTypes[233]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -21460,7 +23636,7 @@ func (x *KeyUpEditEvent) String() string {
 func (*KeyUpEditEvent) ProtoMessage() {}
 
 func (x *KeyUpEditEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[210]
+	mi := &file_volvoxgrid_proto_msgTypes[233]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -21473,7 +23649,14 @@ func (x *KeyUpEditEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KeyUpEditEvent.ProtoReflect.Descriptor instead.
 func (*KeyUpEditEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{210}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{233}
+}
+
+func (x *KeyUpEditEvent) GetSessionId() int64 {
+	if x != nil {
+		return x.SessionId
+	}
+	return 0
 }
 
 func (x *KeyUpEditEvent) GetKeyCode() int32 {
@@ -21490,29 +23673,32 @@ func (x *KeyUpEditEvent) GetModifier() int32 {
 	return 0
 }
 
-type CellEditConfigureStyleEvent struct {
+type EditValidationRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Row           int32                  `protobuf:"varint,1,opt,name=row,proto3" json:"row,omitempty"`
-	Col           int32                  `protobuf:"varint,2,opt,name=col,proto3" json:"col,omitempty"`
+	RequestId     int64                  `protobuf:"varint,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	SessionId     int64                  `protobuf:"varint,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Row           int32                  `protobuf:"varint,3,opt,name=row,proto3" json:"row,omitempty"`
+	Col           int32                  `protobuf:"varint,4,opt,name=col,proto3" json:"col,omitempty"`
+	Value         *EditorValue           `protobuf:"bytes,5,opt,name=value,proto3" json:"value,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *CellEditConfigureStyleEvent) Reset() {
-	*x = CellEditConfigureStyleEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[211]
+func (x *EditValidationRequest) Reset() {
+	*x = EditValidationRequest{}
+	mi := &file_volvoxgrid_proto_msgTypes[234]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CellEditConfigureStyleEvent) String() string {
+func (x *EditValidationRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CellEditConfigureStyleEvent) ProtoMessage() {}
+func (*EditValidationRequest) ProtoMessage() {}
 
-func (x *CellEditConfigureStyleEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[211]
+func (x *EditValidationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_volvoxgrid_proto_msgTypes[234]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -21523,208 +23709,156 @@ func (x *CellEditConfigureStyleEvent) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CellEditConfigureStyleEvent.ProtoReflect.Descriptor instead.
-func (*CellEditConfigureStyleEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{211}
+// Deprecated: Use EditValidationRequest.ProtoReflect.Descriptor instead.
+func (*EditValidationRequest) Descriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{234}
 }
 
-func (x *CellEditConfigureStyleEvent) GetRow() int32 {
+func (x *EditValidationRequest) GetRequestId() int64 {
+	if x != nil {
+		return x.RequestId
+	}
+	return 0
+}
+
+func (x *EditValidationRequest) GetSessionId() int64 {
+	if x != nil {
+		return x.SessionId
+	}
+	return 0
+}
+
+func (x *EditValidationRequest) GetRow() int32 {
 	if x != nil {
 		return x.Row
 	}
 	return 0
 }
 
-func (x *CellEditConfigureStyleEvent) GetCol() int32 {
+func (x *EditValidationRequest) GetCol() int32 {
 	if x != nil {
 		return x.Col
 	}
 	return 0
 }
 
-type CellEditConfigureWindowEvent struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Row           int32                  `protobuf:"varint,1,opt,name=row,proto3" json:"row,omitempty"`
-	Col           int32                  `protobuf:"varint,2,opt,name=col,proto3" json:"col,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *CellEditConfigureWindowEvent) Reset() {
-	*x = CellEditConfigureWindowEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[212]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *CellEditConfigureWindowEvent) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*CellEditConfigureWindowEvent) ProtoMessage() {}
-
-func (x *CellEditConfigureWindowEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[212]
+func (x *EditValidationRequest) GetValue() *EditorValue {
 	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use CellEditConfigureWindowEvent.ProtoReflect.Descriptor instead.
-func (*CellEditConfigureWindowEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{212}
-}
-
-func (x *CellEditConfigureWindowEvent) GetRow() int32 {
-	if x != nil {
-		return x.Row
-	}
-	return 0
-}
-
-func (x *CellEditConfigureWindowEvent) GetCol() int32 {
-	if x != nil {
-		return x.Col
-	}
-	return 0
-}
-
-type BeforeDropdownOpenEvent struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	Row   int32                  `protobuf:"varint,1,opt,name=row,proto3" json:"row,omitempty"`
-	Col   int32                  `protobuf:"varint,2,opt,name=col,proto3" json:"col,omitempty"`
-	// Viewport-local cell rect. Hosts can use this when canceling the
-	// engine list and opening their own positioned popup.
-	X             float32   `protobuf:"fixed32,3,opt,name=x,proto3" json:"x,omitempty"`
-	Y             float32   `protobuf:"fixed32,4,opt,name=y,proto3" json:"y,omitempty"`
-	Width         float32   `protobuf:"fixed32,5,opt,name=width,proto3" json:"width,omitempty"`
-	Height        float32   `protobuf:"fixed32,6,opt,name=height,proto3" json:"height,omitempty"`
-	Dropdown      *Dropdown `protobuf:"bytes,7,opt,name=dropdown,proto3" json:"dropdown,omitempty"`
-	CurrentValue  string    `protobuf:"bytes,8,opt,name=current_value,json=currentValue,proto3" json:"current_value,omitempty"`
-	SelectedIndex int32     `protobuf:"varint,9,opt,name=selected_index,json=selectedIndex,proto3" json:"selected_index,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *BeforeDropdownOpenEvent) Reset() {
-	*x = BeforeDropdownOpenEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[213]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *BeforeDropdownOpenEvent) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*BeforeDropdownOpenEvent) ProtoMessage() {}
-
-func (x *BeforeDropdownOpenEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[213]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use BeforeDropdownOpenEvent.ProtoReflect.Descriptor instead.
-func (*BeforeDropdownOpenEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{213}
-}
-
-func (x *BeforeDropdownOpenEvent) GetRow() int32 {
-	if x != nil {
-		return x.Row
-	}
-	return 0
-}
-
-func (x *BeforeDropdownOpenEvent) GetCol() int32 {
-	if x != nil {
-		return x.Col
-	}
-	return 0
-}
-
-func (x *BeforeDropdownOpenEvent) GetX() float32 {
-	if x != nil {
-		return x.X
-	}
-	return 0
-}
-
-func (x *BeforeDropdownOpenEvent) GetY() float32 {
-	if x != nil {
-		return x.Y
-	}
-	return 0
-}
-
-func (x *BeforeDropdownOpenEvent) GetWidth() float32 {
-	if x != nil {
-		return x.Width
-	}
-	return 0
-}
-
-func (x *BeforeDropdownOpenEvent) GetHeight() float32 {
-	if x != nil {
-		return x.Height
-	}
-	return 0
-}
-
-func (x *BeforeDropdownOpenEvent) GetDropdown() *Dropdown {
-	if x != nil {
-		return x.Dropdown
+		return x.Value
 	}
 	return nil
 }
 
-func (x *BeforeDropdownOpenEvent) GetCurrentValue() string {
-	if x != nil {
-		return x.CurrentValue
-	}
-	return ""
+type EditorListItemsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RequestId     int64                  `protobuf:"varint,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	SessionId     int64                  `protobuf:"varint,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	DataSourceId  string                 `protobuf:"bytes,3,opt,name=data_source_id,json=dataSourceId,proto3" json:"data_source_id,omitempty"`
+	FilterText    string                 `protobuf:"bytes,4,opt,name=filter_text,json=filterText,proto3" json:"filter_text,omitempty"`
+	Offset        int32                  `protobuf:"varint,5,opt,name=offset,proto3" json:"offset,omitempty"`
+	Limit         int32                  `protobuf:"varint,6,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
-func (x *BeforeDropdownOpenEvent) GetSelectedIndex() int32 {
+func (x *EditorListItemsRequest) Reset() {
+	*x = EditorListItemsRequest{}
+	mi := &file_volvoxgrid_proto_msgTypes[235]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EditorListItemsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EditorListItemsRequest) ProtoMessage() {}
+
+func (x *EditorListItemsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_volvoxgrid_proto_msgTypes[235]
 	if x != nil {
-		return x.SelectedIndex
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EditorListItemsRequest.ProtoReflect.Descriptor instead.
+func (*EditorListItemsRequest) Descriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{235}
+}
+
+func (x *EditorListItemsRequest) GetRequestId() int64 {
+	if x != nil {
+		return x.RequestId
 	}
 	return 0
 }
 
-type DropdownClosedEvent struct {
+func (x *EditorListItemsRequest) GetSessionId() int64 {
+	if x != nil {
+		return x.SessionId
+	}
+	return 0
+}
+
+func (x *EditorListItemsRequest) GetDataSourceId() string {
+	if x != nil {
+		return x.DataSourceId
+	}
+	return ""
+}
+
+func (x *EditorListItemsRequest) GetFilterText() string {
+	if x != nil {
+		return x.FilterText
+	}
+	return ""
+}
+
+func (x *EditorListItemsRequest) GetOffset() int32 {
+	if x != nil {
+		return x.Offset
+	}
+	return 0
+}
+
+func (x *EditorListItemsRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type CustomEditorActionEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
+	SessionId     int64                  `protobuf:"varint,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Row           int32                  `protobuf:"varint,2,opt,name=row,proto3" json:"row,omitempty"`
+	Col           int32                  `protobuf:"varint,3,opt,name=col,proto3" json:"col,omitempty"`
+	ActionId      string                 `protobuf:"bytes,4,opt,name=action_id,json=actionId,proto3" json:"action_id,omitempty"`
+	Payload       *StructValue           `protobuf:"bytes,5,opt,name=payload,proto3" json:"payload,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *DropdownClosedEvent) Reset() {
-	*x = DropdownClosedEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[214]
+func (x *CustomEditorActionEvent) Reset() {
+	*x = CustomEditorActionEvent{}
+	mi := &file_volvoxgrid_proto_msgTypes[236]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *DropdownClosedEvent) String() string {
+func (x *CustomEditorActionEvent) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*DropdownClosedEvent) ProtoMessage() {}
+func (*CustomEditorActionEvent) ProtoMessage() {}
 
-func (x *DropdownClosedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[214]
+func (x *CustomEditorActionEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_volvoxgrid_proto_msgTypes[236]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -21735,45 +23869,44 @@ func (x *DropdownClosedEvent) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use DropdownClosedEvent.ProtoReflect.Descriptor instead.
-func (*DropdownClosedEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{214}
+// Deprecated: Use CustomEditorActionEvent.ProtoReflect.Descriptor instead.
+func (*CustomEditorActionEvent) Descriptor() ([]byte, []int) {
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{236}
 }
 
-type DropdownOpenedEvent struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *DropdownOpenedEvent) Reset() {
-	*x = DropdownOpenedEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[215]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *DropdownOpenedEvent) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*DropdownOpenedEvent) ProtoMessage() {}
-
-func (x *DropdownOpenedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[215]
+func (x *CustomEditorActionEvent) GetSessionId() int64 {
 	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
+		return x.SessionId
 	}
-	return mi.MessageOf(x)
+	return 0
 }
 
-// Deprecated: Use DropdownOpenedEvent.ProtoReflect.Descriptor instead.
-func (*DropdownOpenedEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{215}
+func (x *CustomEditorActionEvent) GetRow() int32 {
+	if x != nil {
+		return x.Row
+	}
+	return 0
+}
+
+func (x *CustomEditorActionEvent) GetCol() int32 {
+	if x != nil {
+		return x.Col
+	}
+	return 0
+}
+
+func (x *CustomEditorActionEvent) GetActionId() string {
+	if x != nil {
+		return x.ActionId
+	}
+	return ""
+}
+
+func (x *CustomEditorActionEvent) GetPayload() *StructValue {
+	if x != nil {
+		return x.Payload
+	}
+	return nil
 }
 
 // ── Data Events ──
@@ -21789,7 +23922,7 @@ type CellChangedEvent struct {
 
 func (x *CellChangedEvent) Reset() {
 	*x = CellChangedEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[216]
+	mi := &file_volvoxgrid_proto_msgTypes[237]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -21801,7 +23934,7 @@ func (x *CellChangedEvent) String() string {
 func (*CellChangedEvent) ProtoMessage() {}
 
 func (x *CellChangedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[216]
+	mi := &file_volvoxgrid_proto_msgTypes[237]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -21814,7 +23947,7 @@ func (x *CellChangedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CellChangedEvent.ProtoReflect.Descriptor instead.
 func (*CellChangedEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{216}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{237}
 }
 
 func (x *CellChangedEvent) GetRow() int32 {
@@ -21855,7 +23988,7 @@ type RowStatusChangeEvent struct {
 
 func (x *RowStatusChangeEvent) Reset() {
 	*x = RowStatusChangeEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[217]
+	mi := &file_volvoxgrid_proto_msgTypes[238]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -21867,7 +24000,7 @@ func (x *RowStatusChangeEvent) String() string {
 func (*RowStatusChangeEvent) ProtoMessage() {}
 
 func (x *RowStatusChangeEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[217]
+	mi := &file_volvoxgrid_proto_msgTypes[238]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -21880,7 +24013,7 @@ func (x *RowStatusChangeEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RowStatusChangeEvent.ProtoReflect.Descriptor instead.
 func (*RowStatusChangeEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{217}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{238}
 }
 
 func (x *RowStatusChangeEvent) GetRow() int32 {
@@ -21907,7 +24040,7 @@ type BeforeSortEvent struct {
 
 func (x *BeforeSortEvent) Reset() {
 	*x = BeforeSortEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[218]
+	mi := &file_volvoxgrid_proto_msgTypes[239]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -21919,7 +24052,7 @@ func (x *BeforeSortEvent) String() string {
 func (*BeforeSortEvent) ProtoMessage() {}
 
 func (x *BeforeSortEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[218]
+	mi := &file_volvoxgrid_proto_msgTypes[239]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -21932,7 +24065,7 @@ func (x *BeforeSortEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BeforeSortEvent.ProtoReflect.Descriptor instead.
 func (*BeforeSortEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{218}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{239}
 }
 
 func (x *BeforeSortEvent) GetCol() int32 {
@@ -21951,7 +24084,7 @@ type AfterSortEvent struct {
 
 func (x *AfterSortEvent) Reset() {
 	*x = AfterSortEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[219]
+	mi := &file_volvoxgrid_proto_msgTypes[240]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -21963,7 +24096,7 @@ func (x *AfterSortEvent) String() string {
 func (*AfterSortEvent) ProtoMessage() {}
 
 func (x *AfterSortEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[219]
+	mi := &file_volvoxgrid_proto_msgTypes[240]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -21976,7 +24109,7 @@ func (x *AfterSortEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AfterSortEvent.ProtoReflect.Descriptor instead.
 func (*AfterSortEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{219}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{240}
 }
 
 func (x *AfterSortEvent) GetCol() int32 {
@@ -22002,7 +24135,7 @@ type CompareEvent struct {
 
 func (x *CompareEvent) Reset() {
 	*x = CompareEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[220]
+	mi := &file_volvoxgrid_proto_msgTypes[241]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -22014,7 +24147,7 @@ func (x *CompareEvent) String() string {
 func (*CompareEvent) ProtoMessage() {}
 
 func (x *CompareEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[220]
+	mi := &file_volvoxgrid_proto_msgTypes[241]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -22027,7 +24160,7 @@ func (x *CompareEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CompareEvent.ProtoReflect.Descriptor instead.
 func (*CompareEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{220}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{241}
 }
 
 func (x *CompareEvent) GetRequestId() int64 {
@@ -22069,7 +24202,7 @@ type BeforeNodeToggleEvent struct {
 
 func (x *BeforeNodeToggleEvent) Reset() {
 	*x = BeforeNodeToggleEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[221]
+	mi := &file_volvoxgrid_proto_msgTypes[242]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -22081,7 +24214,7 @@ func (x *BeforeNodeToggleEvent) String() string {
 func (*BeforeNodeToggleEvent) ProtoMessage() {}
 
 func (x *BeforeNodeToggleEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[221]
+	mi := &file_volvoxgrid_proto_msgTypes[242]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -22094,7 +24227,7 @@ func (x *BeforeNodeToggleEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BeforeNodeToggleEvent.ProtoReflect.Descriptor instead.
 func (*BeforeNodeToggleEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{221}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{242}
 }
 
 func (x *BeforeNodeToggleEvent) GetRow() int32 {
@@ -22121,7 +24254,7 @@ type AfterNodeToggleEvent struct {
 
 func (x *AfterNodeToggleEvent) Reset() {
 	*x = AfterNodeToggleEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[222]
+	mi := &file_volvoxgrid_proto_msgTypes[243]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -22133,7 +24266,7 @@ func (x *AfterNodeToggleEvent) String() string {
 func (*AfterNodeToggleEvent) ProtoMessage() {}
 
 func (x *AfterNodeToggleEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[222]
+	mi := &file_volvoxgrid_proto_msgTypes[243]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -22146,7 +24279,7 @@ func (x *AfterNodeToggleEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AfterNodeToggleEvent.ProtoReflect.Descriptor instead.
 func (*AfterNodeToggleEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{222}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{243}
 }
 
 func (x *AfterNodeToggleEvent) GetRow() int32 {
@@ -22177,7 +24310,7 @@ type TreeChildrenRequestedEvent struct {
 
 func (x *TreeChildrenRequestedEvent) Reset() {
 	*x = TreeChildrenRequestedEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[223]
+	mi := &file_volvoxgrid_proto_msgTypes[244]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -22189,7 +24322,7 @@ func (x *TreeChildrenRequestedEvent) String() string {
 func (*TreeChildrenRequestedEvent) ProtoMessage() {}
 
 func (x *TreeChildrenRequestedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[223]
+	mi := &file_volvoxgrid_proto_msgTypes[244]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -22202,7 +24335,7 @@ func (x *TreeChildrenRequestedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TreeChildrenRequestedEvent.ProtoReflect.Descriptor instead.
 func (*TreeChildrenRequestedEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{223}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{244}
 }
 
 func (x *TreeChildrenRequestedEvent) GetNodeId() string {
@@ -22237,7 +24370,7 @@ type BeforeTreeNodeToggleEvent struct {
 
 func (x *BeforeTreeNodeToggleEvent) Reset() {
 	*x = BeforeTreeNodeToggleEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[224]
+	mi := &file_volvoxgrid_proto_msgTypes[245]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -22249,7 +24382,7 @@ func (x *BeforeTreeNodeToggleEvent) String() string {
 func (*BeforeTreeNodeToggleEvent) ProtoMessage() {}
 
 func (x *BeforeTreeNodeToggleEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[224]
+	mi := &file_volvoxgrid_proto_msgTypes[245]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -22262,7 +24395,7 @@ func (x *BeforeTreeNodeToggleEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BeforeTreeNodeToggleEvent.ProtoReflect.Descriptor instead.
 func (*BeforeTreeNodeToggleEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{224}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{245}
 }
 
 func (x *BeforeTreeNodeToggleEvent) GetNodeId() string {
@@ -22297,7 +24430,7 @@ type AfterTreeNodeToggleEvent struct {
 
 func (x *AfterTreeNodeToggleEvent) Reset() {
 	*x = AfterTreeNodeToggleEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[225]
+	mi := &file_volvoxgrid_proto_msgTypes[246]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -22309,7 +24442,7 @@ func (x *AfterTreeNodeToggleEvent) String() string {
 func (*AfterTreeNodeToggleEvent) ProtoMessage() {}
 
 func (x *AfterTreeNodeToggleEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[225]
+	mi := &file_volvoxgrid_proto_msgTypes[246]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -22322,7 +24455,7 @@ func (x *AfterTreeNodeToggleEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AfterTreeNodeToggleEvent.ProtoReflect.Descriptor instead.
 func (*AfterTreeNodeToggleEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{225}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{246}
 }
 
 func (x *AfterTreeNodeToggleEvent) GetNodeId() string {
@@ -22356,7 +24489,7 @@ type TreeNodeActivateEvent struct {
 
 func (x *TreeNodeActivateEvent) Reset() {
 	*x = TreeNodeActivateEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[226]
+	mi := &file_volvoxgrid_proto_msgTypes[247]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -22368,7 +24501,7 @@ func (x *TreeNodeActivateEvent) String() string {
 func (*TreeNodeActivateEvent) ProtoMessage() {}
 
 func (x *TreeNodeActivateEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[226]
+	mi := &file_volvoxgrid_proto_msgTypes[247]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -22381,7 +24514,7 @@ func (x *TreeNodeActivateEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TreeNodeActivateEvent.ProtoReflect.Descriptor instead.
 func (*TreeNodeActivateEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{226}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{247}
 }
 
 func (x *TreeNodeActivateEvent) GetNodeId() string {
@@ -22410,7 +24543,7 @@ type TreeNodeContextMenuEvent struct {
 
 func (x *TreeNodeContextMenuEvent) Reset() {
 	*x = TreeNodeContextMenuEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[227]
+	mi := &file_volvoxgrid_proto_msgTypes[248]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -22422,7 +24555,7 @@ func (x *TreeNodeContextMenuEvent) String() string {
 func (*TreeNodeContextMenuEvent) ProtoMessage() {}
 
 func (x *TreeNodeContextMenuEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[227]
+	mi := &file_volvoxgrid_proto_msgTypes[248]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -22435,7 +24568,7 @@ func (x *TreeNodeContextMenuEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TreeNodeContextMenuEvent.ProtoReflect.Descriptor instead.
 func (*TreeNodeContextMenuEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{227}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{248}
 }
 
 func (x *TreeNodeContextMenuEvent) GetNodeId() string {
@@ -22479,7 +24612,7 @@ type BeforeScrollEvent struct {
 
 func (x *BeforeScrollEvent) Reset() {
 	*x = BeforeScrollEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[228]
+	mi := &file_volvoxgrid_proto_msgTypes[249]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -22491,7 +24624,7 @@ func (x *BeforeScrollEvent) String() string {
 func (*BeforeScrollEvent) ProtoMessage() {}
 
 func (x *BeforeScrollEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[228]
+	mi := &file_volvoxgrid_proto_msgTypes[249]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -22504,7 +24637,7 @@ func (x *BeforeScrollEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BeforeScrollEvent.ProtoReflect.Descriptor instead.
 func (*BeforeScrollEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{228}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{249}
 }
 
 func (x *BeforeScrollEvent) GetOldTopRow() int32 {
@@ -22547,7 +24680,7 @@ type AfterScrollEvent struct {
 
 func (x *AfterScrollEvent) Reset() {
 	*x = AfterScrollEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[229]
+	mi := &file_volvoxgrid_proto_msgTypes[250]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -22559,7 +24692,7 @@ func (x *AfterScrollEvent) String() string {
 func (*AfterScrollEvent) ProtoMessage() {}
 
 func (x *AfterScrollEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[229]
+	mi := &file_volvoxgrid_proto_msgTypes[250]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -22572,7 +24705,7 @@ func (x *AfterScrollEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AfterScrollEvent.ProtoReflect.Descriptor instead.
 func (*AfterScrollEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{229}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{250}
 }
 
 func (x *AfterScrollEvent) GetOldTopRow() int32 {
@@ -22612,7 +24745,7 @@ type ScrollTooltipEvent struct {
 
 func (x *ScrollTooltipEvent) Reset() {
 	*x = ScrollTooltipEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[230]
+	mi := &file_volvoxgrid_proto_msgTypes[251]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -22624,7 +24757,7 @@ func (x *ScrollTooltipEvent) String() string {
 func (*ScrollTooltipEvent) ProtoMessage() {}
 
 func (x *ScrollTooltipEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[230]
+	mi := &file_volvoxgrid_proto_msgTypes[251]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -22637,7 +24770,7 @@ func (x *ScrollTooltipEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScrollTooltipEvent.ProtoReflect.Descriptor instead.
 func (*ScrollTooltipEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{230}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{251}
 }
 
 func (x *ScrollTooltipEvent) GetText() string {
@@ -22658,7 +24791,7 @@ type BeforeUserResizeEvent struct {
 
 func (x *BeforeUserResizeEvent) Reset() {
 	*x = BeforeUserResizeEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[231]
+	mi := &file_volvoxgrid_proto_msgTypes[252]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -22670,7 +24803,7 @@ func (x *BeforeUserResizeEvent) String() string {
 func (*BeforeUserResizeEvent) ProtoMessage() {}
 
 func (x *BeforeUserResizeEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[231]
+	mi := &file_volvoxgrid_proto_msgTypes[252]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -22683,7 +24816,7 @@ func (x *BeforeUserResizeEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BeforeUserResizeEvent.ProtoReflect.Descriptor instead.
 func (*BeforeUserResizeEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{231}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{252}
 }
 
 func (x *BeforeUserResizeEvent) GetRow() int32 {
@@ -22710,7 +24843,7 @@ type AfterUserResizeEvent struct {
 
 func (x *AfterUserResizeEvent) Reset() {
 	*x = AfterUserResizeEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[232]
+	mi := &file_volvoxgrid_proto_msgTypes[253]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -22722,7 +24855,7 @@ func (x *AfterUserResizeEvent) String() string {
 func (*AfterUserResizeEvent) ProtoMessage() {}
 
 func (x *AfterUserResizeEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[232]
+	mi := &file_volvoxgrid_proto_msgTypes[253]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -22735,7 +24868,7 @@ func (x *AfterUserResizeEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AfterUserResizeEvent.ProtoReflect.Descriptor instead.
 func (*AfterUserResizeEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{232}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{253}
 }
 
 func (x *AfterUserResizeEvent) GetRow() int32 {
@@ -22762,7 +24895,7 @@ type AfterUserFreezeEvent struct {
 
 func (x *AfterUserFreezeEvent) Reset() {
 	*x = AfterUserFreezeEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[233]
+	mi := &file_volvoxgrid_proto_msgTypes[254]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -22774,7 +24907,7 @@ func (x *AfterUserFreezeEvent) String() string {
 func (*AfterUserFreezeEvent) ProtoMessage() {}
 
 func (x *AfterUserFreezeEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[233]
+	mi := &file_volvoxgrid_proto_msgTypes[254]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -22787,7 +24920,7 @@ func (x *AfterUserFreezeEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AfterUserFreezeEvent.ProtoReflect.Descriptor instead.
 func (*AfterUserFreezeEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{233}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{254}
 }
 
 func (x *AfterUserFreezeEvent) GetFrozenRows() int32 {
@@ -22815,7 +24948,7 @@ type BeforeMoveColumnEvent struct {
 
 func (x *BeforeMoveColumnEvent) Reset() {
 	*x = BeforeMoveColumnEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[234]
+	mi := &file_volvoxgrid_proto_msgTypes[255]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -22827,7 +24960,7 @@ func (x *BeforeMoveColumnEvent) String() string {
 func (*BeforeMoveColumnEvent) ProtoMessage() {}
 
 func (x *BeforeMoveColumnEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[234]
+	mi := &file_volvoxgrid_proto_msgTypes[255]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -22840,7 +24973,7 @@ func (x *BeforeMoveColumnEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BeforeMoveColumnEvent.ProtoReflect.Descriptor instead.
 func (*BeforeMoveColumnEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{234}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{255}
 }
 
 func (x *BeforeMoveColumnEvent) GetCol() int32 {
@@ -22867,7 +25000,7 @@ type AfterMoveColumnEvent struct {
 
 func (x *AfterMoveColumnEvent) Reset() {
 	*x = AfterMoveColumnEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[235]
+	mi := &file_volvoxgrid_proto_msgTypes[256]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -22879,7 +25012,7 @@ func (x *AfterMoveColumnEvent) String() string {
 func (*AfterMoveColumnEvent) ProtoMessage() {}
 
 func (x *AfterMoveColumnEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[235]
+	mi := &file_volvoxgrid_proto_msgTypes[256]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -22892,7 +25025,7 @@ func (x *AfterMoveColumnEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AfterMoveColumnEvent.ProtoReflect.Descriptor instead.
 func (*AfterMoveColumnEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{235}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{256}
 }
 
 func (x *AfterMoveColumnEvent) GetCol() int32 {
@@ -22919,7 +25052,7 @@ type BeforeMoveRowEvent struct {
 
 func (x *BeforeMoveRowEvent) Reset() {
 	*x = BeforeMoveRowEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[236]
+	mi := &file_volvoxgrid_proto_msgTypes[257]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -22931,7 +25064,7 @@ func (x *BeforeMoveRowEvent) String() string {
 func (*BeforeMoveRowEvent) ProtoMessage() {}
 
 func (x *BeforeMoveRowEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[236]
+	mi := &file_volvoxgrid_proto_msgTypes[257]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -22944,7 +25077,7 @@ func (x *BeforeMoveRowEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BeforeMoveRowEvent.ProtoReflect.Descriptor instead.
 func (*BeforeMoveRowEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{236}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{257}
 }
 
 func (x *BeforeMoveRowEvent) GetRow() int32 {
@@ -22971,7 +25104,7 @@ type AfterMoveRowEvent struct {
 
 func (x *AfterMoveRowEvent) Reset() {
 	*x = AfterMoveRowEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[237]
+	mi := &file_volvoxgrid_proto_msgTypes[258]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -22983,7 +25116,7 @@ func (x *AfterMoveRowEvent) String() string {
 func (*AfterMoveRowEvent) ProtoMessage() {}
 
 func (x *AfterMoveRowEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[237]
+	mi := &file_volvoxgrid_proto_msgTypes[258]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -22996,7 +25129,7 @@ func (x *AfterMoveRowEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AfterMoveRowEvent.ProtoReflect.Descriptor instead.
 func (*AfterMoveRowEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{237}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{258}
 }
 
 func (x *AfterMoveRowEvent) GetRow() int32 {
@@ -23027,7 +25160,7 @@ type BeforeMouseDownEvent struct {
 
 func (x *BeforeMouseDownEvent) Reset() {
 	*x = BeforeMouseDownEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[238]
+	mi := &file_volvoxgrid_proto_msgTypes[259]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -23039,7 +25172,7 @@ func (x *BeforeMouseDownEvent) String() string {
 func (*BeforeMouseDownEvent) ProtoMessage() {}
 
 func (x *BeforeMouseDownEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[238]
+	mi := &file_volvoxgrid_proto_msgTypes[259]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -23052,7 +25185,7 @@ func (x *BeforeMouseDownEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BeforeMouseDownEvent.ProtoReflect.Descriptor instead.
 func (*BeforeMouseDownEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{238}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{259}
 }
 
 func (x *BeforeMouseDownEvent) GetRow() int32 {
@@ -23088,7 +25221,7 @@ type MouseDownEvent struct {
 
 func (x *MouseDownEvent) Reset() {
 	*x = MouseDownEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[239]
+	mi := &file_volvoxgrid_proto_msgTypes[260]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -23100,7 +25233,7 @@ func (x *MouseDownEvent) String() string {
 func (*MouseDownEvent) ProtoMessage() {}
 
 func (x *MouseDownEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[239]
+	mi := &file_volvoxgrid_proto_msgTypes[260]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -23113,7 +25246,7 @@ func (x *MouseDownEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MouseDownEvent.ProtoReflect.Descriptor instead.
 func (*MouseDownEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{239}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{260}
 }
 
 func (x *MouseDownEvent) GetButton() int32 {
@@ -23156,7 +25289,7 @@ type MouseUpEvent struct {
 
 func (x *MouseUpEvent) Reset() {
 	*x = MouseUpEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[240]
+	mi := &file_volvoxgrid_proto_msgTypes[261]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -23168,7 +25301,7 @@ func (x *MouseUpEvent) String() string {
 func (*MouseUpEvent) ProtoMessage() {}
 
 func (x *MouseUpEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[240]
+	mi := &file_volvoxgrid_proto_msgTypes[261]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -23181,7 +25314,7 @@ func (x *MouseUpEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MouseUpEvent.ProtoReflect.Descriptor instead.
 func (*MouseUpEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{240}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{261}
 }
 
 func (x *MouseUpEvent) GetButton() int32 {
@@ -23225,7 +25358,7 @@ type MouseMoveEvent struct {
 
 func (x *MouseMoveEvent) Reset() {
 	*x = MouseMoveEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[241]
+	mi := &file_volvoxgrid_proto_msgTypes[262]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -23237,7 +25370,7 @@ func (x *MouseMoveEvent) String() string {
 func (*MouseMoveEvent) ProtoMessage() {}
 
 func (x *MouseMoveEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[241]
+	mi := &file_volvoxgrid_proto_msgTypes[262]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -23250,7 +25383,7 @@ func (x *MouseMoveEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MouseMoveEvent.ProtoReflect.Descriptor instead.
 func (*MouseMoveEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{241}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{262}
 }
 
 func (x *MouseMoveEvent) GetButton() int32 {
@@ -23301,7 +25434,7 @@ type ClickEvent struct {
 
 func (x *ClickEvent) Reset() {
 	*x = ClickEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[242]
+	mi := &file_volvoxgrid_proto_msgTypes[263]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -23313,7 +25446,7 @@ func (x *ClickEvent) String() string {
 func (*ClickEvent) ProtoMessage() {}
 
 func (x *ClickEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[242]
+	mi := &file_volvoxgrid_proto_msgTypes[263]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -23326,7 +25459,7 @@ func (x *ClickEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClickEvent.ProtoReflect.Descriptor instead.
 func (*ClickEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{242}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{263}
 }
 
 func (x *ClickEvent) GetRow() int32 {
@@ -23375,7 +25508,7 @@ type DblClickEvent struct {
 
 func (x *DblClickEvent) Reset() {
 	*x = DblClickEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[243]
+	mi := &file_volvoxgrid_proto_msgTypes[264]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -23387,7 +25520,7 @@ func (x *DblClickEvent) String() string {
 func (*DblClickEvent) ProtoMessage() {}
 
 func (x *DblClickEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[243]
+	mi := &file_volvoxgrid_proto_msgTypes[264]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -23400,7 +25533,7 @@ func (x *DblClickEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DblClickEvent.ProtoReflect.Descriptor instead.
 func (*DblClickEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{243}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{264}
 }
 
 func (x *DblClickEvent) GetRow() int32 {
@@ -23436,7 +25569,7 @@ type KeyDownEvent struct {
 
 func (x *KeyDownEvent) Reset() {
 	*x = KeyDownEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[244]
+	mi := &file_volvoxgrid_proto_msgTypes[265]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -23448,7 +25581,7 @@ func (x *KeyDownEvent) String() string {
 func (*KeyDownEvent) ProtoMessage() {}
 
 func (x *KeyDownEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[244]
+	mi := &file_volvoxgrid_proto_msgTypes[265]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -23461,7 +25594,7 @@ func (x *KeyDownEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KeyDownEvent.ProtoReflect.Descriptor instead.
 func (*KeyDownEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{244}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{265}
 }
 
 func (x *KeyDownEvent) GetKeyCode() int32 {
@@ -23487,7 +25620,7 @@ type KeyPressEvent struct {
 
 func (x *KeyPressEvent) Reset() {
 	*x = KeyPressEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[245]
+	mi := &file_volvoxgrid_proto_msgTypes[266]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -23499,7 +25632,7 @@ func (x *KeyPressEvent) String() string {
 func (*KeyPressEvent) ProtoMessage() {}
 
 func (x *KeyPressEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[245]
+	mi := &file_volvoxgrid_proto_msgTypes[266]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -23512,7 +25645,7 @@ func (x *KeyPressEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KeyPressEvent.ProtoReflect.Descriptor instead.
 func (*KeyPressEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{245}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{266}
 }
 
 func (x *KeyPressEvent) GetKeyAscii() int32 {
@@ -23532,7 +25665,7 @@ type KeyUpEvent struct {
 
 func (x *KeyUpEvent) Reset() {
 	*x = KeyUpEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[246]
+	mi := &file_volvoxgrid_proto_msgTypes[267]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -23544,7 +25677,7 @@ func (x *KeyUpEvent) String() string {
 func (*KeyUpEvent) ProtoMessage() {}
 
 func (x *KeyUpEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[246]
+	mi := &file_volvoxgrid_proto_msgTypes[267]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -23557,7 +25690,7 @@ func (x *KeyUpEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KeyUpEvent.ProtoReflect.Descriptor instead.
 func (*KeyUpEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{246}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{267}
 }
 
 func (x *KeyUpEvent) GetKeyCode() int32 {
@@ -23592,7 +25725,7 @@ type CustomRenderCellEvent struct {
 
 func (x *CustomRenderCellEvent) Reset() {
 	*x = CustomRenderCellEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[247]
+	mi := &file_volvoxgrid_proto_msgTypes[268]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -23604,7 +25737,7 @@ func (x *CustomRenderCellEvent) String() string {
 func (*CustomRenderCellEvent) ProtoMessage() {}
 
 func (x *CustomRenderCellEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[247]
+	mi := &file_volvoxgrid_proto_msgTypes[268]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -23617,7 +25750,7 @@ func (x *CustomRenderCellEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CustomRenderCellEvent.ProtoReflect.Descriptor instead.
 func (*CustomRenderCellEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{247}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{268}
 }
 
 func (x *CustomRenderCellEvent) GetRow() int32 {
@@ -23694,7 +25827,7 @@ type DragStartEvent struct {
 
 func (x *DragStartEvent) Reset() {
 	*x = DragStartEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[248]
+	mi := &file_volvoxgrid_proto_msgTypes[269]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -23706,7 +25839,7 @@ func (x *DragStartEvent) String() string {
 func (*DragStartEvent) ProtoMessage() {}
 
 func (x *DragStartEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[248]
+	mi := &file_volvoxgrid_proto_msgTypes[269]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -23719,7 +25852,7 @@ func (x *DragStartEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DragStartEvent.ProtoReflect.Descriptor instead.
 func (*DragStartEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{248}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{269}
 }
 
 func (x *DragStartEvent) GetRow() int32 {
@@ -23748,7 +25881,7 @@ type DragOverEvent struct {
 
 func (x *DragOverEvent) Reset() {
 	*x = DragOverEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[249]
+	mi := &file_volvoxgrid_proto_msgTypes[270]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -23760,7 +25893,7 @@ func (x *DragOverEvent) String() string {
 func (*DragOverEvent) ProtoMessage() {}
 
 func (x *DragOverEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[249]
+	mi := &file_volvoxgrid_proto_msgTypes[270]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -23773,7 +25906,7 @@ func (x *DragOverEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DragOverEvent.ProtoReflect.Descriptor instead.
 func (*DragOverEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{249}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{270}
 }
 
 func (x *DragOverEvent) GetRow() int32 {
@@ -23814,7 +25947,7 @@ type DragDropEvent struct {
 
 func (x *DragDropEvent) Reset() {
 	*x = DragDropEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[250]
+	mi := &file_volvoxgrid_proto_msgTypes[271]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -23826,7 +25959,7 @@ func (x *DragDropEvent) String() string {
 func (*DragDropEvent) ProtoMessage() {}
 
 func (x *DragDropEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[250]
+	mi := &file_volvoxgrid_proto_msgTypes[271]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -23839,7 +25972,7 @@ func (x *DragDropEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DragDropEvent.ProtoReflect.Descriptor instead.
 func (*DragDropEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{250}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{271}
 }
 
 func (x *DragDropEvent) GetRow() int32 {
@@ -23865,7 +25998,7 @@ type DragCompleteEvent struct {
 
 func (x *DragCompleteEvent) Reset() {
 	*x = DragCompleteEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[251]
+	mi := &file_volvoxgrid_proto_msgTypes[272]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -23877,7 +26010,7 @@ func (x *DragCompleteEvent) String() string {
 func (*DragCompleteEvent) ProtoMessage() {}
 
 func (x *DragCompleteEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[251]
+	mi := &file_volvoxgrid_proto_msgTypes[272]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -23890,7 +26023,7 @@ func (x *DragCompleteEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DragCompleteEvent.ProtoReflect.Descriptor instead.
 func (*DragCompleteEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{251}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{272}
 }
 
 func (x *DragCompleteEvent) GetSuccess() bool {
@@ -23911,7 +26044,7 @@ type TypeAheadStartedEvent struct {
 
 func (x *TypeAheadStartedEvent) Reset() {
 	*x = TypeAheadStartedEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[252]
+	mi := &file_volvoxgrid_proto_msgTypes[273]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -23923,7 +26056,7 @@ func (x *TypeAheadStartedEvent) String() string {
 func (*TypeAheadStartedEvent) ProtoMessage() {}
 
 func (x *TypeAheadStartedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[252]
+	mi := &file_volvoxgrid_proto_msgTypes[273]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -23936,7 +26069,7 @@ func (x *TypeAheadStartedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TypeAheadStartedEvent.ProtoReflect.Descriptor instead.
 func (*TypeAheadStartedEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{252}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{273}
 }
 
 func (x *TypeAheadStartedEvent) GetCol() int32 {
@@ -23961,7 +26094,7 @@ type TypeAheadEndedEvent struct {
 
 func (x *TypeAheadEndedEvent) Reset() {
 	*x = TypeAheadEndedEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[253]
+	mi := &file_volvoxgrid_proto_msgTypes[274]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -23973,7 +26106,7 @@ func (x *TypeAheadEndedEvent) String() string {
 func (*TypeAheadEndedEvent) ProtoMessage() {}
 
 func (x *TypeAheadEndedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[253]
+	mi := &file_volvoxgrid_proto_msgTypes[274]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -23986,7 +26119,7 @@ func (x *TypeAheadEndedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TypeAheadEndedEvent.ProtoReflect.Descriptor instead.
 func (*TypeAheadEndedEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{253}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{274}
 }
 
 // ── Data Refresh Events ──
@@ -23998,7 +26131,7 @@ type DataRefreshingEvent struct {
 
 func (x *DataRefreshingEvent) Reset() {
 	*x = DataRefreshingEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[254]
+	mi := &file_volvoxgrid_proto_msgTypes[275]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -24010,7 +26143,7 @@ func (x *DataRefreshingEvent) String() string {
 func (*DataRefreshingEvent) ProtoMessage() {}
 
 func (x *DataRefreshingEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[254]
+	mi := &file_volvoxgrid_proto_msgTypes[275]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -24023,7 +26156,7 @@ func (x *DataRefreshingEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DataRefreshingEvent.ProtoReflect.Descriptor instead.
 func (*DataRefreshingEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{254}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{275}
 }
 
 type DataRefreshedEvent struct {
@@ -24034,7 +26167,7 @@ type DataRefreshedEvent struct {
 
 func (x *DataRefreshedEvent) Reset() {
 	*x = DataRefreshedEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[255]
+	mi := &file_volvoxgrid_proto_msgTypes[276]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -24046,7 +26179,7 @@ func (x *DataRefreshedEvent) String() string {
 func (*DataRefreshedEvent) ProtoMessage() {}
 
 func (x *DataRefreshedEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[255]
+	mi := &file_volvoxgrid_proto_msgTypes[276]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -24059,7 +26192,7 @@ func (x *DataRefreshedEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DataRefreshedEvent.ProtoReflect.Descriptor instead.
 func (*DataRefreshedEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{255}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{276}
 }
 
 type FilterDataEvent struct {
@@ -24073,7 +26206,7 @@ type FilterDataEvent struct {
 
 func (x *FilterDataEvent) Reset() {
 	*x = FilterDataEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[256]
+	mi := &file_volvoxgrid_proto_msgTypes[277]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -24085,7 +26218,7 @@ func (x *FilterDataEvent) String() string {
 func (*FilterDataEvent) ProtoMessage() {}
 
 func (x *FilterDataEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[256]
+	mi := &file_volvoxgrid_proto_msgTypes[277]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -24098,7 +26231,7 @@ func (x *FilterDataEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FilterDataEvent.ProtoReflect.Descriptor instead.
 func (*FilterDataEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{256}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{277}
 }
 
 func (x *FilterDataEvent) GetRow() int32 {
@@ -24131,7 +26264,7 @@ type PullToRefreshTriggeredEvent struct {
 
 func (x *PullToRefreshTriggeredEvent) Reset() {
 	*x = PullToRefreshTriggeredEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[257]
+	mi := &file_volvoxgrid_proto_msgTypes[278]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -24143,7 +26276,7 @@ func (x *PullToRefreshTriggeredEvent) String() string {
 func (*PullToRefreshTriggeredEvent) ProtoMessage() {}
 
 func (x *PullToRefreshTriggeredEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[257]
+	mi := &file_volvoxgrid_proto_msgTypes[278]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -24156,7 +26289,7 @@ func (x *PullToRefreshTriggeredEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PullToRefreshTriggeredEvent.ProtoReflect.Descriptor instead.
 func (*PullToRefreshTriggeredEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{257}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{278}
 }
 
 type PullToRefreshCanceledEvent struct {
@@ -24167,7 +26300,7 @@ type PullToRefreshCanceledEvent struct {
 
 func (x *PullToRefreshCanceledEvent) Reset() {
 	*x = PullToRefreshCanceledEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[258]
+	mi := &file_volvoxgrid_proto_msgTypes[279]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -24179,7 +26312,7 @@ func (x *PullToRefreshCanceledEvent) String() string {
 func (*PullToRefreshCanceledEvent) ProtoMessage() {}
 
 func (x *PullToRefreshCanceledEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[258]
+	mi := &file_volvoxgrid_proto_msgTypes[279]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -24192,7 +26325,7 @@ func (x *PullToRefreshCanceledEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PullToRefreshCanceledEvent.ProtoReflect.Descriptor instead.
 func (*PullToRefreshCanceledEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{258}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{279}
 }
 
 // ── Error Events ──
@@ -24206,7 +26339,7 @@ type ErrorEvent struct {
 
 func (x *ErrorEvent) Reset() {
 	*x = ErrorEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[259]
+	mi := &file_volvoxgrid_proto_msgTypes[280]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -24218,7 +26351,7 @@ func (x *ErrorEvent) String() string {
 func (*ErrorEvent) ProtoMessage() {}
 
 func (x *ErrorEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[259]
+	mi := &file_volvoxgrid_proto_msgTypes[280]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -24231,7 +26364,7 @@ func (x *ErrorEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ErrorEvent.ProtoReflect.Descriptor instead.
 func (*ErrorEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{259}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{280}
 }
 
 func (x *ErrorEvent) GetCode() int32 {
@@ -24258,7 +26391,7 @@ type BeforePageBreakEvent struct {
 
 func (x *BeforePageBreakEvent) Reset() {
 	*x = BeforePageBreakEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[260]
+	mi := &file_volvoxgrid_proto_msgTypes[281]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -24270,7 +26403,7 @@ func (x *BeforePageBreakEvent) String() string {
 func (*BeforePageBreakEvent) ProtoMessage() {}
 
 func (x *BeforePageBreakEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[260]
+	mi := &file_volvoxgrid_proto_msgTypes[281]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -24283,7 +26416,7 @@ func (x *BeforePageBreakEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BeforePageBreakEvent.ProtoReflect.Descriptor instead.
 func (*BeforePageBreakEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{260}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{281}
 }
 
 func (x *BeforePageBreakEvent) GetRow() int32 {
@@ -24302,7 +26435,7 @@ type StartPageEvent struct {
 
 func (x *StartPageEvent) Reset() {
 	*x = StartPageEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[261]
+	mi := &file_volvoxgrid_proto_msgTypes[282]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -24314,7 +26447,7 @@ func (x *StartPageEvent) String() string {
 func (*StartPageEvent) ProtoMessage() {}
 
 func (x *StartPageEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[261]
+	mi := &file_volvoxgrid_proto_msgTypes[282]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -24327,7 +26460,7 @@ func (x *StartPageEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartPageEvent.ProtoReflect.Descriptor instead.
 func (*StartPageEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{261}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{282}
 }
 
 func (x *StartPageEvent) GetPage() int32 {
@@ -24346,7 +26479,7 @@ type GetHeaderRowEvent struct {
 
 func (x *GetHeaderRowEvent) Reset() {
 	*x = GetHeaderRowEvent{}
-	mi := &file_volvoxgrid_proto_msgTypes[262]
+	mi := &file_volvoxgrid_proto_msgTypes[283]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -24358,7 +26491,7 @@ func (x *GetHeaderRowEvent) String() string {
 func (*GetHeaderRowEvent) ProtoMessage() {}
 
 func (x *GetHeaderRowEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_volvoxgrid_proto_msgTypes[262]
+	mi := &file_volvoxgrid_proto_msgTypes[283]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -24371,7 +26504,7 @@ func (x *GetHeaderRowEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetHeaderRowEvent.ProtoReflect.Descriptor instead.
 func (*GetHeaderRowEvent) Descriptor() ([]byte, []int) {
-	return file_volvoxgrid_proto_rawDescGZIP(), []int{262}
+	return file_volvoxgrid_proto_rawDescGZIP(), []int{283}
 }
 
 func (x *GetHeaderRowEvent) GetPage() int32 {
@@ -24505,13 +26638,31 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\x04row1\x18\x01 \x01(\x05R\x04row1\x12\x12\n" +
 	"\x04col1\x18\x02 \x01(\x05R\x04col1\x12\x12\n" +
 	"\x04row2\x18\x03 \x01(\x05R\x04row2\x12\x12\n" +
-	"\x04col2\x18\x04 \x01(\x05R\x04col2\"\x8e\x01\n" +
+	"\x04col2\x18\x04 \x01(\x05R\x04col2\"P\n" +
+	"\x04Rect\x12\f\n" +
+	"\x01x\x18\x01 \x01(\x02R\x01x\x12\f\n" +
+	"\x01y\x18\x02 \x01(\x02R\x01y\x12\x14\n" +
+	"\x05width\x18\x03 \x01(\x02R\x05width\x12\x16\n" +
+	"\x06height\x18\x04 \x01(\x02R\x06height\"\x8e\x01\n" +
 	"\tCellValue\x12\x14\n" +
 	"\x04text\x18\x01 \x01(\tH\x00R\x04text\x12\x18\n" +
 	"\x06number\x18\x02 \x01(\x01H\x00R\x06number\x12\x14\n" +
 	"\x04flag\x18\x03 \x01(\bH\x00R\x04flag\x12\x12\n" +
 	"\x03raw\x18\x04 \x01(\fH\x00R\x03raw\x12\x1e\n" +
 	"\ttimestamp\x18\x05 \x01(\x03H\x00R\ttimestampB\a\n" +
+	"\x05value\"A\n" +
+	"\vStructValue\x122\n" +
+	"\x06fields\x18\x01 \x03(\v2\x1a.volvoxgrid.v1.StructFieldR\x06fields\"Q\n" +
+	"\vStructField\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x120\n" +
+	"\x05value\x18\x02 \x01(\v2\x1a.volvoxgrid.v1.ScalarValueR\x05value\"\xa4\x01\n" +
+	"\vScalarValue\x12#\n" +
+	"\fstring_value\x18\x01 \x01(\tH\x00R\vstringValue\x12#\n" +
+	"\fnumber_value\x18\x02 \x01(\x01H\x00R\vnumberValue\x12\x1f\n" +
+	"\n" +
+	"bool_value\x18\x03 \x01(\bH\x00R\tboolValue\x12!\n" +
+	"\vbytes_value\x18\x04 \x01(\fH\x00R\n" +
+	"bytesValueB\a\n" +
 	"\x05value\"<\n" +
 	"\bRichText\x120\n" +
 	"\x04runs\x18\x01 \x03(\v2\x1c.volvoxgrid.v1.TextFormatRunR\x04runs\"c\n" +
@@ -24528,23 +26679,108 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\blink_url\x18\x04 \x01(\tH\x02R\alinkUrl\x88\x01\x01B\r\n" +
 	"\v_foregroundB\v\n" +
 	"\t_baselineB\v\n" +
-	"\t_link_url\"\xe3\x01\n" +
-	"\bDropdown\x121\n" +
-	"\x05items\x18\x01 \x03(\v2\x1b.volvoxgrid.v1.DropdownItemR\x05items\x12,\n" +
-	"\x12allow_custom_value\x18\x02 \x01(\bR\x10allowCustomValue\x12B\n" +
-	"\vitem_layout\x18\x03 \x01(\x0e2!.volvoxgrid.v1.DropdownItemLayoutR\n" +
-	"itemLayout\x12#\n" +
+	"\t_link_url\"\xe5\x06\n" +
 	"\n" +
-	"searchable\x18\x04 \x01(\bH\x00R\n" +
-	"searchable\x88\x01\x01B\r\n" +
-	"\v_searchable\"\x8e\x01\n" +
-	"\fDropdownItem\x12\x19\n" +
-	"\x05value\x18\x01 \x01(\tH\x00R\x05value\x88\x01\x01\x12\x19\n" +
-	"\x05label\x18\x02 \x01(\tH\x01R\x05label\x88\x01\x01\x12\x18\n" +
+	"EditorSpec\x12-\n" +
+	"\x04kind\x18\x01 \x01(\x0e2\x19.volvoxgrid.v1.EditorKindR\x04kind\x120\n" +
+	"\x05owner\x18\x02 \x01(\x0e2\x1a.volvoxgrid.v1.EditorOwnerR\x05owner\x12E\n" +
+	"\fpresentation\x18\x03 \x01(\x0e2!.volvoxgrid.v1.EditorPresentationR\fpresentation\x12F\n" +
+	"\x0fvalidation_mode\x18\x04 \x01(\x0e2\x1d.volvoxgrid.v1.ValidationModeR\x0evalidationMode\x12O\n" +
+	"\x12validation_trigger\x18\x05 \x01(\x0e2 .volvoxgrid.v1.ValidationTriggerR\x11validationTrigger\x124\n" +
+	"\x16validation_debounce_ms\x18\x06 \x01(\x05R\x14validationDebounceMs\x12-\n" +
+	"\x10custom_editor_id\x18\n" +
+	" \x01(\tH\x00R\x0ecustomEditorId\x88\x01\x01\x123\n" +
+	"\x04text\x18\v \x01(\v2\x1f.volvoxgrid.v1.TextEditorParamsR\x04text\x129\n" +
+	"\x06number\x18\f \x01(\v2!.volvoxgrid.v1.NumberEditorParamsR\x06number\x12?\n" +
+	"\bcheckbox\x18\r \x01(\v2#.volvoxgrid.v1.CheckboxEditorParamsR\bcheckbox\x123\n" +
+	"\x04list\x18\x0e \x01(\v2\x1f.volvoxgrid.v1.ListEditorParamsR\x04list\x12@\n" +
+	"\tdate_time\x18\x0f \x01(\v2#.volvoxgrid.v1.DateTimeEditorParamsR\bdateTime\x125\n" +
+	"\aactions\x18\x10 \x03(\v2\x1b.volvoxgrid.v1.EditorActionR\aactions\x12=\n" +
+	"\fcustom_props\x18\x11 \x01(\v2\x1a.volvoxgrid.v1.StructValueR\vcustomPropsB\x13\n" +
+	"\x11_custom_editor_id\"\xa5\x01\n" +
+	"\x10TextEditorParams\x12\x1d\n" +
+	"\n" +
+	"max_length\x18\x01 \x01(\x05R\tmaxLength\x12\x12\n" +
+	"\x04mask\x18\x02 \x01(\tR\x04mask\x12%\n" +
+	"\x0eallow_newlines\x18\x03 \x01(\bR\rallowNewlines\x127\n" +
+	"\n" +
+	"input_type\x18\x04 \x01(\x0e2\x18.volvoxgrid.v1.InputTypeR\tinputType\"\xa8\x01\n" +
+	"\x12NumberEditorParams\x12\x15\n" +
+	"\x03min\x18\x01 \x01(\x01H\x00R\x03min\x88\x01\x01\x12\x15\n" +
+	"\x03max\x18\x02 \x01(\x01H\x01R\x03max\x88\x01\x01\x12\x17\n" +
+	"\x04step\x18\x03 \x01(\x01H\x02R\x04step\x88\x01\x01\x12\x16\n" +
+	"\x06format\x18\x04 \x01(\tR\x06format\x12\x1a\n" +
+	"\bnullable\x18\x05 \x01(\bR\bnullableB\x06\n" +
+	"\x04_minB\x06\n" +
+	"\x04_maxB\a\n" +
+	"\x05_step\"7\n" +
+	"\x14CheckboxEditorParams\x12\x1f\n" +
+	"\vthree_state\x18\x01 \x01(\bR\n" +
+	"threeState\"\xe0\x01\n" +
+	"\x14DateTimeEditorParams\x12\x16\n" +
+	"\x06format\x18\x01 \x01(\tR\x06format\x12(\n" +
+	"\rmin_timestamp\x18\x02 \x01(\x03H\x00R\fminTimestamp\x88\x01\x01\x12(\n" +
+	"\rmax_timestamp\x18\x03 \x01(\x03H\x01R\fmaxTimestamp\x88\x01\x01\x12\x1b\n" +
+	"\tdate_only\x18\x04 \x01(\bR\bdateOnly\x12\x1b\n" +
+	"\ttime_only\x18\x05 \x01(\bR\btimeOnlyB\x10\n" +
+	"\x0e_min_timestampB\x10\n" +
+	"\x0e_max_timestamp\"\x9e\x01\n" +
+	"\fEditorAction\x12\x1b\n" +
+	"\taction_id\x18\x01 \x01(\tR\bactionId\x12\x14\n" +
+	"\x05label\x18\x02 \x01(\tR\x05label\x12-\n" +
+	"\x04role\x18\x03 \x01(\x0e2\x19.volvoxgrid.v1.ButtonRoleR\x04role\x12,\n" +
+	"\x04icon\x18\x04 \x01(\v2\x18.volvoxgrid.v1.ImageDataR\x04icon\"\xc3\x02\n" +
+	"\x10ListEditorParams\x12:\n" +
+	"\fstatic_items\x18\x01 \x03(\v2\x17.volvoxgrid.v1.ListItemR\vstaticItems\x12>\n" +
+	"\vdata_source\x18\x02 \x01(\v2\x1d.volvoxgrid.v1.ListDataSourceR\n" +
+	"dataSource\x12,\n" +
+	"\x12allow_custom_value\x18\x03 \x01(\bR\x10allowCustomValue\x12\x1e\n" +
+	"\n" +
+	"searchable\x18\x04 \x01(\bR\n" +
+	"searchable\x12!\n" +
+	"\fmulti_select\x18\x05 \x01(\bR\vmultiSelect\x12B\n" +
+	"\vitem_layout\x18\x06 \x01(\x0e2!.volvoxgrid.v1.DropdownItemLayoutR\n" +
+	"itemLayout\"\x86\x01\n" +
+	"\bListItem\x12.\n" +
+	"\x05value\x18\x01 \x01(\v2\x18.volvoxgrid.v1.CellValueR\x05value\x12\x14\n" +
+	"\x05label\x18\x02 \x01(\tR\x05label\x12\x18\n" +
 	"\adetails\x18\x03 \x03(\tR\adetails\x12\x1a\n" +
-	"\bdisabled\x18\x04 \x01(\bR\bdisabledB\b\n" +
-	"\x06_valueB\b\n" +
-	"\x06_label\"\x97\x02\n" +
+	"\bdisabled\x18\x04 \x01(\bR\bdisabled\"\x8f\x01\n" +
+	"\x0eListDataSource\x12$\n" +
+	"\x0edata_source_id\x18\x01 \x01(\tR\fdataSourceId\x12\x1e\n" +
+	"\n" +
+	"filterable\x18\x02 \x01(\bR\n" +
+	"filterable\x12\x1a\n" +
+	"\bpageable\x18\x03 \x01(\bR\bpageable\x12\x1b\n" +
+	"\tpage_size\x18\x04 \x01(\x05R\bpageSize\"\xa6\x01\n" +
+	"\vEditorValue\x12.\n" +
+	"\x05value\x18\x01 \x01(\v2\x18.volvoxgrid.v1.CellValueR\x05value\x12 \n" +
+	"\tedit_text\x18\x02 \x01(\tH\x00R\beditText\x88\x01\x01\x12&\n" +
+	"\fdisplay_text\x18\x03 \x01(\tH\x01R\vdisplayText\x88\x01\x01B\f\n" +
+	"\n" +
+	"_edit_textB\x0f\n" +
+	"\r_display_text\"=\n" +
+	"\rTextSelection\x12\x14\n" +
+	"\x05start\x18\x01 \x01(\x05R\x05start\x12\x16\n" +
+	"\x06length\x18\x02 \x01(\x05R\x06length\"[\n" +
+	"\x0fValidationError\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\tR\x04code\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12\x1a\n" +
+	"\bblocking\x18\x03 \x01(\bR\bblocking\"\xf3\x03\n" +
+	"\x0eEditActivation\x129\n" +
+	"\atrigger\x18\x01 \x01(\x0e2\x1a.volvoxgrid.v1.EditTriggerH\x00R\atrigger\x88\x01\x01\x12B\n" +
+	"\ftab_behavior\x18\x02 \x01(\x0e2\x1a.volvoxgrid.v1.TabBehaviorH\x01R\vtabBehavior\x88\x01\x01\x12/\n" +
+	"\x11single_click_edit\x18\x03 \x01(\bH\x02R\x0fsingleClickEdit\x88\x01\x01\x123\n" +
+	"\x13suppress_click_edit\x18\x04 \x01(\bH\x03R\x11suppressClickEdit\x88\x01\x01\x124\n" +
+	"\x14commit_on_focus_lost\x18\x05 \x01(\bH\x04R\x11commitOnFocusLost\x88\x01\x01\x12B\n" +
+	"\x1bpreserve_edit_on_navigation\x18\x06 \x01(\bH\x05R\x18preserveEditOnNavigation\x88\x01\x01B\n" +
+	"\n" +
+	"\b_triggerB\x0f\n" +
+	"\r_tab_behaviorB\x14\n" +
+	"\x12_single_click_editB\x16\n" +
+	"\x14_suppress_click_editB\x17\n" +
+	"\x15_commit_on_focus_lostB\x1e\n" +
+	"\x1c_preserve_edit_on_navigation\"\x97\x02\n" +
 	"\x0fScrollBarColors\x12\x19\n" +
 	"\x05thumb\x18\x01 \x01(\rH\x00R\x05thumb\x88\x01\x01\x12$\n" +
 	"\vthumb_hover\x18\x02 \x01(\rH\x01R\n" +
@@ -24776,7 +27012,7 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\n" +
 	"\b_reorderB\n" +
 	"\n" +
-	"\b_chooser\"\xe2\x04\n" +
+	"\b_chooser\"\xb7\x05\n" +
 	"\n" +
 	"GridConfig\x123\n" +
 	"\x06layout\x18\x01 \x01(\v2\x1b.volvoxgrid.v1.LayoutConfigR\x06layout\x120\n" +
@@ -24792,7 +27028,9 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	" \x01(\tR\aversion\x12?\n" +
 	"\n" +
 	"indicators\x18\v \x01(\v2\x1f.volvoxgrid.v1.IndicatorsConfigR\n" +
-	"indicators\"\xb1\x04\n" +
+	"indicators\x12B\n" +
+	"\ftheme_preset\x18\f \x01(\x0e2\x1a.volvoxgrid.v1.ThemePresetH\x00R\vthemePreset\x88\x01\x01B\x0f\n" +
+	"\r_theme_preset\"\xb1\x04\n" +
 	"\fLayoutConfig\x12\x17\n" +
 	"\x04rows\x18\x01 \x01(\x05H\x00R\x04rows\x88\x01\x01\x12\x17\n" +
 	"\x04cols\x18\x02 \x01(\x05H\x01R\x04cols\x88\x01\x01\x12\"\n" +
@@ -24894,31 +27132,14 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\r_focus_borderB\r\n" +
 	"\v_visibilityB\b\n" +
 	"\x06_allowB\x16\n" +
-	"\x14_header_click_select\"\xda\x05\n" +
+	"\x14_header_click_select\"\xea\x01\n" +
 	"\n" +
-	"EditConfig\x129\n" +
-	"\atrigger\x18\x01 \x01(\x0e2\x1a.volvoxgrid.v1.EditTriggerH\x00R\atrigger\x88\x01\x01\x12B\n" +
-	"\ftab_behavior\x18\x02 \x01(\x0e2\x1a.volvoxgrid.v1.TabBehaviorH\x01R\vtabBehavior\x88\x01\x01\x12N\n" +
-	"\x10dropdown_trigger\x18\x03 \x01(\x0e2\x1e.volvoxgrid.v1.DropdownTriggerH\x02R\x0fdropdownTrigger\x88\x01\x01\x12,\n" +
-	"\x0fdropdown_search\x18\x04 \x01(\bH\x03R\x0edropdownSearch\x88\x01\x01\x12\"\n" +
+	"EditConfig\x12=\n" +
 	"\n" +
-	"max_length\x18\x05 \x01(\x05H\x04R\tmaxLength\x88\x01\x01\x12\x17\n" +
-	"\x04mask\x18\x06 \x01(\tH\x05R\x04mask\x88\x01\x01\x12/\n" +
-	"\x11host_key_dispatch\x18\a \x01(\bH\x06R\x0fhostKeyDispatch\x88\x01\x01\x127\n" +
-	"\x15host_pointer_dispatch\x18\b \x01(\bH\aR\x13hostPointerDispatch\x88\x01\x01\x12*\n" +
-	"\x0eengine_compose\x18\t \x01(\bH\bR\rengineCompose\x88\x01\x01\x12H\n" +
-	"\x0ecompose_method\x18\n" +
-	" \x01(\x0e2\x1c.volvoxgrid.v1.ComposeMethodH\tR\rcomposeMethod\x88\x01\x01B\n" +
-	"\n" +
-	"\b_triggerB\x0f\n" +
-	"\r_tab_behaviorB\x13\n" +
-	"\x11_dropdown_triggerB\x12\n" +
-	"\x10_dropdown_searchB\r\n" +
-	"\v_max_lengthB\a\n" +
-	"\x05_maskB\x14\n" +
-	"\x12_host_key_dispatchB\x18\n" +
-	"\x16_host_pointer_dispatchB\x11\n" +
-	"\x0f_engine_composeB\x11\n" +
+	"activation\x18\x01 \x01(\v2\x1d.volvoxgrid.v1.EditActivationR\n" +
+	"activation\x12@\n" +
+	"\x0edefault_editor\x18\x02 \x01(\v2\x19.volvoxgrid.v1.EditorSpecR\rdefaultEditor\x12H\n" +
+	"\x0ecompose_method\x18\x03 \x01(\x0e2\x1c.volvoxgrid.v1.ComposeMethodH\x00R\rcomposeMethod\x88\x01\x01B\x11\n" +
 	"\x0f_compose_method\"\xf1\x01\n" +
 	"\x13PullToRefreshConfig\x12\x1d\n" +
 	"\aenabled\x18\x01 \x01(\bH\x00R\aenabled\x88\x01\x01\x12<\n" +
@@ -24955,20 +27176,19 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\x0f_fling_frictionB\x15\n" +
 	"\x13_pinch_zoom_enabledB\x0e\n" +
 	"\f_fast_scrollB\r\n" +
-	"\v_scrollbars\"\x87\x05\n" +
+	"\v_scrollbars\"\x81\x05\n" +
 	"\rOutlineConfig\x12M\n" +
 	"\x0etree_indicator\x18\x01 \x01(\x0e2!.volvoxgrid.v1.TreeIndicatorStyleH\x00R\rtreeIndicator\x88\x01\x01\x12\"\n" +
 	"\n" +
-	"tree_color\x18\x03 \x01(\rH\x01R\ttreeColor\x88\x01\x01\x12X\n" +
-	"\x14group_total_position\x18\x04 \x01(\x0e2!.volvoxgrid.v1.GroupTotalPositionH\x02R\x12groupTotalPosition\x88\x01\x01\x12&\n" +
-	"\fmulti_totals\x18\x05 \x01(\bH\x03R\vmultiTotals\x88\x01\x01\x12.\n" +
-	"\x10indicator_indent\x18\x06 \x01(\x05H\x04R\x0findicatorIndent\x88\x01\x01\x12\"\n" +
+	"tree_color\x18\x02 \x01(\rH\x01R\ttreeColor\x88\x01\x01\x12X\n" +
+	"\x14group_total_position\x18\x03 \x01(\x0e2!.volvoxgrid.v1.GroupTotalPositionH\x02R\x12groupTotalPosition\x88\x01\x01\x12&\n" +
+	"\fmulti_totals\x18\x04 \x01(\bH\x03R\vmultiTotals\x88\x01\x01\x12.\n" +
+	"\x10indicator_indent\x18\x05 \x01(\x05H\x04R\x0findicatorIndent\x88\x01\x01\x12\"\n" +
 	"\n" +
-	"max_levels\x18\a \x01(\x05H\x05R\tmaxLevels\x88\x01\x01\x121\n" +
-	"\x12show_level_buttons\x18\b \x01(\bH\x06R\x10showLevelButtons\x88\x01\x01\x12&\n" +
-	"\flabel_column\x18\t \x01(\x05H\aR\vlabelColumn\x88\x01\x01\x12$\n" +
-	"\vicon_column\x18\n" +
-	" \x01(\x05H\bR\n" +
+	"max_levels\x18\x06 \x01(\x05H\x05R\tmaxLevels\x88\x01\x01\x121\n" +
+	"\x12show_level_buttons\x18\a \x01(\bH\x06R\x10showLevelButtons\x88\x01\x01\x12&\n" +
+	"\flabel_column\x18\b \x01(\x05H\aR\vlabelColumn\x88\x01\x01\x12$\n" +
+	"\vicon_column\x18\t \x01(\x05H\bR\n" +
 	"iconColumn\x88\x01\x01B\x11\n" +
 	"\x0f_tree_indicatorB\r\n" +
 	"\v_tree_colorB\x17\n" +
@@ -24978,7 +27198,7 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\v_max_levelsB\x15\n" +
 	"\x13_show_level_buttonsB\x0f\n" +
 	"\r_label_columnB\x0e\n" +
-	"\f_icon_columnJ\x04\b\x02\x10\x03\"\x88\x03\n" +
+	"\f_icon_column\"\x88\x03\n" +
 	"\n" +
 	"SpanConfig\x12=\n" +
 	"\tcell_span\x18\x01 \x01(\x0e2\x1b.volvoxgrid.v1.CellSpanModeH\x00R\bcellSpan\x88\x01\x01\x12H\n" +
@@ -25016,7 +27236,7 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\n" +
 	"_drop_modeB\x16\n" +
 	"\x14_decision_timeout_msB\x1e\n" +
-	"\x1c_compare_response_timeout_ms\"\xda\x06\n" +
+	"\x1c_compare_response_timeout_ms\"\xad\a\n" +
 	"\fRenderConfig\x12E\n" +
 	"\rrenderer_mode\x18\x01 \x01(\x0e2\x1b.volvoxgrid.v1.RendererModeH\x00R\frendererMode\x88\x01\x01\x12(\n" +
 	"\rdebug_overlay\x18\x02 \x01(\bH\x01R\fdebugOverlay\x88\x01\x01\x120\n" +
@@ -25031,7 +27251,8 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	" \x01(\bH\tR\x0elayerProfiling\x88\x01\x01\x12$\n" +
 	"\vscroll_blit\x18\v \x01(\bH\n" +
 	"R\n" +
-	"scrollBlit\x88\x01\x01B\x10\n" +
+	"scrollBlit\x88\x01\x01\x127\n" +
+	"\x15font_fallback_enabled\x18\f \x01(\bH\vR\x13fontFallbackEnabled\x88\x01\x01B\x10\n" +
 	"\x0e_renderer_modeB\x10\n" +
 	"\x0e_debug_overlayB\x14\n" +
 	"\x12_animation_enabledB\x18\n" +
@@ -25042,7 +27263,10 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\x15_target_frame_rate_hzB\x14\n" +
 	"\x12_render_layer_maskB\x12\n" +
 	"\x10_layer_profilingB\x0e\n" +
-	"\f_scroll_blit\"\xfe\x01\n" +
+	"\f_scroll_blitB\x18\n" +
+	"\x16_font_fallback_enabled\"R\n" +
+	"\x15ColIndicatorCellModes\x129\n" +
+	"\x05modes\x18\x01 \x03(\x0e2#.volvoxgrid.v1.ColIndicatorCellModeR\x05modes\"\xfe\x01\n" +
 	"\x10RowIndicatorSlot\x12<\n" +
 	"\x04kind\x18\x01 \x01(\x0e2#.volvoxgrid.v1.RowIndicatorSlotKindH\x00R\x04kind\x88\x01\x01\x12\x19\n" +
 	"\x05width\x18\x02 \x01(\x05H\x01R\x05width\x88\x01\x01\x12\x1d\n" +
@@ -25055,26 +27279,26 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\n" +
 	"\b_visibleB\r\n" +
 	"\v_custom_keyB\a\n" +
-	"\x05_data\"\xeb\x04\n" +
+	"\x05_data\"\xe5\x04\n" +
 	"\x12RowIndicatorConfig\x12\x1d\n" +
 	"\avisible\x18\x01 \x01(\bH\x00R\avisible\x88\x01\x01\x12\x19\n" +
 	"\x05width\x18\x02 \x01(\x05H\x01R\x05width\x88\x01\x01\x12#\n" +
 	"\n" +
-	"background\x18\x04 \x01(\rH\x02R\n" +
+	"background\x18\x03 \x01(\rH\x02R\n" +
 	"background\x88\x01\x01\x12#\n" +
 	"\n" +
-	"foreground\x18\x05 \x01(\rH\x03R\n" +
+	"foreground\x18\x04 \x01(\rH\x03R\n" +
 	"foreground\x88\x01\x01\x12@\n" +
 	"\n" +
-	"grid_lines\x18\x06 \x01(\x0e2\x1c.volvoxgrid.v1.GridLineStyleH\x04R\tgridLines\x88\x01\x01\x12\"\n" +
+	"grid_lines\x18\x05 \x01(\x0e2\x1c.volvoxgrid.v1.GridLineStyleH\x04R\tgridLines\x88\x01\x01\x12\"\n" +
 	"\n" +
-	"grid_color\x18\a \x01(\rH\x05R\tgridColor\x88\x01\x01\x12 \n" +
-	"\tauto_size\x18\b \x01(\bH\x06R\bautoSize\x88\x01\x01\x12&\n" +
-	"\fallow_resize\x18\t \x01(\bH\aR\vallowResize\x88\x01\x01\x12&\n" +
-	"\fallow_select\x18\n" +
-	" \x01(\bH\bR\vallowSelect\x88\x01\x01\x12(\n" +
-	"\rallow_reorder\x18\v \x01(\bH\tR\fallowReorder\x88\x01\x01\x125\n" +
-	"\x05slots\x18\f \x03(\v2\x1f.volvoxgrid.v1.RowIndicatorSlotR\x05slotsB\n" +
+	"grid_color\x18\x06 \x01(\rH\x05R\tgridColor\x88\x01\x01\x12 \n" +
+	"\tauto_size\x18\a \x01(\bH\x06R\bautoSize\x88\x01\x01\x12&\n" +
+	"\fallow_resize\x18\b \x01(\bH\aR\vallowResize\x88\x01\x01\x12&\n" +
+	"\fallow_select\x18\t \x01(\bH\bR\vallowSelect\x88\x01\x01\x12(\n" +
+	"\rallow_reorder\x18\n" +
+	" \x01(\bH\tR\fallowReorder\x88\x01\x01\x125\n" +
+	"\x05slots\x18\v \x03(\v2\x1f.volvoxgrid.v1.RowIndicatorSlotR\x05slotsB\n" +
 	"\n" +
 	"\b_visibleB\b\n" +
 	"\x06_widthB\r\n" +
@@ -25086,62 +27310,60 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"_auto_sizeB\x0f\n" +
 	"\r_allow_resizeB\x0f\n" +
 	"\r_allow_selectB\x10\n" +
-	"\x0e_allow_reorderJ\x04\b\x03\x10\x04\"a\n" +
+	"\x0e_allow_reorder\"a\n" +
 	"\x12ColIndicatorRowDef\x12\x19\n" +
 	"\x05index\x18\x01 \x01(\x05H\x00R\x05index\x88\x01\x01\x12\x1b\n" +
 	"\x06height\x18\x02 \x01(\x05H\x01R\x06height\x88\x01\x01B\b\n" +
 	"\x06_indexB\t\n" +
-	"\a_height\"\xc1\x02\n" +
+	"\a_height\"\xdc\x02\n" +
 	"\x10ColIndicatorCell\x12\x17\n" +
 	"\x04row1\x18\x01 \x01(\x05H\x00R\x04row1\x88\x01\x01\x12\x17\n" +
 	"\x04row2\x18\x02 \x01(\x05H\x01R\x04row2\x88\x01\x01\x12\x17\n" +
 	"\x04col1\x18\x03 \x01(\x05H\x02R\x04col1\x88\x01\x01\x12\x17\n" +
 	"\x04col2\x18\x04 \x01(\x05H\x03R\x04col2\x88\x01\x01\x12\x17\n" +
-	"\x04text\x18\x05 \x01(\tH\x04R\x04text\x88\x01\x01\x12 \n" +
-	"\tmode_bits\x18\x06 \x01(\rH\x05R\bmodeBits\x88\x01\x01\x12\"\n" +
+	"\x04text\x18\x05 \x01(\tH\x04R\x04text\x88\x01\x01\x12\"\n" +
 	"\n" +
-	"custom_key\x18\a \x01(\tH\x06R\tcustomKey\x88\x01\x01\x12\x17\n" +
-	"\x04data\x18\b \x01(\fH\aR\x04data\x88\x01\x01B\a\n" +
+	"custom_key\x18\x06 \x01(\tH\x05R\tcustomKey\x88\x01\x01\x12\x17\n" +
+	"\x04data\x18\a \x01(\fH\x06R\x04data\x88\x01\x01\x12?\n" +
+	"\x05modes\x18\b \x01(\v2$.volvoxgrid.v1.ColIndicatorCellModesH\aR\x05modes\x88\x01\x01B\a\n" +
 	"\x05_row1B\a\n" +
 	"\x05_row2B\a\n" +
 	"\x05_col1B\a\n" +
 	"\x05_col2B\a\n" +
-	"\x05_textB\f\n" +
-	"\n" +
-	"_mode_bitsB\r\n" +
+	"\x05_textB\r\n" +
 	"\v_custom_keyB\a\n" +
-	"\x05_data\"\xa2\x06\n" +
+	"\x05_dataB\b\n" +
+	"\x06_modes\"\xcb\x06\n" +
 	"\x12ColIndicatorConfig\x12\x1d\n" +
 	"\avisible\x18\x01 \x01(\bH\x00R\avisible\x88\x01\x01\x121\n" +
 	"\x12default_row_height\x18\x02 \x01(\x05H\x01R\x10defaultRowHeight\x88\x01\x01\x12 \n" +
-	"\tband_rows\x18\x03 \x01(\x05H\x02R\bbandRows\x88\x01\x01\x12 \n" +
-	"\tmode_bits\x18\x04 \x01(\rH\x03R\bmodeBits\x88\x01\x01\x12#\n" +
+	"\tband_rows\x18\x03 \x01(\x05H\x02R\bbandRows\x88\x01\x01\x12#\n" +
 	"\n" +
-	"background\x18\x05 \x01(\rH\x04R\n" +
+	"background\x18\x04 \x01(\rH\x03R\n" +
 	"background\x88\x01\x01\x12#\n" +
 	"\n" +
-	"foreground\x18\x06 \x01(\rH\x05R\n" +
+	"foreground\x18\x05 \x01(\rH\x04R\n" +
 	"foreground\x88\x01\x01\x12@\n" +
 	"\n" +
-	"grid_lines\x18\a \x01(\x0e2\x1c.volvoxgrid.v1.GridLineStyleH\x06R\tgridLines\x88\x01\x01\x12\"\n" +
+	"grid_lines\x18\x06 \x01(\x0e2\x1c.volvoxgrid.v1.GridLineStyleH\x05R\tgridLines\x88\x01\x01\x12\"\n" +
 	"\n" +
-	"grid_color\x18\b \x01(\rH\aR\tgridColor\x88\x01\x01\x12 \n" +
-	"\tauto_size\x18\t \x01(\bH\bR\bautoSize\x88\x01\x01\x12&\n" +
-	"\fallow_resize\x18\n" +
-	" \x01(\bH\tR\vallowResize\x88\x01\x01\x12(\n" +
-	"\rallow_reorder\x18\v \x01(\bH\n" +
-	"R\fallowReorder\x88\x01\x01\x12\"\n" +
+	"grid_color\x18\a \x01(\rH\x06R\tgridColor\x88\x01\x01\x12 \n" +
+	"\tauto_size\x18\b \x01(\bH\aR\bautoSize\x88\x01\x01\x12&\n" +
+	"\fallow_resize\x18\t \x01(\bH\bR\vallowResize\x88\x01\x01\x12(\n" +
+	"\rallow_reorder\x18\n" +
+	" \x01(\bH\tR\fallowReorder\x88\x01\x01\x12\"\n" +
 	"\n" +
-	"allow_menu\x18\f \x01(\bH\vR\tallowMenu\x88\x01\x01\x12<\n" +
-	"\brow_defs\x18\r \x03(\v2!.volvoxgrid.v1.ColIndicatorRowDefR\arowDefs\x125\n" +
-	"\x05cells\x18\x0e \x03(\v2\x1f.volvoxgrid.v1.ColIndicatorCellR\x05cellsB\n" +
+	"allow_menu\x18\v \x01(\bH\n" +
+	"R\tallowMenu\x88\x01\x01\x12<\n" +
+	"\brow_defs\x18\f \x03(\v2!.volvoxgrid.v1.ColIndicatorRowDefR\arowDefs\x125\n" +
+	"\x05cells\x18\r \x03(\v2\x1f.volvoxgrid.v1.ColIndicatorCellR\x05cells\x12H\n" +
+	"\n" +
+	"cell_modes\x18\x0e \x01(\v2$.volvoxgrid.v1.ColIndicatorCellModesH\vR\tcellModes\x88\x01\x01B\n" +
 	"\n" +
 	"\b_visibleB\x15\n" +
 	"\x13_default_row_heightB\f\n" +
 	"\n" +
-	"_band_rowsB\f\n" +
-	"\n" +
-	"_mode_bitsB\r\n" +
+	"_band_rowsB\r\n" +
 	"\v_backgroundB\r\n" +
 	"\v_foregroundB\r\n" +
 	"\v_grid_linesB\r\n" +
@@ -25150,7 +27372,8 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"_auto_sizeB\x0f\n" +
 	"\r_allow_resizeB\x10\n" +
 	"\x0e_allow_reorderB\r\n" +
-	"\v_allow_menu\"\xb7\x02\n" +
+	"\v_allow_menuB\r\n" +
+	"\v_cell_modes\"\xb7\x02\n" +
 	"\x13CornerIndicatorSlot\x12?\n" +
 	"\x04kind\x18\x01 \x01(\x0e2&.volvoxgrid.v1.CornerIndicatorSlotKindH\x00R\x04kind\x88\x01\x01\x12\x19\n" +
 	"\x05width\x18\x02 \x01(\x05H\x01R\x05width\x88\x01\x01\x12\x1d\n" +
@@ -25166,24 +27389,21 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\b_visibleB\r\n" +
 	"\v_custom_keyB\a\n" +
 	"\x05_dataB\r\n" +
-	"\v_label_text\"\xe9\x02\n" +
+	"\v_label_text\"\xb9\x02\n" +
 	"\x15CornerIndicatorConfig\x12\x1d\n" +
-	"\avisible\x18\x01 \x01(\bH\x00R\avisible\x88\x01\x01\x12 \n" +
-	"\tmode_bits\x18\x02 \x01(\rH\x01R\bmodeBits\x88\x01\x01\x12#\n" +
+	"\avisible\x18\x01 \x01(\bH\x00R\avisible\x88\x01\x01\x12#\n" +
 	"\n" +
-	"background\x18\x03 \x01(\rH\x02R\n" +
+	"background\x18\x02 \x01(\rH\x01R\n" +
 	"background\x88\x01\x01\x12#\n" +
 	"\n" +
-	"foreground\x18\x04 \x01(\rH\x03R\n" +
+	"foreground\x18\x03 \x01(\rH\x02R\n" +
 	"foreground\x88\x01\x01\x12\"\n" +
 	"\n" +
-	"custom_key\x18\x05 \x01(\tH\x04R\tcustomKey\x88\x01\x01\x12\x17\n" +
-	"\x04data\x18\x06 \x01(\fH\x05R\x04data\x88\x01\x01\x128\n" +
-	"\x05slots\x18\a \x03(\v2\".volvoxgrid.v1.CornerIndicatorSlotR\x05slotsB\n" +
+	"custom_key\x18\x04 \x01(\tH\x03R\tcustomKey\x88\x01\x01\x12\x17\n" +
+	"\x04data\x18\x05 \x01(\fH\x04R\x04data\x88\x01\x01\x128\n" +
+	"\x05slots\x18\x06 \x03(\v2\".volvoxgrid.v1.CornerIndicatorSlotR\x05slotsB\n" +
 	"\n" +
-	"\b_visibleB\f\n" +
-	"\n" +
-	"_mode_bitsB\r\n" +
+	"\b_visibleB\r\n" +
 	"\v_backgroundB\r\n" +
 	"\v_foregroundB\r\n" +
 	"\v_custom_keyB\a\n" +
@@ -25220,21 +27440,21 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\x1c_button_pressed_border_lightB\x1a\n" +
 	"\x18_button_hover_backgroundB\x1a\n" +
 	"\x18_button_hover_foregroundB\x16\n" +
-	"\x14_button_hover_border\"\xdd\x02\n" +
+	"\x14_button_hover_border\"\xd4\x02\n" +
 	"\x0fGridEventTarget\x121\n" +
 	"\x04kind\x18\x01 \x01(\x0e2\x1d.volvoxgrid.v1.GridTargetKindR\x04kind\x120\n" +
 	"\x04band\x18\x02 \x01(\x0e2\x1c.volvoxgrid.v1.IndicatorBandR\x04band\x12\x1d\n" +
 	"\n" +
 	"slot_index\x18\x03 \x01(\x05R\tslotIndex\x12\x1b\n" +
-	"\tslot_kind\x18\x04 \x01(\x05R\bslotKind\x12\"\n" +
-	"\rsub_mode_bits\x18\x05 \x01(\rR\vsubModeBits\x12\x1d\n" +
+	"\tslot_kind\x18\x04 \x01(\x05R\bslotKind\x12\x1d\n" +
 	"\n" +
-	"custom_key\x18\x06 \x01(\tR\tcustomKey\x12\x12\n" +
-	"\x04text\x18\a \x01(\tR\x04text\x12\x1b\n" +
-	"\tint_value\x18\b \x01(\x03R\bintValue\x12!\n" +
-	"\fstatus_flags\x18\t \x01(\rR\vstatusFlags\x12\x12\n" +
-	"\x04data\x18\n" +
-	" \x01(\fR\x04data\"\xe2\x01\n" +
+	"custom_key\x18\x05 \x01(\tR\tcustomKey\x12\x12\n" +
+	"\x04text\x18\x06 \x01(\tR\x04text\x12\x1b\n" +
+	"\tint_value\x18\a \x01(\x03R\bintValue\x12!\n" +
+	"\fstatus_flags\x18\b \x01(\rR\vstatusFlags\x12\x12\n" +
+	"\x04data\x18\t \x01(\fR\x04data\x12\x19\n" +
+	"\bsub_mode\x18\n" +
+	" \x01(\x05R\asubMode\"\xe2\x01\n" +
 	"\x14IndicatorFocusConfig\x127\n" +
 	"\x15enable_keyboard_focus\x18\x01 \x01(\bH\x00R\x13enableKeyboardFocus\x88\x01\x01\x12)\n" +
 	"\x0eenter_key_code\x18\x02 \x01(\x05H\x01R\fenterKeyCode\x88\x01\x01\x12'\n" +
@@ -25258,7 +27478,7 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	" \x01(\x0e2\".volvoxgrid.v1.IndicatorAppearanceH\x00R\n" +
 	"appearance\x88\x01\x01\x126\n" +
 	"\x06colors\x18\v \x01(\v2\x1e.volvoxgrid.v1.IndicatorColorsR\x06colorsB\r\n" +
-	"\v_appearance\"\xe9\v\n" +
+	"\v_appearance\"\xa5\v\n" +
 	"\tColumnDef\x12\x14\n" +
 	"\x05index\x18\x01 \x01(\x05R\x05index\x12\x19\n" +
 	"\x05width\x18\x02 \x01(\x05H\x00R\x05width\x88\x01\x01\x12 \n" +
@@ -25275,24 +27495,23 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\n" +
 	"sort_order\x18\v \x01(\x0e2\x18.volvoxgrid.v1.SortOrderH\tR\tsortOrder\x88\x01\x01\x129\n" +
 	"\tsort_type\x18\f \x01(\x0e2\x17.volvoxgrid.v1.SortTypeH\n" +
-	"R\bsortType\x88\x01\x01\x128\n" +
-	"\bdropdown\x18\r \x01(\v2\x17.volvoxgrid.v1.DropdownH\vR\bdropdown\x88\x01\x01\x12 \n" +
-	"\tedit_mask\x18\x0e \x01(\tH\fR\beditMask\x88\x01\x01\x12\x1b\n" +
-	"\x06indent\x18\x0f \x01(\x05H\rR\x06indent\x88\x01\x01\x12\x1b\n" +
-	"\x06hidden\x18\x10 \x01(\bH\x0eR\x06hidden\x88\x01\x01\x12\x17\n" +
-	"\x04span\x18\x11 \x01(\bH\x0fR\x04span\x88\x01\x01\x127\n" +
+	"R\bsortType\x88\x01\x01\x121\n" +
+	"\x06editor\x18\r \x01(\v2\x19.volvoxgrid.v1.EditorSpecR\x06editor\x12\x1b\n" +
+	"\x06indent\x18\x0e \x01(\x05H\vR\x06indent\x88\x01\x01\x12\x1b\n" +
+	"\x06hidden\x18\x0f \x01(\bH\fR\x06hidden\x88\x01\x01\x12\x17\n" +
+	"\x04span\x18\x10 \x01(\bH\rR\x04span\x88\x01\x01\x127\n" +
 	"\n" +
-	"image_list\x18\x12 \x03(\v2\x18.volvoxgrid.v1.ImageDataR\timageList\x12\x17\n" +
-	"\x04data\x18\x13 \x01(\fH\x10R\x04data\x88\x01\x01\x126\n" +
-	"\x06sticky\x18\x14 \x01(\x0e2\x19.volvoxgrid.v1.StickyEdgeH\x11R\x06sticky\x88\x01\x01\x120\n" +
-	"\apadding\x18\x15 \x01(\v2\x16.volvoxgrid.v1.PaddingR\apadding\x12;\n" +
-	"\rfixed_padding\x18\x16 \x01(\v2\x16.volvoxgrid.v1.PaddingR\ffixedPadding\x12\x1f\n" +
-	"\bnullable\x18\x17 \x01(\bH\x12R\bnullable\x88\x01\x01\x12E\n" +
-	"\rcoercion_mode\x18\x18 \x01(\x0e2\x1b.volvoxgrid.v1.CoercionModeH\x13R\fcoercionMode\x88\x01\x01\x12A\n" +
+	"image_list\x18\x11 \x03(\v2\x18.volvoxgrid.v1.ImageDataR\timageList\x12\x17\n" +
+	"\x04data\x18\x12 \x01(\fH\x0eR\x04data\x88\x01\x01\x126\n" +
+	"\x06sticky\x18\x13 \x01(\x0e2\x19.volvoxgrid.v1.StickyEdgeH\x0fR\x06sticky\x88\x01\x01\x120\n" +
+	"\apadding\x18\x14 \x01(\v2\x16.volvoxgrid.v1.PaddingR\apadding\x12;\n" +
+	"\rfixed_padding\x18\x15 \x01(\v2\x16.volvoxgrid.v1.PaddingR\ffixedPadding\x12\x1f\n" +
+	"\bnullable\x18\x16 \x01(\bH\x10R\bnullable\x88\x01\x01\x12E\n" +
+	"\rcoercion_mode\x18\x17 \x01(\x0e2\x1b.volvoxgrid.v1.CoercionModeH\x11R\fcoercionMode\x88\x01\x01\x12A\n" +
 	"\n" +
-	"error_mode\x18\x19 \x01(\x0e2\x1d.volvoxgrid.v1.WriteErrorModeH\x14R\terrorMode\x88\x01\x01\x12E\n" +
-	"\vinteraction\x18\x1a \x01(\x0e2\x1e.volvoxgrid.v1.CellInteractionH\x15R\vinteraction\x88\x01\x01\x12*\n" +
-	"\x0eprogress_color\x18\x1b \x01(\rH\x16R\rprogressColor\x88\x01\x01B\b\n" +
+	"error_mode\x18\x18 \x01(\x0e2\x1d.volvoxgrid.v1.WriteErrorModeH\x12R\terrorMode\x88\x01\x01\x12E\n" +
+	"\vinteraction\x18\x19 \x01(\x0e2\x1e.volvoxgrid.v1.CellInteractionH\x13R\vinteraction\x88\x01\x01\x12*\n" +
+	"\x0eprogress_color\x18\x1a \x01(\rH\x14R\rprogressColor\x88\x01\x01B\b\n" +
 	"\x06_widthB\f\n" +
 	"\n" +
 	"_min_widthB\f\n" +
@@ -25308,10 +27527,7 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\x04_keyB\r\n" +
 	"\v_sort_orderB\f\n" +
 	"\n" +
-	"_sort_typeB\v\n" +
-	"\t_dropdownB\f\n" +
-	"\n" +
-	"_edit_maskB\t\n" +
+	"_sort_typeB\t\n" +
 	"\a_indentB\t\n" +
 	"\a_hiddenB\a\n" +
 	"\x05_spanB\a\n" +
@@ -25355,7 +27571,7 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\x04code\x18\x02 \x01(\x05R\x04code\"W\n" +
 	"\x11DefineRowsRequest\x12\x17\n" +
 	"\agrid_id\x18\x01 \x01(\x03R\x06gridId\x12)\n" +
-	"\x04rows\x18\x02 \x03(\v2\x15.volvoxgrid.v1.RowDefR\x04rows\"\xf2\x06\n" +
+	"\x04rows\x18\x02 \x03(\v2\x15.volvoxgrid.v1.RowDefR\x04rows\"\xde\x06\n" +
 	"\n" +
 	"CellUpdate\x12\x10\n" +
 	"\x03row\x18\x01 \x01(\x05R\x03row\x12\x10\n" +
@@ -25365,20 +27581,19 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\achecked\x18\x05 \x01(\x0e2\x1b.volvoxgrid.v1.CheckedStateH\x00R\achecked\x88\x01\x01\x122\n" +
 	"\apicture\x18\x06 \x01(\v2\x18.volvoxgrid.v1.ImageDataR\apicture\x12G\n" +
 	"\rpicture_align\x18\a \x01(\x0e2\x1d.volvoxgrid.v1.ImageAlignmentH\x01R\fpictureAlign\x88\x01\x01\x12?\n" +
-	"\x0ebutton_picture\x18\b \x01(\v2\x18.volvoxgrid.v1.ImageDataR\rbuttonPicture\x128\n" +
-	"\bdropdown\x18\t \x01(\v2\x17.volvoxgrid.v1.DropdownH\x02R\bdropdown\x88\x01\x01\x12=\n" +
+	"\x0ebutton_picture\x18\b \x01(\v2\x18.volvoxgrid.v1.ImageDataR\rbuttonPicture\x121\n" +
+	"\x06editor\x18\t \x01(\v2\x19.volvoxgrid.v1.EditorSpecR\x06editor\x12=\n" +
 	"\n" +
 	"sticky_row\x18\n" +
-	" \x01(\x0e2\x19.volvoxgrid.v1.StickyEdgeH\x03R\tstickyRow\x88\x01\x01\x12=\n" +
+	" \x01(\x0e2\x19.volvoxgrid.v1.StickyEdgeH\x02R\tstickyRow\x88\x01\x01\x12=\n" +
 	"\n" +
-	"sticky_col\x18\v \x01(\x0e2\x19.volvoxgrid.v1.StickyEdgeH\x04R\tstickyCol\x88\x01\x01\x12E\n" +
-	"\vinteraction\x18\f \x01(\x0e2\x1e.volvoxgrid.v1.CellInteractionH\x05R\vinteraction\x88\x01\x01\x129\n" +
-	"\abarcode\x18\r \x01(\v2\x1a.volvoxgrid.v1.BarcodeDataH\x06R\abarcode\x88\x01\x01\x129\n" +
-	"\trich_text\x18\x0e \x01(\v2\x17.volvoxgrid.v1.RichTextH\aR\brichText\x88\x01\x01B\n" +
+	"sticky_col\x18\v \x01(\x0e2\x19.volvoxgrid.v1.StickyEdgeH\x03R\tstickyCol\x88\x01\x01\x12E\n" +
+	"\vinteraction\x18\f \x01(\x0e2\x1e.volvoxgrid.v1.CellInteractionH\x04R\vinteraction\x88\x01\x01\x129\n" +
+	"\abarcode\x18\r \x01(\v2\x1a.volvoxgrid.v1.BarcodeDataH\x05R\abarcode\x88\x01\x01\x129\n" +
+	"\trich_text\x18\x0e \x01(\v2\x17.volvoxgrid.v1.RichTextH\x06R\brichText\x88\x01\x01B\n" +
 	"\n" +
 	"\b_checkedB\x10\n" +
-	"\x0e_picture_alignB\v\n" +
-	"\t_dropdownB\r\n" +
+	"\x0e_picture_alignB\r\n" +
 	"\v_sticky_rowB\r\n" +
 	"\v_sticky_colB\x0e\n" +
 	"\f_interactionB\n" +
@@ -25565,68 +27780,76 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\v_text_startB\x0e\n" +
 	"\f_text_length\"M\n" +
 	"\x11EditSetHighlights\x128\n" +
-	"\aregions\x18\x01 \x03(\v2\x1e.volvoxgrid.v1.HighlightRegionR\aregions\"\x90\x04\n" +
+	"\aregions\x18\x01 \x03(\v2\x1e.volvoxgrid.v1.HighlightRegionR\aregions\"\xe0\x01\n" +
 	"\vEditCommand\x12\x17\n" +
 	"\agrid_id\x18\x01 \x01(\x03R\x06gridId\x120\n" +
-	"\x05start\x18\x02 \x01(\v2\x18.volvoxgrid.v1.EditStartH\x00R\x05start\x123\n" +
-	"\x06commit\x18\x03 \x01(\v2\x19.volvoxgrid.v1.EditCommitH\x00R\x06commit\x123\n" +
-	"\x06cancel\x18\x04 \x01(\v2\x19.volvoxgrid.v1.EditCancelH\x00R\x06cancel\x127\n" +
-	"\bset_text\x18\x05 \x01(\v2\x1a.volvoxgrid.v1.EditSetTextH\x00R\asetText\x12F\n" +
-	"\rset_selection\x18\x06 \x01(\v2\x1f.volvoxgrid.v1.EditSetSelectionH\x00R\fsetSelection\x123\n" +
-	"\x06finish\x18\a \x01(\v2\x19.volvoxgrid.v1.EditFinishH\x00R\x06finish\x12I\n" +
-	"\x0eset_highlights\x18\b \x01(\v2 .volvoxgrid.v1.EditSetHighlightsH\x00R\rsetHighlights\x12@\n" +
-	"\vset_preedit\x18\t \x01(\v2\x1d.volvoxgrid.v1.EditSetPreeditH\x00R\n" +
-	"setPreeditB\t\n" +
-	"\acommand\"\xfb\x01\n" +
+	"\x05start\x18\x02 \x01(\v2\x18.volvoxgrid.v1.EditStartH\x00R\x05start\x12?\n" +
+	"\asession\x18\x03 \x01(\v2#.volvoxgrid.v1.EditorSessionCommandH\x00R\asession\x12:\n" +
+	"\tget_state\x18\x04 \x01(\v2\x1b.volvoxgrid.v1.EditGetStateH\x00R\bgetStateB\t\n" +
+	"\acommand\"\xe1\x01\n" +
 	"\tEditStart\x12\x10\n" +
 	"\x03row\x18\x01 \x01(\x05R\x03row\x12\x10\n" +
-	"\x03col\x18\x02 \x01(\x05R\x03col\x12\"\n" +
+	"\x03col\x18\x02 \x01(\x05R\x03col\x126\n" +
+	"\x06reason\x18\x03 \x01(\x0e2\x1e.volvoxgrid.v1.EditStartReasonR\x06reason\x129\n" +
 	"\n" +
-	"select_all\x18\x03 \x01(\bH\x00R\tselectAll\x88\x01\x01\x12 \n" +
-	"\tcaret_end\x18\x04 \x01(\bH\x01R\bcaretEnd\x88\x01\x01\x12 \n" +
-	"\tseed_text\x18\x05 \x01(\tH\x02R\bseedText\x88\x01\x01\x12&\n" +
-	"\fformula_mode\x18\x06 \x01(\bH\x03R\vformulaMode\x88\x01\x01B\r\n" +
-	"\v_select_allB\f\n" +
+	"seed_value\x18\x04 \x01(\v2\x1a.volvoxgrid.v1.EditorValueR\tseedValue\x12*\n" +
+	"\x0ecaret_position\x18\x05 \x01(\x05H\x00R\rcaretPosition\x88\x01\x01B\x11\n" +
+	"\x0f_caret_position\"\x0e\n" +
+	"\fEditGetState\"\x87\x04\n" +
+	"\x14EditorSessionCommand\x12\x1d\n" +
 	"\n" +
-	"_caret_endB\f\n" +
-	"\n" +
-	"_seed_textB\x0f\n" +
-	"\r_formula_mode\".\n" +
-	"\n" +
-	"EditCommit\x12\x17\n" +
-	"\x04text\x18\x01 \x01(\tH\x00R\x04text\x88\x01\x01B\a\n" +
-	"\x05_text\"\f\n" +
-	"\n" +
-	"EditCancel\"!\n" +
-	"\vEditSetText\x12\x12\n" +
-	"\x04text\x18\x01 \x01(\tR\x04text\"@\n" +
-	"\x10EditSetSelection\x12\x14\n" +
-	"\x05start\x18\x01 \x01(\x05R\x05start\x12\x16\n" +
-	"\x06length\x18\x02 \x01(\x05R\x06length\"T\n" +
-	"\x0eEditSetPreedit\x12\x12\n" +
+	"session_id\x18\x01 \x01(\x03R\tsessionId\x12#\n" +
+	"\rstate_version\x18\x02 \x01(\x04R\fstateVersion\x12H\n" +
+	"\rvalue_changed\x18\x03 \x01(\v2!.volvoxgrid.v1.EditorValueChangedH\x00R\fvalueChanged\x12R\n" +
+	"\x11selection_changed\x18\x04 \x01(\v2#.volvoxgrid.v1.TextSelectionChangedH\x00R\x10selectionChanged\x12N\n" +
+	"\x0fpreedit_changed\x18\x05 \x01(\v2#.volvoxgrid.v1.EditorPreeditChangedH\x00R\x0epreeditChanged\x123\n" +
+	"\x06commit\x18\x06 \x01(\v2\x19.volvoxgrid.v1.EditCommitH\x00R\x06commit\x123\n" +
+	"\x06cancel\x18\a \x01(\v2\x19.volvoxgrid.v1.EditCancelH\x00R\x06cancel\x12H\n" +
+	"\rcustom_action\x18\b \x01(\v2!.volvoxgrid.v1.CustomEditorActionH\x00R\fcustomActionB\t\n" +
+	"\acommand\"F\n" +
+	"\x12EditorValueChanged\x120\n" +
+	"\x05value\x18\x01 \x01(\v2\x1a.volvoxgrid.v1.EditorValueR\x05value\"R\n" +
+	"\x14TextSelectionChanged\x12:\n" +
+	"\tselection\x18\x01 \x01(\v2\x1c.volvoxgrid.v1.TextSelectionR\tselection\"Z\n" +
+	"\x14EditorPreeditChanged\x12\x12\n" +
 	"\x04text\x18\x01 \x01(\tR\x04text\x12\x16\n" +
 	"\x06cursor\x18\x02 \x01(\x05R\x06cursor\x12\x16\n" +
-	"\x06commit\x18\x03 \x01(\bR\x06commit\"\f\n" +
+	"\x06commit\x18\x03 \x01(\bR\x06commit\"M\n" +
 	"\n" +
-	"EditFinish\"\xf5\x02\n" +
-	"\tEditState\x12\x16\n" +
-	"\x06active\x18\x01 \x01(\bR\x06active\x12\x10\n" +
+	"EditCommit\x125\n" +
+	"\x05value\x18\x01 \x01(\v2\x1a.volvoxgrid.v1.EditorValueH\x00R\x05value\x88\x01\x01B\b\n" +
+	"\x06_value\"\f\n" +
+	"\n" +
+	"EditCancel\"g\n" +
+	"\x12CustomEditorAction\x12\x1b\n" +
+	"\taction_id\x18\x01 \x01(\tR\bactionId\x124\n" +
+	"\apayload\x18\x02 \x01(\v2\x1a.volvoxgrid.v1.StructValueR\apayload\"\x93\x05\n" +
+	"\rEditorSession\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\x03R\tsessionId\x12\x10\n" +
 	"\x03row\x18\x02 \x01(\x05R\x03row\x12\x10\n" +
-	"\x03col\x18\x03 \x01(\x05R\x03col\x12\x12\n" +
-	"\x04text\x18\x04 \x01(\tR\x04text\x12\x1b\n" +
-	"\tsel_start\x18\x05 \x01(\x05R\bselStart\x12\x1d\n" +
-	"\n" +
-	"sel_length\x18\x06 \x01(\x05R\tselLength\x12\x1c\n" +
-	"\tcomposing\x18\a \x01(\bR\tcomposing\x12!\n" +
-	"\fpreedit_text\x18\b \x01(\tR\vpreeditText\x122\n" +
-	"\aui_mode\x18\t \x01(\x0e2\x19.volvoxgrid.v1.EditUiModeR\x06uiMode\x12\f\n" +
-	"\x01x\x18\n" +
-	" \x01(\x02R\x01x\x12\f\n" +
-	"\x01y\x18\v \x01(\x02R\x01y\x12\x14\n" +
-	"\x05width\x18\f \x01(\x02R\x05width\x12\x16\n" +
-	"\x06height\x18\r \x01(\x02R\x06height\x12\x1d\n" +
-	"\n" +
-	"max_length\x18\x0e \x01(\x05R\tmaxLength\"\x98\x01\n" +
+	"\x03col\x18\x03 \x01(\x05R\x03col\x128\n" +
+	"\rviewport_rect\x18\x04 \x01(\v2\x13.volvoxgrid.v1.RectR\fviewportRect\x121\n" +
+	"\x06editor\x18\x05 \x01(\v2\x19.volvoxgrid.v1.EditorSpecR\x06editor\x120\n" +
+	"\x05value\x18\x06 \x01(\v2\x1a.volvoxgrid.v1.EditorValueR\x05value\x12:\n" +
+	"\tselection\x18\a \x01(\v2\x1c.volvoxgrid.v1.TextSelectionR\tselection\x122\n" +
+	"\aui_mode\x18\b \x01(\x0e2\x19.volvoxgrid.v1.EditUiModeR\x06uiMode\x12E\n" +
+	"\fcapabilities\x18\t \x01(\v2!.volvoxgrid.v1.EditorCapabilitiesR\fcapabilities\x126\n" +
+	"\x06reason\x18\n" +
+	" \x01(\x0e2\x1e.volvoxgrid.v1.EditStartReasonR\x06reason\x12#\n" +
+	"\rstate_version\x18\v \x01(\x04R\fstateVersion\x12\x1c\n" +
+	"\tcomposing\x18\f \x01(\bR\tcomposing\x12!\n" +
+	"\fpreedit_text\x18\r \x01(\tR\vpreeditText\x12K\n" +
+	"\x11validation_errors\x18\x0e \x03(\v2\x1e.volvoxgrid.v1.ValidationErrorR\x10validationErrors\"\xe0\x01\n" +
+	"\x12EditorCapabilities\x12,\n" +
+	"\x12accepts_text_input\x18\x01 \x01(\bR\x10acceptsTextInput\x12-\n" +
+	"\x12supports_selection\x18\x02 \x01(\bR\x11supportsSelection\x12!\n" +
+	"\fsupports_cut\x18\x03 \x01(\bR\vsupportsCut\x12%\n" +
+	"\x0esupports_paste\x18\x04 \x01(\bR\rsupportsPaste\x12#\n" +
+	"\rsupports_undo\x18\x05 \x01(\bR\fsupportsUndo\"[\n" +
+	"\tEditState\x12\x16\n" +
+	"\x06active\x18\x01 \x01(\bR\x06active\x126\n" +
+	"\asession\x18\x02 \x01(\v2\x1c.volvoxgrid.v1.EditorSessionR\asession\"\x98\x01\n" +
 	"\n" +
 	"SortColumn\x12\x10\n" +
 	"\x03col\x18\x01 \x01(\x05R\x03col\x123\n" +
@@ -25905,7 +28128,7 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\x0fviewport_height\x18\x02 \x01(\x05R\x0eviewportHeight\"\x13\n" +
 	"\x11SetRedrawResponse\"\x11\n" +
 	"\x0fRefreshResponse\"\x12\n" +
-	"\x10LoadDemoResponse\"\x89\a\n" +
+	"\x10LoadDemoResponse\"\xd3\b\n" +
 	"\vRenderInput\x12\x17\n" +
 	"\agrid_id\x18\x01 \x01(\x03R\x06gridId\x12:\n" +
 	"\bviewport\x18\x02 \x01(\v2\x1c.volvoxgrid.v1.ViewportStateH\x00R\bviewport\x127\n" +
@@ -25922,12 +28145,29 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\x15terminal_capabilities\x18\v \x01(\v2#.volvoxgrid.v1.TerminalCapabilitiesH\x00R\x14terminalCapabilities\x12N\n" +
 	"\x11terminal_viewport\x18\f \x01(\v2\x1f.volvoxgrid.v1.TerminalViewportH\x00R\x10terminalViewport\x12K\n" +
 	"\x10terminal_command\x18\r \x01(\v2\x1e.volvoxgrid.v1.TerminalCommandH\x00R\x0fterminalCommand\x12K\n" +
-	"\x10compare_response\x18\x0e \x01(\v2\x1e.volvoxgrid.v1.CompareResponseH\x00R\x0fcompareResponseB\a\n" +
+	"\x10compare_response\x18\x0e \x01(\v2\x1e.volvoxgrid.v1.CompareResponseH\x00R\x0fcompareResponse\x12a\n" +
+	"\x18edit_validation_response\x18\x0f \x01(\v2%.volvoxgrid.v1.EditValidationResponseH\x00R\x16editValidationResponse\x12e\n" +
+	"\x1aeditor_list_items_response\x18\x10 \x01(\v2&.volvoxgrid.v1.EditorListItemsResponseH\x00R\x17editorListItemsResponseB\a\n" +
 	"\x05input\"H\n" +
 	"\x0fCompareResponse\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\x03R\trequestId\x12\x16\n" +
-	"\x06result\x18\x02 \x01(\x05R\x06result\"s\n" +
+	"\x06result\x18\x02 \x01(\x05R\x06result\"\xef\x01\n" +
+	"\x16EditValidationResponse\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\x03R\trequestId\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x02 \x01(\x03R\tsessionId\x126\n" +
+	"\x06errors\x18\x03 \x03(\v2\x1e.volvoxgrid.v1.ValidationErrorR\x06errors\x12J\n" +
+	"\x10normalized_value\x18\x04 \x01(\v2\x1a.volvoxgrid.v1.EditorValueH\x00R\x0fnormalizedValue\x88\x01\x01B\x13\n" +
+	"\x11_normalized_value\"\xa1\x01\n" +
+	"\x17EditorListItemsResponse\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\x03R\trequestId\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x02 \x01(\x03R\tsessionId\x12-\n" +
+	"\x05items\x18\x03 \x03(\v2\x17.volvoxgrid.v1.ListItemR\x05items\x12\x19\n" +
+	"\bhas_more\x18\x04 \x01(\bR\ahasMore\"s\n" +
 	"\rViewportState\x12\x19\n" +
 	"\bscroll_x\x18\x01 \x01(\x02R\ascrollX\x12\x19\n" +
 	"\bscroll_y\x18\x02 \x01(\x02R\ascrollY\x12\x14\n" +
@@ -26006,17 +28246,18 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\rEventDecision\x12\x17\n" +
 	"\agrid_id\x18\x01 \x01(\x03R\x06gridId\x12\x19\n" +
 	"\bevent_id\x18\x02 \x01(\x03R\aeventId\x12\x16\n" +
-	"\x06cancel\x18\x03 \x01(\bR\x06cancel\"\x82\x04\n" +
+	"\x06cancel\x18\x03 \x01(\bR\x06cancel\"\xd8\x04\n" +
 	"\fRenderOutput\x12\x1a\n" +
 	"\brendered\x18\x01 \x01(\bR\brendered\x129\n" +
 	"\n" +
 	"frame_done\x18\x02 \x01(\v2\x18.volvoxgrid.v1.FrameDoneH\x00R\tframeDone\x12>\n" +
 	"\tselection\x18\x03 \x01(\v2\x1e.volvoxgrid.v1.SelectionUpdateH\x00R\tselection\x125\n" +
-	"\x06cursor\x18\x04 \x01(\v2\x1b.volvoxgrid.v1.CursorChangeH\x00R\x06cursor\x12?\n" +
-	"\fedit_request\x18\x05 \x01(\v2\x1a.volvoxgrid.v1.EditRequestH\x00R\veditRequest\x12K\n" +
-	"\x10dropdown_request\x18\x06 \x01(\v2\x1e.volvoxgrid.v1.DropdownRequestH\x00R\x0fdropdownRequest\x12H\n" +
-	"\x0ftooltip_request\x18\a \x01(\v2\x1d.volvoxgrid.v1.TooltipRequestH\x00R\x0etooltipRequest\x12C\n" +
-	"\x0egpu_frame_done\x18\b \x01(\v2\x1b.volvoxgrid.v1.GpuFrameDoneH\x00R\fgpuFrameDoneB\a\n" +
+	"\x06cursor\x18\x04 \x01(\v2\x1b.volvoxgrid.v1.CursorChangeH\x00R\x06cursor\x12L\n" +
+	"\x0eeditor_started\x18\x05 \x01(\v2#.volvoxgrid.v1.EditorSessionStartedH\x00R\reditorStarted\x12L\n" +
+	"\x0eeditor_updated\x18\x06 \x01(\v2#.volvoxgrid.v1.EditorSessionUpdatedH\x00R\reditorUpdated\x12F\n" +
+	"\feditor_ended\x18\a \x01(\v2!.volvoxgrid.v1.EditorSessionEndedH\x00R\veditorEnded\x12H\n" +
+	"\x0ftooltip_request\x18\b \x01(\v2\x1d.volvoxgrid.v1.TooltipRequestH\x00R\x0etooltipRequest\x12C\n" +
+	"\x0egpu_frame_done\x18\t \x01(\v2\x1b.volvoxgrid.v1.GpuFrameDoneH\x00R\fgpuFrameDoneB\a\n" +
 	"\x05event\"\xc9\x02\n" +
 	"\tFrameDone\x12\x16\n" +
 	"\x06handle\x18\x01 \x01(\x03R\x06handle\x12\x17\n" +
@@ -26048,37 +28289,39 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"active_col\x18\x02 \x01(\x05R\tactiveCol\x120\n" +
 	"\x06ranges\x18\x03 \x03(\v2\x18.volvoxgrid.v1.CellRangeR\x06ranges\"A\n" +
 	"\fCursorChange\x121\n" +
-	"\x06cursor\x18\x01 \x01(\x0e2\x19.volvoxgrid.v1.CursorTypeR\x06cursor\"\xcc\x02\n" +
-	"\vEditRequest\x12\x10\n" +
-	"\x03row\x18\x01 \x01(\x05R\x03row\x12\x10\n" +
-	"\x03col\x18\x02 \x01(\x05R\x03col\x12\f\n" +
-	"\x01x\x18\x03 \x01(\x02R\x01x\x12\f\n" +
-	"\x01y\x18\x04 \x01(\x02R\x01y\x12\x14\n" +
-	"\x05width\x18\x05 \x01(\x02R\x05width\x12\x16\n" +
-	"\x06height\x18\x06 \x01(\x02R\x06height\x12#\n" +
-	"\rcurrent_value\x18\a \x01(\tR\fcurrentValue\x12\x1b\n" +
-	"\tedit_mask\x18\b \x01(\tR\beditMask\x12\x1d\n" +
+	"\x06cursor\x18\x01 \x01(\x0e2\x19.volvoxgrid.v1.CursorTypeR\x06cursor\"N\n" +
+	"\x14EditorSessionStarted\x126\n" +
+	"\asession\x18\x01 \x01(\v2\x1c.volvoxgrid.v1.EditorSessionR\asession\"\xed\x04\n" +
+	"\x14EditorSessionUpdated\x12\x1d\n" +
 	"\n" +
-	"max_length\x18\t \x01(\x05R\tmaxLength\x12\x1b\n" +
-	"\tsel_start\x18\n" +
-	" \x01(\x05R\bselStart\x12\x1d\n" +
+	"session_id\x18\x01 \x01(\x03R\tsessionId\x12#\n" +
+	"\rstate_version\x18\x02 \x01(\x04R\fstateVersion\x129\n" +
+	"\x06reason\x18\x03 \x01(\x0e2!.volvoxgrid.v1.EditorUpdateReasonR\x06reason\x12=\n" +
+	"\rviewport_rect\x18\x04 \x01(\v2\x13.volvoxgrid.v1.RectH\x00R\fviewportRect\x88\x01\x01\x125\n" +
+	"\x05value\x18\x05 \x01(\v2\x1a.volvoxgrid.v1.EditorValueH\x01R\x05value\x88\x01\x01\x12?\n" +
+	"\tselection\x18\x06 \x01(\v2\x1c.volvoxgrid.v1.TextSelectionH\x02R\tselection\x88\x01\x01\x12\x1d\n" +
+	"\avisible\x18\a \x01(\bH\x03R\avisible\x88\x01\x01\x12(\n" +
+	"\rforce_refocus\x18\b \x01(\bH\x04R\fforceRefocus\x88\x01\x01\x12K\n" +
+	"\x11validation_errors\x18\t \x03(\v2\x1e.volvoxgrid.v1.ValidationErrorR\x10validationErrors\x12A\n" +
+	"\x0ecustom_payload\x18\n" +
+	" \x01(\v2\x1a.volvoxgrid.v1.StructValueR\rcustomPayloadB\x10\n" +
+	"\x0e_viewport_rectB\b\n" +
+	"\x06_valueB\f\n" +
 	"\n" +
-	"sel_length\x18\v \x01(\x05R\tselLength\x122\n" +
-	"\aui_mode\x18\f \x01(\x0e2\x19.volvoxgrid.v1.EditUiModeR\x06uiMode\"\xcd\x01\n" +
-	"\x0fDropdownRequest\x12\x10\n" +
-	"\x03row\x18\x01 \x01(\x05R\x03row\x12\x10\n" +
-	"\x03col\x18\x02 \x01(\x05R\x03col\x12\f\n" +
-	"\x01x\x18\x03 \x01(\x02R\x01x\x12\f\n" +
-	"\x01y\x18\x04 \x01(\x02R\x01y\x12\x14\n" +
-	"\x05width\x18\x05 \x01(\x02R\x05width\x12\x16\n" +
-	"\x06height\x18\x06 \x01(\x02R\x06height\x12\x14\n" +
-	"\x05items\x18\a \x03(\tR\x05items\x12\x1a\n" +
-	"\bselected\x18\b \x01(\x05R\bselected\x12\x1a\n" +
-	"\beditable\x18\t \x01(\bR\beditable\"@\n" +
+	"_selectionB\n" +
+	"\n" +
+	"\b_visibleB\x10\n" +
+	"\x0e_force_refocus\"\xd3\x01\n" +
+	"\x12EditorSessionEnded\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\x03R\tsessionId\x124\n" +
+	"\x06reason\x18\x02 \x01(\x0e2\x1c.volvoxgrid.v1.EditEndReasonR\x06reason\x12C\n" +
+	"\x0fcommitted_value\x18\x03 \x01(\v2\x1a.volvoxgrid.v1.EditorValueR\x0ecommittedValue\x12#\n" +
+	"\rstate_version\x18\x04 \x01(\x04R\fstateVersion\"@\n" +
 	"\x0eTooltipRequest\x12\f\n" +
 	"\x01x\x18\x01 \x01(\x02R\x01x\x12\f\n" +
 	"\x01y\x18\x02 \x01(\x02R\x01y\x12\x12\n" +
-	"\x04text\x18\x03 \x01(\tR\x04text\"\x85(\n" +
+	"\x04text\x18\x03 \x01(\tR\x04text\"\xd6&\n" +
 	"\tGridEvent\x12\x17\n" +
 	"\agrid_id\x18\x01 \x01(\x03R\x06gridId\x12\x19\n" +
 	"\bevent_id\x18d \x01(\x03R\aeventId\x12W\n" +
@@ -26099,68 +28342,66 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	" \x01(\v2\x1d.volvoxgrid.v1.AfterEditEventH\x00R\tafterEdit\x12T\n" +
 	"\x12cell_edit_validate\x18\v \x01(\v2$.volvoxgrid.v1.CellEditValidateEventH\x00R\x10cellEditValidate\x12N\n" +
 	"\x10cell_edit_change\x18\f \x01(\v2\".volvoxgrid.v1.CellEditChangeEventH\x00R\x0ecellEditChange\x12E\n" +
-	"\rkey_down_edit\x18\x0e \x01(\v2\x1f.volvoxgrid.v1.KeyDownEditEventH\x00R\vkeyDownEdit\x12H\n" +
-	"\x0ekey_press_edit\x18\x0f \x01(\v2 .volvoxgrid.v1.KeyPressEditEventH\x00R\fkeyPressEdit\x12?\n" +
-	"\vkey_up_edit\x18\x10 \x01(\v2\x1d.volvoxgrid.v1.KeyUpEditEventH\x00R\tkeyUpEdit\x12g\n" +
-	"\x19cell_edit_configure_style\x18\x11 \x01(\v2*.volvoxgrid.v1.CellEditConfigureStyleEventH\x00R\x16cellEditConfigureStyle\x12j\n" +
-	"\x1acell_edit_configure_window\x18\x12 \x01(\v2+.volvoxgrid.v1.CellEditConfigureWindowEventH\x00R\x17cellEditConfigureWindow\x12M\n" +
-	"\x0fdropdown_closed\x18\x13 \x01(\v2\".volvoxgrid.v1.DropdownClosedEventH\x00R\x0edropdownClosed\x12M\n" +
-	"\x0fdropdown_opened\x18\x14 \x01(\v2\".volvoxgrid.v1.DropdownOpenedEventH\x00R\x0edropdownOpened\x12D\n" +
-	"\fcell_changed\x18\x15 \x01(\v2\x1f.volvoxgrid.v1.CellChangedEventH\x00R\vcellChanged\x12Q\n" +
-	"\x11row_status_change\x18\x16 \x01(\v2#.volvoxgrid.v1.RowStatusChangeEventH\x00R\x0frowStatusChange\x12A\n" +
-	"\vbefore_sort\x18\x17 \x01(\v2\x1e.volvoxgrid.v1.BeforeSortEventH\x00R\n" +
+	"\rkey_down_edit\x18\r \x01(\v2\x1f.volvoxgrid.v1.KeyDownEditEventH\x00R\vkeyDownEdit\x12H\n" +
+	"\x0ekey_press_edit\x18\x0e \x01(\v2 .volvoxgrid.v1.KeyPressEditEventH\x00R\fkeyPressEdit\x12?\n" +
+	"\vkey_up_edit\x18\x0f \x01(\v2\x1d.volvoxgrid.v1.KeyUpEditEventH\x00R\tkeyUpEdit\x12^\n" +
+	"\x17edit_validation_request\x18\x10 \x01(\v2$.volvoxgrid.v1.EditValidationRequestH\x00R\x15editValidationRequest\x12b\n" +
+	"\x19editor_list_items_request\x18\x11 \x01(\v2%.volvoxgrid.v1.EditorListItemsRequestH\x00R\x16editorListItemsRequest\x12Z\n" +
+	"\x14custom_editor_action\x18\x12 \x01(\v2&.volvoxgrid.v1.CustomEditorActionEventH\x00R\x12customEditorAction\x12D\n" +
+	"\fcell_changed\x18\x13 \x01(\v2\x1f.volvoxgrid.v1.CellChangedEventH\x00R\vcellChanged\x12Q\n" +
+	"\x11row_status_change\x18\x14 \x01(\v2#.volvoxgrid.v1.RowStatusChangeEventH\x00R\x0frowStatusChange\x12A\n" +
+	"\vbefore_sort\x18\x15 \x01(\v2\x1e.volvoxgrid.v1.BeforeSortEventH\x00R\n" +
 	"beforeSort\x12>\n" +
 	"\n" +
-	"after_sort\x18\x18 \x01(\v2\x1d.volvoxgrid.v1.AfterSortEventH\x00R\tafterSort\x127\n" +
-	"\acompare\x18\x19 \x01(\v2\x1b.volvoxgrid.v1.CompareEventH\x00R\acompare\x12T\n" +
-	"\x12before_node_toggle\x18\x1a \x01(\v2$.volvoxgrid.v1.BeforeNodeToggleEventH\x00R\x10beforeNodeToggle\x12Q\n" +
-	"\x11after_node_toggle\x18\x1b \x01(\v2#.volvoxgrid.v1.AfterNodeToggleEventH\x00R\x0fafterNodeToggle\x12G\n" +
-	"\rbefore_scroll\x18\x1c \x01(\v2 .volvoxgrid.v1.BeforeScrollEventH\x00R\fbeforeScroll\x12D\n" +
-	"\fafter_scroll\x18\x1d \x01(\v2\x1f.volvoxgrid.v1.AfterScrollEventH\x00R\vafterScroll\x12J\n" +
-	"\x0escroll_tooltip\x18\x1e \x01(\v2!.volvoxgrid.v1.ScrollTooltipEventH\x00R\rscrollTooltip\x12T\n" +
-	"\x12before_user_resize\x18\x1f \x01(\v2$.volvoxgrid.v1.BeforeUserResizeEventH\x00R\x10beforeUserResize\x12Q\n" +
-	"\x11after_user_resize\x18  \x01(\v2#.volvoxgrid.v1.AfterUserResizeEventH\x00R\x0fafterUserResize\x12Q\n" +
-	"\x11after_user_freeze\x18! \x01(\v2#.volvoxgrid.v1.AfterUserFreezeEventH\x00R\x0fafterUserFreeze\x12T\n" +
-	"\x12before_move_column\x18\" \x01(\v2$.volvoxgrid.v1.BeforeMoveColumnEventH\x00R\x10beforeMoveColumn\x12Q\n" +
-	"\x11after_move_column\x18# \x01(\v2#.volvoxgrid.v1.AfterMoveColumnEventH\x00R\x0fafterMoveColumn\x12K\n" +
-	"\x0fbefore_move_row\x18$ \x01(\v2!.volvoxgrid.v1.BeforeMoveRowEventH\x00R\rbeforeMoveRow\x12H\n" +
-	"\x0eafter_move_row\x18% \x01(\v2 .volvoxgrid.v1.AfterMoveRowEventH\x00R\fafterMoveRow\x12Q\n" +
-	"\x11before_mouse_down\x18& \x01(\v2#.volvoxgrid.v1.BeforeMouseDownEventH\x00R\x0fbeforeMouseDown\x12>\n" +
+	"after_sort\x18\x16 \x01(\v2\x1d.volvoxgrid.v1.AfterSortEventH\x00R\tafterSort\x127\n" +
+	"\acompare\x18\x17 \x01(\v2\x1b.volvoxgrid.v1.CompareEventH\x00R\acompare\x12T\n" +
+	"\x12before_node_toggle\x18\x18 \x01(\v2$.volvoxgrid.v1.BeforeNodeToggleEventH\x00R\x10beforeNodeToggle\x12Q\n" +
+	"\x11after_node_toggle\x18\x19 \x01(\v2#.volvoxgrid.v1.AfterNodeToggleEventH\x00R\x0fafterNodeToggle\x12G\n" +
+	"\rbefore_scroll\x18\x1a \x01(\v2 .volvoxgrid.v1.BeforeScrollEventH\x00R\fbeforeScroll\x12D\n" +
+	"\fafter_scroll\x18\x1b \x01(\v2\x1f.volvoxgrid.v1.AfterScrollEventH\x00R\vafterScroll\x12J\n" +
+	"\x0escroll_tooltip\x18\x1c \x01(\v2!.volvoxgrid.v1.ScrollTooltipEventH\x00R\rscrollTooltip\x12T\n" +
+	"\x12before_user_resize\x18\x1d \x01(\v2$.volvoxgrid.v1.BeforeUserResizeEventH\x00R\x10beforeUserResize\x12Q\n" +
+	"\x11after_user_resize\x18\x1e \x01(\v2#.volvoxgrid.v1.AfterUserResizeEventH\x00R\x0fafterUserResize\x12Q\n" +
+	"\x11after_user_freeze\x18\x1f \x01(\v2#.volvoxgrid.v1.AfterUserFreezeEventH\x00R\x0fafterUserFreeze\x12T\n" +
+	"\x12before_move_column\x18  \x01(\v2$.volvoxgrid.v1.BeforeMoveColumnEventH\x00R\x10beforeMoveColumn\x12Q\n" +
+	"\x11after_move_column\x18! \x01(\v2#.volvoxgrid.v1.AfterMoveColumnEventH\x00R\x0fafterMoveColumn\x12K\n" +
+	"\x0fbefore_move_row\x18\" \x01(\v2!.volvoxgrid.v1.BeforeMoveRowEventH\x00R\rbeforeMoveRow\x12H\n" +
+	"\x0eafter_move_row\x18# \x01(\v2 .volvoxgrid.v1.AfterMoveRowEventH\x00R\fafterMoveRow\x12Q\n" +
+	"\x11before_mouse_down\x18$ \x01(\v2#.volvoxgrid.v1.BeforeMouseDownEventH\x00R\x0fbeforeMouseDown\x12>\n" +
 	"\n" +
-	"mouse_down\x18' \x01(\v2\x1d.volvoxgrid.v1.MouseDownEventH\x00R\tmouseDown\x128\n" +
-	"\bmouse_up\x18( \x01(\v2\x1b.volvoxgrid.v1.MouseUpEventH\x00R\amouseUp\x12>\n" +
+	"mouse_down\x18% \x01(\v2\x1d.volvoxgrid.v1.MouseDownEventH\x00R\tmouseDown\x128\n" +
+	"\bmouse_up\x18& \x01(\v2\x1b.volvoxgrid.v1.MouseUpEventH\x00R\amouseUp\x12>\n" +
 	"\n" +
-	"mouse_move\x18) \x01(\v2\x1d.volvoxgrid.v1.MouseMoveEventH\x00R\tmouseMove\x121\n" +
-	"\x05click\x18* \x01(\v2\x19.volvoxgrid.v1.ClickEventH\x00R\x05click\x12;\n" +
-	"\tdbl_click\x18+ \x01(\v2\x1c.volvoxgrid.v1.DblClickEventH\x00R\bdblClick\x128\n" +
-	"\bkey_down\x18, \x01(\v2\x1b.volvoxgrid.v1.KeyDownEventH\x00R\akeyDown\x12;\n" +
-	"\tkey_press\x18- \x01(\v2\x1c.volvoxgrid.v1.KeyPressEventH\x00R\bkeyPress\x122\n" +
-	"\x06key_up\x18. \x01(\v2\x19.volvoxgrid.v1.KeyUpEventH\x00R\x05keyUp\x12T\n" +
-	"\x12custom_render_cell\x18/ \x01(\v2$.volvoxgrid.v1.CustomRenderCellEventH\x00R\x10customRenderCell\x12>\n" +
+	"mouse_move\x18' \x01(\v2\x1d.volvoxgrid.v1.MouseMoveEventH\x00R\tmouseMove\x121\n" +
+	"\x05click\x18( \x01(\v2\x19.volvoxgrid.v1.ClickEventH\x00R\x05click\x12;\n" +
+	"\tdbl_click\x18) \x01(\v2\x1c.volvoxgrid.v1.DblClickEventH\x00R\bdblClick\x128\n" +
+	"\bkey_down\x18* \x01(\v2\x1b.volvoxgrid.v1.KeyDownEventH\x00R\akeyDown\x12;\n" +
+	"\tkey_press\x18+ \x01(\v2\x1c.volvoxgrid.v1.KeyPressEventH\x00R\bkeyPress\x122\n" +
+	"\x06key_up\x18, \x01(\v2\x19.volvoxgrid.v1.KeyUpEventH\x00R\x05keyUp\x12T\n" +
+	"\x12custom_render_cell\x18- \x01(\v2$.volvoxgrid.v1.CustomRenderCellEventH\x00R\x10customRenderCell\x12>\n" +
 	"\n" +
-	"drag_start\x180 \x01(\v2\x1d.volvoxgrid.v1.DragStartEventH\x00R\tdragStart\x12;\n" +
-	"\tdrag_over\x181 \x01(\v2\x1c.volvoxgrid.v1.DragOverEventH\x00R\bdragOver\x12;\n" +
-	"\tdrag_drop\x182 \x01(\v2\x1c.volvoxgrid.v1.DragDropEventH\x00R\bdragDrop\x12G\n" +
-	"\rdrag_complete\x183 \x01(\v2 .volvoxgrid.v1.DragCompleteEventH\x00R\fdragComplete\x12T\n" +
-	"\x12type_ahead_started\x184 \x01(\v2$.volvoxgrid.v1.TypeAheadStartedEventH\x00R\x10typeAheadStarted\x12N\n" +
-	"\x10type_ahead_ended\x185 \x01(\v2\".volvoxgrid.v1.TypeAheadEndedEventH\x00R\x0etypeAheadEnded\x12M\n" +
-	"\x0fdata_refreshing\x186 \x01(\v2\".volvoxgrid.v1.DataRefreshingEventH\x00R\x0edataRefreshing\x12J\n" +
-	"\x0edata_refreshed\x187 \x01(\v2!.volvoxgrid.v1.DataRefreshedEventH\x00R\rdataRefreshed\x12A\n" +
-	"\vfilter_data\x188 \x01(\v2\x1e.volvoxgrid.v1.FilterDataEventH\x00R\n" +
+	"drag_start\x18. \x01(\v2\x1d.volvoxgrid.v1.DragStartEventH\x00R\tdragStart\x12;\n" +
+	"\tdrag_over\x18/ \x01(\v2\x1c.volvoxgrid.v1.DragOverEventH\x00R\bdragOver\x12;\n" +
+	"\tdrag_drop\x180 \x01(\v2\x1c.volvoxgrid.v1.DragDropEventH\x00R\bdragDrop\x12G\n" +
+	"\rdrag_complete\x181 \x01(\v2 .volvoxgrid.v1.DragCompleteEventH\x00R\fdragComplete\x12T\n" +
+	"\x12type_ahead_started\x182 \x01(\v2$.volvoxgrid.v1.TypeAheadStartedEventH\x00R\x10typeAheadStarted\x12N\n" +
+	"\x10type_ahead_ended\x183 \x01(\v2\".volvoxgrid.v1.TypeAheadEndedEventH\x00R\x0etypeAheadEnded\x12M\n" +
+	"\x0fdata_refreshing\x184 \x01(\v2\".volvoxgrid.v1.DataRefreshingEventH\x00R\x0edataRefreshing\x12J\n" +
+	"\x0edata_refreshed\x185 \x01(\v2!.volvoxgrid.v1.DataRefreshedEventH\x00R\rdataRefreshed\x12A\n" +
+	"\vfilter_data\x186 \x01(\v2\x1e.volvoxgrid.v1.FilterDataEventH\x00R\n" +
 	"filterData\x121\n" +
-	"\x05error\x189 \x01(\v2\x19.volvoxgrid.v1.ErrorEventH\x00R\x05error\x12Q\n" +
-	"\x11before_page_break\x18: \x01(\v2#.volvoxgrid.v1.BeforePageBreakEventH\x00R\x0fbeforePageBreak\x12>\n" +
+	"\x05error\x187 \x01(\v2\x19.volvoxgrid.v1.ErrorEventH\x00R\x05error\x12Q\n" +
+	"\x11before_page_break\x188 \x01(\v2#.volvoxgrid.v1.BeforePageBreakEventH\x00R\x0fbeforePageBreak\x12>\n" +
 	"\n" +
-	"start_page\x18; \x01(\v2\x1d.volvoxgrid.v1.StartPageEventH\x00R\tstartPage\x12H\n" +
-	"\x0eget_header_row\x18< \x01(\v2 .volvoxgrid.v1.GetHeaderRowEventH\x00R\fgetHeaderRow\x12g\n" +
-	"\x19pull_to_refresh_triggered\x18= \x01(\v2*.volvoxgrid.v1.PullToRefreshTriggeredEventH\x00R\x16pullToRefreshTriggered\x12d\n" +
-	"\x18pull_to_refresh_canceled\x18> \x01(\v2).volvoxgrid.v1.PullToRefreshCanceledEventH\x00R\x15pullToRefreshCanceled\x12Z\n" +
-	"\x14before_dropdown_open\x18? \x01(\v2&.volvoxgrid.v1.BeforeDropdownOpenEventH\x00R\x12beforeDropdownOpen\x12c\n" +
-	"\x17tree_children_requested\x18@ \x01(\v2).volvoxgrid.v1.TreeChildrenRequestedEventH\x00R\x15treeChildrenRequested\x12a\n" +
-	"\x17before_tree_node_toggle\x18A \x01(\v2(.volvoxgrid.v1.BeforeTreeNodeToggleEventH\x00R\x14beforeTreeNodeToggle\x12^\n" +
-	"\x16after_tree_node_toggle\x18B \x01(\v2'.volvoxgrid.v1.AfterTreeNodeToggleEventH\x00R\x13afterTreeNodeToggle\x12T\n" +
-	"\x12tree_node_activate\x18C \x01(\v2$.volvoxgrid.v1.TreeNodeActivateEventH\x00R\x10treeNodeActivate\x12^\n" +
-	"\x16tree_node_context_menu\x18D \x01(\v2'.volvoxgrid.v1.TreeNodeContextMenuEventH\x00R\x13treeNodeContextMenuB\a\n" +
+	"start_page\x189 \x01(\v2\x1d.volvoxgrid.v1.StartPageEventH\x00R\tstartPage\x12H\n" +
+	"\x0eget_header_row\x18: \x01(\v2 .volvoxgrid.v1.GetHeaderRowEventH\x00R\fgetHeaderRow\x12g\n" +
+	"\x19pull_to_refresh_triggered\x18; \x01(\v2*.volvoxgrid.v1.PullToRefreshTriggeredEventH\x00R\x16pullToRefreshTriggered\x12d\n" +
+	"\x18pull_to_refresh_canceled\x18< \x01(\v2).volvoxgrid.v1.PullToRefreshCanceledEventH\x00R\x15pullToRefreshCanceled\x12c\n" +
+	"\x17tree_children_requested\x18= \x01(\v2).volvoxgrid.v1.TreeChildrenRequestedEventH\x00R\x15treeChildrenRequested\x12a\n" +
+	"\x17before_tree_node_toggle\x18> \x01(\v2(.volvoxgrid.v1.BeforeTreeNodeToggleEventH\x00R\x14beforeTreeNodeToggle\x12^\n" +
+	"\x16after_tree_node_toggle\x18? \x01(\v2'.volvoxgrid.v1.AfterTreeNodeToggleEventH\x00R\x13afterTreeNodeToggle\x12T\n" +
+	"\x12tree_node_activate\x18@ \x01(\v2$.volvoxgrid.v1.TreeNodeActivateEventH\x00R\x10treeNodeActivate\x12^\n" +
+	"\x16tree_node_context_menu\x18A \x01(\v2'.volvoxgrid.v1.TreeNodeContextMenuEventH\x00R\x13treeNodeContextMenuB\a\n" +
 	"\x05event\"|\n" +
 	"\x16CellFocusChangingEvent\x12\x17\n" +
 	"\aold_row\x18\x01 \x01(\x05R\x06oldRow\x12\x17\n" +
@@ -26214,33 +28455,46 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\x03col\x18\x02 \x01(\x05R\x03col\x12\x1b\n" +
 	"\tedit_text\x18\x03 \x01(\tR\beditText\")\n" +
 	"\x13CellEditChangeEvent\x12\x12\n" +
-	"\x04text\x18\x01 \x01(\tR\x04text\"I\n" +
-	"\x10KeyDownEditEvent\x12\x19\n" +
-	"\bkey_code\x18\x01 \x01(\x05R\akeyCode\x12\x1a\n" +
-	"\bmodifier\x18\x02 \x01(\x05R\bmodifier\"0\n" +
-	"\x11KeyPressEditEvent\x12\x1b\n" +
-	"\tkey_ascii\x18\x01 \x01(\x05R\bkeyAscii\"G\n" +
-	"\x0eKeyUpEditEvent\x12\x19\n" +
-	"\bkey_code\x18\x01 \x01(\x05R\akeyCode\x12\x1a\n" +
-	"\bmodifier\x18\x02 \x01(\x05R\bmodifier\"A\n" +
-	"\x1bCellEditConfigureStyleEvent\x12\x10\n" +
-	"\x03row\x18\x01 \x01(\x05R\x03row\x12\x10\n" +
-	"\x03col\x18\x02 \x01(\x05R\x03col\"B\n" +
-	"\x1cCellEditConfigureWindowEvent\x12\x10\n" +
-	"\x03row\x18\x01 \x01(\x05R\x03row\x12\x10\n" +
-	"\x03col\x18\x02 \x01(\x05R\x03col\"\x88\x02\n" +
-	"\x17BeforeDropdownOpenEvent\x12\x10\n" +
-	"\x03row\x18\x01 \x01(\x05R\x03row\x12\x10\n" +
-	"\x03col\x18\x02 \x01(\x05R\x03col\x12\f\n" +
-	"\x01x\x18\x03 \x01(\x02R\x01x\x12\f\n" +
-	"\x01y\x18\x04 \x01(\x02R\x01y\x12\x14\n" +
-	"\x05width\x18\x05 \x01(\x02R\x05width\x12\x16\n" +
-	"\x06height\x18\x06 \x01(\x02R\x06height\x123\n" +
-	"\bdropdown\x18\a \x01(\v2\x17.volvoxgrid.v1.DropdownR\bdropdown\x12#\n" +
-	"\rcurrent_value\x18\b \x01(\tR\fcurrentValue\x12%\n" +
-	"\x0eselected_index\x18\t \x01(\x05R\rselectedIndex\"\x15\n" +
-	"\x13DropdownClosedEvent\"\x15\n" +
-	"\x13DropdownOpenedEvent\"l\n" +
+	"\x04text\x18\x01 \x01(\tR\x04text\"h\n" +
+	"\x10KeyDownEditEvent\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\x03R\tsessionId\x12\x19\n" +
+	"\bkey_code\x18\x02 \x01(\x05R\akeyCode\x12\x1a\n" +
+	"\bmodifier\x18\x03 \x01(\x05R\bmodifier\"O\n" +
+	"\x11KeyPressEditEvent\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\x03R\tsessionId\x12\x1b\n" +
+	"\tkey_ascii\x18\x02 \x01(\x05R\bkeyAscii\"f\n" +
+	"\x0eKeyUpEditEvent\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\x03R\tsessionId\x12\x19\n" +
+	"\bkey_code\x18\x02 \x01(\x05R\akeyCode\x12\x1a\n" +
+	"\bmodifier\x18\x03 \x01(\x05R\bmodifier\"\xab\x01\n" +
+	"\x15EditValidationRequest\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\x03R\trequestId\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x02 \x01(\x03R\tsessionId\x12\x10\n" +
+	"\x03row\x18\x03 \x01(\x05R\x03row\x12\x10\n" +
+	"\x03col\x18\x04 \x01(\x05R\x03col\x120\n" +
+	"\x05value\x18\x05 \x01(\v2\x1a.volvoxgrid.v1.EditorValueR\x05value\"\xcb\x01\n" +
+	"\x16EditorListItemsRequest\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\x03R\trequestId\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x02 \x01(\x03R\tsessionId\x12$\n" +
+	"\x0edata_source_id\x18\x03 \x01(\tR\fdataSourceId\x12\x1f\n" +
+	"\vfilter_text\x18\x04 \x01(\tR\n" +
+	"filterText\x12\x16\n" +
+	"\x06offset\x18\x05 \x01(\x05R\x06offset\x12\x14\n" +
+	"\x05limit\x18\x06 \x01(\x05R\x05limit\"\xaf\x01\n" +
+	"\x17CustomEditorActionEvent\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\x03R\tsessionId\x12\x10\n" +
+	"\x03row\x18\x02 \x01(\x05R\x03row\x12\x10\n" +
+	"\x03col\x18\x03 \x01(\x05R\x03col\x12\x1b\n" +
+	"\taction_id\x18\x04 \x01(\tR\bactionId\x124\n" +
+	"\apayload\x18\x05 \x01(\v2\x1a.volvoxgrid.v1.StructValueR\apayload\"l\n" +
 	"\x10CellChangedEvent\x12\x10\n" +
 	"\x03row\x18\x01 \x01(\x05R\x03row\x12\x10\n" +
 	"\x03col\x18\x02 \x01(\x05R\x03col\x12\x19\n" +
@@ -26429,7 +28683,17 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\x10BorderAppearance\x12\x1a\n" +
 	"\x16BORDER_APPEARANCE_FLAT\x10\x00\x12\x1c\n" +
 	"\x18BORDER_APPEARANCE_RAISED\x10\x01\x12\x1c\n" +
-	"\x18BORDER_APPEARANCE_SUBTLE\x10\x02*\x90\x01\n" +
+	"\x18BORDER_APPEARANCE_SUBTLE\x10\x02*\x8e\x01\n" +
+	"\vThemePreset\x12\x0e\n" +
+	"\n" +
+	"THEME_NONE\x10\x00\x12\x11\n" +
+	"\rTHEME_CLASSIC\x10\x01\x12\x0f\n" +
+	"\vTHEME_LIGHT\x10\x02\x12\x0e\n" +
+	"\n" +
+	"THEME_DARK\x10\x03\x12\x17\n" +
+	"\x13THEME_HIGH_CONTRAST\x10\x04\x12\x11\n" +
+	"\rTHEME_MONOKAI\x10\x05\x12\x0f\n" +
+	"\vTHEME_AMBER\x10\x06*\x90\x01\n" +
 	"\n" +
 	"TextEffect\x12\x14\n" +
 	"\x10TEXT_EFFECT_NONE\x10\x00\x12\x16\n" +
@@ -26582,11 +28846,7 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\vEditTrigger\x12\x15\n" +
 	"\x11EDIT_TRIGGER_NONE\x10\x00\x12\x14\n" +
 	"\x10EDIT_TRIGGER_KEY\x10\x01\x12\x1a\n" +
-	"\x16EDIT_TRIGGER_KEY_CLICK\x10\x02*P\n" +
-	"\x0fDropdownTrigger\x12\x12\n" +
-	"\x0eDROPDOWN_NEVER\x10\x00\x12\x13\n" +
-	"\x0fDROPDOWN_ALWAYS\x10\x01\x12\x14\n" +
-	"\x10DROPDOWN_ON_EDIT\x10\x02*\x85\x01\n" +
+	"\x16EDIT_TRIGGER_KEY_CLICK\x10\x02*\x85\x01\n" +
 	"\x12DropdownItemLayout\x12\x16\n" +
 	"\x12DROPDOWN_ITEM_AUTO\x10\x00\x12\x17\n" +
 	"\x13DROPDOWN_ITEM_LABEL\x10\x01\x12\x1d\n" +
@@ -26594,7 +28854,51 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\x1bDROPDOWN_ITEM_LABEL_DETAILS\x10\x03*.\n" +
 	"\vTabBehavior\x12\x10\n" +
 	"\fTAB_CONTROLS\x10\x00\x12\r\n" +
-	"\tTAB_CELLS\x10\x01*C\n" +
+	"\tTAB_CELLS\x10\x01*\xde\x01\n" +
+	"\n" +
+	"EditorKind\x12\x1b\n" +
+	"\x17EDITOR_KIND_UNSPECIFIED\x10\x00\x12\x0f\n" +
+	"\vEDITOR_TEXT\x10\x01\x12\x19\n" +
+	"\x15EDITOR_MULTILINE_TEXT\x10\x02\x12\x11\n" +
+	"\rEDITOR_NUMBER\x10\x03\x12\x13\n" +
+	"\x0fEDITOR_CHECKBOX\x10\x04\x12\x11\n" +
+	"\rEDITOR_SELECT\x10\x05\x12\x10\n" +
+	"\fEDITOR_COMBO\x10\x06\x12\x14\n" +
+	"\x10EDITOR_DATE_TIME\x10\a\x12\x11\n" +
+	"\rEDITOR_BUTTON\x10\b\x12\x11\n" +
+	"\rEDITOR_CUSTOM\x10d*]\n" +
+	"\vEditorOwner\x12\x17\n" +
+	"\x13EDITOR_OWNER_ENGINE\x10\x00\x12\x1c\n" +
+	"\x18EDITOR_OWNER_HOST_NATIVE\x10\x01\x12\x17\n" +
+	"\x13EDITOR_OWNER_CUSTOM\x10\x02*{\n" +
+	"\x12EditorPresentation\x12\x11\n" +
+	"\rEDITOR_CANVAS\x10\x00\x12\x15\n" +
+	"\x11EDITOR_POPUP_OVER\x10\x01\x12\x16\n" +
+	"\x12EDITOR_POPUP_UNDER\x10\x02\x12\x10\n" +
+	"\fEDITOR_MODAL\x10\x03\x12\x11\n" +
+	"\rEDITOR_INLINE\x10\x04*[\n" +
+	"\x0eValidationMode\x12\x14\n" +
+	"\x10VALIDATION_BLOCK\x10\x00\x12\x15\n" +
+	"\x11VALIDATION_REVERT\x10\x01\x12\x1c\n" +
+	"\x18VALIDATION_ALLOW_INVALID\x10\x02*\x9e\x01\n" +
+	"\x11ValidationTrigger\x12 \n" +
+	"\x1cVALIDATION_TRIGGER_ON_COMMIT\x10\x00\x12 \n" +
+	"\x1cVALIDATION_TRIGGER_ON_CHANGE\x10\x01\x12\x1f\n" +
+	"\x1bVALIDATION_TRIGGER_ON_PAUSE\x10\x02\x12$\n" +
+	" VALIDATION_TRIGGER_ON_FOCUS_LOST\x10\x03*\x90\x01\n" +
+	"\tInputType\x12\x13\n" +
+	"\x0fINPUT_TYPE_TEXT\x10\x00\x12\x15\n" +
+	"\x11INPUT_TYPE_NUMBER\x10\x01\x12\x14\n" +
+	"\x10INPUT_TYPE_EMAIL\x10\x02\x12\x12\n" +
+	"\x0eINPUT_TYPE_URL\x10\x03\x12\x14\n" +
+	"\x10INPUT_TYPE_PHONE\x10\x04\x12\x17\n" +
+	"\x13INPUT_TYPE_PASSWORD\x10\x05*n\n" +
+	"\n" +
+	"ButtonRole\x12\x17\n" +
+	"\x13BUTTON_ROLE_DEFAULT\x10\x00\x12\x18\n" +
+	"\x14BUTTON_ROLE_ELLIPSIS\x10\x01\x12\x15\n" +
+	"\x11BUTTON_ROLE_CLEAR\x10\x02\x12\x16\n" +
+	"\x12BUTTON_ROLE_CUSTOM\x10\x03*C\n" +
 	"\tSortOrder\x12\r\n" +
 	"\tSORT_NONE\x10\x00\x12\x12\n" +
 	"\x0eSORT_ASCENDING\x10\x01\x12\x13\n" +
@@ -26825,7 +29129,7 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\x1fINDICATOR_BAND_CORNER_TOP_START\x10\x05\x12!\n" +
 	"\x1dINDICATOR_BAND_CORNER_TOP_END\x10\x06\x12&\n" +
 	"\"INDICATOR_BAND_CORNER_BOTTOM_START\x10\a\x12$\n" +
-	" INDICATOR_BAND_CORNER_BOTTOM_END\x10\b*\xf6\x03\n" +
+	" INDICATOR_BAND_CORNER_BOTTOM_END\x10\b*\xa0\x04\n" +
 	"\x14RowIndicatorSlotKind\x12\x1b\n" +
 	"\x17ROW_INDICATOR_SLOT_NONE\x10\x00\x12\x1e\n" +
 	"\x1aROW_INDICATOR_SLOT_NUMBERS\x10\x01\x12\x1e\n" +
@@ -26842,7 +29146,8 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\x19ROW_INDICATOR_SLOT_RESIZE\x10\v\x12\x1d\n" +
 	"\x19ROW_INDICATOR_SLOT_ACTION\x10\f\x12\"\n" +
 	"\x1eROW_INDICATOR_SLOT_STATUS_ICON\x10\r\x12\x1d\n" +
-	"\x19ROW_INDICATOR_SLOT_CUSTOM\x10\x0e*\x8c\x04\n" +
+	"\x19ROW_INDICATOR_SLOT_CUSTOM\x10\x0e\x12(\n" +
+	"$ROW_INDICATOR_SLOT_NUMBERS_DATA_ONLY\x10\x0f*\x8c\x04\n" +
 	"\x14ColIndicatorCellMode\x12\x1b\n" +
 	"\x17COL_INDICATOR_CELL_NONE\x10\x00\x12\"\n" +
 	"\x1eCOL_INDICATOR_CELL_HEADER_TEXT\x10\x01\x12!\n" +
@@ -26921,7 +29226,33 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\x12CURSOR_NOT_ALLOWED\x10\b\x12\x14\n" +
 	"\x10CURSOR_CROSSHAIR\x10\t\x12\x0f\n" +
 	"\vCURSOR_COPY\x10\n" +
-	"2\xe6\x1c\n" +
+	"*\x8e\x02\n" +
+	"\x0fEditStartReason\x12\x1a\n" +
+	"\x16EDIT_START_UNSPECIFIED\x10\x00\x12\x11\n" +
+	"\rEDIT_START_F2\x10\x01\x12\x1b\n" +
+	"\x17EDIT_START_DOUBLE_CLICK\x10\x02\x12\x1a\n" +
+	"\x16EDIT_START_CLICK_CARET\x10\x03\x12\x18\n" +
+	"\x14EDIT_START_ENTER_KEY\x10\x04\x12\x1c\n" +
+	"\x18EDIT_START_PRINTABLE_KEY\x10\x05\x12\x1e\n" +
+	"\x1aEDIT_START_IME_COMPOSITION\x10\x06\x12\x1e\n" +
+	"\x1aEDIT_START_DROPDOWN_BUTTON\x10\a\x12\x1b\n" +
+	"\x17EDIT_START_PROGRAMMATIC\x10\b*\xc8\x01\n" +
+	"\rEditEndReason\x12\x18\n" +
+	"\x14EDIT_END_UNSPECIFIED\x10\x00\x12\x16\n" +
+	"\x12EDIT_END_COMMITTED\x10\x01\x12\x15\n" +
+	"\x11EDIT_END_CANCELED\x10\x02\x12\x1d\n" +
+	"\x19EDIT_END_REVERTED_INVALID\x10\x03\x12\x17\n" +
+	"\x13EDIT_END_FOCUS_LOST\x10\x04\x12\x19\n" +
+	"\x15EDIT_END_CELL_REMOVED\x10\x05\x12\x1b\n" +
+	"\x17EDIT_END_GRID_DESTROYED\x10\x06*\xf9\x01\n" +
+	"\x12EditorUpdateReason\x12\x1d\n" +
+	"\x19EDITOR_UPDATE_UNSPECIFIED\x10\x00\x12\x1a\n" +
+	"\x16EDITOR_UPDATE_GEOMETRY\x10\x01\x12\x1c\n" +
+	"\x18EDITOR_UPDATE_VALIDATION\x10\x02\x12\"\n" +
+	"\x1eEDITOR_UPDATE_NORMALIZED_VALUE\x10\x03\x12$\n" +
+	" EDITOR_UPDATE_PROGRAMMATIC_VALUE\x10\x04\x12\x1e\n" +
+	"\x1aEDITOR_UPDATE_REMOTE_VALUE\x10\x05\x12 \n" +
+	"\x1cEDITOR_UPDATE_CUSTOM_PAYLOAD\x10\x062\xe6\x1c\n" +
 	"\x11VolvoxGridService\x12E\n" +
 	"\x06Create\x12\x1c.volvoxgrid.v1.CreateRequest\x1a\x1d.volvoxgrid.v1.CreateResponse\x12H\n" +
 	"\aDestroy\x12\x1d.volvoxgrid.v1.DestroyRequest\x1a\x1e.volvoxgrid.v1.DestroyResponse\x12N\n" +
@@ -26991,816 +29322,900 @@ func file_volvoxgrid_proto_rawDescGZIP() []byte {
 	return file_volvoxgrid_proto_rawDescData
 }
 
-var file_volvoxgrid_proto_enumTypes = make([]protoimpl.EnumInfo, 82)
-var file_volvoxgrid_proto_msgTypes = make([]protoimpl.MessageInfo, 263)
+var file_volvoxgrid_proto_enumTypes = make([]protoimpl.EnumInfo, 92)
+var file_volvoxgrid_proto_msgTypes = make([]protoimpl.MessageInfo, 284)
 var file_volvoxgrid_proto_goTypes = []any{
-	(BorderStyle)(0),                     // 0: volvoxgrid.v1.BorderStyle
-	(GridLineStyle)(0),                   // 1: volvoxgrid.v1.GridLineStyle
-	(GridLineDirection)(0),               // 2: volvoxgrid.v1.GridLineDirection
-	(BorderAppearance)(0),                // 3: volvoxgrid.v1.BorderAppearance
-	(TextEffect)(0),                      // 4: volvoxgrid.v1.TextEffect
-	(TextRenderMode)(0),                  // 5: volvoxgrid.v1.TextRenderMode
-	(TextHintingMode)(0),                 // 6: volvoxgrid.v1.TextHintingMode
-	(TextBaseline)(0),                    // 7: volvoxgrid.v1.TextBaseline
-	(Align)(0),                           // 8: volvoxgrid.v1.Align
-	(ImageAlignment)(0),                  // 9: volvoxgrid.v1.ImageAlignment
-	(BarcodeSymbology)(0),                // 10: volvoxgrid.v1.BarcodeSymbology
-	(BarcodeCaptionPosition)(0),          // 11: volvoxgrid.v1.BarcodeCaptionPosition
-	(BarcodeCheckDigitMode)(0),           // 12: volvoxgrid.v1.BarcodeCheckDigitMode
-	(BarcodeTextEncoding)(0),             // 13: volvoxgrid.v1.BarcodeTextEncoding
-	(BarcodeQrErrorCorrection)(0),        // 14: volvoxgrid.v1.BarcodeQrErrorCorrection
-	(BarcodeRenderStatus)(0),             // 15: volvoxgrid.v1.BarcodeRenderStatus
-	(CheckedState)(0),                    // 16: volvoxgrid.v1.CheckedState
-	(FillHandlePosition)(0),              // 17: volvoxgrid.v1.FillHandlePosition
-	(ColumnDataType)(0),                  // 18: volvoxgrid.v1.ColumnDataType
-	(CoercionMode)(0),                    // 19: volvoxgrid.v1.CoercionMode
-	(WriteErrorMode)(0),                  // 20: volvoxgrid.v1.WriteErrorMode
-	(CellInteraction)(0),                 // 21: volvoxgrid.v1.CellInteraction
-	(HeaderPolicy)(0),                    // 22: volvoxgrid.v1.HeaderPolicy
-	(TypePolicy)(0),                      // 23: volvoxgrid.v1.TypePolicy
-	(LoadDataStatus)(0),                  // 24: volvoxgrid.v1.LoadDataStatus
-	(SelectionMode)(0),                   // 25: volvoxgrid.v1.SelectionMode
-	(FocusBorderStyle)(0),                // 26: volvoxgrid.v1.FocusBorderStyle
-	(SelectionVisibility)(0),             // 27: volvoxgrid.v1.SelectionVisibility
-	(EditTrigger)(0),                     // 28: volvoxgrid.v1.EditTrigger
-	(DropdownTrigger)(0),                 // 29: volvoxgrid.v1.DropdownTrigger
-	(DropdownItemLayout)(0),              // 30: volvoxgrid.v1.DropdownItemLayout
-	(TabBehavior)(0),                     // 31: volvoxgrid.v1.TabBehavior
-	(SortOrder)(0),                       // 32: volvoxgrid.v1.SortOrder
-	(SortType)(0),                        // 33: volvoxgrid.v1.SortType
-	(TreeIndicatorStyle)(0),              // 34: volvoxgrid.v1.TreeIndicatorStyle
-	(GroupTotalPosition)(0),              // 35: volvoxgrid.v1.GroupTotalPosition
-	(AggregateType)(0),                   // 36: volvoxgrid.v1.AggregateType
-	(CellSpanMode)(0),                    // 37: volvoxgrid.v1.CellSpanMode
-	(SpanCompareMode)(0),                 // 38: volvoxgrid.v1.SpanCompareMode
-	(ScrollBarsMode)(0),                  // 39: volvoxgrid.v1.ScrollBarsMode
-	(ScrollBarMode)(0),                   // 40: volvoxgrid.v1.ScrollBarMode
-	(ScrollBarAppearance)(0),             // 41: volvoxgrid.v1.ScrollBarAppearance
-	(IndicatorAppearance)(0),             // 42: volvoxgrid.v1.IndicatorAppearance
-	(PinPosition)(0),                     // 43: volvoxgrid.v1.PinPosition
-	(StickyEdge)(0),                      // 44: volvoxgrid.v1.StickyEdge
-	(TypeAheadMode)(0),                   // 45: volvoxgrid.v1.TypeAheadMode
-	(AutoSizeMode)(0),                    // 46: volvoxgrid.v1.AutoSizeMode
-	(DragMode)(0),                        // 47: volvoxgrid.v1.DragMode
-	(DropMode)(0),                        // 48: volvoxgrid.v1.DropMode
-	(CustomRenderMode)(0),                // 49: volvoxgrid.v1.CustomRenderMode
-	(ApplyScope)(0),                      // 50: volvoxgrid.v1.ApplyScope
-	(RendererMode)(0),                    // 51: volvoxgrid.v1.RendererMode
-	(PresentMode)(0),                     // 52: volvoxgrid.v1.PresentMode
-	(FramePacingMode)(0),                 // 53: volvoxgrid.v1.FramePacingMode
-	(ClearScope)(0),                      // 54: volvoxgrid.v1.ClearScope
-	(ClearRegion)(0),                     // 55: volvoxgrid.v1.ClearRegion
-	(ExportFormat)(0),                    // 56: volvoxgrid.v1.ExportFormat
-	(ExportScope)(0),                     // 57: volvoxgrid.v1.ExportScope
-	(PrintOrientation)(0),                // 58: volvoxgrid.v1.PrintOrientation
-	(NodeRelation)(0),                    // 59: volvoxgrid.v1.NodeRelation
-	(IconAlign)(0),                       // 60: volvoxgrid.v1.IconAlign
-	(CellHitArea)(0),                     // 61: volvoxgrid.v1.CellHitArea
-	(PullToRefreshTheme)(0),              // 62: volvoxgrid.v1.PullToRefreshTheme
-	(RenderLayerBit)(0),                  // 63: volvoxgrid.v1.RenderLayerBit
-	(GridTargetKind)(0),                  // 64: volvoxgrid.v1.GridTargetKind
-	(IndicatorBand)(0),                   // 65: volvoxgrid.v1.IndicatorBand
-	(RowIndicatorSlotKind)(0),            // 66: volvoxgrid.v1.RowIndicatorSlotKind
-	(ColIndicatorCellMode)(0),            // 67: volvoxgrid.v1.ColIndicatorCellMode
-	(CornerIndicatorSlotKind)(0),         // 68: volvoxgrid.v1.CornerIndicatorSlotKind
-	(GridEventTargetFlag)(0),             // 69: volvoxgrid.v1.GridEventTargetFlag
-	(ComposeMethod)(0),                   // 70: volvoxgrid.v1.ComposeMethod
-	(EditUiMode)(0),                      // 71: volvoxgrid.v1.EditUiMode
-	(ErrorCode)(0),                       // 72: volvoxgrid.v1.ErrorCode
-	(DemoDataFormat)(0),                  // 73: volvoxgrid.v1.DemoDataFormat
-	(TerminalColorLevel)(0),              // 74: volvoxgrid.v1.TerminalColorLevel
-	(FrameKind)(0),                       // 75: volvoxgrid.v1.FrameKind
-	(CursorType)(0),                      // 76: volvoxgrid.v1.CursorType
-	(ArchiveRequest_Action)(0),           // 77: volvoxgrid.v1.ArchiveRequest.Action
-	(PointerEvent_Type)(0),               // 78: volvoxgrid.v1.PointerEvent.Type
-	(ZoomEvent_Phase)(0),                 // 79: volvoxgrid.v1.ZoomEvent.Phase
-	(KeyEvent_Type)(0),                   // 80: volvoxgrid.v1.KeyEvent.Type
-	(TerminalCommand_Kind)(0),            // 81: volvoxgrid.v1.TerminalCommand.Kind
-	(*Font)(nil),                         // 82: volvoxgrid.v1.Font
-	(*Padding)(nil),                      // 83: volvoxgrid.v1.Padding
-	(*Border)(nil),                       // 84: volvoxgrid.v1.Border
-	(*Borders)(nil),                      // 85: volvoxgrid.v1.Borders
-	(*GridLines)(nil),                    // 86: volvoxgrid.v1.GridLines
-	(*Separator)(nil),                    // 87: volvoxgrid.v1.Separator
-	(*TextRendering)(nil),                // 88: volvoxgrid.v1.TextRendering
-	(*ImageData)(nil),                    // 89: volvoxgrid.v1.ImageData
-	(*BarcodeEncodingOptions)(nil),       // 90: volvoxgrid.v1.BarcodeEncodingOptions
-	(*BarcodeRenderOptions)(nil),         // 91: volvoxgrid.v1.BarcodeRenderOptions
-	(*BarcodeCaptionOptions)(nil),        // 92: volvoxgrid.v1.BarcodeCaptionOptions
-	(*BarcodeData)(nil),                  // 93: volvoxgrid.v1.BarcodeData
-	(*CellRange)(nil),                    // 94: volvoxgrid.v1.CellRange
-	(*CellValue)(nil),                    // 95: volvoxgrid.v1.CellValue
-	(*RichText)(nil),                     // 96: volvoxgrid.v1.RichText
-	(*TextFormatRun)(nil),                // 97: volvoxgrid.v1.TextFormatRun
-	(*TextRunStyle)(nil),                 // 98: volvoxgrid.v1.TextRunStyle
-	(*Dropdown)(nil),                     // 99: volvoxgrid.v1.Dropdown
-	(*DropdownItem)(nil),                 // 100: volvoxgrid.v1.DropdownItem
-	(*ScrollBarColors)(nil),              // 101: volvoxgrid.v1.ScrollBarColors
-	(*ScrollBarConfig)(nil),              // 102: volvoxgrid.v1.ScrollBarConfig
-	(*RegionStyle)(nil),                  // 103: volvoxgrid.v1.RegionStyle
-	(*CellStyle)(nil),                    // 104: volvoxgrid.v1.CellStyle
-	(*HighlightStyle)(nil),               // 105: volvoxgrid.v1.HighlightStyle
-	(*HeaderMarkSize)(nil),               // 106: volvoxgrid.v1.HeaderMarkSize
-	(*HeaderSeparator)(nil),              // 107: volvoxgrid.v1.HeaderSeparator
-	(*HeaderResizeHandle)(nil),           // 108: volvoxgrid.v1.HeaderResizeHandle
-	(*HeaderStyle)(nil),                  // 109: volvoxgrid.v1.HeaderStyle
-	(*IconSlots)(nil),                    // 110: volvoxgrid.v1.IconSlots
-	(*IconStyle)(nil),                    // 111: volvoxgrid.v1.IconStyle
-	(*IconSlotStyles)(nil),               // 112: volvoxgrid.v1.IconSlotStyles
-	(*IconPictures)(nil),                 // 113: volvoxgrid.v1.IconPictures
-	(*IconTheme)(nil),                    // 114: volvoxgrid.v1.IconTheme
-	(*HoverConfig)(nil),                  // 115: volvoxgrid.v1.HoverConfig
-	(*ResizePolicy)(nil),                 // 116: volvoxgrid.v1.ResizePolicy
-	(*FreezePolicy)(nil),                 // 117: volvoxgrid.v1.FreezePolicy
-	(*HeaderFeatures)(nil),               // 118: volvoxgrid.v1.HeaderFeatures
-	(*GridConfig)(nil),                   // 119: volvoxgrid.v1.GridConfig
-	(*LayoutConfig)(nil),                 // 120: volvoxgrid.v1.LayoutConfig
-	(*StyleConfig)(nil),                  // 121: volvoxgrid.v1.StyleConfig
-	(*SelectionConfig)(nil),              // 122: volvoxgrid.v1.SelectionConfig
-	(*EditConfig)(nil),                   // 123: volvoxgrid.v1.EditConfig
-	(*PullToRefreshConfig)(nil),          // 124: volvoxgrid.v1.PullToRefreshConfig
-	(*ScrollConfig)(nil),                 // 125: volvoxgrid.v1.ScrollConfig
-	(*OutlineConfig)(nil),                // 126: volvoxgrid.v1.OutlineConfig
-	(*SpanConfig)(nil),                   // 127: volvoxgrid.v1.SpanConfig
-	(*InteractionConfig)(nil),            // 128: volvoxgrid.v1.InteractionConfig
-	(*RenderConfig)(nil),                 // 129: volvoxgrid.v1.RenderConfig
-	(*RowIndicatorSlot)(nil),             // 130: volvoxgrid.v1.RowIndicatorSlot
-	(*RowIndicatorConfig)(nil),           // 131: volvoxgrid.v1.RowIndicatorConfig
-	(*ColIndicatorRowDef)(nil),           // 132: volvoxgrid.v1.ColIndicatorRowDef
-	(*ColIndicatorCell)(nil),             // 133: volvoxgrid.v1.ColIndicatorCell
-	(*ColIndicatorConfig)(nil),           // 134: volvoxgrid.v1.ColIndicatorConfig
-	(*CornerIndicatorSlot)(nil),          // 135: volvoxgrid.v1.CornerIndicatorSlot
-	(*CornerIndicatorConfig)(nil),        // 136: volvoxgrid.v1.CornerIndicatorConfig
-	(*IndicatorColors)(nil),              // 137: volvoxgrid.v1.IndicatorColors
-	(*GridEventTarget)(nil),              // 138: volvoxgrid.v1.GridEventTarget
-	(*IndicatorFocusConfig)(nil),         // 139: volvoxgrid.v1.IndicatorFocusConfig
-	(*IndicatorsConfig)(nil),             // 140: volvoxgrid.v1.IndicatorsConfig
-	(*ColumnDef)(nil),                    // 141: volvoxgrid.v1.ColumnDef
-	(*DefineColumnsRequest)(nil),         // 142: volvoxgrid.v1.DefineColumnsRequest
-	(*SchemaResponse)(nil),               // 143: volvoxgrid.v1.SchemaResponse
-	(*RowDef)(nil),                       // 144: volvoxgrid.v1.RowDef
-	(*RowStatus)(nil),                    // 145: volvoxgrid.v1.RowStatus
-	(*DefineRowsRequest)(nil),            // 146: volvoxgrid.v1.DefineRowsRequest
-	(*CellUpdate)(nil),                   // 147: volvoxgrid.v1.CellUpdate
-	(*UpdateCellsRequest)(nil),           // 148: volvoxgrid.v1.UpdateCellsRequest
-	(*GetCellsRequest)(nil),              // 149: volvoxgrid.v1.GetCellsRequest
-	(*CellData)(nil),                     // 150: volvoxgrid.v1.CellData
-	(*CellsResponse)(nil),                // 151: volvoxgrid.v1.CellsResponse
-	(*TypeViolation)(nil),                // 152: volvoxgrid.v1.TypeViolation
-	(*WriteResult)(nil),                  // 153: volvoxgrid.v1.WriteResult
-	(*LoadTableRequest)(nil),             // 154: volvoxgrid.v1.LoadTableRequest
-	(*FieldMapping)(nil),                 // 155: volvoxgrid.v1.FieldMapping
-	(*CsvOptions)(nil),                   // 156: volvoxgrid.v1.CsvOptions
-	(*JsonOptions)(nil),                  // 157: volvoxgrid.v1.JsonOptions
-	(*LoadDataOptions)(nil),              // 158: volvoxgrid.v1.LoadDataOptions
-	(*LoadDataRequest)(nil),              // 159: volvoxgrid.v1.LoadDataRequest
-	(*AppendDataRequest)(nil),            // 160: volvoxgrid.v1.AppendDataRequest
-	(*LoadDataResult)(nil),               // 161: volvoxgrid.v1.LoadDataResult
-	(*ClearRequest)(nil),                 // 162: volvoxgrid.v1.ClearRequest
-	(*InsertRowsRequest)(nil),            // 163: volvoxgrid.v1.InsertRowsRequest
-	(*RemoveRowsRequest)(nil),            // 164: volvoxgrid.v1.RemoveRowsRequest
-	(*MoveColumnRequest)(nil),            // 165: volvoxgrid.v1.MoveColumnRequest
-	(*MoveRowRequest)(nil),               // 166: volvoxgrid.v1.MoveRowRequest
-	(*SelectRequest)(nil),                // 167: volvoxgrid.v1.SelectRequest
-	(*SelectionState)(nil),               // 168: volvoxgrid.v1.SelectionState
-	(*HighlightRegion)(nil),              // 169: volvoxgrid.v1.HighlightRegion
-	(*EditSetHighlights)(nil),            // 170: volvoxgrid.v1.EditSetHighlights
-	(*EditCommand)(nil),                  // 171: volvoxgrid.v1.EditCommand
-	(*EditStart)(nil),                    // 172: volvoxgrid.v1.EditStart
-	(*EditCommit)(nil),                   // 173: volvoxgrid.v1.EditCommit
-	(*EditCancel)(nil),                   // 174: volvoxgrid.v1.EditCancel
-	(*EditSetText)(nil),                  // 175: volvoxgrid.v1.EditSetText
-	(*EditSetSelection)(nil),             // 176: volvoxgrid.v1.EditSetSelection
-	(*EditSetPreedit)(nil),               // 177: volvoxgrid.v1.EditSetPreedit
-	(*EditFinish)(nil),                   // 178: volvoxgrid.v1.EditFinish
-	(*EditState)(nil),                    // 179: volvoxgrid.v1.EditState
-	(*SortColumn)(nil),                   // 180: volvoxgrid.v1.SortColumn
-	(*SortRequest)(nil),                  // 181: volvoxgrid.v1.SortRequest
-	(*SubtotalRequest)(nil),              // 182: volvoxgrid.v1.SubtotalRequest
-	(*SubtotalResult)(nil),               // 183: volvoxgrid.v1.SubtotalResult
-	(*AutoSizeRequest)(nil),              // 184: volvoxgrid.v1.AutoSizeRequest
-	(*OutlineRequest)(nil),               // 185: volvoxgrid.v1.OutlineRequest
-	(*GetNodeRequest)(nil),               // 186: volvoxgrid.v1.GetNodeRequest
-	(*NodeInfo)(nil),                     // 187: volvoxgrid.v1.NodeInfo
-	(*FindRequest)(nil),                  // 188: volvoxgrid.v1.FindRequest
-	(*TextQuery)(nil),                    // 189: volvoxgrid.v1.TextQuery
-	(*RegexQuery)(nil),                   // 190: volvoxgrid.v1.RegexQuery
-	(*FindResponse)(nil),                 // 191: volvoxgrid.v1.FindResponse
-	(*AggregateRequest)(nil),             // 192: volvoxgrid.v1.AggregateRequest
-	(*AggregateResponse)(nil),            // 193: volvoxgrid.v1.AggregateResponse
-	(*GetMergedRangeRequest)(nil),        // 194: volvoxgrid.v1.GetMergedRangeRequest
-	(*MergeCellsRequest)(nil),            // 195: volvoxgrid.v1.MergeCellsRequest
-	(*UnmergeCellsRequest)(nil),          // 196: volvoxgrid.v1.UnmergeCellsRequest
-	(*MergedRegionsResponse)(nil),        // 197: volvoxgrid.v1.MergedRegionsResponse
-	(*MemoryUsageResponse)(nil),          // 198: volvoxgrid.v1.MemoryUsageResponse
-	(*ClipboardCommand)(nil),             // 199: volvoxgrid.v1.ClipboardCommand
-	(*ClipboardCopy)(nil),                // 200: volvoxgrid.v1.ClipboardCopy
-	(*ClipboardCut)(nil),                 // 201: volvoxgrid.v1.ClipboardCut
-	(*ClipboardPaste)(nil),               // 202: volvoxgrid.v1.ClipboardPaste
-	(*ClipboardDelete)(nil),              // 203: volvoxgrid.v1.ClipboardDelete
-	(*ClipboardResponse)(nil),            // 204: volvoxgrid.v1.ClipboardResponse
-	(*ExportRequest)(nil),                // 205: volvoxgrid.v1.ExportRequest
-	(*ExportResponse)(nil),               // 206: volvoxgrid.v1.ExportResponse
-	(*PrintRequest)(nil),                 // 207: volvoxgrid.v1.PrintRequest
-	(*PrintResponse)(nil),                // 208: volvoxgrid.v1.PrintResponse
-	(*PrintPage)(nil),                    // 209: volvoxgrid.v1.PrintPage
-	(*ArchiveRequest)(nil),               // 210: volvoxgrid.v1.ArchiveRequest
-	(*ArchiveResponse)(nil),              // 211: volvoxgrid.v1.ArchiveResponse
-	(*CreateRequest)(nil),                // 212: volvoxgrid.v1.CreateRequest
-	(*CreateResponse)(nil),               // 213: volvoxgrid.v1.CreateResponse
-	(*DestroyRequest)(nil),               // 214: volvoxgrid.v1.DestroyRequest
-	(*GetConfigRequest)(nil),             // 215: volvoxgrid.v1.GetConfigRequest
-	(*GetSchemaRequest)(nil),             // 216: volvoxgrid.v1.GetSchemaRequest
-	(*GetSelectionRequest)(nil),          // 217: volvoxgrid.v1.GetSelectionRequest
-	(*GetMergedRegionsRequest)(nil),      // 218: volvoxgrid.v1.GetMergedRegionsRequest
-	(*GetMemoryUsageRequest)(nil),        // 219: volvoxgrid.v1.GetMemoryUsageRequest
-	(*RefreshRequest)(nil),               // 220: volvoxgrid.v1.RefreshRequest
-	(*EventStreamRequest)(nil),           // 221: volvoxgrid.v1.EventStreamRequest
-	(*ResizeViewportRequest)(nil),        // 222: volvoxgrid.v1.ResizeViewportRequest
-	(*ShowCellRequest)(nil),              // 223: volvoxgrid.v1.ShowCellRequest
-	(*SetRowRequest)(nil),                // 224: volvoxgrid.v1.SetRowRequest
-	(*SetColRequest)(nil),                // 225: volvoxgrid.v1.SetColRequest
-	(*SetRedrawRequest)(nil),             // 226: volvoxgrid.v1.SetRedrawRequest
-	(*ConfigureRequest)(nil),             // 227: volvoxgrid.v1.ConfigureRequest
-	(*LoadFontDataRequest)(nil),          // 228: volvoxgrid.v1.LoadFontDataRequest
-	(*LoadDemoRequest)(nil),              // 229: volvoxgrid.v1.LoadDemoRequest
-	(*GetDemoDataRequest)(nil),           // 230: volvoxgrid.v1.GetDemoDataRequest
-	(*GetDemoDataResponse)(nil),          // 231: volvoxgrid.v1.GetDemoDataResponse
-	(*DestroyResponse)(nil),              // 232: volvoxgrid.v1.DestroyResponse
-	(*ConfigureResponse)(nil),            // 233: volvoxgrid.v1.ConfigureResponse
-	(*LoadFontDataResponse)(nil),         // 234: volvoxgrid.v1.LoadFontDataResponse
-	(*DefineColumnsResponse)(nil),        // 235: volvoxgrid.v1.DefineColumnsResponse
-	(*DefineRowsResponse)(nil),           // 236: volvoxgrid.v1.DefineRowsResponse
-	(*InsertRowsResponse)(nil),           // 237: volvoxgrid.v1.InsertRowsResponse
-	(*RemoveRowsResponse)(nil),           // 238: volvoxgrid.v1.RemoveRowsResponse
-	(*MoveColumnResponse)(nil),           // 239: volvoxgrid.v1.MoveColumnResponse
-	(*MoveRowResponse)(nil),              // 240: volvoxgrid.v1.MoveRowResponse
-	(*ClearResponse)(nil),                // 241: volvoxgrid.v1.ClearResponse
-	(*SelectResponse)(nil),               // 242: volvoxgrid.v1.SelectResponse
-	(*ShowCellResponse)(nil),             // 243: volvoxgrid.v1.ShowCellResponse
-	(*SetTopRowResponse)(nil),            // 244: volvoxgrid.v1.SetTopRowResponse
-	(*SetLeftColResponse)(nil),           // 245: volvoxgrid.v1.SetLeftColResponse
-	(*SortResponse)(nil),                 // 246: volvoxgrid.v1.SortResponse
-	(*AutoSizeResponse)(nil),             // 247: volvoxgrid.v1.AutoSizeResponse
-	(*OutlineResponse)(nil),              // 248: volvoxgrid.v1.OutlineResponse
-	(*MergeCellsResponse)(nil),           // 249: volvoxgrid.v1.MergeCellsResponse
-	(*UnmergeCellsResponse)(nil),         // 250: volvoxgrid.v1.UnmergeCellsResponse
-	(*ResizeViewportResponse)(nil),       // 251: volvoxgrid.v1.ResizeViewportResponse
-	(*SetRedrawResponse)(nil),            // 252: volvoxgrid.v1.SetRedrawResponse
-	(*RefreshResponse)(nil),              // 253: volvoxgrid.v1.RefreshResponse
-	(*LoadDemoResponse)(nil),             // 254: volvoxgrid.v1.LoadDemoResponse
-	(*RenderInput)(nil),                  // 255: volvoxgrid.v1.RenderInput
-	(*CompareResponse)(nil),              // 256: volvoxgrid.v1.CompareResponse
-	(*ViewportState)(nil),                // 257: volvoxgrid.v1.ViewportState
-	(*PointerEvent)(nil),                 // 258: volvoxgrid.v1.PointerEvent
-	(*ScrollEvent)(nil),                  // 259: volvoxgrid.v1.ScrollEvent
-	(*ZoomEvent)(nil),                    // 260: volvoxgrid.v1.ZoomEvent
-	(*KeyEvent)(nil),                     // 261: volvoxgrid.v1.KeyEvent
-	(*BufferReady)(nil),                  // 262: volvoxgrid.v1.BufferReady
-	(*TerminalInputBytes)(nil),           // 263: volvoxgrid.v1.TerminalInputBytes
-	(*TerminalCapabilities)(nil),         // 264: volvoxgrid.v1.TerminalCapabilities
-	(*TerminalViewport)(nil),             // 265: volvoxgrid.v1.TerminalViewport
-	(*TerminalCommand)(nil),              // 266: volvoxgrid.v1.TerminalCommand
-	(*GpuSurfaceReady)(nil),              // 267: volvoxgrid.v1.GpuSurfaceReady
-	(*EventDecision)(nil),                // 268: volvoxgrid.v1.EventDecision
-	(*RenderOutput)(nil),                 // 269: volvoxgrid.v1.RenderOutput
-	(*FrameDone)(nil),                    // 270: volvoxgrid.v1.FrameDone
-	(*GpuFrameDone)(nil),                 // 271: volvoxgrid.v1.GpuFrameDone
-	(*FrameMetrics)(nil),                 // 272: volvoxgrid.v1.FrameMetrics
-	(*SelectionUpdate)(nil),              // 273: volvoxgrid.v1.SelectionUpdate
-	(*CursorChange)(nil),                 // 274: volvoxgrid.v1.CursorChange
-	(*EditRequest)(nil),                  // 275: volvoxgrid.v1.EditRequest
-	(*DropdownRequest)(nil),              // 276: volvoxgrid.v1.DropdownRequest
-	(*TooltipRequest)(nil),               // 277: volvoxgrid.v1.TooltipRequest
-	(*GridEvent)(nil),                    // 278: volvoxgrid.v1.GridEvent
-	(*CellFocusChangingEvent)(nil),       // 279: volvoxgrid.v1.CellFocusChangingEvent
-	(*CellFocusChangedEvent)(nil),        // 280: volvoxgrid.v1.CellFocusChangedEvent
-	(*SelectionChangingEvent)(nil),       // 281: volvoxgrid.v1.SelectionChangingEvent
-	(*SelectionChangedEvent)(nil),        // 282: volvoxgrid.v1.SelectionChangedEvent
-	(*EnterCellEvent)(nil),               // 283: volvoxgrid.v1.EnterCellEvent
-	(*LeaveCellEvent)(nil),               // 284: volvoxgrid.v1.LeaveCellEvent
-	(*BeforeEditEvent)(nil),              // 285: volvoxgrid.v1.BeforeEditEvent
-	(*StartEditEvent)(nil),               // 286: volvoxgrid.v1.StartEditEvent
-	(*AfterEditEvent)(nil),               // 287: volvoxgrid.v1.AfterEditEvent
-	(*CellEditValidateEvent)(nil),        // 288: volvoxgrid.v1.CellEditValidateEvent
-	(*CellEditChangeEvent)(nil),          // 289: volvoxgrid.v1.CellEditChangeEvent
-	(*KeyDownEditEvent)(nil),             // 290: volvoxgrid.v1.KeyDownEditEvent
-	(*KeyPressEditEvent)(nil),            // 291: volvoxgrid.v1.KeyPressEditEvent
-	(*KeyUpEditEvent)(nil),               // 292: volvoxgrid.v1.KeyUpEditEvent
-	(*CellEditConfigureStyleEvent)(nil),  // 293: volvoxgrid.v1.CellEditConfigureStyleEvent
-	(*CellEditConfigureWindowEvent)(nil), // 294: volvoxgrid.v1.CellEditConfigureWindowEvent
-	(*BeforeDropdownOpenEvent)(nil),      // 295: volvoxgrid.v1.BeforeDropdownOpenEvent
-	(*DropdownClosedEvent)(nil),          // 296: volvoxgrid.v1.DropdownClosedEvent
-	(*DropdownOpenedEvent)(nil),          // 297: volvoxgrid.v1.DropdownOpenedEvent
-	(*CellChangedEvent)(nil),             // 298: volvoxgrid.v1.CellChangedEvent
-	(*RowStatusChangeEvent)(nil),         // 299: volvoxgrid.v1.RowStatusChangeEvent
-	(*BeforeSortEvent)(nil),              // 300: volvoxgrid.v1.BeforeSortEvent
-	(*AfterSortEvent)(nil),               // 301: volvoxgrid.v1.AfterSortEvent
-	(*CompareEvent)(nil),                 // 302: volvoxgrid.v1.CompareEvent
-	(*BeforeNodeToggleEvent)(nil),        // 303: volvoxgrid.v1.BeforeNodeToggleEvent
-	(*AfterNodeToggleEvent)(nil),         // 304: volvoxgrid.v1.AfterNodeToggleEvent
-	(*TreeChildrenRequestedEvent)(nil),   // 305: volvoxgrid.v1.TreeChildrenRequestedEvent
-	(*BeforeTreeNodeToggleEvent)(nil),    // 306: volvoxgrid.v1.BeforeTreeNodeToggleEvent
-	(*AfterTreeNodeToggleEvent)(nil),     // 307: volvoxgrid.v1.AfterTreeNodeToggleEvent
-	(*TreeNodeActivateEvent)(nil),        // 308: volvoxgrid.v1.TreeNodeActivateEvent
-	(*TreeNodeContextMenuEvent)(nil),     // 309: volvoxgrid.v1.TreeNodeContextMenuEvent
-	(*BeforeScrollEvent)(nil),            // 310: volvoxgrid.v1.BeforeScrollEvent
-	(*AfterScrollEvent)(nil),             // 311: volvoxgrid.v1.AfterScrollEvent
-	(*ScrollTooltipEvent)(nil),           // 312: volvoxgrid.v1.ScrollTooltipEvent
-	(*BeforeUserResizeEvent)(nil),        // 313: volvoxgrid.v1.BeforeUserResizeEvent
-	(*AfterUserResizeEvent)(nil),         // 314: volvoxgrid.v1.AfterUserResizeEvent
-	(*AfterUserFreezeEvent)(nil),         // 315: volvoxgrid.v1.AfterUserFreezeEvent
-	(*BeforeMoveColumnEvent)(nil),        // 316: volvoxgrid.v1.BeforeMoveColumnEvent
-	(*AfterMoveColumnEvent)(nil),         // 317: volvoxgrid.v1.AfterMoveColumnEvent
-	(*BeforeMoveRowEvent)(nil),           // 318: volvoxgrid.v1.BeforeMoveRowEvent
-	(*AfterMoveRowEvent)(nil),            // 319: volvoxgrid.v1.AfterMoveRowEvent
-	(*BeforeMouseDownEvent)(nil),         // 320: volvoxgrid.v1.BeforeMouseDownEvent
-	(*MouseDownEvent)(nil),               // 321: volvoxgrid.v1.MouseDownEvent
-	(*MouseUpEvent)(nil),                 // 322: volvoxgrid.v1.MouseUpEvent
-	(*MouseMoveEvent)(nil),               // 323: volvoxgrid.v1.MouseMoveEvent
-	(*ClickEvent)(nil),                   // 324: volvoxgrid.v1.ClickEvent
-	(*DblClickEvent)(nil),                // 325: volvoxgrid.v1.DblClickEvent
-	(*KeyDownEvent)(nil),                 // 326: volvoxgrid.v1.KeyDownEvent
-	(*KeyPressEvent)(nil),                // 327: volvoxgrid.v1.KeyPressEvent
-	(*KeyUpEvent)(nil),                   // 328: volvoxgrid.v1.KeyUpEvent
-	(*CustomRenderCellEvent)(nil),        // 329: volvoxgrid.v1.CustomRenderCellEvent
-	(*DragStartEvent)(nil),               // 330: volvoxgrid.v1.DragStartEvent
-	(*DragOverEvent)(nil),                // 331: volvoxgrid.v1.DragOverEvent
-	(*DragDropEvent)(nil),                // 332: volvoxgrid.v1.DragDropEvent
-	(*DragCompleteEvent)(nil),            // 333: volvoxgrid.v1.DragCompleteEvent
-	(*TypeAheadStartedEvent)(nil),        // 334: volvoxgrid.v1.TypeAheadStartedEvent
-	(*TypeAheadEndedEvent)(nil),          // 335: volvoxgrid.v1.TypeAheadEndedEvent
-	(*DataRefreshingEvent)(nil),          // 336: volvoxgrid.v1.DataRefreshingEvent
-	(*DataRefreshedEvent)(nil),           // 337: volvoxgrid.v1.DataRefreshedEvent
-	(*FilterDataEvent)(nil),              // 338: volvoxgrid.v1.FilterDataEvent
-	(*PullToRefreshTriggeredEvent)(nil),  // 339: volvoxgrid.v1.PullToRefreshTriggeredEvent
-	(*PullToRefreshCanceledEvent)(nil),   // 340: volvoxgrid.v1.PullToRefreshCanceledEvent
-	(*ErrorEvent)(nil),                   // 341: volvoxgrid.v1.ErrorEvent
-	(*BeforePageBreakEvent)(nil),         // 342: volvoxgrid.v1.BeforePageBreakEvent
-	(*StartPageEvent)(nil),               // 343: volvoxgrid.v1.StartPageEvent
-	(*GetHeaderRowEvent)(nil),            // 344: volvoxgrid.v1.GetHeaderRowEvent
+	(BorderStyle)(0),                    // 0: volvoxgrid.v1.BorderStyle
+	(GridLineStyle)(0),                  // 1: volvoxgrid.v1.GridLineStyle
+	(GridLineDirection)(0),              // 2: volvoxgrid.v1.GridLineDirection
+	(BorderAppearance)(0),               // 3: volvoxgrid.v1.BorderAppearance
+	(ThemePreset)(0),                    // 4: volvoxgrid.v1.ThemePreset
+	(TextEffect)(0),                     // 5: volvoxgrid.v1.TextEffect
+	(TextRenderMode)(0),                 // 6: volvoxgrid.v1.TextRenderMode
+	(TextHintingMode)(0),                // 7: volvoxgrid.v1.TextHintingMode
+	(TextBaseline)(0),                   // 8: volvoxgrid.v1.TextBaseline
+	(Align)(0),                          // 9: volvoxgrid.v1.Align
+	(ImageAlignment)(0),                 // 10: volvoxgrid.v1.ImageAlignment
+	(BarcodeSymbology)(0),               // 11: volvoxgrid.v1.BarcodeSymbology
+	(BarcodeCaptionPosition)(0),         // 12: volvoxgrid.v1.BarcodeCaptionPosition
+	(BarcodeCheckDigitMode)(0),          // 13: volvoxgrid.v1.BarcodeCheckDigitMode
+	(BarcodeTextEncoding)(0),            // 14: volvoxgrid.v1.BarcodeTextEncoding
+	(BarcodeQrErrorCorrection)(0),       // 15: volvoxgrid.v1.BarcodeQrErrorCorrection
+	(BarcodeRenderStatus)(0),            // 16: volvoxgrid.v1.BarcodeRenderStatus
+	(CheckedState)(0),                   // 17: volvoxgrid.v1.CheckedState
+	(FillHandlePosition)(0),             // 18: volvoxgrid.v1.FillHandlePosition
+	(ColumnDataType)(0),                 // 19: volvoxgrid.v1.ColumnDataType
+	(CoercionMode)(0),                   // 20: volvoxgrid.v1.CoercionMode
+	(WriteErrorMode)(0),                 // 21: volvoxgrid.v1.WriteErrorMode
+	(CellInteraction)(0),                // 22: volvoxgrid.v1.CellInteraction
+	(HeaderPolicy)(0),                   // 23: volvoxgrid.v1.HeaderPolicy
+	(TypePolicy)(0),                     // 24: volvoxgrid.v1.TypePolicy
+	(LoadDataStatus)(0),                 // 25: volvoxgrid.v1.LoadDataStatus
+	(SelectionMode)(0),                  // 26: volvoxgrid.v1.SelectionMode
+	(FocusBorderStyle)(0),               // 27: volvoxgrid.v1.FocusBorderStyle
+	(SelectionVisibility)(0),            // 28: volvoxgrid.v1.SelectionVisibility
+	(EditTrigger)(0),                    // 29: volvoxgrid.v1.EditTrigger
+	(DropdownItemLayout)(0),             // 30: volvoxgrid.v1.DropdownItemLayout
+	(TabBehavior)(0),                    // 31: volvoxgrid.v1.TabBehavior
+	(EditorKind)(0),                     // 32: volvoxgrid.v1.EditorKind
+	(EditorOwner)(0),                    // 33: volvoxgrid.v1.EditorOwner
+	(EditorPresentation)(0),             // 34: volvoxgrid.v1.EditorPresentation
+	(ValidationMode)(0),                 // 35: volvoxgrid.v1.ValidationMode
+	(ValidationTrigger)(0),              // 36: volvoxgrid.v1.ValidationTrigger
+	(InputType)(0),                      // 37: volvoxgrid.v1.InputType
+	(ButtonRole)(0),                     // 38: volvoxgrid.v1.ButtonRole
+	(SortOrder)(0),                      // 39: volvoxgrid.v1.SortOrder
+	(SortType)(0),                       // 40: volvoxgrid.v1.SortType
+	(TreeIndicatorStyle)(0),             // 41: volvoxgrid.v1.TreeIndicatorStyle
+	(GroupTotalPosition)(0),             // 42: volvoxgrid.v1.GroupTotalPosition
+	(AggregateType)(0),                  // 43: volvoxgrid.v1.AggregateType
+	(CellSpanMode)(0),                   // 44: volvoxgrid.v1.CellSpanMode
+	(SpanCompareMode)(0),                // 45: volvoxgrid.v1.SpanCompareMode
+	(ScrollBarsMode)(0),                 // 46: volvoxgrid.v1.ScrollBarsMode
+	(ScrollBarMode)(0),                  // 47: volvoxgrid.v1.ScrollBarMode
+	(ScrollBarAppearance)(0),            // 48: volvoxgrid.v1.ScrollBarAppearance
+	(IndicatorAppearance)(0),            // 49: volvoxgrid.v1.IndicatorAppearance
+	(PinPosition)(0),                    // 50: volvoxgrid.v1.PinPosition
+	(StickyEdge)(0),                     // 51: volvoxgrid.v1.StickyEdge
+	(TypeAheadMode)(0),                  // 52: volvoxgrid.v1.TypeAheadMode
+	(AutoSizeMode)(0),                   // 53: volvoxgrid.v1.AutoSizeMode
+	(DragMode)(0),                       // 54: volvoxgrid.v1.DragMode
+	(DropMode)(0),                       // 55: volvoxgrid.v1.DropMode
+	(CustomRenderMode)(0),               // 56: volvoxgrid.v1.CustomRenderMode
+	(ApplyScope)(0),                     // 57: volvoxgrid.v1.ApplyScope
+	(RendererMode)(0),                   // 58: volvoxgrid.v1.RendererMode
+	(PresentMode)(0),                    // 59: volvoxgrid.v1.PresentMode
+	(FramePacingMode)(0),                // 60: volvoxgrid.v1.FramePacingMode
+	(ClearScope)(0),                     // 61: volvoxgrid.v1.ClearScope
+	(ClearRegion)(0),                    // 62: volvoxgrid.v1.ClearRegion
+	(ExportFormat)(0),                   // 63: volvoxgrid.v1.ExportFormat
+	(ExportScope)(0),                    // 64: volvoxgrid.v1.ExportScope
+	(PrintOrientation)(0),               // 65: volvoxgrid.v1.PrintOrientation
+	(NodeRelation)(0),                   // 66: volvoxgrid.v1.NodeRelation
+	(IconAlign)(0),                      // 67: volvoxgrid.v1.IconAlign
+	(CellHitArea)(0),                    // 68: volvoxgrid.v1.CellHitArea
+	(PullToRefreshTheme)(0),             // 69: volvoxgrid.v1.PullToRefreshTheme
+	(RenderLayerBit)(0),                 // 70: volvoxgrid.v1.RenderLayerBit
+	(GridTargetKind)(0),                 // 71: volvoxgrid.v1.GridTargetKind
+	(IndicatorBand)(0),                  // 72: volvoxgrid.v1.IndicatorBand
+	(RowIndicatorSlotKind)(0),           // 73: volvoxgrid.v1.RowIndicatorSlotKind
+	(ColIndicatorCellMode)(0),           // 74: volvoxgrid.v1.ColIndicatorCellMode
+	(CornerIndicatorSlotKind)(0),        // 75: volvoxgrid.v1.CornerIndicatorSlotKind
+	(GridEventTargetFlag)(0),            // 76: volvoxgrid.v1.GridEventTargetFlag
+	(ComposeMethod)(0),                  // 77: volvoxgrid.v1.ComposeMethod
+	(EditUiMode)(0),                     // 78: volvoxgrid.v1.EditUiMode
+	(ErrorCode)(0),                      // 79: volvoxgrid.v1.ErrorCode
+	(DemoDataFormat)(0),                 // 80: volvoxgrid.v1.DemoDataFormat
+	(TerminalColorLevel)(0),             // 81: volvoxgrid.v1.TerminalColorLevel
+	(FrameKind)(0),                      // 82: volvoxgrid.v1.FrameKind
+	(CursorType)(0),                     // 83: volvoxgrid.v1.CursorType
+	(EditStartReason)(0),                // 84: volvoxgrid.v1.EditStartReason
+	(EditEndReason)(0),                  // 85: volvoxgrid.v1.EditEndReason
+	(EditorUpdateReason)(0),             // 86: volvoxgrid.v1.EditorUpdateReason
+	(ArchiveRequest_Action)(0),          // 87: volvoxgrid.v1.ArchiveRequest.Action
+	(PointerEvent_Type)(0),              // 88: volvoxgrid.v1.PointerEvent.Type
+	(ZoomEvent_Phase)(0),                // 89: volvoxgrid.v1.ZoomEvent.Phase
+	(KeyEvent_Type)(0),                  // 90: volvoxgrid.v1.KeyEvent.Type
+	(TerminalCommand_Kind)(0),           // 91: volvoxgrid.v1.TerminalCommand.Kind
+	(*Font)(nil),                        // 92: volvoxgrid.v1.Font
+	(*Padding)(nil),                     // 93: volvoxgrid.v1.Padding
+	(*Border)(nil),                      // 94: volvoxgrid.v1.Border
+	(*Borders)(nil),                     // 95: volvoxgrid.v1.Borders
+	(*GridLines)(nil),                   // 96: volvoxgrid.v1.GridLines
+	(*Separator)(nil),                   // 97: volvoxgrid.v1.Separator
+	(*TextRendering)(nil),               // 98: volvoxgrid.v1.TextRendering
+	(*ImageData)(nil),                   // 99: volvoxgrid.v1.ImageData
+	(*BarcodeEncodingOptions)(nil),      // 100: volvoxgrid.v1.BarcodeEncodingOptions
+	(*BarcodeRenderOptions)(nil),        // 101: volvoxgrid.v1.BarcodeRenderOptions
+	(*BarcodeCaptionOptions)(nil),       // 102: volvoxgrid.v1.BarcodeCaptionOptions
+	(*BarcodeData)(nil),                 // 103: volvoxgrid.v1.BarcodeData
+	(*CellRange)(nil),                   // 104: volvoxgrid.v1.CellRange
+	(*Rect)(nil),                        // 105: volvoxgrid.v1.Rect
+	(*CellValue)(nil),                   // 106: volvoxgrid.v1.CellValue
+	(*StructValue)(nil),                 // 107: volvoxgrid.v1.StructValue
+	(*StructField)(nil),                 // 108: volvoxgrid.v1.StructField
+	(*ScalarValue)(nil),                 // 109: volvoxgrid.v1.ScalarValue
+	(*RichText)(nil),                    // 110: volvoxgrid.v1.RichText
+	(*TextFormatRun)(nil),               // 111: volvoxgrid.v1.TextFormatRun
+	(*TextRunStyle)(nil),                // 112: volvoxgrid.v1.TextRunStyle
+	(*EditorSpec)(nil),                  // 113: volvoxgrid.v1.EditorSpec
+	(*TextEditorParams)(nil),            // 114: volvoxgrid.v1.TextEditorParams
+	(*NumberEditorParams)(nil),          // 115: volvoxgrid.v1.NumberEditorParams
+	(*CheckboxEditorParams)(nil),        // 116: volvoxgrid.v1.CheckboxEditorParams
+	(*DateTimeEditorParams)(nil),        // 117: volvoxgrid.v1.DateTimeEditorParams
+	(*EditorAction)(nil),                // 118: volvoxgrid.v1.EditorAction
+	(*ListEditorParams)(nil),            // 119: volvoxgrid.v1.ListEditorParams
+	(*ListItem)(nil),                    // 120: volvoxgrid.v1.ListItem
+	(*ListDataSource)(nil),              // 121: volvoxgrid.v1.ListDataSource
+	(*EditorValue)(nil),                 // 122: volvoxgrid.v1.EditorValue
+	(*TextSelection)(nil),               // 123: volvoxgrid.v1.TextSelection
+	(*ValidationError)(nil),             // 124: volvoxgrid.v1.ValidationError
+	(*EditActivation)(nil),              // 125: volvoxgrid.v1.EditActivation
+	(*ScrollBarColors)(nil),             // 126: volvoxgrid.v1.ScrollBarColors
+	(*ScrollBarConfig)(nil),             // 127: volvoxgrid.v1.ScrollBarConfig
+	(*RegionStyle)(nil),                 // 128: volvoxgrid.v1.RegionStyle
+	(*CellStyle)(nil),                   // 129: volvoxgrid.v1.CellStyle
+	(*HighlightStyle)(nil),              // 130: volvoxgrid.v1.HighlightStyle
+	(*HeaderMarkSize)(nil),              // 131: volvoxgrid.v1.HeaderMarkSize
+	(*HeaderSeparator)(nil),             // 132: volvoxgrid.v1.HeaderSeparator
+	(*HeaderResizeHandle)(nil),          // 133: volvoxgrid.v1.HeaderResizeHandle
+	(*HeaderStyle)(nil),                 // 134: volvoxgrid.v1.HeaderStyle
+	(*IconSlots)(nil),                   // 135: volvoxgrid.v1.IconSlots
+	(*IconStyle)(nil),                   // 136: volvoxgrid.v1.IconStyle
+	(*IconSlotStyles)(nil),              // 137: volvoxgrid.v1.IconSlotStyles
+	(*IconPictures)(nil),                // 138: volvoxgrid.v1.IconPictures
+	(*IconTheme)(nil),                   // 139: volvoxgrid.v1.IconTheme
+	(*HoverConfig)(nil),                 // 140: volvoxgrid.v1.HoverConfig
+	(*ResizePolicy)(nil),                // 141: volvoxgrid.v1.ResizePolicy
+	(*FreezePolicy)(nil),                // 142: volvoxgrid.v1.FreezePolicy
+	(*HeaderFeatures)(nil),              // 143: volvoxgrid.v1.HeaderFeatures
+	(*GridConfig)(nil),                  // 144: volvoxgrid.v1.GridConfig
+	(*LayoutConfig)(nil),                // 145: volvoxgrid.v1.LayoutConfig
+	(*StyleConfig)(nil),                 // 146: volvoxgrid.v1.StyleConfig
+	(*SelectionConfig)(nil),             // 147: volvoxgrid.v1.SelectionConfig
+	(*EditConfig)(nil),                  // 148: volvoxgrid.v1.EditConfig
+	(*PullToRefreshConfig)(nil),         // 149: volvoxgrid.v1.PullToRefreshConfig
+	(*ScrollConfig)(nil),                // 150: volvoxgrid.v1.ScrollConfig
+	(*OutlineConfig)(nil),               // 151: volvoxgrid.v1.OutlineConfig
+	(*SpanConfig)(nil),                  // 152: volvoxgrid.v1.SpanConfig
+	(*InteractionConfig)(nil),           // 153: volvoxgrid.v1.InteractionConfig
+	(*RenderConfig)(nil),                // 154: volvoxgrid.v1.RenderConfig
+	(*ColIndicatorCellModes)(nil),       // 155: volvoxgrid.v1.ColIndicatorCellModes
+	(*RowIndicatorSlot)(nil),            // 156: volvoxgrid.v1.RowIndicatorSlot
+	(*RowIndicatorConfig)(nil),          // 157: volvoxgrid.v1.RowIndicatorConfig
+	(*ColIndicatorRowDef)(nil),          // 158: volvoxgrid.v1.ColIndicatorRowDef
+	(*ColIndicatorCell)(nil),            // 159: volvoxgrid.v1.ColIndicatorCell
+	(*ColIndicatorConfig)(nil),          // 160: volvoxgrid.v1.ColIndicatorConfig
+	(*CornerIndicatorSlot)(nil),         // 161: volvoxgrid.v1.CornerIndicatorSlot
+	(*CornerIndicatorConfig)(nil),       // 162: volvoxgrid.v1.CornerIndicatorConfig
+	(*IndicatorColors)(nil),             // 163: volvoxgrid.v1.IndicatorColors
+	(*GridEventTarget)(nil),             // 164: volvoxgrid.v1.GridEventTarget
+	(*IndicatorFocusConfig)(nil),        // 165: volvoxgrid.v1.IndicatorFocusConfig
+	(*IndicatorsConfig)(nil),            // 166: volvoxgrid.v1.IndicatorsConfig
+	(*ColumnDef)(nil),                   // 167: volvoxgrid.v1.ColumnDef
+	(*DefineColumnsRequest)(nil),        // 168: volvoxgrid.v1.DefineColumnsRequest
+	(*SchemaResponse)(nil),              // 169: volvoxgrid.v1.SchemaResponse
+	(*RowDef)(nil),                      // 170: volvoxgrid.v1.RowDef
+	(*RowStatus)(nil),                   // 171: volvoxgrid.v1.RowStatus
+	(*DefineRowsRequest)(nil),           // 172: volvoxgrid.v1.DefineRowsRequest
+	(*CellUpdate)(nil),                  // 173: volvoxgrid.v1.CellUpdate
+	(*UpdateCellsRequest)(nil),          // 174: volvoxgrid.v1.UpdateCellsRequest
+	(*GetCellsRequest)(nil),             // 175: volvoxgrid.v1.GetCellsRequest
+	(*CellData)(nil),                    // 176: volvoxgrid.v1.CellData
+	(*CellsResponse)(nil),               // 177: volvoxgrid.v1.CellsResponse
+	(*TypeViolation)(nil),               // 178: volvoxgrid.v1.TypeViolation
+	(*WriteResult)(nil),                 // 179: volvoxgrid.v1.WriteResult
+	(*LoadTableRequest)(nil),            // 180: volvoxgrid.v1.LoadTableRequest
+	(*FieldMapping)(nil),                // 181: volvoxgrid.v1.FieldMapping
+	(*CsvOptions)(nil),                  // 182: volvoxgrid.v1.CsvOptions
+	(*JsonOptions)(nil),                 // 183: volvoxgrid.v1.JsonOptions
+	(*LoadDataOptions)(nil),             // 184: volvoxgrid.v1.LoadDataOptions
+	(*LoadDataRequest)(nil),             // 185: volvoxgrid.v1.LoadDataRequest
+	(*AppendDataRequest)(nil),           // 186: volvoxgrid.v1.AppendDataRequest
+	(*LoadDataResult)(nil),              // 187: volvoxgrid.v1.LoadDataResult
+	(*ClearRequest)(nil),                // 188: volvoxgrid.v1.ClearRequest
+	(*InsertRowsRequest)(nil),           // 189: volvoxgrid.v1.InsertRowsRequest
+	(*RemoveRowsRequest)(nil),           // 190: volvoxgrid.v1.RemoveRowsRequest
+	(*MoveColumnRequest)(nil),           // 191: volvoxgrid.v1.MoveColumnRequest
+	(*MoveRowRequest)(nil),              // 192: volvoxgrid.v1.MoveRowRequest
+	(*SelectRequest)(nil),               // 193: volvoxgrid.v1.SelectRequest
+	(*SelectionState)(nil),              // 194: volvoxgrid.v1.SelectionState
+	(*HighlightRegion)(nil),             // 195: volvoxgrid.v1.HighlightRegion
+	(*EditSetHighlights)(nil),           // 196: volvoxgrid.v1.EditSetHighlights
+	(*EditCommand)(nil),                 // 197: volvoxgrid.v1.EditCommand
+	(*EditStart)(nil),                   // 198: volvoxgrid.v1.EditStart
+	(*EditGetState)(nil),                // 199: volvoxgrid.v1.EditGetState
+	(*EditorSessionCommand)(nil),        // 200: volvoxgrid.v1.EditorSessionCommand
+	(*EditorValueChanged)(nil),          // 201: volvoxgrid.v1.EditorValueChanged
+	(*TextSelectionChanged)(nil),        // 202: volvoxgrid.v1.TextSelectionChanged
+	(*EditorPreeditChanged)(nil),        // 203: volvoxgrid.v1.EditorPreeditChanged
+	(*EditCommit)(nil),                  // 204: volvoxgrid.v1.EditCommit
+	(*EditCancel)(nil),                  // 205: volvoxgrid.v1.EditCancel
+	(*CustomEditorAction)(nil),          // 206: volvoxgrid.v1.CustomEditorAction
+	(*EditorSession)(nil),               // 207: volvoxgrid.v1.EditorSession
+	(*EditorCapabilities)(nil),          // 208: volvoxgrid.v1.EditorCapabilities
+	(*EditState)(nil),                   // 209: volvoxgrid.v1.EditState
+	(*SortColumn)(nil),                  // 210: volvoxgrid.v1.SortColumn
+	(*SortRequest)(nil),                 // 211: volvoxgrid.v1.SortRequest
+	(*SubtotalRequest)(nil),             // 212: volvoxgrid.v1.SubtotalRequest
+	(*SubtotalResult)(nil),              // 213: volvoxgrid.v1.SubtotalResult
+	(*AutoSizeRequest)(nil),             // 214: volvoxgrid.v1.AutoSizeRequest
+	(*OutlineRequest)(nil),              // 215: volvoxgrid.v1.OutlineRequest
+	(*GetNodeRequest)(nil),              // 216: volvoxgrid.v1.GetNodeRequest
+	(*NodeInfo)(nil),                    // 217: volvoxgrid.v1.NodeInfo
+	(*FindRequest)(nil),                 // 218: volvoxgrid.v1.FindRequest
+	(*TextQuery)(nil),                   // 219: volvoxgrid.v1.TextQuery
+	(*RegexQuery)(nil),                  // 220: volvoxgrid.v1.RegexQuery
+	(*FindResponse)(nil),                // 221: volvoxgrid.v1.FindResponse
+	(*AggregateRequest)(nil),            // 222: volvoxgrid.v1.AggregateRequest
+	(*AggregateResponse)(nil),           // 223: volvoxgrid.v1.AggregateResponse
+	(*GetMergedRangeRequest)(nil),       // 224: volvoxgrid.v1.GetMergedRangeRequest
+	(*MergeCellsRequest)(nil),           // 225: volvoxgrid.v1.MergeCellsRequest
+	(*UnmergeCellsRequest)(nil),         // 226: volvoxgrid.v1.UnmergeCellsRequest
+	(*MergedRegionsResponse)(nil),       // 227: volvoxgrid.v1.MergedRegionsResponse
+	(*MemoryUsageResponse)(nil),         // 228: volvoxgrid.v1.MemoryUsageResponse
+	(*ClipboardCommand)(nil),            // 229: volvoxgrid.v1.ClipboardCommand
+	(*ClipboardCopy)(nil),               // 230: volvoxgrid.v1.ClipboardCopy
+	(*ClipboardCut)(nil),                // 231: volvoxgrid.v1.ClipboardCut
+	(*ClipboardPaste)(nil),              // 232: volvoxgrid.v1.ClipboardPaste
+	(*ClipboardDelete)(nil),             // 233: volvoxgrid.v1.ClipboardDelete
+	(*ClipboardResponse)(nil),           // 234: volvoxgrid.v1.ClipboardResponse
+	(*ExportRequest)(nil),               // 235: volvoxgrid.v1.ExportRequest
+	(*ExportResponse)(nil),              // 236: volvoxgrid.v1.ExportResponse
+	(*PrintRequest)(nil),                // 237: volvoxgrid.v1.PrintRequest
+	(*PrintResponse)(nil),               // 238: volvoxgrid.v1.PrintResponse
+	(*PrintPage)(nil),                   // 239: volvoxgrid.v1.PrintPage
+	(*ArchiveRequest)(nil),              // 240: volvoxgrid.v1.ArchiveRequest
+	(*ArchiveResponse)(nil),             // 241: volvoxgrid.v1.ArchiveResponse
+	(*CreateRequest)(nil),               // 242: volvoxgrid.v1.CreateRequest
+	(*CreateResponse)(nil),              // 243: volvoxgrid.v1.CreateResponse
+	(*DestroyRequest)(nil),              // 244: volvoxgrid.v1.DestroyRequest
+	(*GetConfigRequest)(nil),            // 245: volvoxgrid.v1.GetConfigRequest
+	(*GetSchemaRequest)(nil),            // 246: volvoxgrid.v1.GetSchemaRequest
+	(*GetSelectionRequest)(nil),         // 247: volvoxgrid.v1.GetSelectionRequest
+	(*GetMergedRegionsRequest)(nil),     // 248: volvoxgrid.v1.GetMergedRegionsRequest
+	(*GetMemoryUsageRequest)(nil),       // 249: volvoxgrid.v1.GetMemoryUsageRequest
+	(*RefreshRequest)(nil),              // 250: volvoxgrid.v1.RefreshRequest
+	(*EventStreamRequest)(nil),          // 251: volvoxgrid.v1.EventStreamRequest
+	(*ResizeViewportRequest)(nil),       // 252: volvoxgrid.v1.ResizeViewportRequest
+	(*ShowCellRequest)(nil),             // 253: volvoxgrid.v1.ShowCellRequest
+	(*SetRowRequest)(nil),               // 254: volvoxgrid.v1.SetRowRequest
+	(*SetColRequest)(nil),               // 255: volvoxgrid.v1.SetColRequest
+	(*SetRedrawRequest)(nil),            // 256: volvoxgrid.v1.SetRedrawRequest
+	(*ConfigureRequest)(nil),            // 257: volvoxgrid.v1.ConfigureRequest
+	(*LoadFontDataRequest)(nil),         // 258: volvoxgrid.v1.LoadFontDataRequest
+	(*LoadDemoRequest)(nil),             // 259: volvoxgrid.v1.LoadDemoRequest
+	(*GetDemoDataRequest)(nil),          // 260: volvoxgrid.v1.GetDemoDataRequest
+	(*GetDemoDataResponse)(nil),         // 261: volvoxgrid.v1.GetDemoDataResponse
+	(*DestroyResponse)(nil),             // 262: volvoxgrid.v1.DestroyResponse
+	(*ConfigureResponse)(nil),           // 263: volvoxgrid.v1.ConfigureResponse
+	(*LoadFontDataResponse)(nil),        // 264: volvoxgrid.v1.LoadFontDataResponse
+	(*DefineColumnsResponse)(nil),       // 265: volvoxgrid.v1.DefineColumnsResponse
+	(*DefineRowsResponse)(nil),          // 266: volvoxgrid.v1.DefineRowsResponse
+	(*InsertRowsResponse)(nil),          // 267: volvoxgrid.v1.InsertRowsResponse
+	(*RemoveRowsResponse)(nil),          // 268: volvoxgrid.v1.RemoveRowsResponse
+	(*MoveColumnResponse)(nil),          // 269: volvoxgrid.v1.MoveColumnResponse
+	(*MoveRowResponse)(nil),             // 270: volvoxgrid.v1.MoveRowResponse
+	(*ClearResponse)(nil),               // 271: volvoxgrid.v1.ClearResponse
+	(*SelectResponse)(nil),              // 272: volvoxgrid.v1.SelectResponse
+	(*ShowCellResponse)(nil),            // 273: volvoxgrid.v1.ShowCellResponse
+	(*SetTopRowResponse)(nil),           // 274: volvoxgrid.v1.SetTopRowResponse
+	(*SetLeftColResponse)(nil),          // 275: volvoxgrid.v1.SetLeftColResponse
+	(*SortResponse)(nil),                // 276: volvoxgrid.v1.SortResponse
+	(*AutoSizeResponse)(nil),            // 277: volvoxgrid.v1.AutoSizeResponse
+	(*OutlineResponse)(nil),             // 278: volvoxgrid.v1.OutlineResponse
+	(*MergeCellsResponse)(nil),          // 279: volvoxgrid.v1.MergeCellsResponse
+	(*UnmergeCellsResponse)(nil),        // 280: volvoxgrid.v1.UnmergeCellsResponse
+	(*ResizeViewportResponse)(nil),      // 281: volvoxgrid.v1.ResizeViewportResponse
+	(*SetRedrawResponse)(nil),           // 282: volvoxgrid.v1.SetRedrawResponse
+	(*RefreshResponse)(nil),             // 283: volvoxgrid.v1.RefreshResponse
+	(*LoadDemoResponse)(nil),            // 284: volvoxgrid.v1.LoadDemoResponse
+	(*RenderInput)(nil),                 // 285: volvoxgrid.v1.RenderInput
+	(*CompareResponse)(nil),             // 286: volvoxgrid.v1.CompareResponse
+	(*EditValidationResponse)(nil),      // 287: volvoxgrid.v1.EditValidationResponse
+	(*EditorListItemsResponse)(nil),     // 288: volvoxgrid.v1.EditorListItemsResponse
+	(*ViewportState)(nil),               // 289: volvoxgrid.v1.ViewportState
+	(*PointerEvent)(nil),                // 290: volvoxgrid.v1.PointerEvent
+	(*ScrollEvent)(nil),                 // 291: volvoxgrid.v1.ScrollEvent
+	(*ZoomEvent)(nil),                   // 292: volvoxgrid.v1.ZoomEvent
+	(*KeyEvent)(nil),                    // 293: volvoxgrid.v1.KeyEvent
+	(*BufferReady)(nil),                 // 294: volvoxgrid.v1.BufferReady
+	(*TerminalInputBytes)(nil),          // 295: volvoxgrid.v1.TerminalInputBytes
+	(*TerminalCapabilities)(nil),        // 296: volvoxgrid.v1.TerminalCapabilities
+	(*TerminalViewport)(nil),            // 297: volvoxgrid.v1.TerminalViewport
+	(*TerminalCommand)(nil),             // 298: volvoxgrid.v1.TerminalCommand
+	(*GpuSurfaceReady)(nil),             // 299: volvoxgrid.v1.GpuSurfaceReady
+	(*EventDecision)(nil),               // 300: volvoxgrid.v1.EventDecision
+	(*RenderOutput)(nil),                // 301: volvoxgrid.v1.RenderOutput
+	(*FrameDone)(nil),                   // 302: volvoxgrid.v1.FrameDone
+	(*GpuFrameDone)(nil),                // 303: volvoxgrid.v1.GpuFrameDone
+	(*FrameMetrics)(nil),                // 304: volvoxgrid.v1.FrameMetrics
+	(*SelectionUpdate)(nil),             // 305: volvoxgrid.v1.SelectionUpdate
+	(*CursorChange)(nil),                // 306: volvoxgrid.v1.CursorChange
+	(*EditorSessionStarted)(nil),        // 307: volvoxgrid.v1.EditorSessionStarted
+	(*EditorSessionUpdated)(nil),        // 308: volvoxgrid.v1.EditorSessionUpdated
+	(*EditorSessionEnded)(nil),          // 309: volvoxgrid.v1.EditorSessionEnded
+	(*TooltipRequest)(nil),              // 310: volvoxgrid.v1.TooltipRequest
+	(*GridEvent)(nil),                   // 311: volvoxgrid.v1.GridEvent
+	(*CellFocusChangingEvent)(nil),      // 312: volvoxgrid.v1.CellFocusChangingEvent
+	(*CellFocusChangedEvent)(nil),       // 313: volvoxgrid.v1.CellFocusChangedEvent
+	(*SelectionChangingEvent)(nil),      // 314: volvoxgrid.v1.SelectionChangingEvent
+	(*SelectionChangedEvent)(nil),       // 315: volvoxgrid.v1.SelectionChangedEvent
+	(*EnterCellEvent)(nil),              // 316: volvoxgrid.v1.EnterCellEvent
+	(*LeaveCellEvent)(nil),              // 317: volvoxgrid.v1.LeaveCellEvent
+	(*BeforeEditEvent)(nil),             // 318: volvoxgrid.v1.BeforeEditEvent
+	(*StartEditEvent)(nil),              // 319: volvoxgrid.v1.StartEditEvent
+	(*AfterEditEvent)(nil),              // 320: volvoxgrid.v1.AfterEditEvent
+	(*CellEditValidateEvent)(nil),       // 321: volvoxgrid.v1.CellEditValidateEvent
+	(*CellEditChangeEvent)(nil),         // 322: volvoxgrid.v1.CellEditChangeEvent
+	(*KeyDownEditEvent)(nil),            // 323: volvoxgrid.v1.KeyDownEditEvent
+	(*KeyPressEditEvent)(nil),           // 324: volvoxgrid.v1.KeyPressEditEvent
+	(*KeyUpEditEvent)(nil),              // 325: volvoxgrid.v1.KeyUpEditEvent
+	(*EditValidationRequest)(nil),       // 326: volvoxgrid.v1.EditValidationRequest
+	(*EditorListItemsRequest)(nil),      // 327: volvoxgrid.v1.EditorListItemsRequest
+	(*CustomEditorActionEvent)(nil),     // 328: volvoxgrid.v1.CustomEditorActionEvent
+	(*CellChangedEvent)(nil),            // 329: volvoxgrid.v1.CellChangedEvent
+	(*RowStatusChangeEvent)(nil),        // 330: volvoxgrid.v1.RowStatusChangeEvent
+	(*BeforeSortEvent)(nil),             // 331: volvoxgrid.v1.BeforeSortEvent
+	(*AfterSortEvent)(nil),              // 332: volvoxgrid.v1.AfterSortEvent
+	(*CompareEvent)(nil),                // 333: volvoxgrid.v1.CompareEvent
+	(*BeforeNodeToggleEvent)(nil),       // 334: volvoxgrid.v1.BeforeNodeToggleEvent
+	(*AfterNodeToggleEvent)(nil),        // 335: volvoxgrid.v1.AfterNodeToggleEvent
+	(*TreeChildrenRequestedEvent)(nil),  // 336: volvoxgrid.v1.TreeChildrenRequestedEvent
+	(*BeforeTreeNodeToggleEvent)(nil),   // 337: volvoxgrid.v1.BeforeTreeNodeToggleEvent
+	(*AfterTreeNodeToggleEvent)(nil),    // 338: volvoxgrid.v1.AfterTreeNodeToggleEvent
+	(*TreeNodeActivateEvent)(nil),       // 339: volvoxgrid.v1.TreeNodeActivateEvent
+	(*TreeNodeContextMenuEvent)(nil),    // 340: volvoxgrid.v1.TreeNodeContextMenuEvent
+	(*BeforeScrollEvent)(nil),           // 341: volvoxgrid.v1.BeforeScrollEvent
+	(*AfterScrollEvent)(nil),            // 342: volvoxgrid.v1.AfterScrollEvent
+	(*ScrollTooltipEvent)(nil),          // 343: volvoxgrid.v1.ScrollTooltipEvent
+	(*BeforeUserResizeEvent)(nil),       // 344: volvoxgrid.v1.BeforeUserResizeEvent
+	(*AfterUserResizeEvent)(nil),        // 345: volvoxgrid.v1.AfterUserResizeEvent
+	(*AfterUserFreezeEvent)(nil),        // 346: volvoxgrid.v1.AfterUserFreezeEvent
+	(*BeforeMoveColumnEvent)(nil),       // 347: volvoxgrid.v1.BeforeMoveColumnEvent
+	(*AfterMoveColumnEvent)(nil),        // 348: volvoxgrid.v1.AfterMoveColumnEvent
+	(*BeforeMoveRowEvent)(nil),          // 349: volvoxgrid.v1.BeforeMoveRowEvent
+	(*AfterMoveRowEvent)(nil),           // 350: volvoxgrid.v1.AfterMoveRowEvent
+	(*BeforeMouseDownEvent)(nil),        // 351: volvoxgrid.v1.BeforeMouseDownEvent
+	(*MouseDownEvent)(nil),              // 352: volvoxgrid.v1.MouseDownEvent
+	(*MouseUpEvent)(nil),                // 353: volvoxgrid.v1.MouseUpEvent
+	(*MouseMoveEvent)(nil),              // 354: volvoxgrid.v1.MouseMoveEvent
+	(*ClickEvent)(nil),                  // 355: volvoxgrid.v1.ClickEvent
+	(*DblClickEvent)(nil),               // 356: volvoxgrid.v1.DblClickEvent
+	(*KeyDownEvent)(nil),                // 357: volvoxgrid.v1.KeyDownEvent
+	(*KeyPressEvent)(nil),               // 358: volvoxgrid.v1.KeyPressEvent
+	(*KeyUpEvent)(nil),                  // 359: volvoxgrid.v1.KeyUpEvent
+	(*CustomRenderCellEvent)(nil),       // 360: volvoxgrid.v1.CustomRenderCellEvent
+	(*DragStartEvent)(nil),              // 361: volvoxgrid.v1.DragStartEvent
+	(*DragOverEvent)(nil),               // 362: volvoxgrid.v1.DragOverEvent
+	(*DragDropEvent)(nil),               // 363: volvoxgrid.v1.DragDropEvent
+	(*DragCompleteEvent)(nil),           // 364: volvoxgrid.v1.DragCompleteEvent
+	(*TypeAheadStartedEvent)(nil),       // 365: volvoxgrid.v1.TypeAheadStartedEvent
+	(*TypeAheadEndedEvent)(nil),         // 366: volvoxgrid.v1.TypeAheadEndedEvent
+	(*DataRefreshingEvent)(nil),         // 367: volvoxgrid.v1.DataRefreshingEvent
+	(*DataRefreshedEvent)(nil),          // 368: volvoxgrid.v1.DataRefreshedEvent
+	(*FilterDataEvent)(nil),             // 369: volvoxgrid.v1.FilterDataEvent
+	(*PullToRefreshTriggeredEvent)(nil), // 370: volvoxgrid.v1.PullToRefreshTriggeredEvent
+	(*PullToRefreshCanceledEvent)(nil),  // 371: volvoxgrid.v1.PullToRefreshCanceledEvent
+	(*ErrorEvent)(nil),                  // 372: volvoxgrid.v1.ErrorEvent
+	(*BeforePageBreakEvent)(nil),        // 373: volvoxgrid.v1.BeforePageBreakEvent
+	(*StartPageEvent)(nil),              // 374: volvoxgrid.v1.StartPageEvent
+	(*GetHeaderRowEvent)(nil),           // 375: volvoxgrid.v1.GetHeaderRowEvent
 }
 var file_volvoxgrid_proto_depIdxs = []int32{
 	0,   // 0: volvoxgrid.v1.Border.style:type_name -> volvoxgrid.v1.BorderStyle
-	84,  // 1: volvoxgrid.v1.Borders.all:type_name -> volvoxgrid.v1.Border
-	84,  // 2: volvoxgrid.v1.Borders.top:type_name -> volvoxgrid.v1.Border
-	84,  // 3: volvoxgrid.v1.Borders.right:type_name -> volvoxgrid.v1.Border
-	84,  // 4: volvoxgrid.v1.Borders.bottom:type_name -> volvoxgrid.v1.Border
-	84,  // 5: volvoxgrid.v1.Borders.left:type_name -> volvoxgrid.v1.Border
+	94,  // 1: volvoxgrid.v1.Borders.all:type_name -> volvoxgrid.v1.Border
+	94,  // 2: volvoxgrid.v1.Borders.top:type_name -> volvoxgrid.v1.Border
+	94,  // 3: volvoxgrid.v1.Borders.right:type_name -> volvoxgrid.v1.Border
+	94,  // 4: volvoxgrid.v1.Borders.bottom:type_name -> volvoxgrid.v1.Border
+	94,  // 5: volvoxgrid.v1.Borders.left:type_name -> volvoxgrid.v1.Border
 	1,   // 6: volvoxgrid.v1.GridLines.style:type_name -> volvoxgrid.v1.GridLineStyle
 	2,   // 7: volvoxgrid.v1.GridLines.direction:type_name -> volvoxgrid.v1.GridLineDirection
-	5,   // 8: volvoxgrid.v1.TextRendering.mode:type_name -> volvoxgrid.v1.TextRenderMode
-	6,   // 9: volvoxgrid.v1.TextRendering.hinting:type_name -> volvoxgrid.v1.TextHintingMode
-	12,  // 10: volvoxgrid.v1.BarcodeEncodingOptions.check_digit:type_name -> volvoxgrid.v1.BarcodeCheckDigitMode
-	13,  // 11: volvoxgrid.v1.BarcodeEncodingOptions.text_encoding:type_name -> volvoxgrid.v1.BarcodeTextEncoding
-	14,  // 12: volvoxgrid.v1.BarcodeEncodingOptions.qr_ecc:type_name -> volvoxgrid.v1.BarcodeQrErrorCorrection
-	9,   // 13: volvoxgrid.v1.BarcodeRenderOptions.alignment:type_name -> volvoxgrid.v1.ImageAlignment
-	11,  // 14: volvoxgrid.v1.BarcodeCaptionOptions.position:type_name -> volvoxgrid.v1.BarcodeCaptionPosition
-	10,  // 15: volvoxgrid.v1.BarcodeData.symbology:type_name -> volvoxgrid.v1.BarcodeSymbology
-	90,  // 16: volvoxgrid.v1.BarcodeData.encoding:type_name -> volvoxgrid.v1.BarcodeEncodingOptions
-	91,  // 17: volvoxgrid.v1.BarcodeData.render:type_name -> volvoxgrid.v1.BarcodeRenderOptions
-	92,  // 18: volvoxgrid.v1.BarcodeData.caption:type_name -> volvoxgrid.v1.BarcodeCaptionOptions
-	97,  // 19: volvoxgrid.v1.RichText.runs:type_name -> volvoxgrid.v1.TextFormatRun
-	98,  // 20: volvoxgrid.v1.TextFormatRun.style:type_name -> volvoxgrid.v1.TextRunStyle
-	82,  // 21: volvoxgrid.v1.TextRunStyle.font:type_name -> volvoxgrid.v1.Font
-	7,   // 22: volvoxgrid.v1.TextRunStyle.baseline:type_name -> volvoxgrid.v1.TextBaseline
-	100, // 23: volvoxgrid.v1.Dropdown.items:type_name -> volvoxgrid.v1.DropdownItem
-	30,  // 24: volvoxgrid.v1.Dropdown.item_layout:type_name -> volvoxgrid.v1.DropdownItemLayout
-	40,  // 25: volvoxgrid.v1.ScrollBarConfig.show_h:type_name -> volvoxgrid.v1.ScrollBarMode
-	40,  // 26: volvoxgrid.v1.ScrollBarConfig.show_v:type_name -> volvoxgrid.v1.ScrollBarMode
-	41,  // 27: volvoxgrid.v1.ScrollBarConfig.appearance:type_name -> volvoxgrid.v1.ScrollBarAppearance
-	101, // 28: volvoxgrid.v1.ScrollBarConfig.colors:type_name -> volvoxgrid.v1.ScrollBarColors
-	82,  // 29: volvoxgrid.v1.RegionStyle.font:type_name -> volvoxgrid.v1.Font
-	86,  // 30: volvoxgrid.v1.RegionStyle.grid_lines:type_name -> volvoxgrid.v1.GridLines
-	4,   // 31: volvoxgrid.v1.RegionStyle.text_effect:type_name -> volvoxgrid.v1.TextEffect
-	87,  // 32: volvoxgrid.v1.RegionStyle.separator:type_name -> volvoxgrid.v1.Separator
-	83,  // 33: volvoxgrid.v1.RegionStyle.cell_padding:type_name -> volvoxgrid.v1.Padding
-	8,   // 34: volvoxgrid.v1.CellStyle.align:type_name -> volvoxgrid.v1.Align
-	82,  // 35: volvoxgrid.v1.CellStyle.font:type_name -> volvoxgrid.v1.Font
-	83,  // 36: volvoxgrid.v1.CellStyle.padding:type_name -> volvoxgrid.v1.Padding
-	85,  // 37: volvoxgrid.v1.CellStyle.borders:type_name -> volvoxgrid.v1.Borders
-	4,   // 38: volvoxgrid.v1.CellStyle.text_effect:type_name -> volvoxgrid.v1.TextEffect
-	85,  // 39: volvoxgrid.v1.HighlightStyle.borders:type_name -> volvoxgrid.v1.Borders
-	17,  // 40: volvoxgrid.v1.HighlightStyle.fill_handle:type_name -> volvoxgrid.v1.FillHandlePosition
-	106, // 41: volvoxgrid.v1.HeaderSeparator.height:type_name -> volvoxgrid.v1.HeaderMarkSize
-	106, // 42: volvoxgrid.v1.HeaderResizeHandle.height:type_name -> volvoxgrid.v1.HeaderMarkSize
-	107, // 43: volvoxgrid.v1.HeaderStyle.separator:type_name -> volvoxgrid.v1.HeaderSeparator
-	108, // 44: volvoxgrid.v1.HeaderStyle.resize_handle:type_name -> volvoxgrid.v1.HeaderResizeHandle
-	82,  // 45: volvoxgrid.v1.IconStyle.font:type_name -> volvoxgrid.v1.Font
-	60,  // 46: volvoxgrid.v1.IconStyle.align:type_name -> volvoxgrid.v1.IconAlign
-	111, // 47: volvoxgrid.v1.IconSlotStyles.sort_ascending:type_name -> volvoxgrid.v1.IconStyle
-	111, // 48: volvoxgrid.v1.IconSlotStyles.sort_descending:type_name -> volvoxgrid.v1.IconStyle
-	111, // 49: volvoxgrid.v1.IconSlotStyles.sort_none:type_name -> volvoxgrid.v1.IconStyle
-	111, // 50: volvoxgrid.v1.IconSlotStyles.tree_expanded:type_name -> volvoxgrid.v1.IconStyle
-	111, // 51: volvoxgrid.v1.IconSlotStyles.tree_collapsed:type_name -> volvoxgrid.v1.IconStyle
-	111, // 52: volvoxgrid.v1.IconSlotStyles.menu:type_name -> volvoxgrid.v1.IconStyle
-	111, // 53: volvoxgrid.v1.IconSlotStyles.filter:type_name -> volvoxgrid.v1.IconStyle
-	111, // 54: volvoxgrid.v1.IconSlotStyles.filter_active:type_name -> volvoxgrid.v1.IconStyle
-	111, // 55: volvoxgrid.v1.IconSlotStyles.columns:type_name -> volvoxgrid.v1.IconStyle
-	111, // 56: volvoxgrid.v1.IconSlotStyles.drag_handle:type_name -> volvoxgrid.v1.IconStyle
-	111, // 57: volvoxgrid.v1.IconSlotStyles.checkbox_checked:type_name -> volvoxgrid.v1.IconStyle
-	111, // 58: volvoxgrid.v1.IconSlotStyles.checkbox_unchecked:type_name -> volvoxgrid.v1.IconStyle
-	111, // 59: volvoxgrid.v1.IconSlotStyles.checkbox_indeterminate:type_name -> volvoxgrid.v1.IconStyle
-	89,  // 60: volvoxgrid.v1.IconPictures.sort_ascending:type_name -> volvoxgrid.v1.ImageData
-	89,  // 61: volvoxgrid.v1.IconPictures.sort_descending:type_name -> volvoxgrid.v1.ImageData
-	89,  // 62: volvoxgrid.v1.IconPictures.node_open:type_name -> volvoxgrid.v1.ImageData
-	89,  // 63: volvoxgrid.v1.IconPictures.node_closed:type_name -> volvoxgrid.v1.ImageData
-	89,  // 64: volvoxgrid.v1.IconPictures.checkbox_checked:type_name -> volvoxgrid.v1.ImageData
-	89,  // 65: volvoxgrid.v1.IconPictures.checkbox_unchecked:type_name -> volvoxgrid.v1.ImageData
-	89,  // 66: volvoxgrid.v1.IconPictures.checkbox_indeterminate:type_name -> volvoxgrid.v1.ImageData
-	110, // 67: volvoxgrid.v1.IconTheme.slots:type_name -> volvoxgrid.v1.IconSlots
-	111, // 68: volvoxgrid.v1.IconTheme.defaults:type_name -> volvoxgrid.v1.IconStyle
-	112, // 69: volvoxgrid.v1.IconTheme.overrides:type_name -> volvoxgrid.v1.IconSlotStyles
-	113, // 70: volvoxgrid.v1.IconTheme.pictures:type_name -> volvoxgrid.v1.IconPictures
-	105, // 71: volvoxgrid.v1.HoverConfig.row_style:type_name -> volvoxgrid.v1.HighlightStyle
-	105, // 72: volvoxgrid.v1.HoverConfig.column_style:type_name -> volvoxgrid.v1.HighlightStyle
-	105, // 73: volvoxgrid.v1.HoverConfig.cell_style:type_name -> volvoxgrid.v1.HighlightStyle
-	120, // 74: volvoxgrid.v1.GridConfig.layout:type_name -> volvoxgrid.v1.LayoutConfig
-	121, // 75: volvoxgrid.v1.GridConfig.style:type_name -> volvoxgrid.v1.StyleConfig
-	122, // 76: volvoxgrid.v1.GridConfig.selection:type_name -> volvoxgrid.v1.SelectionConfig
-	123, // 77: volvoxgrid.v1.GridConfig.editing:type_name -> volvoxgrid.v1.EditConfig
-	125, // 78: volvoxgrid.v1.GridConfig.scrolling:type_name -> volvoxgrid.v1.ScrollConfig
-	126, // 79: volvoxgrid.v1.GridConfig.outline:type_name -> volvoxgrid.v1.OutlineConfig
-	127, // 80: volvoxgrid.v1.GridConfig.span:type_name -> volvoxgrid.v1.SpanConfig
-	128, // 81: volvoxgrid.v1.GridConfig.interaction:type_name -> volvoxgrid.v1.InteractionConfig
-	129, // 82: volvoxgrid.v1.GridConfig.rendering:type_name -> volvoxgrid.v1.RenderConfig
-	140, // 83: volvoxgrid.v1.GridConfig.indicators:type_name -> volvoxgrid.v1.IndicatorsConfig
-	82,  // 84: volvoxgrid.v1.StyleConfig.font:type_name -> volvoxgrid.v1.Font
-	83,  // 85: volvoxgrid.v1.StyleConfig.cell_padding:type_name -> volvoxgrid.v1.Padding
-	4,   // 86: volvoxgrid.v1.StyleConfig.text_effect:type_name -> volvoxgrid.v1.TextEffect
-	86,  // 87: volvoxgrid.v1.StyleConfig.grid_lines:type_name -> volvoxgrid.v1.GridLines
-	103, // 88: volvoxgrid.v1.StyleConfig.fixed:type_name -> volvoxgrid.v1.RegionStyle
-	103, // 89: volvoxgrid.v1.StyleConfig.frozen:type_name -> volvoxgrid.v1.RegionStyle
-	109, // 90: volvoxgrid.v1.StyleConfig.header:type_name -> volvoxgrid.v1.HeaderStyle
-	3,   // 91: volvoxgrid.v1.StyleConfig.appearance:type_name -> volvoxgrid.v1.BorderAppearance
-	9,   // 92: volvoxgrid.v1.StyleConfig.background_image_align:type_name -> volvoxgrid.v1.ImageAlignment
-	88,  // 93: volvoxgrid.v1.StyleConfig.text_rendering:type_name -> volvoxgrid.v1.TextRendering
-	114, // 94: volvoxgrid.v1.StyleConfig.icons:type_name -> volvoxgrid.v1.IconTheme
-	50,  // 95: volvoxgrid.v1.StyleConfig.apply_scope:type_name -> volvoxgrid.v1.ApplyScope
-	49,  // 96: volvoxgrid.v1.StyleConfig.custom_render:type_name -> volvoxgrid.v1.CustomRenderMode
-	25,  // 97: volvoxgrid.v1.SelectionConfig.mode:type_name -> volvoxgrid.v1.SelectionMode
-	26,  // 98: volvoxgrid.v1.SelectionConfig.focus_border:type_name -> volvoxgrid.v1.FocusBorderStyle
-	27,  // 99: volvoxgrid.v1.SelectionConfig.visibility:type_name -> volvoxgrid.v1.SelectionVisibility
-	105, // 100: volvoxgrid.v1.SelectionConfig.style:type_name -> volvoxgrid.v1.HighlightStyle
-	115, // 101: volvoxgrid.v1.SelectionConfig.hover:type_name -> volvoxgrid.v1.HoverConfig
-	105, // 102: volvoxgrid.v1.SelectionConfig.indicator_row_style:type_name -> volvoxgrid.v1.HighlightStyle
-	105, // 103: volvoxgrid.v1.SelectionConfig.indicator_col_style:type_name -> volvoxgrid.v1.HighlightStyle
-	105, // 104: volvoxgrid.v1.SelectionConfig.active_cell_style:type_name -> volvoxgrid.v1.HighlightStyle
-	28,  // 105: volvoxgrid.v1.EditConfig.trigger:type_name -> volvoxgrid.v1.EditTrigger
-	31,  // 106: volvoxgrid.v1.EditConfig.tab_behavior:type_name -> volvoxgrid.v1.TabBehavior
-	29,  // 107: volvoxgrid.v1.EditConfig.dropdown_trigger:type_name -> volvoxgrid.v1.DropdownTrigger
-	70,  // 108: volvoxgrid.v1.EditConfig.compose_method:type_name -> volvoxgrid.v1.ComposeMethod
-	62,  // 109: volvoxgrid.v1.PullToRefreshConfig.theme:type_name -> volvoxgrid.v1.PullToRefreshTheme
-	102, // 110: volvoxgrid.v1.ScrollConfig.scroll_bar:type_name -> volvoxgrid.v1.ScrollBarConfig
-	39,  // 111: volvoxgrid.v1.ScrollConfig.scrollbars:type_name -> volvoxgrid.v1.ScrollBarsMode
-	124, // 112: volvoxgrid.v1.ScrollConfig.pull_to_refresh:type_name -> volvoxgrid.v1.PullToRefreshConfig
-	34,  // 113: volvoxgrid.v1.OutlineConfig.tree_indicator:type_name -> volvoxgrid.v1.TreeIndicatorStyle
-	35,  // 114: volvoxgrid.v1.OutlineConfig.group_total_position:type_name -> volvoxgrid.v1.GroupTotalPosition
-	37,  // 115: volvoxgrid.v1.SpanConfig.cell_span:type_name -> volvoxgrid.v1.CellSpanMode
-	37,  // 116: volvoxgrid.v1.SpanConfig.cell_span_fixed:type_name -> volvoxgrid.v1.CellSpanMode
-	38,  // 117: volvoxgrid.v1.SpanConfig.cell_span_compare:type_name -> volvoxgrid.v1.SpanCompareMode
-	38,  // 118: volvoxgrid.v1.SpanConfig.group_span_compare:type_name -> volvoxgrid.v1.SpanCompareMode
-	116, // 119: volvoxgrid.v1.InteractionConfig.resize:type_name -> volvoxgrid.v1.ResizePolicy
-	117, // 120: volvoxgrid.v1.InteractionConfig.freeze:type_name -> volvoxgrid.v1.FreezePolicy
-	45,  // 121: volvoxgrid.v1.InteractionConfig.type_ahead:type_name -> volvoxgrid.v1.TypeAheadMode
-	46,  // 122: volvoxgrid.v1.InteractionConfig.auto_size_mode:type_name -> volvoxgrid.v1.AutoSizeMode
-	47,  // 123: volvoxgrid.v1.InteractionConfig.drag_mode:type_name -> volvoxgrid.v1.DragMode
-	48,  // 124: volvoxgrid.v1.InteractionConfig.drop_mode:type_name -> volvoxgrid.v1.DropMode
-	118, // 125: volvoxgrid.v1.InteractionConfig.header_features:type_name -> volvoxgrid.v1.HeaderFeatures
-	51,  // 126: volvoxgrid.v1.RenderConfig.renderer_mode:type_name -> volvoxgrid.v1.RendererMode
-	52,  // 127: volvoxgrid.v1.RenderConfig.present_mode:type_name -> volvoxgrid.v1.PresentMode
-	53,  // 128: volvoxgrid.v1.RenderConfig.frame_pacing_mode:type_name -> volvoxgrid.v1.FramePacingMode
-	66,  // 129: volvoxgrid.v1.RowIndicatorSlot.kind:type_name -> volvoxgrid.v1.RowIndicatorSlotKind
-	1,   // 130: volvoxgrid.v1.RowIndicatorConfig.grid_lines:type_name -> volvoxgrid.v1.GridLineStyle
-	130, // 131: volvoxgrid.v1.RowIndicatorConfig.slots:type_name -> volvoxgrid.v1.RowIndicatorSlot
-	1,   // 132: volvoxgrid.v1.ColIndicatorConfig.grid_lines:type_name -> volvoxgrid.v1.GridLineStyle
-	132, // 133: volvoxgrid.v1.ColIndicatorConfig.row_defs:type_name -> volvoxgrid.v1.ColIndicatorRowDef
-	133, // 134: volvoxgrid.v1.ColIndicatorConfig.cells:type_name -> volvoxgrid.v1.ColIndicatorCell
-	68,  // 135: volvoxgrid.v1.CornerIndicatorSlot.kind:type_name -> volvoxgrid.v1.CornerIndicatorSlotKind
-	135, // 136: volvoxgrid.v1.CornerIndicatorConfig.slots:type_name -> volvoxgrid.v1.CornerIndicatorSlot
-	64,  // 137: volvoxgrid.v1.GridEventTarget.kind:type_name -> volvoxgrid.v1.GridTargetKind
-	65,  // 138: volvoxgrid.v1.GridEventTarget.band:type_name -> volvoxgrid.v1.IndicatorBand
-	131, // 139: volvoxgrid.v1.IndicatorsConfig.row_start:type_name -> volvoxgrid.v1.RowIndicatorConfig
-	131, // 140: volvoxgrid.v1.IndicatorsConfig.row_end:type_name -> volvoxgrid.v1.RowIndicatorConfig
-	134, // 141: volvoxgrid.v1.IndicatorsConfig.col_top:type_name -> volvoxgrid.v1.ColIndicatorConfig
-	134, // 142: volvoxgrid.v1.IndicatorsConfig.col_bottom:type_name -> volvoxgrid.v1.ColIndicatorConfig
-	136, // 143: volvoxgrid.v1.IndicatorsConfig.corner_top_start:type_name -> volvoxgrid.v1.CornerIndicatorConfig
-	136, // 144: volvoxgrid.v1.IndicatorsConfig.corner_top_end:type_name -> volvoxgrid.v1.CornerIndicatorConfig
-	136, // 145: volvoxgrid.v1.IndicatorsConfig.corner_bottom_start:type_name -> volvoxgrid.v1.CornerIndicatorConfig
-	136, // 146: volvoxgrid.v1.IndicatorsConfig.corner_bottom_end:type_name -> volvoxgrid.v1.CornerIndicatorConfig
-	139, // 147: volvoxgrid.v1.IndicatorsConfig.focus:type_name -> volvoxgrid.v1.IndicatorFocusConfig
-	42,  // 148: volvoxgrid.v1.IndicatorsConfig.appearance:type_name -> volvoxgrid.v1.IndicatorAppearance
-	137, // 149: volvoxgrid.v1.IndicatorsConfig.colors:type_name -> volvoxgrid.v1.IndicatorColors
-	8,   // 150: volvoxgrid.v1.ColumnDef.align:type_name -> volvoxgrid.v1.Align
-	8,   // 151: volvoxgrid.v1.ColumnDef.fixed_align:type_name -> volvoxgrid.v1.Align
-	18,  // 152: volvoxgrid.v1.ColumnDef.data_type:type_name -> volvoxgrid.v1.ColumnDataType
-	32,  // 153: volvoxgrid.v1.ColumnDef.sort_order:type_name -> volvoxgrid.v1.SortOrder
-	33,  // 154: volvoxgrid.v1.ColumnDef.sort_type:type_name -> volvoxgrid.v1.SortType
-	99,  // 155: volvoxgrid.v1.ColumnDef.dropdown:type_name -> volvoxgrid.v1.Dropdown
-	89,  // 156: volvoxgrid.v1.ColumnDef.image_list:type_name -> volvoxgrid.v1.ImageData
-	44,  // 157: volvoxgrid.v1.ColumnDef.sticky:type_name -> volvoxgrid.v1.StickyEdge
-	83,  // 158: volvoxgrid.v1.ColumnDef.padding:type_name -> volvoxgrid.v1.Padding
-	83,  // 159: volvoxgrid.v1.ColumnDef.fixed_padding:type_name -> volvoxgrid.v1.Padding
-	19,  // 160: volvoxgrid.v1.ColumnDef.coercion_mode:type_name -> volvoxgrid.v1.CoercionMode
-	20,  // 161: volvoxgrid.v1.ColumnDef.error_mode:type_name -> volvoxgrid.v1.WriteErrorMode
-	21,  // 162: volvoxgrid.v1.ColumnDef.interaction:type_name -> volvoxgrid.v1.CellInteraction
-	141, // 163: volvoxgrid.v1.DefineColumnsRequest.columns:type_name -> volvoxgrid.v1.ColumnDef
-	141, // 164: volvoxgrid.v1.SchemaResponse.columns:type_name -> volvoxgrid.v1.ColumnDef
-	145, // 165: volvoxgrid.v1.RowDef.status:type_name -> volvoxgrid.v1.RowStatus
-	43,  // 166: volvoxgrid.v1.RowDef.pin:type_name -> volvoxgrid.v1.PinPosition
-	44,  // 167: volvoxgrid.v1.RowDef.sticky:type_name -> volvoxgrid.v1.StickyEdge
-	144, // 168: volvoxgrid.v1.DefineRowsRequest.rows:type_name -> volvoxgrid.v1.RowDef
-	95,  // 169: volvoxgrid.v1.CellUpdate.value:type_name -> volvoxgrid.v1.CellValue
-	104, // 170: volvoxgrid.v1.CellUpdate.style:type_name -> volvoxgrid.v1.CellStyle
-	16,  // 171: volvoxgrid.v1.CellUpdate.checked:type_name -> volvoxgrid.v1.CheckedState
-	89,  // 172: volvoxgrid.v1.CellUpdate.picture:type_name -> volvoxgrid.v1.ImageData
-	9,   // 173: volvoxgrid.v1.CellUpdate.picture_align:type_name -> volvoxgrid.v1.ImageAlignment
-	89,  // 174: volvoxgrid.v1.CellUpdate.button_picture:type_name -> volvoxgrid.v1.ImageData
-	99,  // 175: volvoxgrid.v1.CellUpdate.dropdown:type_name -> volvoxgrid.v1.Dropdown
-	44,  // 176: volvoxgrid.v1.CellUpdate.sticky_row:type_name -> volvoxgrid.v1.StickyEdge
-	44,  // 177: volvoxgrid.v1.CellUpdate.sticky_col:type_name -> volvoxgrid.v1.StickyEdge
-	21,  // 178: volvoxgrid.v1.CellUpdate.interaction:type_name -> volvoxgrid.v1.CellInteraction
-	93,  // 179: volvoxgrid.v1.CellUpdate.barcode:type_name -> volvoxgrid.v1.BarcodeData
-	96,  // 180: volvoxgrid.v1.CellUpdate.rich_text:type_name -> volvoxgrid.v1.RichText
-	147, // 181: volvoxgrid.v1.UpdateCellsRequest.cells:type_name -> volvoxgrid.v1.CellUpdate
-	95,  // 182: volvoxgrid.v1.CellData.value:type_name -> volvoxgrid.v1.CellValue
-	104, // 183: volvoxgrid.v1.CellData.style:type_name -> volvoxgrid.v1.CellStyle
-	16,  // 184: volvoxgrid.v1.CellData.checked:type_name -> volvoxgrid.v1.CheckedState
-	21,  // 185: volvoxgrid.v1.CellData.interaction:type_name -> volvoxgrid.v1.CellInteraction
-	93,  // 186: volvoxgrid.v1.CellData.barcode:type_name -> volvoxgrid.v1.BarcodeData
-	15,  // 187: volvoxgrid.v1.CellData.barcode_status:type_name -> volvoxgrid.v1.BarcodeRenderStatus
-	96,  // 188: volvoxgrid.v1.CellData.rich_text:type_name -> volvoxgrid.v1.RichText
-	150, // 189: volvoxgrid.v1.CellsResponse.cells:type_name -> volvoxgrid.v1.CellData
-	18,  // 190: volvoxgrid.v1.TypeViolation.expected:type_name -> volvoxgrid.v1.ColumnDataType
-	95,  // 191: volvoxgrid.v1.TypeViolation.actual:type_name -> volvoxgrid.v1.CellValue
-	152, // 192: volvoxgrid.v1.WriteResult.violations:type_name -> volvoxgrid.v1.TypeViolation
-	95,  // 193: volvoxgrid.v1.LoadTableRequest.values:type_name -> volvoxgrid.v1.CellValue
-	156, // 194: volvoxgrid.v1.LoadDataOptions.csv:type_name -> volvoxgrid.v1.CsvOptions
-	157, // 195: volvoxgrid.v1.LoadDataOptions.json:type_name -> volvoxgrid.v1.JsonOptions
-	22,  // 196: volvoxgrid.v1.LoadDataOptions.header_policy:type_name -> volvoxgrid.v1.HeaderPolicy
-	155, // 197: volvoxgrid.v1.LoadDataOptions.field_map:type_name -> volvoxgrid.v1.FieldMapping
-	23,  // 198: volvoxgrid.v1.LoadDataOptions.type_policy:type_name -> volvoxgrid.v1.TypePolicy
-	19,  // 199: volvoxgrid.v1.LoadDataOptions.coercion:type_name -> volvoxgrid.v1.CoercionMode
-	20,  // 200: volvoxgrid.v1.LoadDataOptions.error_mode:type_name -> volvoxgrid.v1.WriteErrorMode
-	158, // 201: volvoxgrid.v1.LoadDataRequest.options:type_name -> volvoxgrid.v1.LoadDataOptions
-	158, // 202: volvoxgrid.v1.AppendDataRequest.options:type_name -> volvoxgrid.v1.LoadDataOptions
-	24,  // 203: volvoxgrid.v1.LoadDataResult.status:type_name -> volvoxgrid.v1.LoadDataStatus
-	152, // 204: volvoxgrid.v1.LoadDataResult.violations:type_name -> volvoxgrid.v1.TypeViolation
-	141, // 205: volvoxgrid.v1.LoadDataResult.inferred_columns:type_name -> volvoxgrid.v1.ColumnDef
-	54,  // 206: volvoxgrid.v1.ClearRequest.scope:type_name -> volvoxgrid.v1.ClearScope
-	55,  // 207: volvoxgrid.v1.ClearRequest.region:type_name -> volvoxgrid.v1.ClearRegion
-	94,  // 208: volvoxgrid.v1.SelectRequest.ranges:type_name -> volvoxgrid.v1.CellRange
-	94,  // 209: volvoxgrid.v1.SelectionState.ranges:type_name -> volvoxgrid.v1.CellRange
-	94,  // 210: volvoxgrid.v1.HighlightRegion.range:type_name -> volvoxgrid.v1.CellRange
-	105, // 211: volvoxgrid.v1.HighlightRegion.style:type_name -> volvoxgrid.v1.HighlightStyle
-	169, // 212: volvoxgrid.v1.EditSetHighlights.regions:type_name -> volvoxgrid.v1.HighlightRegion
-	172, // 213: volvoxgrid.v1.EditCommand.start:type_name -> volvoxgrid.v1.EditStart
-	173, // 214: volvoxgrid.v1.EditCommand.commit:type_name -> volvoxgrid.v1.EditCommit
-	174, // 215: volvoxgrid.v1.EditCommand.cancel:type_name -> volvoxgrid.v1.EditCancel
-	175, // 216: volvoxgrid.v1.EditCommand.set_text:type_name -> volvoxgrid.v1.EditSetText
-	176, // 217: volvoxgrid.v1.EditCommand.set_selection:type_name -> volvoxgrid.v1.EditSetSelection
-	178, // 218: volvoxgrid.v1.EditCommand.finish:type_name -> volvoxgrid.v1.EditFinish
-	170, // 219: volvoxgrid.v1.EditCommand.set_highlights:type_name -> volvoxgrid.v1.EditSetHighlights
-	177, // 220: volvoxgrid.v1.EditCommand.set_preedit:type_name -> volvoxgrid.v1.EditSetPreedit
-	71,  // 221: volvoxgrid.v1.EditState.ui_mode:type_name -> volvoxgrid.v1.EditUiMode
-	32,  // 222: volvoxgrid.v1.SortColumn.order:type_name -> volvoxgrid.v1.SortOrder
-	33,  // 223: volvoxgrid.v1.SortColumn.type:type_name -> volvoxgrid.v1.SortType
-	180, // 224: volvoxgrid.v1.SortRequest.sort_columns:type_name -> volvoxgrid.v1.SortColumn
-	36,  // 225: volvoxgrid.v1.SubtotalRequest.aggregate:type_name -> volvoxgrid.v1.AggregateType
-	82,  // 226: volvoxgrid.v1.SubtotalRequest.font:type_name -> volvoxgrid.v1.Font
-	59,  // 227: volvoxgrid.v1.GetNodeRequest.relation:type_name -> volvoxgrid.v1.NodeRelation
-	189, // 228: volvoxgrid.v1.FindRequest.text_query:type_name -> volvoxgrid.v1.TextQuery
-	190, // 229: volvoxgrid.v1.FindRequest.regex_query:type_name -> volvoxgrid.v1.RegexQuery
-	36,  // 230: volvoxgrid.v1.AggregateRequest.aggregate:type_name -> volvoxgrid.v1.AggregateType
-	94,  // 231: volvoxgrid.v1.MergeCellsRequest.range:type_name -> volvoxgrid.v1.CellRange
-	94,  // 232: volvoxgrid.v1.UnmergeCellsRequest.range:type_name -> volvoxgrid.v1.CellRange
-	94,  // 233: volvoxgrid.v1.MergedRegionsResponse.ranges:type_name -> volvoxgrid.v1.CellRange
-	200, // 234: volvoxgrid.v1.ClipboardCommand.copy:type_name -> volvoxgrid.v1.ClipboardCopy
-	201, // 235: volvoxgrid.v1.ClipboardCommand.cut:type_name -> volvoxgrid.v1.ClipboardCut
-	202, // 236: volvoxgrid.v1.ClipboardCommand.paste:type_name -> volvoxgrid.v1.ClipboardPaste
-	203, // 237: volvoxgrid.v1.ClipboardCommand.delete:type_name -> volvoxgrid.v1.ClipboardDelete
-	56,  // 238: volvoxgrid.v1.ExportRequest.format:type_name -> volvoxgrid.v1.ExportFormat
-	57,  // 239: volvoxgrid.v1.ExportRequest.scope:type_name -> volvoxgrid.v1.ExportScope
-	56,  // 240: volvoxgrid.v1.ExportResponse.format:type_name -> volvoxgrid.v1.ExportFormat
-	58,  // 241: volvoxgrid.v1.PrintRequest.orientation:type_name -> volvoxgrid.v1.PrintOrientation
-	209, // 242: volvoxgrid.v1.PrintResponse.pages:type_name -> volvoxgrid.v1.PrintPage
-	77,  // 243: volvoxgrid.v1.ArchiveRequest.action:type_name -> volvoxgrid.v1.ArchiveRequest.Action
-	119, // 244: volvoxgrid.v1.CreateRequest.config:type_name -> volvoxgrid.v1.GridConfig
-	119, // 245: volvoxgrid.v1.ConfigureRequest.config:type_name -> volvoxgrid.v1.GridConfig
-	73,  // 246: volvoxgrid.v1.GetDemoDataResponse.format:type_name -> volvoxgrid.v1.DemoDataFormat
-	168, // 247: volvoxgrid.v1.SelectResponse.selection:type_name -> volvoxgrid.v1.SelectionState
-	94,  // 248: volvoxgrid.v1.MergeCellsResponse.merged:type_name -> volvoxgrid.v1.CellRange
-	257, // 249: volvoxgrid.v1.RenderInput.viewport:type_name -> volvoxgrid.v1.ViewportState
-	258, // 250: volvoxgrid.v1.RenderInput.pointer:type_name -> volvoxgrid.v1.PointerEvent
-	261, // 251: volvoxgrid.v1.RenderInput.key:type_name -> volvoxgrid.v1.KeyEvent
-	262, // 252: volvoxgrid.v1.RenderInput.buffer:type_name -> volvoxgrid.v1.BufferReady
-	259, // 253: volvoxgrid.v1.RenderInput.scroll:type_name -> volvoxgrid.v1.ScrollEvent
-	268, // 254: volvoxgrid.v1.RenderInput.event_decision:type_name -> volvoxgrid.v1.EventDecision
-	260, // 255: volvoxgrid.v1.RenderInput.zoom:type_name -> volvoxgrid.v1.ZoomEvent
-	267, // 256: volvoxgrid.v1.RenderInput.gpu_surface:type_name -> volvoxgrid.v1.GpuSurfaceReady
-	263, // 257: volvoxgrid.v1.RenderInput.terminal_input:type_name -> volvoxgrid.v1.TerminalInputBytes
-	264, // 258: volvoxgrid.v1.RenderInput.terminal_capabilities:type_name -> volvoxgrid.v1.TerminalCapabilities
-	265, // 259: volvoxgrid.v1.RenderInput.terminal_viewport:type_name -> volvoxgrid.v1.TerminalViewport
-	266, // 260: volvoxgrid.v1.RenderInput.terminal_command:type_name -> volvoxgrid.v1.TerminalCommand
-	256, // 261: volvoxgrid.v1.RenderInput.compare_response:type_name -> volvoxgrid.v1.CompareResponse
-	78,  // 262: volvoxgrid.v1.PointerEvent.type:type_name -> volvoxgrid.v1.PointerEvent.Type
-	79,  // 263: volvoxgrid.v1.ZoomEvent.phase:type_name -> volvoxgrid.v1.ZoomEvent.Phase
-	80,  // 264: volvoxgrid.v1.KeyEvent.type:type_name -> volvoxgrid.v1.KeyEvent.Type
-	74,  // 265: volvoxgrid.v1.TerminalCapabilities.color_level:type_name -> volvoxgrid.v1.TerminalColorLevel
-	81,  // 266: volvoxgrid.v1.TerminalCommand.kind:type_name -> volvoxgrid.v1.TerminalCommand.Kind
-	270, // 267: volvoxgrid.v1.RenderOutput.frame_done:type_name -> volvoxgrid.v1.FrameDone
-	273, // 268: volvoxgrid.v1.RenderOutput.selection:type_name -> volvoxgrid.v1.SelectionUpdate
-	274, // 269: volvoxgrid.v1.RenderOutput.cursor:type_name -> volvoxgrid.v1.CursorChange
-	275, // 270: volvoxgrid.v1.RenderOutput.edit_request:type_name -> volvoxgrid.v1.EditRequest
-	276, // 271: volvoxgrid.v1.RenderOutput.dropdown_request:type_name -> volvoxgrid.v1.DropdownRequest
-	277, // 272: volvoxgrid.v1.RenderOutput.tooltip_request:type_name -> volvoxgrid.v1.TooltipRequest
-	271, // 273: volvoxgrid.v1.RenderOutput.gpu_frame_done:type_name -> volvoxgrid.v1.GpuFrameDone
-	272, // 274: volvoxgrid.v1.FrameDone.metrics:type_name -> volvoxgrid.v1.FrameMetrics
-	75,  // 275: volvoxgrid.v1.FrameDone.frame_kind:type_name -> volvoxgrid.v1.FrameKind
-	272, // 276: volvoxgrid.v1.GpuFrameDone.metrics:type_name -> volvoxgrid.v1.FrameMetrics
-	94,  // 277: volvoxgrid.v1.SelectionUpdate.ranges:type_name -> volvoxgrid.v1.CellRange
-	76,  // 278: volvoxgrid.v1.CursorChange.cursor:type_name -> volvoxgrid.v1.CursorType
-	71,  // 279: volvoxgrid.v1.EditRequest.ui_mode:type_name -> volvoxgrid.v1.EditUiMode
-	279, // 280: volvoxgrid.v1.GridEvent.cell_focus_changing:type_name -> volvoxgrid.v1.CellFocusChangingEvent
-	280, // 281: volvoxgrid.v1.GridEvent.cell_focus_changed:type_name -> volvoxgrid.v1.CellFocusChangedEvent
-	281, // 282: volvoxgrid.v1.GridEvent.selection_changing:type_name -> volvoxgrid.v1.SelectionChangingEvent
-	282, // 283: volvoxgrid.v1.GridEvent.selection_changed:type_name -> volvoxgrid.v1.SelectionChangedEvent
-	283, // 284: volvoxgrid.v1.GridEvent.enter_cell:type_name -> volvoxgrid.v1.EnterCellEvent
-	284, // 285: volvoxgrid.v1.GridEvent.leave_cell:type_name -> volvoxgrid.v1.LeaveCellEvent
-	285, // 286: volvoxgrid.v1.GridEvent.before_edit:type_name -> volvoxgrid.v1.BeforeEditEvent
-	286, // 287: volvoxgrid.v1.GridEvent.start_edit:type_name -> volvoxgrid.v1.StartEditEvent
-	287, // 288: volvoxgrid.v1.GridEvent.after_edit:type_name -> volvoxgrid.v1.AfterEditEvent
-	288, // 289: volvoxgrid.v1.GridEvent.cell_edit_validate:type_name -> volvoxgrid.v1.CellEditValidateEvent
-	289, // 290: volvoxgrid.v1.GridEvent.cell_edit_change:type_name -> volvoxgrid.v1.CellEditChangeEvent
-	290, // 291: volvoxgrid.v1.GridEvent.key_down_edit:type_name -> volvoxgrid.v1.KeyDownEditEvent
-	291, // 292: volvoxgrid.v1.GridEvent.key_press_edit:type_name -> volvoxgrid.v1.KeyPressEditEvent
-	292, // 293: volvoxgrid.v1.GridEvent.key_up_edit:type_name -> volvoxgrid.v1.KeyUpEditEvent
-	293, // 294: volvoxgrid.v1.GridEvent.cell_edit_configure_style:type_name -> volvoxgrid.v1.CellEditConfigureStyleEvent
-	294, // 295: volvoxgrid.v1.GridEvent.cell_edit_configure_window:type_name -> volvoxgrid.v1.CellEditConfigureWindowEvent
-	296, // 296: volvoxgrid.v1.GridEvent.dropdown_closed:type_name -> volvoxgrid.v1.DropdownClosedEvent
-	297, // 297: volvoxgrid.v1.GridEvent.dropdown_opened:type_name -> volvoxgrid.v1.DropdownOpenedEvent
-	298, // 298: volvoxgrid.v1.GridEvent.cell_changed:type_name -> volvoxgrid.v1.CellChangedEvent
-	299, // 299: volvoxgrid.v1.GridEvent.row_status_change:type_name -> volvoxgrid.v1.RowStatusChangeEvent
-	300, // 300: volvoxgrid.v1.GridEvent.before_sort:type_name -> volvoxgrid.v1.BeforeSortEvent
-	301, // 301: volvoxgrid.v1.GridEvent.after_sort:type_name -> volvoxgrid.v1.AfterSortEvent
-	302, // 302: volvoxgrid.v1.GridEvent.compare:type_name -> volvoxgrid.v1.CompareEvent
-	303, // 303: volvoxgrid.v1.GridEvent.before_node_toggle:type_name -> volvoxgrid.v1.BeforeNodeToggleEvent
-	304, // 304: volvoxgrid.v1.GridEvent.after_node_toggle:type_name -> volvoxgrid.v1.AfterNodeToggleEvent
-	310, // 305: volvoxgrid.v1.GridEvent.before_scroll:type_name -> volvoxgrid.v1.BeforeScrollEvent
-	311, // 306: volvoxgrid.v1.GridEvent.after_scroll:type_name -> volvoxgrid.v1.AfterScrollEvent
-	312, // 307: volvoxgrid.v1.GridEvent.scroll_tooltip:type_name -> volvoxgrid.v1.ScrollTooltipEvent
-	313, // 308: volvoxgrid.v1.GridEvent.before_user_resize:type_name -> volvoxgrid.v1.BeforeUserResizeEvent
-	314, // 309: volvoxgrid.v1.GridEvent.after_user_resize:type_name -> volvoxgrid.v1.AfterUserResizeEvent
-	315, // 310: volvoxgrid.v1.GridEvent.after_user_freeze:type_name -> volvoxgrid.v1.AfterUserFreezeEvent
-	316, // 311: volvoxgrid.v1.GridEvent.before_move_column:type_name -> volvoxgrid.v1.BeforeMoveColumnEvent
-	317, // 312: volvoxgrid.v1.GridEvent.after_move_column:type_name -> volvoxgrid.v1.AfterMoveColumnEvent
-	318, // 313: volvoxgrid.v1.GridEvent.before_move_row:type_name -> volvoxgrid.v1.BeforeMoveRowEvent
-	319, // 314: volvoxgrid.v1.GridEvent.after_move_row:type_name -> volvoxgrid.v1.AfterMoveRowEvent
-	320, // 315: volvoxgrid.v1.GridEvent.before_mouse_down:type_name -> volvoxgrid.v1.BeforeMouseDownEvent
-	321, // 316: volvoxgrid.v1.GridEvent.mouse_down:type_name -> volvoxgrid.v1.MouseDownEvent
-	322, // 317: volvoxgrid.v1.GridEvent.mouse_up:type_name -> volvoxgrid.v1.MouseUpEvent
-	323, // 318: volvoxgrid.v1.GridEvent.mouse_move:type_name -> volvoxgrid.v1.MouseMoveEvent
-	324, // 319: volvoxgrid.v1.GridEvent.click:type_name -> volvoxgrid.v1.ClickEvent
-	325, // 320: volvoxgrid.v1.GridEvent.dbl_click:type_name -> volvoxgrid.v1.DblClickEvent
-	326, // 321: volvoxgrid.v1.GridEvent.key_down:type_name -> volvoxgrid.v1.KeyDownEvent
-	327, // 322: volvoxgrid.v1.GridEvent.key_press:type_name -> volvoxgrid.v1.KeyPressEvent
-	328, // 323: volvoxgrid.v1.GridEvent.key_up:type_name -> volvoxgrid.v1.KeyUpEvent
-	329, // 324: volvoxgrid.v1.GridEvent.custom_render_cell:type_name -> volvoxgrid.v1.CustomRenderCellEvent
-	330, // 325: volvoxgrid.v1.GridEvent.drag_start:type_name -> volvoxgrid.v1.DragStartEvent
-	331, // 326: volvoxgrid.v1.GridEvent.drag_over:type_name -> volvoxgrid.v1.DragOverEvent
-	332, // 327: volvoxgrid.v1.GridEvent.drag_drop:type_name -> volvoxgrid.v1.DragDropEvent
-	333, // 328: volvoxgrid.v1.GridEvent.drag_complete:type_name -> volvoxgrid.v1.DragCompleteEvent
-	334, // 329: volvoxgrid.v1.GridEvent.type_ahead_started:type_name -> volvoxgrid.v1.TypeAheadStartedEvent
-	335, // 330: volvoxgrid.v1.GridEvent.type_ahead_ended:type_name -> volvoxgrid.v1.TypeAheadEndedEvent
-	336, // 331: volvoxgrid.v1.GridEvent.data_refreshing:type_name -> volvoxgrid.v1.DataRefreshingEvent
-	337, // 332: volvoxgrid.v1.GridEvent.data_refreshed:type_name -> volvoxgrid.v1.DataRefreshedEvent
-	338, // 333: volvoxgrid.v1.GridEvent.filter_data:type_name -> volvoxgrid.v1.FilterDataEvent
-	341, // 334: volvoxgrid.v1.GridEvent.error:type_name -> volvoxgrid.v1.ErrorEvent
-	342, // 335: volvoxgrid.v1.GridEvent.before_page_break:type_name -> volvoxgrid.v1.BeforePageBreakEvent
-	343, // 336: volvoxgrid.v1.GridEvent.start_page:type_name -> volvoxgrid.v1.StartPageEvent
-	344, // 337: volvoxgrid.v1.GridEvent.get_header_row:type_name -> volvoxgrid.v1.GetHeaderRowEvent
-	339, // 338: volvoxgrid.v1.GridEvent.pull_to_refresh_triggered:type_name -> volvoxgrid.v1.PullToRefreshTriggeredEvent
-	340, // 339: volvoxgrid.v1.GridEvent.pull_to_refresh_canceled:type_name -> volvoxgrid.v1.PullToRefreshCanceledEvent
-	295, // 340: volvoxgrid.v1.GridEvent.before_dropdown_open:type_name -> volvoxgrid.v1.BeforeDropdownOpenEvent
-	305, // 341: volvoxgrid.v1.GridEvent.tree_children_requested:type_name -> volvoxgrid.v1.TreeChildrenRequestedEvent
-	306, // 342: volvoxgrid.v1.GridEvent.before_tree_node_toggle:type_name -> volvoxgrid.v1.BeforeTreeNodeToggleEvent
-	307, // 343: volvoxgrid.v1.GridEvent.after_tree_node_toggle:type_name -> volvoxgrid.v1.AfterTreeNodeToggleEvent
-	308, // 344: volvoxgrid.v1.GridEvent.tree_node_activate:type_name -> volvoxgrid.v1.TreeNodeActivateEvent
-	309, // 345: volvoxgrid.v1.GridEvent.tree_node_context_menu:type_name -> volvoxgrid.v1.TreeNodeContextMenuEvent
-	94,  // 346: volvoxgrid.v1.SelectionChangingEvent.old_ranges:type_name -> volvoxgrid.v1.CellRange
-	94,  // 347: volvoxgrid.v1.SelectionChangingEvent.new_ranges:type_name -> volvoxgrid.v1.CellRange
-	94,  // 348: volvoxgrid.v1.SelectionChangedEvent.old_ranges:type_name -> volvoxgrid.v1.CellRange
-	94,  // 349: volvoxgrid.v1.SelectionChangedEvent.new_ranges:type_name -> volvoxgrid.v1.CellRange
-	138, // 350: volvoxgrid.v1.EnterCellEvent.target:type_name -> volvoxgrid.v1.GridEventTarget
-	138, // 351: volvoxgrid.v1.LeaveCellEvent.target:type_name -> volvoxgrid.v1.GridEventTarget
-	99,  // 352: volvoxgrid.v1.BeforeDropdownOpenEvent.dropdown:type_name -> volvoxgrid.v1.Dropdown
-	145, // 353: volvoxgrid.v1.RowStatusChangeEvent.status:type_name -> volvoxgrid.v1.RowStatus
-	138, // 354: volvoxgrid.v1.BeforeMouseDownEvent.target:type_name -> volvoxgrid.v1.GridEventTarget
-	138, // 355: volvoxgrid.v1.MouseMoveEvent.target:type_name -> volvoxgrid.v1.GridEventTarget
-	61,  // 356: volvoxgrid.v1.ClickEvent.hit_area:type_name -> volvoxgrid.v1.CellHitArea
-	21,  // 357: volvoxgrid.v1.ClickEvent.interaction:type_name -> volvoxgrid.v1.CellInteraction
-	138, // 358: volvoxgrid.v1.ClickEvent.target:type_name -> volvoxgrid.v1.GridEventTarget
-	138, // 359: volvoxgrid.v1.DblClickEvent.target:type_name -> volvoxgrid.v1.GridEventTarget
-	104, // 360: volvoxgrid.v1.CustomRenderCellEvent.style:type_name -> volvoxgrid.v1.CellStyle
-	212, // 361: volvoxgrid.v1.VolvoxGridService.Create:input_type -> volvoxgrid.v1.CreateRequest
-	214, // 362: volvoxgrid.v1.VolvoxGridService.Destroy:input_type -> volvoxgrid.v1.DestroyRequest
-	227, // 363: volvoxgrid.v1.VolvoxGridService.Configure:input_type -> volvoxgrid.v1.ConfigureRequest
-	215, // 364: volvoxgrid.v1.VolvoxGridService.GetConfig:input_type -> volvoxgrid.v1.GetConfigRequest
-	228, // 365: volvoxgrid.v1.VolvoxGridService.LoadFontData:input_type -> volvoxgrid.v1.LoadFontDataRequest
-	142, // 366: volvoxgrid.v1.VolvoxGridService.DefineColumns:input_type -> volvoxgrid.v1.DefineColumnsRequest
-	216, // 367: volvoxgrid.v1.VolvoxGridService.GetSchema:input_type -> volvoxgrid.v1.GetSchemaRequest
-	146, // 368: volvoxgrid.v1.VolvoxGridService.DefineRows:input_type -> volvoxgrid.v1.DefineRowsRequest
-	163, // 369: volvoxgrid.v1.VolvoxGridService.InsertRows:input_type -> volvoxgrid.v1.InsertRowsRequest
-	164, // 370: volvoxgrid.v1.VolvoxGridService.RemoveRows:input_type -> volvoxgrid.v1.RemoveRowsRequest
-	165, // 371: volvoxgrid.v1.VolvoxGridService.MoveColumn:input_type -> volvoxgrid.v1.MoveColumnRequest
-	166, // 372: volvoxgrid.v1.VolvoxGridService.MoveRow:input_type -> volvoxgrid.v1.MoveRowRequest
-	148, // 373: volvoxgrid.v1.VolvoxGridService.UpdateCells:input_type -> volvoxgrid.v1.UpdateCellsRequest
-	149, // 374: volvoxgrid.v1.VolvoxGridService.GetCells:input_type -> volvoxgrid.v1.GetCellsRequest
-	154, // 375: volvoxgrid.v1.VolvoxGridService.LoadTable:input_type -> volvoxgrid.v1.LoadTableRequest
-	159, // 376: volvoxgrid.v1.VolvoxGridService.LoadData:input_type -> volvoxgrid.v1.LoadDataRequest
-	160, // 377: volvoxgrid.v1.VolvoxGridService.AppendData:input_type -> volvoxgrid.v1.AppendDataRequest
-	162, // 378: volvoxgrid.v1.VolvoxGridService.Clear:input_type -> volvoxgrid.v1.ClearRequest
-	167, // 379: volvoxgrid.v1.VolvoxGridService.Select:input_type -> volvoxgrid.v1.SelectRequest
-	217, // 380: volvoxgrid.v1.VolvoxGridService.GetSelection:input_type -> volvoxgrid.v1.GetSelectionRequest
-	223, // 381: volvoxgrid.v1.VolvoxGridService.ShowCell:input_type -> volvoxgrid.v1.ShowCellRequest
-	224, // 382: volvoxgrid.v1.VolvoxGridService.SetTopRow:input_type -> volvoxgrid.v1.SetRowRequest
-	225, // 383: volvoxgrid.v1.VolvoxGridService.SetLeftCol:input_type -> volvoxgrid.v1.SetColRequest
-	171, // 384: volvoxgrid.v1.VolvoxGridService.Edit:input_type -> volvoxgrid.v1.EditCommand
-	181, // 385: volvoxgrid.v1.VolvoxGridService.Sort:input_type -> volvoxgrid.v1.SortRequest
-	182, // 386: volvoxgrid.v1.VolvoxGridService.Subtotal:input_type -> volvoxgrid.v1.SubtotalRequest
-	184, // 387: volvoxgrid.v1.VolvoxGridService.AutoSize:input_type -> volvoxgrid.v1.AutoSizeRequest
-	185, // 388: volvoxgrid.v1.VolvoxGridService.Outline:input_type -> volvoxgrid.v1.OutlineRequest
-	186, // 389: volvoxgrid.v1.VolvoxGridService.GetNode:input_type -> volvoxgrid.v1.GetNodeRequest
-	188, // 390: volvoxgrid.v1.VolvoxGridService.Find:input_type -> volvoxgrid.v1.FindRequest
-	192, // 391: volvoxgrid.v1.VolvoxGridService.Aggregate:input_type -> volvoxgrid.v1.AggregateRequest
-	194, // 392: volvoxgrid.v1.VolvoxGridService.GetMergedRange:input_type -> volvoxgrid.v1.GetMergedRangeRequest
-	195, // 393: volvoxgrid.v1.VolvoxGridService.MergeCells:input_type -> volvoxgrid.v1.MergeCellsRequest
-	196, // 394: volvoxgrid.v1.VolvoxGridService.UnmergeCells:input_type -> volvoxgrid.v1.UnmergeCellsRequest
-	218, // 395: volvoxgrid.v1.VolvoxGridService.GetMergedRegions:input_type -> volvoxgrid.v1.GetMergedRegionsRequest
-	219, // 396: volvoxgrid.v1.VolvoxGridService.GetMemoryUsage:input_type -> volvoxgrid.v1.GetMemoryUsageRequest
-	199, // 397: volvoxgrid.v1.VolvoxGridService.Clipboard:input_type -> volvoxgrid.v1.ClipboardCommand
-	205, // 398: volvoxgrid.v1.VolvoxGridService.Export:input_type -> volvoxgrid.v1.ExportRequest
-	207, // 399: volvoxgrid.v1.VolvoxGridService.Print:input_type -> volvoxgrid.v1.PrintRequest
-	210, // 400: volvoxgrid.v1.VolvoxGridService.Archive:input_type -> volvoxgrid.v1.ArchiveRequest
-	222, // 401: volvoxgrid.v1.VolvoxGridService.ResizeViewport:input_type -> volvoxgrid.v1.ResizeViewportRequest
-	226, // 402: volvoxgrid.v1.VolvoxGridService.SetRedraw:input_type -> volvoxgrid.v1.SetRedrawRequest
-	220, // 403: volvoxgrid.v1.VolvoxGridService.Refresh:input_type -> volvoxgrid.v1.RefreshRequest
-	229, // 404: volvoxgrid.v1.VolvoxGridService.LoadDemo:input_type -> volvoxgrid.v1.LoadDemoRequest
-	230, // 405: volvoxgrid.v1.VolvoxGridService.GetDemoData:input_type -> volvoxgrid.v1.GetDemoDataRequest
-	255, // 406: volvoxgrid.v1.VolvoxGridService.RenderSession:input_type -> volvoxgrid.v1.RenderInput
-	221, // 407: volvoxgrid.v1.VolvoxGridService.EventStream:input_type -> volvoxgrid.v1.EventStreamRequest
-	213, // 408: volvoxgrid.v1.VolvoxGridService.Create:output_type -> volvoxgrid.v1.CreateResponse
-	232, // 409: volvoxgrid.v1.VolvoxGridService.Destroy:output_type -> volvoxgrid.v1.DestroyResponse
-	233, // 410: volvoxgrid.v1.VolvoxGridService.Configure:output_type -> volvoxgrid.v1.ConfigureResponse
-	119, // 411: volvoxgrid.v1.VolvoxGridService.GetConfig:output_type -> volvoxgrid.v1.GridConfig
-	234, // 412: volvoxgrid.v1.VolvoxGridService.LoadFontData:output_type -> volvoxgrid.v1.LoadFontDataResponse
-	235, // 413: volvoxgrid.v1.VolvoxGridService.DefineColumns:output_type -> volvoxgrid.v1.DefineColumnsResponse
-	143, // 414: volvoxgrid.v1.VolvoxGridService.GetSchema:output_type -> volvoxgrid.v1.SchemaResponse
-	236, // 415: volvoxgrid.v1.VolvoxGridService.DefineRows:output_type -> volvoxgrid.v1.DefineRowsResponse
-	237, // 416: volvoxgrid.v1.VolvoxGridService.InsertRows:output_type -> volvoxgrid.v1.InsertRowsResponse
-	238, // 417: volvoxgrid.v1.VolvoxGridService.RemoveRows:output_type -> volvoxgrid.v1.RemoveRowsResponse
-	239, // 418: volvoxgrid.v1.VolvoxGridService.MoveColumn:output_type -> volvoxgrid.v1.MoveColumnResponse
-	240, // 419: volvoxgrid.v1.VolvoxGridService.MoveRow:output_type -> volvoxgrid.v1.MoveRowResponse
-	153, // 420: volvoxgrid.v1.VolvoxGridService.UpdateCells:output_type -> volvoxgrid.v1.WriteResult
-	151, // 421: volvoxgrid.v1.VolvoxGridService.GetCells:output_type -> volvoxgrid.v1.CellsResponse
-	153, // 422: volvoxgrid.v1.VolvoxGridService.LoadTable:output_type -> volvoxgrid.v1.WriteResult
-	161, // 423: volvoxgrid.v1.VolvoxGridService.LoadData:output_type -> volvoxgrid.v1.LoadDataResult
-	161, // 424: volvoxgrid.v1.VolvoxGridService.AppendData:output_type -> volvoxgrid.v1.LoadDataResult
-	241, // 425: volvoxgrid.v1.VolvoxGridService.Clear:output_type -> volvoxgrid.v1.ClearResponse
-	242, // 426: volvoxgrid.v1.VolvoxGridService.Select:output_type -> volvoxgrid.v1.SelectResponse
-	168, // 427: volvoxgrid.v1.VolvoxGridService.GetSelection:output_type -> volvoxgrid.v1.SelectionState
-	243, // 428: volvoxgrid.v1.VolvoxGridService.ShowCell:output_type -> volvoxgrid.v1.ShowCellResponse
-	244, // 429: volvoxgrid.v1.VolvoxGridService.SetTopRow:output_type -> volvoxgrid.v1.SetTopRowResponse
-	245, // 430: volvoxgrid.v1.VolvoxGridService.SetLeftCol:output_type -> volvoxgrid.v1.SetLeftColResponse
-	179, // 431: volvoxgrid.v1.VolvoxGridService.Edit:output_type -> volvoxgrid.v1.EditState
-	246, // 432: volvoxgrid.v1.VolvoxGridService.Sort:output_type -> volvoxgrid.v1.SortResponse
-	183, // 433: volvoxgrid.v1.VolvoxGridService.Subtotal:output_type -> volvoxgrid.v1.SubtotalResult
-	247, // 434: volvoxgrid.v1.VolvoxGridService.AutoSize:output_type -> volvoxgrid.v1.AutoSizeResponse
-	248, // 435: volvoxgrid.v1.VolvoxGridService.Outline:output_type -> volvoxgrid.v1.OutlineResponse
-	187, // 436: volvoxgrid.v1.VolvoxGridService.GetNode:output_type -> volvoxgrid.v1.NodeInfo
-	191, // 437: volvoxgrid.v1.VolvoxGridService.Find:output_type -> volvoxgrid.v1.FindResponse
-	193, // 438: volvoxgrid.v1.VolvoxGridService.Aggregate:output_type -> volvoxgrid.v1.AggregateResponse
-	94,  // 439: volvoxgrid.v1.VolvoxGridService.GetMergedRange:output_type -> volvoxgrid.v1.CellRange
-	249, // 440: volvoxgrid.v1.VolvoxGridService.MergeCells:output_type -> volvoxgrid.v1.MergeCellsResponse
-	250, // 441: volvoxgrid.v1.VolvoxGridService.UnmergeCells:output_type -> volvoxgrid.v1.UnmergeCellsResponse
-	197, // 442: volvoxgrid.v1.VolvoxGridService.GetMergedRegions:output_type -> volvoxgrid.v1.MergedRegionsResponse
-	198, // 443: volvoxgrid.v1.VolvoxGridService.GetMemoryUsage:output_type -> volvoxgrid.v1.MemoryUsageResponse
-	204, // 444: volvoxgrid.v1.VolvoxGridService.Clipboard:output_type -> volvoxgrid.v1.ClipboardResponse
-	206, // 445: volvoxgrid.v1.VolvoxGridService.Export:output_type -> volvoxgrid.v1.ExportResponse
-	208, // 446: volvoxgrid.v1.VolvoxGridService.Print:output_type -> volvoxgrid.v1.PrintResponse
-	211, // 447: volvoxgrid.v1.VolvoxGridService.Archive:output_type -> volvoxgrid.v1.ArchiveResponse
-	251, // 448: volvoxgrid.v1.VolvoxGridService.ResizeViewport:output_type -> volvoxgrid.v1.ResizeViewportResponse
-	252, // 449: volvoxgrid.v1.VolvoxGridService.SetRedraw:output_type -> volvoxgrid.v1.SetRedrawResponse
-	253, // 450: volvoxgrid.v1.VolvoxGridService.Refresh:output_type -> volvoxgrid.v1.RefreshResponse
-	254, // 451: volvoxgrid.v1.VolvoxGridService.LoadDemo:output_type -> volvoxgrid.v1.LoadDemoResponse
-	231, // 452: volvoxgrid.v1.VolvoxGridService.GetDemoData:output_type -> volvoxgrid.v1.GetDemoDataResponse
-	269, // 453: volvoxgrid.v1.VolvoxGridService.RenderSession:output_type -> volvoxgrid.v1.RenderOutput
-	278, // 454: volvoxgrid.v1.VolvoxGridService.EventStream:output_type -> volvoxgrid.v1.GridEvent
-	408, // [408:455] is the sub-list for method output_type
-	361, // [361:408] is the sub-list for method input_type
-	361, // [361:361] is the sub-list for extension type_name
-	361, // [361:361] is the sub-list for extension extendee
-	0,   // [0:361] is the sub-list for field type_name
+	6,   // 8: volvoxgrid.v1.TextRendering.mode:type_name -> volvoxgrid.v1.TextRenderMode
+	7,   // 9: volvoxgrid.v1.TextRendering.hinting:type_name -> volvoxgrid.v1.TextHintingMode
+	13,  // 10: volvoxgrid.v1.BarcodeEncodingOptions.check_digit:type_name -> volvoxgrid.v1.BarcodeCheckDigitMode
+	14,  // 11: volvoxgrid.v1.BarcodeEncodingOptions.text_encoding:type_name -> volvoxgrid.v1.BarcodeTextEncoding
+	15,  // 12: volvoxgrid.v1.BarcodeEncodingOptions.qr_ecc:type_name -> volvoxgrid.v1.BarcodeQrErrorCorrection
+	10,  // 13: volvoxgrid.v1.BarcodeRenderOptions.alignment:type_name -> volvoxgrid.v1.ImageAlignment
+	12,  // 14: volvoxgrid.v1.BarcodeCaptionOptions.position:type_name -> volvoxgrid.v1.BarcodeCaptionPosition
+	11,  // 15: volvoxgrid.v1.BarcodeData.symbology:type_name -> volvoxgrid.v1.BarcodeSymbology
+	100, // 16: volvoxgrid.v1.BarcodeData.encoding:type_name -> volvoxgrid.v1.BarcodeEncodingOptions
+	101, // 17: volvoxgrid.v1.BarcodeData.render:type_name -> volvoxgrid.v1.BarcodeRenderOptions
+	102, // 18: volvoxgrid.v1.BarcodeData.caption:type_name -> volvoxgrid.v1.BarcodeCaptionOptions
+	108, // 19: volvoxgrid.v1.StructValue.fields:type_name -> volvoxgrid.v1.StructField
+	109, // 20: volvoxgrid.v1.StructField.value:type_name -> volvoxgrid.v1.ScalarValue
+	111, // 21: volvoxgrid.v1.RichText.runs:type_name -> volvoxgrid.v1.TextFormatRun
+	112, // 22: volvoxgrid.v1.TextFormatRun.style:type_name -> volvoxgrid.v1.TextRunStyle
+	92,  // 23: volvoxgrid.v1.TextRunStyle.font:type_name -> volvoxgrid.v1.Font
+	8,   // 24: volvoxgrid.v1.TextRunStyle.baseline:type_name -> volvoxgrid.v1.TextBaseline
+	32,  // 25: volvoxgrid.v1.EditorSpec.kind:type_name -> volvoxgrid.v1.EditorKind
+	33,  // 26: volvoxgrid.v1.EditorSpec.owner:type_name -> volvoxgrid.v1.EditorOwner
+	34,  // 27: volvoxgrid.v1.EditorSpec.presentation:type_name -> volvoxgrid.v1.EditorPresentation
+	35,  // 28: volvoxgrid.v1.EditorSpec.validation_mode:type_name -> volvoxgrid.v1.ValidationMode
+	36,  // 29: volvoxgrid.v1.EditorSpec.validation_trigger:type_name -> volvoxgrid.v1.ValidationTrigger
+	114, // 30: volvoxgrid.v1.EditorSpec.text:type_name -> volvoxgrid.v1.TextEditorParams
+	115, // 31: volvoxgrid.v1.EditorSpec.number:type_name -> volvoxgrid.v1.NumberEditorParams
+	116, // 32: volvoxgrid.v1.EditorSpec.checkbox:type_name -> volvoxgrid.v1.CheckboxEditorParams
+	119, // 33: volvoxgrid.v1.EditorSpec.list:type_name -> volvoxgrid.v1.ListEditorParams
+	117, // 34: volvoxgrid.v1.EditorSpec.date_time:type_name -> volvoxgrid.v1.DateTimeEditorParams
+	118, // 35: volvoxgrid.v1.EditorSpec.actions:type_name -> volvoxgrid.v1.EditorAction
+	107, // 36: volvoxgrid.v1.EditorSpec.custom_props:type_name -> volvoxgrid.v1.StructValue
+	37,  // 37: volvoxgrid.v1.TextEditorParams.input_type:type_name -> volvoxgrid.v1.InputType
+	38,  // 38: volvoxgrid.v1.EditorAction.role:type_name -> volvoxgrid.v1.ButtonRole
+	99,  // 39: volvoxgrid.v1.EditorAction.icon:type_name -> volvoxgrid.v1.ImageData
+	120, // 40: volvoxgrid.v1.ListEditorParams.static_items:type_name -> volvoxgrid.v1.ListItem
+	121, // 41: volvoxgrid.v1.ListEditorParams.data_source:type_name -> volvoxgrid.v1.ListDataSource
+	30,  // 42: volvoxgrid.v1.ListEditorParams.item_layout:type_name -> volvoxgrid.v1.DropdownItemLayout
+	106, // 43: volvoxgrid.v1.ListItem.value:type_name -> volvoxgrid.v1.CellValue
+	106, // 44: volvoxgrid.v1.EditorValue.value:type_name -> volvoxgrid.v1.CellValue
+	29,  // 45: volvoxgrid.v1.EditActivation.trigger:type_name -> volvoxgrid.v1.EditTrigger
+	31,  // 46: volvoxgrid.v1.EditActivation.tab_behavior:type_name -> volvoxgrid.v1.TabBehavior
+	47,  // 47: volvoxgrid.v1.ScrollBarConfig.show_h:type_name -> volvoxgrid.v1.ScrollBarMode
+	47,  // 48: volvoxgrid.v1.ScrollBarConfig.show_v:type_name -> volvoxgrid.v1.ScrollBarMode
+	48,  // 49: volvoxgrid.v1.ScrollBarConfig.appearance:type_name -> volvoxgrid.v1.ScrollBarAppearance
+	126, // 50: volvoxgrid.v1.ScrollBarConfig.colors:type_name -> volvoxgrid.v1.ScrollBarColors
+	92,  // 51: volvoxgrid.v1.RegionStyle.font:type_name -> volvoxgrid.v1.Font
+	96,  // 52: volvoxgrid.v1.RegionStyle.grid_lines:type_name -> volvoxgrid.v1.GridLines
+	5,   // 53: volvoxgrid.v1.RegionStyle.text_effect:type_name -> volvoxgrid.v1.TextEffect
+	97,  // 54: volvoxgrid.v1.RegionStyle.separator:type_name -> volvoxgrid.v1.Separator
+	93,  // 55: volvoxgrid.v1.RegionStyle.cell_padding:type_name -> volvoxgrid.v1.Padding
+	9,   // 56: volvoxgrid.v1.CellStyle.align:type_name -> volvoxgrid.v1.Align
+	92,  // 57: volvoxgrid.v1.CellStyle.font:type_name -> volvoxgrid.v1.Font
+	93,  // 58: volvoxgrid.v1.CellStyle.padding:type_name -> volvoxgrid.v1.Padding
+	95,  // 59: volvoxgrid.v1.CellStyle.borders:type_name -> volvoxgrid.v1.Borders
+	5,   // 60: volvoxgrid.v1.CellStyle.text_effect:type_name -> volvoxgrid.v1.TextEffect
+	95,  // 61: volvoxgrid.v1.HighlightStyle.borders:type_name -> volvoxgrid.v1.Borders
+	18,  // 62: volvoxgrid.v1.HighlightStyle.fill_handle:type_name -> volvoxgrid.v1.FillHandlePosition
+	131, // 63: volvoxgrid.v1.HeaderSeparator.height:type_name -> volvoxgrid.v1.HeaderMarkSize
+	131, // 64: volvoxgrid.v1.HeaderResizeHandle.height:type_name -> volvoxgrid.v1.HeaderMarkSize
+	132, // 65: volvoxgrid.v1.HeaderStyle.separator:type_name -> volvoxgrid.v1.HeaderSeparator
+	133, // 66: volvoxgrid.v1.HeaderStyle.resize_handle:type_name -> volvoxgrid.v1.HeaderResizeHandle
+	92,  // 67: volvoxgrid.v1.IconStyle.font:type_name -> volvoxgrid.v1.Font
+	67,  // 68: volvoxgrid.v1.IconStyle.align:type_name -> volvoxgrid.v1.IconAlign
+	136, // 69: volvoxgrid.v1.IconSlotStyles.sort_ascending:type_name -> volvoxgrid.v1.IconStyle
+	136, // 70: volvoxgrid.v1.IconSlotStyles.sort_descending:type_name -> volvoxgrid.v1.IconStyle
+	136, // 71: volvoxgrid.v1.IconSlotStyles.sort_none:type_name -> volvoxgrid.v1.IconStyle
+	136, // 72: volvoxgrid.v1.IconSlotStyles.tree_expanded:type_name -> volvoxgrid.v1.IconStyle
+	136, // 73: volvoxgrid.v1.IconSlotStyles.tree_collapsed:type_name -> volvoxgrid.v1.IconStyle
+	136, // 74: volvoxgrid.v1.IconSlotStyles.menu:type_name -> volvoxgrid.v1.IconStyle
+	136, // 75: volvoxgrid.v1.IconSlotStyles.filter:type_name -> volvoxgrid.v1.IconStyle
+	136, // 76: volvoxgrid.v1.IconSlotStyles.filter_active:type_name -> volvoxgrid.v1.IconStyle
+	136, // 77: volvoxgrid.v1.IconSlotStyles.columns:type_name -> volvoxgrid.v1.IconStyle
+	136, // 78: volvoxgrid.v1.IconSlotStyles.drag_handle:type_name -> volvoxgrid.v1.IconStyle
+	136, // 79: volvoxgrid.v1.IconSlotStyles.checkbox_checked:type_name -> volvoxgrid.v1.IconStyle
+	136, // 80: volvoxgrid.v1.IconSlotStyles.checkbox_unchecked:type_name -> volvoxgrid.v1.IconStyle
+	136, // 81: volvoxgrid.v1.IconSlotStyles.checkbox_indeterminate:type_name -> volvoxgrid.v1.IconStyle
+	99,  // 82: volvoxgrid.v1.IconPictures.sort_ascending:type_name -> volvoxgrid.v1.ImageData
+	99,  // 83: volvoxgrid.v1.IconPictures.sort_descending:type_name -> volvoxgrid.v1.ImageData
+	99,  // 84: volvoxgrid.v1.IconPictures.node_open:type_name -> volvoxgrid.v1.ImageData
+	99,  // 85: volvoxgrid.v1.IconPictures.node_closed:type_name -> volvoxgrid.v1.ImageData
+	99,  // 86: volvoxgrid.v1.IconPictures.checkbox_checked:type_name -> volvoxgrid.v1.ImageData
+	99,  // 87: volvoxgrid.v1.IconPictures.checkbox_unchecked:type_name -> volvoxgrid.v1.ImageData
+	99,  // 88: volvoxgrid.v1.IconPictures.checkbox_indeterminate:type_name -> volvoxgrid.v1.ImageData
+	135, // 89: volvoxgrid.v1.IconTheme.slots:type_name -> volvoxgrid.v1.IconSlots
+	136, // 90: volvoxgrid.v1.IconTheme.defaults:type_name -> volvoxgrid.v1.IconStyle
+	137, // 91: volvoxgrid.v1.IconTheme.overrides:type_name -> volvoxgrid.v1.IconSlotStyles
+	138, // 92: volvoxgrid.v1.IconTheme.pictures:type_name -> volvoxgrid.v1.IconPictures
+	130, // 93: volvoxgrid.v1.HoverConfig.row_style:type_name -> volvoxgrid.v1.HighlightStyle
+	130, // 94: volvoxgrid.v1.HoverConfig.column_style:type_name -> volvoxgrid.v1.HighlightStyle
+	130, // 95: volvoxgrid.v1.HoverConfig.cell_style:type_name -> volvoxgrid.v1.HighlightStyle
+	145, // 96: volvoxgrid.v1.GridConfig.layout:type_name -> volvoxgrid.v1.LayoutConfig
+	146, // 97: volvoxgrid.v1.GridConfig.style:type_name -> volvoxgrid.v1.StyleConfig
+	147, // 98: volvoxgrid.v1.GridConfig.selection:type_name -> volvoxgrid.v1.SelectionConfig
+	148, // 99: volvoxgrid.v1.GridConfig.editing:type_name -> volvoxgrid.v1.EditConfig
+	150, // 100: volvoxgrid.v1.GridConfig.scrolling:type_name -> volvoxgrid.v1.ScrollConfig
+	151, // 101: volvoxgrid.v1.GridConfig.outline:type_name -> volvoxgrid.v1.OutlineConfig
+	152, // 102: volvoxgrid.v1.GridConfig.span:type_name -> volvoxgrid.v1.SpanConfig
+	153, // 103: volvoxgrid.v1.GridConfig.interaction:type_name -> volvoxgrid.v1.InteractionConfig
+	154, // 104: volvoxgrid.v1.GridConfig.rendering:type_name -> volvoxgrid.v1.RenderConfig
+	166, // 105: volvoxgrid.v1.GridConfig.indicators:type_name -> volvoxgrid.v1.IndicatorsConfig
+	4,   // 106: volvoxgrid.v1.GridConfig.theme_preset:type_name -> volvoxgrid.v1.ThemePreset
+	92,  // 107: volvoxgrid.v1.StyleConfig.font:type_name -> volvoxgrid.v1.Font
+	93,  // 108: volvoxgrid.v1.StyleConfig.cell_padding:type_name -> volvoxgrid.v1.Padding
+	5,   // 109: volvoxgrid.v1.StyleConfig.text_effect:type_name -> volvoxgrid.v1.TextEffect
+	96,  // 110: volvoxgrid.v1.StyleConfig.grid_lines:type_name -> volvoxgrid.v1.GridLines
+	128, // 111: volvoxgrid.v1.StyleConfig.fixed:type_name -> volvoxgrid.v1.RegionStyle
+	128, // 112: volvoxgrid.v1.StyleConfig.frozen:type_name -> volvoxgrid.v1.RegionStyle
+	134, // 113: volvoxgrid.v1.StyleConfig.header:type_name -> volvoxgrid.v1.HeaderStyle
+	3,   // 114: volvoxgrid.v1.StyleConfig.appearance:type_name -> volvoxgrid.v1.BorderAppearance
+	10,  // 115: volvoxgrid.v1.StyleConfig.background_image_align:type_name -> volvoxgrid.v1.ImageAlignment
+	98,  // 116: volvoxgrid.v1.StyleConfig.text_rendering:type_name -> volvoxgrid.v1.TextRendering
+	139, // 117: volvoxgrid.v1.StyleConfig.icons:type_name -> volvoxgrid.v1.IconTheme
+	57,  // 118: volvoxgrid.v1.StyleConfig.apply_scope:type_name -> volvoxgrid.v1.ApplyScope
+	56,  // 119: volvoxgrid.v1.StyleConfig.custom_render:type_name -> volvoxgrid.v1.CustomRenderMode
+	26,  // 120: volvoxgrid.v1.SelectionConfig.mode:type_name -> volvoxgrid.v1.SelectionMode
+	27,  // 121: volvoxgrid.v1.SelectionConfig.focus_border:type_name -> volvoxgrid.v1.FocusBorderStyle
+	28,  // 122: volvoxgrid.v1.SelectionConfig.visibility:type_name -> volvoxgrid.v1.SelectionVisibility
+	130, // 123: volvoxgrid.v1.SelectionConfig.style:type_name -> volvoxgrid.v1.HighlightStyle
+	140, // 124: volvoxgrid.v1.SelectionConfig.hover:type_name -> volvoxgrid.v1.HoverConfig
+	130, // 125: volvoxgrid.v1.SelectionConfig.indicator_row_style:type_name -> volvoxgrid.v1.HighlightStyle
+	130, // 126: volvoxgrid.v1.SelectionConfig.indicator_col_style:type_name -> volvoxgrid.v1.HighlightStyle
+	130, // 127: volvoxgrid.v1.SelectionConfig.active_cell_style:type_name -> volvoxgrid.v1.HighlightStyle
+	125, // 128: volvoxgrid.v1.EditConfig.activation:type_name -> volvoxgrid.v1.EditActivation
+	113, // 129: volvoxgrid.v1.EditConfig.default_editor:type_name -> volvoxgrid.v1.EditorSpec
+	77,  // 130: volvoxgrid.v1.EditConfig.compose_method:type_name -> volvoxgrid.v1.ComposeMethod
+	69,  // 131: volvoxgrid.v1.PullToRefreshConfig.theme:type_name -> volvoxgrid.v1.PullToRefreshTheme
+	127, // 132: volvoxgrid.v1.ScrollConfig.scroll_bar:type_name -> volvoxgrid.v1.ScrollBarConfig
+	46,  // 133: volvoxgrid.v1.ScrollConfig.scrollbars:type_name -> volvoxgrid.v1.ScrollBarsMode
+	149, // 134: volvoxgrid.v1.ScrollConfig.pull_to_refresh:type_name -> volvoxgrid.v1.PullToRefreshConfig
+	41,  // 135: volvoxgrid.v1.OutlineConfig.tree_indicator:type_name -> volvoxgrid.v1.TreeIndicatorStyle
+	42,  // 136: volvoxgrid.v1.OutlineConfig.group_total_position:type_name -> volvoxgrid.v1.GroupTotalPosition
+	44,  // 137: volvoxgrid.v1.SpanConfig.cell_span:type_name -> volvoxgrid.v1.CellSpanMode
+	44,  // 138: volvoxgrid.v1.SpanConfig.cell_span_fixed:type_name -> volvoxgrid.v1.CellSpanMode
+	45,  // 139: volvoxgrid.v1.SpanConfig.cell_span_compare:type_name -> volvoxgrid.v1.SpanCompareMode
+	45,  // 140: volvoxgrid.v1.SpanConfig.group_span_compare:type_name -> volvoxgrid.v1.SpanCompareMode
+	141, // 141: volvoxgrid.v1.InteractionConfig.resize:type_name -> volvoxgrid.v1.ResizePolicy
+	142, // 142: volvoxgrid.v1.InteractionConfig.freeze:type_name -> volvoxgrid.v1.FreezePolicy
+	52,  // 143: volvoxgrid.v1.InteractionConfig.type_ahead:type_name -> volvoxgrid.v1.TypeAheadMode
+	53,  // 144: volvoxgrid.v1.InteractionConfig.auto_size_mode:type_name -> volvoxgrid.v1.AutoSizeMode
+	54,  // 145: volvoxgrid.v1.InteractionConfig.drag_mode:type_name -> volvoxgrid.v1.DragMode
+	55,  // 146: volvoxgrid.v1.InteractionConfig.drop_mode:type_name -> volvoxgrid.v1.DropMode
+	143, // 147: volvoxgrid.v1.InteractionConfig.header_features:type_name -> volvoxgrid.v1.HeaderFeatures
+	58,  // 148: volvoxgrid.v1.RenderConfig.renderer_mode:type_name -> volvoxgrid.v1.RendererMode
+	59,  // 149: volvoxgrid.v1.RenderConfig.present_mode:type_name -> volvoxgrid.v1.PresentMode
+	60,  // 150: volvoxgrid.v1.RenderConfig.frame_pacing_mode:type_name -> volvoxgrid.v1.FramePacingMode
+	74,  // 151: volvoxgrid.v1.ColIndicatorCellModes.modes:type_name -> volvoxgrid.v1.ColIndicatorCellMode
+	73,  // 152: volvoxgrid.v1.RowIndicatorSlot.kind:type_name -> volvoxgrid.v1.RowIndicatorSlotKind
+	1,   // 153: volvoxgrid.v1.RowIndicatorConfig.grid_lines:type_name -> volvoxgrid.v1.GridLineStyle
+	156, // 154: volvoxgrid.v1.RowIndicatorConfig.slots:type_name -> volvoxgrid.v1.RowIndicatorSlot
+	155, // 155: volvoxgrid.v1.ColIndicatorCell.modes:type_name -> volvoxgrid.v1.ColIndicatorCellModes
+	1,   // 156: volvoxgrid.v1.ColIndicatorConfig.grid_lines:type_name -> volvoxgrid.v1.GridLineStyle
+	158, // 157: volvoxgrid.v1.ColIndicatorConfig.row_defs:type_name -> volvoxgrid.v1.ColIndicatorRowDef
+	159, // 158: volvoxgrid.v1.ColIndicatorConfig.cells:type_name -> volvoxgrid.v1.ColIndicatorCell
+	155, // 159: volvoxgrid.v1.ColIndicatorConfig.cell_modes:type_name -> volvoxgrid.v1.ColIndicatorCellModes
+	75,  // 160: volvoxgrid.v1.CornerIndicatorSlot.kind:type_name -> volvoxgrid.v1.CornerIndicatorSlotKind
+	161, // 161: volvoxgrid.v1.CornerIndicatorConfig.slots:type_name -> volvoxgrid.v1.CornerIndicatorSlot
+	71,  // 162: volvoxgrid.v1.GridEventTarget.kind:type_name -> volvoxgrid.v1.GridTargetKind
+	72,  // 163: volvoxgrid.v1.GridEventTarget.band:type_name -> volvoxgrid.v1.IndicatorBand
+	157, // 164: volvoxgrid.v1.IndicatorsConfig.row_start:type_name -> volvoxgrid.v1.RowIndicatorConfig
+	157, // 165: volvoxgrid.v1.IndicatorsConfig.row_end:type_name -> volvoxgrid.v1.RowIndicatorConfig
+	160, // 166: volvoxgrid.v1.IndicatorsConfig.col_top:type_name -> volvoxgrid.v1.ColIndicatorConfig
+	160, // 167: volvoxgrid.v1.IndicatorsConfig.col_bottom:type_name -> volvoxgrid.v1.ColIndicatorConfig
+	162, // 168: volvoxgrid.v1.IndicatorsConfig.corner_top_start:type_name -> volvoxgrid.v1.CornerIndicatorConfig
+	162, // 169: volvoxgrid.v1.IndicatorsConfig.corner_top_end:type_name -> volvoxgrid.v1.CornerIndicatorConfig
+	162, // 170: volvoxgrid.v1.IndicatorsConfig.corner_bottom_start:type_name -> volvoxgrid.v1.CornerIndicatorConfig
+	162, // 171: volvoxgrid.v1.IndicatorsConfig.corner_bottom_end:type_name -> volvoxgrid.v1.CornerIndicatorConfig
+	165, // 172: volvoxgrid.v1.IndicatorsConfig.focus:type_name -> volvoxgrid.v1.IndicatorFocusConfig
+	49,  // 173: volvoxgrid.v1.IndicatorsConfig.appearance:type_name -> volvoxgrid.v1.IndicatorAppearance
+	163, // 174: volvoxgrid.v1.IndicatorsConfig.colors:type_name -> volvoxgrid.v1.IndicatorColors
+	9,   // 175: volvoxgrid.v1.ColumnDef.align:type_name -> volvoxgrid.v1.Align
+	9,   // 176: volvoxgrid.v1.ColumnDef.fixed_align:type_name -> volvoxgrid.v1.Align
+	19,  // 177: volvoxgrid.v1.ColumnDef.data_type:type_name -> volvoxgrid.v1.ColumnDataType
+	39,  // 178: volvoxgrid.v1.ColumnDef.sort_order:type_name -> volvoxgrid.v1.SortOrder
+	40,  // 179: volvoxgrid.v1.ColumnDef.sort_type:type_name -> volvoxgrid.v1.SortType
+	113, // 180: volvoxgrid.v1.ColumnDef.editor:type_name -> volvoxgrid.v1.EditorSpec
+	99,  // 181: volvoxgrid.v1.ColumnDef.image_list:type_name -> volvoxgrid.v1.ImageData
+	51,  // 182: volvoxgrid.v1.ColumnDef.sticky:type_name -> volvoxgrid.v1.StickyEdge
+	93,  // 183: volvoxgrid.v1.ColumnDef.padding:type_name -> volvoxgrid.v1.Padding
+	93,  // 184: volvoxgrid.v1.ColumnDef.fixed_padding:type_name -> volvoxgrid.v1.Padding
+	20,  // 185: volvoxgrid.v1.ColumnDef.coercion_mode:type_name -> volvoxgrid.v1.CoercionMode
+	21,  // 186: volvoxgrid.v1.ColumnDef.error_mode:type_name -> volvoxgrid.v1.WriteErrorMode
+	22,  // 187: volvoxgrid.v1.ColumnDef.interaction:type_name -> volvoxgrid.v1.CellInteraction
+	167, // 188: volvoxgrid.v1.DefineColumnsRequest.columns:type_name -> volvoxgrid.v1.ColumnDef
+	167, // 189: volvoxgrid.v1.SchemaResponse.columns:type_name -> volvoxgrid.v1.ColumnDef
+	171, // 190: volvoxgrid.v1.RowDef.status:type_name -> volvoxgrid.v1.RowStatus
+	50,  // 191: volvoxgrid.v1.RowDef.pin:type_name -> volvoxgrid.v1.PinPosition
+	51,  // 192: volvoxgrid.v1.RowDef.sticky:type_name -> volvoxgrid.v1.StickyEdge
+	170, // 193: volvoxgrid.v1.DefineRowsRequest.rows:type_name -> volvoxgrid.v1.RowDef
+	106, // 194: volvoxgrid.v1.CellUpdate.value:type_name -> volvoxgrid.v1.CellValue
+	129, // 195: volvoxgrid.v1.CellUpdate.style:type_name -> volvoxgrid.v1.CellStyle
+	17,  // 196: volvoxgrid.v1.CellUpdate.checked:type_name -> volvoxgrid.v1.CheckedState
+	99,  // 197: volvoxgrid.v1.CellUpdate.picture:type_name -> volvoxgrid.v1.ImageData
+	10,  // 198: volvoxgrid.v1.CellUpdate.picture_align:type_name -> volvoxgrid.v1.ImageAlignment
+	99,  // 199: volvoxgrid.v1.CellUpdate.button_picture:type_name -> volvoxgrid.v1.ImageData
+	113, // 200: volvoxgrid.v1.CellUpdate.editor:type_name -> volvoxgrid.v1.EditorSpec
+	51,  // 201: volvoxgrid.v1.CellUpdate.sticky_row:type_name -> volvoxgrid.v1.StickyEdge
+	51,  // 202: volvoxgrid.v1.CellUpdate.sticky_col:type_name -> volvoxgrid.v1.StickyEdge
+	22,  // 203: volvoxgrid.v1.CellUpdate.interaction:type_name -> volvoxgrid.v1.CellInteraction
+	103, // 204: volvoxgrid.v1.CellUpdate.barcode:type_name -> volvoxgrid.v1.BarcodeData
+	110, // 205: volvoxgrid.v1.CellUpdate.rich_text:type_name -> volvoxgrid.v1.RichText
+	173, // 206: volvoxgrid.v1.UpdateCellsRequest.cells:type_name -> volvoxgrid.v1.CellUpdate
+	106, // 207: volvoxgrid.v1.CellData.value:type_name -> volvoxgrid.v1.CellValue
+	129, // 208: volvoxgrid.v1.CellData.style:type_name -> volvoxgrid.v1.CellStyle
+	17,  // 209: volvoxgrid.v1.CellData.checked:type_name -> volvoxgrid.v1.CheckedState
+	22,  // 210: volvoxgrid.v1.CellData.interaction:type_name -> volvoxgrid.v1.CellInteraction
+	103, // 211: volvoxgrid.v1.CellData.barcode:type_name -> volvoxgrid.v1.BarcodeData
+	16,  // 212: volvoxgrid.v1.CellData.barcode_status:type_name -> volvoxgrid.v1.BarcodeRenderStatus
+	110, // 213: volvoxgrid.v1.CellData.rich_text:type_name -> volvoxgrid.v1.RichText
+	176, // 214: volvoxgrid.v1.CellsResponse.cells:type_name -> volvoxgrid.v1.CellData
+	19,  // 215: volvoxgrid.v1.TypeViolation.expected:type_name -> volvoxgrid.v1.ColumnDataType
+	106, // 216: volvoxgrid.v1.TypeViolation.actual:type_name -> volvoxgrid.v1.CellValue
+	178, // 217: volvoxgrid.v1.WriteResult.violations:type_name -> volvoxgrid.v1.TypeViolation
+	106, // 218: volvoxgrid.v1.LoadTableRequest.values:type_name -> volvoxgrid.v1.CellValue
+	182, // 219: volvoxgrid.v1.LoadDataOptions.csv:type_name -> volvoxgrid.v1.CsvOptions
+	183, // 220: volvoxgrid.v1.LoadDataOptions.json:type_name -> volvoxgrid.v1.JsonOptions
+	23,  // 221: volvoxgrid.v1.LoadDataOptions.header_policy:type_name -> volvoxgrid.v1.HeaderPolicy
+	181, // 222: volvoxgrid.v1.LoadDataOptions.field_map:type_name -> volvoxgrid.v1.FieldMapping
+	24,  // 223: volvoxgrid.v1.LoadDataOptions.type_policy:type_name -> volvoxgrid.v1.TypePolicy
+	20,  // 224: volvoxgrid.v1.LoadDataOptions.coercion:type_name -> volvoxgrid.v1.CoercionMode
+	21,  // 225: volvoxgrid.v1.LoadDataOptions.error_mode:type_name -> volvoxgrid.v1.WriteErrorMode
+	184, // 226: volvoxgrid.v1.LoadDataRequest.options:type_name -> volvoxgrid.v1.LoadDataOptions
+	184, // 227: volvoxgrid.v1.AppendDataRequest.options:type_name -> volvoxgrid.v1.LoadDataOptions
+	25,  // 228: volvoxgrid.v1.LoadDataResult.status:type_name -> volvoxgrid.v1.LoadDataStatus
+	178, // 229: volvoxgrid.v1.LoadDataResult.violations:type_name -> volvoxgrid.v1.TypeViolation
+	167, // 230: volvoxgrid.v1.LoadDataResult.inferred_columns:type_name -> volvoxgrid.v1.ColumnDef
+	61,  // 231: volvoxgrid.v1.ClearRequest.scope:type_name -> volvoxgrid.v1.ClearScope
+	62,  // 232: volvoxgrid.v1.ClearRequest.region:type_name -> volvoxgrid.v1.ClearRegion
+	104, // 233: volvoxgrid.v1.SelectRequest.ranges:type_name -> volvoxgrid.v1.CellRange
+	104, // 234: volvoxgrid.v1.SelectionState.ranges:type_name -> volvoxgrid.v1.CellRange
+	104, // 235: volvoxgrid.v1.HighlightRegion.range:type_name -> volvoxgrid.v1.CellRange
+	130, // 236: volvoxgrid.v1.HighlightRegion.style:type_name -> volvoxgrid.v1.HighlightStyle
+	195, // 237: volvoxgrid.v1.EditSetHighlights.regions:type_name -> volvoxgrid.v1.HighlightRegion
+	198, // 238: volvoxgrid.v1.EditCommand.start:type_name -> volvoxgrid.v1.EditStart
+	200, // 239: volvoxgrid.v1.EditCommand.session:type_name -> volvoxgrid.v1.EditorSessionCommand
+	199, // 240: volvoxgrid.v1.EditCommand.get_state:type_name -> volvoxgrid.v1.EditGetState
+	84,  // 241: volvoxgrid.v1.EditStart.reason:type_name -> volvoxgrid.v1.EditStartReason
+	122, // 242: volvoxgrid.v1.EditStart.seed_value:type_name -> volvoxgrid.v1.EditorValue
+	201, // 243: volvoxgrid.v1.EditorSessionCommand.value_changed:type_name -> volvoxgrid.v1.EditorValueChanged
+	202, // 244: volvoxgrid.v1.EditorSessionCommand.selection_changed:type_name -> volvoxgrid.v1.TextSelectionChanged
+	203, // 245: volvoxgrid.v1.EditorSessionCommand.preedit_changed:type_name -> volvoxgrid.v1.EditorPreeditChanged
+	204, // 246: volvoxgrid.v1.EditorSessionCommand.commit:type_name -> volvoxgrid.v1.EditCommit
+	205, // 247: volvoxgrid.v1.EditorSessionCommand.cancel:type_name -> volvoxgrid.v1.EditCancel
+	206, // 248: volvoxgrid.v1.EditorSessionCommand.custom_action:type_name -> volvoxgrid.v1.CustomEditorAction
+	122, // 249: volvoxgrid.v1.EditorValueChanged.value:type_name -> volvoxgrid.v1.EditorValue
+	123, // 250: volvoxgrid.v1.TextSelectionChanged.selection:type_name -> volvoxgrid.v1.TextSelection
+	122, // 251: volvoxgrid.v1.EditCommit.value:type_name -> volvoxgrid.v1.EditorValue
+	107, // 252: volvoxgrid.v1.CustomEditorAction.payload:type_name -> volvoxgrid.v1.StructValue
+	105, // 253: volvoxgrid.v1.EditorSession.viewport_rect:type_name -> volvoxgrid.v1.Rect
+	113, // 254: volvoxgrid.v1.EditorSession.editor:type_name -> volvoxgrid.v1.EditorSpec
+	122, // 255: volvoxgrid.v1.EditorSession.value:type_name -> volvoxgrid.v1.EditorValue
+	123, // 256: volvoxgrid.v1.EditorSession.selection:type_name -> volvoxgrid.v1.TextSelection
+	78,  // 257: volvoxgrid.v1.EditorSession.ui_mode:type_name -> volvoxgrid.v1.EditUiMode
+	208, // 258: volvoxgrid.v1.EditorSession.capabilities:type_name -> volvoxgrid.v1.EditorCapabilities
+	84,  // 259: volvoxgrid.v1.EditorSession.reason:type_name -> volvoxgrid.v1.EditStartReason
+	124, // 260: volvoxgrid.v1.EditorSession.validation_errors:type_name -> volvoxgrid.v1.ValidationError
+	207, // 261: volvoxgrid.v1.EditState.session:type_name -> volvoxgrid.v1.EditorSession
+	39,  // 262: volvoxgrid.v1.SortColumn.order:type_name -> volvoxgrid.v1.SortOrder
+	40,  // 263: volvoxgrid.v1.SortColumn.type:type_name -> volvoxgrid.v1.SortType
+	210, // 264: volvoxgrid.v1.SortRequest.sort_columns:type_name -> volvoxgrid.v1.SortColumn
+	43,  // 265: volvoxgrid.v1.SubtotalRequest.aggregate:type_name -> volvoxgrid.v1.AggregateType
+	92,  // 266: volvoxgrid.v1.SubtotalRequest.font:type_name -> volvoxgrid.v1.Font
+	66,  // 267: volvoxgrid.v1.GetNodeRequest.relation:type_name -> volvoxgrid.v1.NodeRelation
+	219, // 268: volvoxgrid.v1.FindRequest.text_query:type_name -> volvoxgrid.v1.TextQuery
+	220, // 269: volvoxgrid.v1.FindRequest.regex_query:type_name -> volvoxgrid.v1.RegexQuery
+	43,  // 270: volvoxgrid.v1.AggregateRequest.aggregate:type_name -> volvoxgrid.v1.AggregateType
+	104, // 271: volvoxgrid.v1.MergeCellsRequest.range:type_name -> volvoxgrid.v1.CellRange
+	104, // 272: volvoxgrid.v1.UnmergeCellsRequest.range:type_name -> volvoxgrid.v1.CellRange
+	104, // 273: volvoxgrid.v1.MergedRegionsResponse.ranges:type_name -> volvoxgrid.v1.CellRange
+	230, // 274: volvoxgrid.v1.ClipboardCommand.copy:type_name -> volvoxgrid.v1.ClipboardCopy
+	231, // 275: volvoxgrid.v1.ClipboardCommand.cut:type_name -> volvoxgrid.v1.ClipboardCut
+	232, // 276: volvoxgrid.v1.ClipboardCommand.paste:type_name -> volvoxgrid.v1.ClipboardPaste
+	233, // 277: volvoxgrid.v1.ClipboardCommand.delete:type_name -> volvoxgrid.v1.ClipboardDelete
+	63,  // 278: volvoxgrid.v1.ExportRequest.format:type_name -> volvoxgrid.v1.ExportFormat
+	64,  // 279: volvoxgrid.v1.ExportRequest.scope:type_name -> volvoxgrid.v1.ExportScope
+	63,  // 280: volvoxgrid.v1.ExportResponse.format:type_name -> volvoxgrid.v1.ExportFormat
+	65,  // 281: volvoxgrid.v1.PrintRequest.orientation:type_name -> volvoxgrid.v1.PrintOrientation
+	239, // 282: volvoxgrid.v1.PrintResponse.pages:type_name -> volvoxgrid.v1.PrintPage
+	87,  // 283: volvoxgrid.v1.ArchiveRequest.action:type_name -> volvoxgrid.v1.ArchiveRequest.Action
+	144, // 284: volvoxgrid.v1.CreateRequest.config:type_name -> volvoxgrid.v1.GridConfig
+	144, // 285: volvoxgrid.v1.ConfigureRequest.config:type_name -> volvoxgrid.v1.GridConfig
+	80,  // 286: volvoxgrid.v1.GetDemoDataResponse.format:type_name -> volvoxgrid.v1.DemoDataFormat
+	194, // 287: volvoxgrid.v1.SelectResponse.selection:type_name -> volvoxgrid.v1.SelectionState
+	104, // 288: volvoxgrid.v1.MergeCellsResponse.merged:type_name -> volvoxgrid.v1.CellRange
+	289, // 289: volvoxgrid.v1.RenderInput.viewport:type_name -> volvoxgrid.v1.ViewportState
+	290, // 290: volvoxgrid.v1.RenderInput.pointer:type_name -> volvoxgrid.v1.PointerEvent
+	293, // 291: volvoxgrid.v1.RenderInput.key:type_name -> volvoxgrid.v1.KeyEvent
+	294, // 292: volvoxgrid.v1.RenderInput.buffer:type_name -> volvoxgrid.v1.BufferReady
+	291, // 293: volvoxgrid.v1.RenderInput.scroll:type_name -> volvoxgrid.v1.ScrollEvent
+	300, // 294: volvoxgrid.v1.RenderInput.event_decision:type_name -> volvoxgrid.v1.EventDecision
+	292, // 295: volvoxgrid.v1.RenderInput.zoom:type_name -> volvoxgrid.v1.ZoomEvent
+	299, // 296: volvoxgrid.v1.RenderInput.gpu_surface:type_name -> volvoxgrid.v1.GpuSurfaceReady
+	295, // 297: volvoxgrid.v1.RenderInput.terminal_input:type_name -> volvoxgrid.v1.TerminalInputBytes
+	296, // 298: volvoxgrid.v1.RenderInput.terminal_capabilities:type_name -> volvoxgrid.v1.TerminalCapabilities
+	297, // 299: volvoxgrid.v1.RenderInput.terminal_viewport:type_name -> volvoxgrid.v1.TerminalViewport
+	298, // 300: volvoxgrid.v1.RenderInput.terminal_command:type_name -> volvoxgrid.v1.TerminalCommand
+	286, // 301: volvoxgrid.v1.RenderInput.compare_response:type_name -> volvoxgrid.v1.CompareResponse
+	287, // 302: volvoxgrid.v1.RenderInput.edit_validation_response:type_name -> volvoxgrid.v1.EditValidationResponse
+	288, // 303: volvoxgrid.v1.RenderInput.editor_list_items_response:type_name -> volvoxgrid.v1.EditorListItemsResponse
+	124, // 304: volvoxgrid.v1.EditValidationResponse.errors:type_name -> volvoxgrid.v1.ValidationError
+	122, // 305: volvoxgrid.v1.EditValidationResponse.normalized_value:type_name -> volvoxgrid.v1.EditorValue
+	120, // 306: volvoxgrid.v1.EditorListItemsResponse.items:type_name -> volvoxgrid.v1.ListItem
+	88,  // 307: volvoxgrid.v1.PointerEvent.type:type_name -> volvoxgrid.v1.PointerEvent.Type
+	89,  // 308: volvoxgrid.v1.ZoomEvent.phase:type_name -> volvoxgrid.v1.ZoomEvent.Phase
+	90,  // 309: volvoxgrid.v1.KeyEvent.type:type_name -> volvoxgrid.v1.KeyEvent.Type
+	81,  // 310: volvoxgrid.v1.TerminalCapabilities.color_level:type_name -> volvoxgrid.v1.TerminalColorLevel
+	91,  // 311: volvoxgrid.v1.TerminalCommand.kind:type_name -> volvoxgrid.v1.TerminalCommand.Kind
+	302, // 312: volvoxgrid.v1.RenderOutput.frame_done:type_name -> volvoxgrid.v1.FrameDone
+	305, // 313: volvoxgrid.v1.RenderOutput.selection:type_name -> volvoxgrid.v1.SelectionUpdate
+	306, // 314: volvoxgrid.v1.RenderOutput.cursor:type_name -> volvoxgrid.v1.CursorChange
+	307, // 315: volvoxgrid.v1.RenderOutput.editor_started:type_name -> volvoxgrid.v1.EditorSessionStarted
+	308, // 316: volvoxgrid.v1.RenderOutput.editor_updated:type_name -> volvoxgrid.v1.EditorSessionUpdated
+	309, // 317: volvoxgrid.v1.RenderOutput.editor_ended:type_name -> volvoxgrid.v1.EditorSessionEnded
+	310, // 318: volvoxgrid.v1.RenderOutput.tooltip_request:type_name -> volvoxgrid.v1.TooltipRequest
+	303, // 319: volvoxgrid.v1.RenderOutput.gpu_frame_done:type_name -> volvoxgrid.v1.GpuFrameDone
+	304, // 320: volvoxgrid.v1.FrameDone.metrics:type_name -> volvoxgrid.v1.FrameMetrics
+	82,  // 321: volvoxgrid.v1.FrameDone.frame_kind:type_name -> volvoxgrid.v1.FrameKind
+	304, // 322: volvoxgrid.v1.GpuFrameDone.metrics:type_name -> volvoxgrid.v1.FrameMetrics
+	104, // 323: volvoxgrid.v1.SelectionUpdate.ranges:type_name -> volvoxgrid.v1.CellRange
+	83,  // 324: volvoxgrid.v1.CursorChange.cursor:type_name -> volvoxgrid.v1.CursorType
+	207, // 325: volvoxgrid.v1.EditorSessionStarted.session:type_name -> volvoxgrid.v1.EditorSession
+	86,  // 326: volvoxgrid.v1.EditorSessionUpdated.reason:type_name -> volvoxgrid.v1.EditorUpdateReason
+	105, // 327: volvoxgrid.v1.EditorSessionUpdated.viewport_rect:type_name -> volvoxgrid.v1.Rect
+	122, // 328: volvoxgrid.v1.EditorSessionUpdated.value:type_name -> volvoxgrid.v1.EditorValue
+	123, // 329: volvoxgrid.v1.EditorSessionUpdated.selection:type_name -> volvoxgrid.v1.TextSelection
+	124, // 330: volvoxgrid.v1.EditorSessionUpdated.validation_errors:type_name -> volvoxgrid.v1.ValidationError
+	107, // 331: volvoxgrid.v1.EditorSessionUpdated.custom_payload:type_name -> volvoxgrid.v1.StructValue
+	85,  // 332: volvoxgrid.v1.EditorSessionEnded.reason:type_name -> volvoxgrid.v1.EditEndReason
+	122, // 333: volvoxgrid.v1.EditorSessionEnded.committed_value:type_name -> volvoxgrid.v1.EditorValue
+	312, // 334: volvoxgrid.v1.GridEvent.cell_focus_changing:type_name -> volvoxgrid.v1.CellFocusChangingEvent
+	313, // 335: volvoxgrid.v1.GridEvent.cell_focus_changed:type_name -> volvoxgrid.v1.CellFocusChangedEvent
+	314, // 336: volvoxgrid.v1.GridEvent.selection_changing:type_name -> volvoxgrid.v1.SelectionChangingEvent
+	315, // 337: volvoxgrid.v1.GridEvent.selection_changed:type_name -> volvoxgrid.v1.SelectionChangedEvent
+	316, // 338: volvoxgrid.v1.GridEvent.enter_cell:type_name -> volvoxgrid.v1.EnterCellEvent
+	317, // 339: volvoxgrid.v1.GridEvent.leave_cell:type_name -> volvoxgrid.v1.LeaveCellEvent
+	318, // 340: volvoxgrid.v1.GridEvent.before_edit:type_name -> volvoxgrid.v1.BeforeEditEvent
+	319, // 341: volvoxgrid.v1.GridEvent.start_edit:type_name -> volvoxgrid.v1.StartEditEvent
+	320, // 342: volvoxgrid.v1.GridEvent.after_edit:type_name -> volvoxgrid.v1.AfterEditEvent
+	321, // 343: volvoxgrid.v1.GridEvent.cell_edit_validate:type_name -> volvoxgrid.v1.CellEditValidateEvent
+	322, // 344: volvoxgrid.v1.GridEvent.cell_edit_change:type_name -> volvoxgrid.v1.CellEditChangeEvent
+	323, // 345: volvoxgrid.v1.GridEvent.key_down_edit:type_name -> volvoxgrid.v1.KeyDownEditEvent
+	324, // 346: volvoxgrid.v1.GridEvent.key_press_edit:type_name -> volvoxgrid.v1.KeyPressEditEvent
+	325, // 347: volvoxgrid.v1.GridEvent.key_up_edit:type_name -> volvoxgrid.v1.KeyUpEditEvent
+	326, // 348: volvoxgrid.v1.GridEvent.edit_validation_request:type_name -> volvoxgrid.v1.EditValidationRequest
+	327, // 349: volvoxgrid.v1.GridEvent.editor_list_items_request:type_name -> volvoxgrid.v1.EditorListItemsRequest
+	328, // 350: volvoxgrid.v1.GridEvent.custom_editor_action:type_name -> volvoxgrid.v1.CustomEditorActionEvent
+	329, // 351: volvoxgrid.v1.GridEvent.cell_changed:type_name -> volvoxgrid.v1.CellChangedEvent
+	330, // 352: volvoxgrid.v1.GridEvent.row_status_change:type_name -> volvoxgrid.v1.RowStatusChangeEvent
+	331, // 353: volvoxgrid.v1.GridEvent.before_sort:type_name -> volvoxgrid.v1.BeforeSortEvent
+	332, // 354: volvoxgrid.v1.GridEvent.after_sort:type_name -> volvoxgrid.v1.AfterSortEvent
+	333, // 355: volvoxgrid.v1.GridEvent.compare:type_name -> volvoxgrid.v1.CompareEvent
+	334, // 356: volvoxgrid.v1.GridEvent.before_node_toggle:type_name -> volvoxgrid.v1.BeforeNodeToggleEvent
+	335, // 357: volvoxgrid.v1.GridEvent.after_node_toggle:type_name -> volvoxgrid.v1.AfterNodeToggleEvent
+	341, // 358: volvoxgrid.v1.GridEvent.before_scroll:type_name -> volvoxgrid.v1.BeforeScrollEvent
+	342, // 359: volvoxgrid.v1.GridEvent.after_scroll:type_name -> volvoxgrid.v1.AfterScrollEvent
+	343, // 360: volvoxgrid.v1.GridEvent.scroll_tooltip:type_name -> volvoxgrid.v1.ScrollTooltipEvent
+	344, // 361: volvoxgrid.v1.GridEvent.before_user_resize:type_name -> volvoxgrid.v1.BeforeUserResizeEvent
+	345, // 362: volvoxgrid.v1.GridEvent.after_user_resize:type_name -> volvoxgrid.v1.AfterUserResizeEvent
+	346, // 363: volvoxgrid.v1.GridEvent.after_user_freeze:type_name -> volvoxgrid.v1.AfterUserFreezeEvent
+	347, // 364: volvoxgrid.v1.GridEvent.before_move_column:type_name -> volvoxgrid.v1.BeforeMoveColumnEvent
+	348, // 365: volvoxgrid.v1.GridEvent.after_move_column:type_name -> volvoxgrid.v1.AfterMoveColumnEvent
+	349, // 366: volvoxgrid.v1.GridEvent.before_move_row:type_name -> volvoxgrid.v1.BeforeMoveRowEvent
+	350, // 367: volvoxgrid.v1.GridEvent.after_move_row:type_name -> volvoxgrid.v1.AfterMoveRowEvent
+	351, // 368: volvoxgrid.v1.GridEvent.before_mouse_down:type_name -> volvoxgrid.v1.BeforeMouseDownEvent
+	352, // 369: volvoxgrid.v1.GridEvent.mouse_down:type_name -> volvoxgrid.v1.MouseDownEvent
+	353, // 370: volvoxgrid.v1.GridEvent.mouse_up:type_name -> volvoxgrid.v1.MouseUpEvent
+	354, // 371: volvoxgrid.v1.GridEvent.mouse_move:type_name -> volvoxgrid.v1.MouseMoveEvent
+	355, // 372: volvoxgrid.v1.GridEvent.click:type_name -> volvoxgrid.v1.ClickEvent
+	356, // 373: volvoxgrid.v1.GridEvent.dbl_click:type_name -> volvoxgrid.v1.DblClickEvent
+	357, // 374: volvoxgrid.v1.GridEvent.key_down:type_name -> volvoxgrid.v1.KeyDownEvent
+	358, // 375: volvoxgrid.v1.GridEvent.key_press:type_name -> volvoxgrid.v1.KeyPressEvent
+	359, // 376: volvoxgrid.v1.GridEvent.key_up:type_name -> volvoxgrid.v1.KeyUpEvent
+	360, // 377: volvoxgrid.v1.GridEvent.custom_render_cell:type_name -> volvoxgrid.v1.CustomRenderCellEvent
+	361, // 378: volvoxgrid.v1.GridEvent.drag_start:type_name -> volvoxgrid.v1.DragStartEvent
+	362, // 379: volvoxgrid.v1.GridEvent.drag_over:type_name -> volvoxgrid.v1.DragOverEvent
+	363, // 380: volvoxgrid.v1.GridEvent.drag_drop:type_name -> volvoxgrid.v1.DragDropEvent
+	364, // 381: volvoxgrid.v1.GridEvent.drag_complete:type_name -> volvoxgrid.v1.DragCompleteEvent
+	365, // 382: volvoxgrid.v1.GridEvent.type_ahead_started:type_name -> volvoxgrid.v1.TypeAheadStartedEvent
+	366, // 383: volvoxgrid.v1.GridEvent.type_ahead_ended:type_name -> volvoxgrid.v1.TypeAheadEndedEvent
+	367, // 384: volvoxgrid.v1.GridEvent.data_refreshing:type_name -> volvoxgrid.v1.DataRefreshingEvent
+	368, // 385: volvoxgrid.v1.GridEvent.data_refreshed:type_name -> volvoxgrid.v1.DataRefreshedEvent
+	369, // 386: volvoxgrid.v1.GridEvent.filter_data:type_name -> volvoxgrid.v1.FilterDataEvent
+	372, // 387: volvoxgrid.v1.GridEvent.error:type_name -> volvoxgrid.v1.ErrorEvent
+	373, // 388: volvoxgrid.v1.GridEvent.before_page_break:type_name -> volvoxgrid.v1.BeforePageBreakEvent
+	374, // 389: volvoxgrid.v1.GridEvent.start_page:type_name -> volvoxgrid.v1.StartPageEvent
+	375, // 390: volvoxgrid.v1.GridEvent.get_header_row:type_name -> volvoxgrid.v1.GetHeaderRowEvent
+	370, // 391: volvoxgrid.v1.GridEvent.pull_to_refresh_triggered:type_name -> volvoxgrid.v1.PullToRefreshTriggeredEvent
+	371, // 392: volvoxgrid.v1.GridEvent.pull_to_refresh_canceled:type_name -> volvoxgrid.v1.PullToRefreshCanceledEvent
+	336, // 393: volvoxgrid.v1.GridEvent.tree_children_requested:type_name -> volvoxgrid.v1.TreeChildrenRequestedEvent
+	337, // 394: volvoxgrid.v1.GridEvent.before_tree_node_toggle:type_name -> volvoxgrid.v1.BeforeTreeNodeToggleEvent
+	338, // 395: volvoxgrid.v1.GridEvent.after_tree_node_toggle:type_name -> volvoxgrid.v1.AfterTreeNodeToggleEvent
+	339, // 396: volvoxgrid.v1.GridEvent.tree_node_activate:type_name -> volvoxgrid.v1.TreeNodeActivateEvent
+	340, // 397: volvoxgrid.v1.GridEvent.tree_node_context_menu:type_name -> volvoxgrid.v1.TreeNodeContextMenuEvent
+	104, // 398: volvoxgrid.v1.SelectionChangingEvent.old_ranges:type_name -> volvoxgrid.v1.CellRange
+	104, // 399: volvoxgrid.v1.SelectionChangingEvent.new_ranges:type_name -> volvoxgrid.v1.CellRange
+	104, // 400: volvoxgrid.v1.SelectionChangedEvent.old_ranges:type_name -> volvoxgrid.v1.CellRange
+	104, // 401: volvoxgrid.v1.SelectionChangedEvent.new_ranges:type_name -> volvoxgrid.v1.CellRange
+	164, // 402: volvoxgrid.v1.EnterCellEvent.target:type_name -> volvoxgrid.v1.GridEventTarget
+	164, // 403: volvoxgrid.v1.LeaveCellEvent.target:type_name -> volvoxgrid.v1.GridEventTarget
+	122, // 404: volvoxgrid.v1.EditValidationRequest.value:type_name -> volvoxgrid.v1.EditorValue
+	107, // 405: volvoxgrid.v1.CustomEditorActionEvent.payload:type_name -> volvoxgrid.v1.StructValue
+	171, // 406: volvoxgrid.v1.RowStatusChangeEvent.status:type_name -> volvoxgrid.v1.RowStatus
+	164, // 407: volvoxgrid.v1.BeforeMouseDownEvent.target:type_name -> volvoxgrid.v1.GridEventTarget
+	164, // 408: volvoxgrid.v1.MouseMoveEvent.target:type_name -> volvoxgrid.v1.GridEventTarget
+	68,  // 409: volvoxgrid.v1.ClickEvent.hit_area:type_name -> volvoxgrid.v1.CellHitArea
+	22,  // 410: volvoxgrid.v1.ClickEvent.interaction:type_name -> volvoxgrid.v1.CellInteraction
+	164, // 411: volvoxgrid.v1.ClickEvent.target:type_name -> volvoxgrid.v1.GridEventTarget
+	164, // 412: volvoxgrid.v1.DblClickEvent.target:type_name -> volvoxgrid.v1.GridEventTarget
+	129, // 413: volvoxgrid.v1.CustomRenderCellEvent.style:type_name -> volvoxgrid.v1.CellStyle
+	242, // 414: volvoxgrid.v1.VolvoxGridService.Create:input_type -> volvoxgrid.v1.CreateRequest
+	244, // 415: volvoxgrid.v1.VolvoxGridService.Destroy:input_type -> volvoxgrid.v1.DestroyRequest
+	257, // 416: volvoxgrid.v1.VolvoxGridService.Configure:input_type -> volvoxgrid.v1.ConfigureRequest
+	245, // 417: volvoxgrid.v1.VolvoxGridService.GetConfig:input_type -> volvoxgrid.v1.GetConfigRequest
+	258, // 418: volvoxgrid.v1.VolvoxGridService.LoadFontData:input_type -> volvoxgrid.v1.LoadFontDataRequest
+	168, // 419: volvoxgrid.v1.VolvoxGridService.DefineColumns:input_type -> volvoxgrid.v1.DefineColumnsRequest
+	246, // 420: volvoxgrid.v1.VolvoxGridService.GetSchema:input_type -> volvoxgrid.v1.GetSchemaRequest
+	172, // 421: volvoxgrid.v1.VolvoxGridService.DefineRows:input_type -> volvoxgrid.v1.DefineRowsRequest
+	189, // 422: volvoxgrid.v1.VolvoxGridService.InsertRows:input_type -> volvoxgrid.v1.InsertRowsRequest
+	190, // 423: volvoxgrid.v1.VolvoxGridService.RemoveRows:input_type -> volvoxgrid.v1.RemoveRowsRequest
+	191, // 424: volvoxgrid.v1.VolvoxGridService.MoveColumn:input_type -> volvoxgrid.v1.MoveColumnRequest
+	192, // 425: volvoxgrid.v1.VolvoxGridService.MoveRow:input_type -> volvoxgrid.v1.MoveRowRequest
+	174, // 426: volvoxgrid.v1.VolvoxGridService.UpdateCells:input_type -> volvoxgrid.v1.UpdateCellsRequest
+	175, // 427: volvoxgrid.v1.VolvoxGridService.GetCells:input_type -> volvoxgrid.v1.GetCellsRequest
+	180, // 428: volvoxgrid.v1.VolvoxGridService.LoadTable:input_type -> volvoxgrid.v1.LoadTableRequest
+	185, // 429: volvoxgrid.v1.VolvoxGridService.LoadData:input_type -> volvoxgrid.v1.LoadDataRequest
+	186, // 430: volvoxgrid.v1.VolvoxGridService.AppendData:input_type -> volvoxgrid.v1.AppendDataRequest
+	188, // 431: volvoxgrid.v1.VolvoxGridService.Clear:input_type -> volvoxgrid.v1.ClearRequest
+	193, // 432: volvoxgrid.v1.VolvoxGridService.Select:input_type -> volvoxgrid.v1.SelectRequest
+	247, // 433: volvoxgrid.v1.VolvoxGridService.GetSelection:input_type -> volvoxgrid.v1.GetSelectionRequest
+	253, // 434: volvoxgrid.v1.VolvoxGridService.ShowCell:input_type -> volvoxgrid.v1.ShowCellRequest
+	254, // 435: volvoxgrid.v1.VolvoxGridService.SetTopRow:input_type -> volvoxgrid.v1.SetRowRequest
+	255, // 436: volvoxgrid.v1.VolvoxGridService.SetLeftCol:input_type -> volvoxgrid.v1.SetColRequest
+	197, // 437: volvoxgrid.v1.VolvoxGridService.Edit:input_type -> volvoxgrid.v1.EditCommand
+	211, // 438: volvoxgrid.v1.VolvoxGridService.Sort:input_type -> volvoxgrid.v1.SortRequest
+	212, // 439: volvoxgrid.v1.VolvoxGridService.Subtotal:input_type -> volvoxgrid.v1.SubtotalRequest
+	214, // 440: volvoxgrid.v1.VolvoxGridService.AutoSize:input_type -> volvoxgrid.v1.AutoSizeRequest
+	215, // 441: volvoxgrid.v1.VolvoxGridService.Outline:input_type -> volvoxgrid.v1.OutlineRequest
+	216, // 442: volvoxgrid.v1.VolvoxGridService.GetNode:input_type -> volvoxgrid.v1.GetNodeRequest
+	218, // 443: volvoxgrid.v1.VolvoxGridService.Find:input_type -> volvoxgrid.v1.FindRequest
+	222, // 444: volvoxgrid.v1.VolvoxGridService.Aggregate:input_type -> volvoxgrid.v1.AggregateRequest
+	224, // 445: volvoxgrid.v1.VolvoxGridService.GetMergedRange:input_type -> volvoxgrid.v1.GetMergedRangeRequest
+	225, // 446: volvoxgrid.v1.VolvoxGridService.MergeCells:input_type -> volvoxgrid.v1.MergeCellsRequest
+	226, // 447: volvoxgrid.v1.VolvoxGridService.UnmergeCells:input_type -> volvoxgrid.v1.UnmergeCellsRequest
+	248, // 448: volvoxgrid.v1.VolvoxGridService.GetMergedRegions:input_type -> volvoxgrid.v1.GetMergedRegionsRequest
+	249, // 449: volvoxgrid.v1.VolvoxGridService.GetMemoryUsage:input_type -> volvoxgrid.v1.GetMemoryUsageRequest
+	229, // 450: volvoxgrid.v1.VolvoxGridService.Clipboard:input_type -> volvoxgrid.v1.ClipboardCommand
+	235, // 451: volvoxgrid.v1.VolvoxGridService.Export:input_type -> volvoxgrid.v1.ExportRequest
+	237, // 452: volvoxgrid.v1.VolvoxGridService.Print:input_type -> volvoxgrid.v1.PrintRequest
+	240, // 453: volvoxgrid.v1.VolvoxGridService.Archive:input_type -> volvoxgrid.v1.ArchiveRequest
+	252, // 454: volvoxgrid.v1.VolvoxGridService.ResizeViewport:input_type -> volvoxgrid.v1.ResizeViewportRequest
+	256, // 455: volvoxgrid.v1.VolvoxGridService.SetRedraw:input_type -> volvoxgrid.v1.SetRedrawRequest
+	250, // 456: volvoxgrid.v1.VolvoxGridService.Refresh:input_type -> volvoxgrid.v1.RefreshRequest
+	259, // 457: volvoxgrid.v1.VolvoxGridService.LoadDemo:input_type -> volvoxgrid.v1.LoadDemoRequest
+	260, // 458: volvoxgrid.v1.VolvoxGridService.GetDemoData:input_type -> volvoxgrid.v1.GetDemoDataRequest
+	285, // 459: volvoxgrid.v1.VolvoxGridService.RenderSession:input_type -> volvoxgrid.v1.RenderInput
+	251, // 460: volvoxgrid.v1.VolvoxGridService.EventStream:input_type -> volvoxgrid.v1.EventStreamRequest
+	243, // 461: volvoxgrid.v1.VolvoxGridService.Create:output_type -> volvoxgrid.v1.CreateResponse
+	262, // 462: volvoxgrid.v1.VolvoxGridService.Destroy:output_type -> volvoxgrid.v1.DestroyResponse
+	263, // 463: volvoxgrid.v1.VolvoxGridService.Configure:output_type -> volvoxgrid.v1.ConfigureResponse
+	144, // 464: volvoxgrid.v1.VolvoxGridService.GetConfig:output_type -> volvoxgrid.v1.GridConfig
+	264, // 465: volvoxgrid.v1.VolvoxGridService.LoadFontData:output_type -> volvoxgrid.v1.LoadFontDataResponse
+	265, // 466: volvoxgrid.v1.VolvoxGridService.DefineColumns:output_type -> volvoxgrid.v1.DefineColumnsResponse
+	169, // 467: volvoxgrid.v1.VolvoxGridService.GetSchema:output_type -> volvoxgrid.v1.SchemaResponse
+	266, // 468: volvoxgrid.v1.VolvoxGridService.DefineRows:output_type -> volvoxgrid.v1.DefineRowsResponse
+	267, // 469: volvoxgrid.v1.VolvoxGridService.InsertRows:output_type -> volvoxgrid.v1.InsertRowsResponse
+	268, // 470: volvoxgrid.v1.VolvoxGridService.RemoveRows:output_type -> volvoxgrid.v1.RemoveRowsResponse
+	269, // 471: volvoxgrid.v1.VolvoxGridService.MoveColumn:output_type -> volvoxgrid.v1.MoveColumnResponse
+	270, // 472: volvoxgrid.v1.VolvoxGridService.MoveRow:output_type -> volvoxgrid.v1.MoveRowResponse
+	179, // 473: volvoxgrid.v1.VolvoxGridService.UpdateCells:output_type -> volvoxgrid.v1.WriteResult
+	177, // 474: volvoxgrid.v1.VolvoxGridService.GetCells:output_type -> volvoxgrid.v1.CellsResponse
+	179, // 475: volvoxgrid.v1.VolvoxGridService.LoadTable:output_type -> volvoxgrid.v1.WriteResult
+	187, // 476: volvoxgrid.v1.VolvoxGridService.LoadData:output_type -> volvoxgrid.v1.LoadDataResult
+	187, // 477: volvoxgrid.v1.VolvoxGridService.AppendData:output_type -> volvoxgrid.v1.LoadDataResult
+	271, // 478: volvoxgrid.v1.VolvoxGridService.Clear:output_type -> volvoxgrid.v1.ClearResponse
+	272, // 479: volvoxgrid.v1.VolvoxGridService.Select:output_type -> volvoxgrid.v1.SelectResponse
+	194, // 480: volvoxgrid.v1.VolvoxGridService.GetSelection:output_type -> volvoxgrid.v1.SelectionState
+	273, // 481: volvoxgrid.v1.VolvoxGridService.ShowCell:output_type -> volvoxgrid.v1.ShowCellResponse
+	274, // 482: volvoxgrid.v1.VolvoxGridService.SetTopRow:output_type -> volvoxgrid.v1.SetTopRowResponse
+	275, // 483: volvoxgrid.v1.VolvoxGridService.SetLeftCol:output_type -> volvoxgrid.v1.SetLeftColResponse
+	209, // 484: volvoxgrid.v1.VolvoxGridService.Edit:output_type -> volvoxgrid.v1.EditState
+	276, // 485: volvoxgrid.v1.VolvoxGridService.Sort:output_type -> volvoxgrid.v1.SortResponse
+	213, // 486: volvoxgrid.v1.VolvoxGridService.Subtotal:output_type -> volvoxgrid.v1.SubtotalResult
+	277, // 487: volvoxgrid.v1.VolvoxGridService.AutoSize:output_type -> volvoxgrid.v1.AutoSizeResponse
+	278, // 488: volvoxgrid.v1.VolvoxGridService.Outline:output_type -> volvoxgrid.v1.OutlineResponse
+	217, // 489: volvoxgrid.v1.VolvoxGridService.GetNode:output_type -> volvoxgrid.v1.NodeInfo
+	221, // 490: volvoxgrid.v1.VolvoxGridService.Find:output_type -> volvoxgrid.v1.FindResponse
+	223, // 491: volvoxgrid.v1.VolvoxGridService.Aggregate:output_type -> volvoxgrid.v1.AggregateResponse
+	104, // 492: volvoxgrid.v1.VolvoxGridService.GetMergedRange:output_type -> volvoxgrid.v1.CellRange
+	279, // 493: volvoxgrid.v1.VolvoxGridService.MergeCells:output_type -> volvoxgrid.v1.MergeCellsResponse
+	280, // 494: volvoxgrid.v1.VolvoxGridService.UnmergeCells:output_type -> volvoxgrid.v1.UnmergeCellsResponse
+	227, // 495: volvoxgrid.v1.VolvoxGridService.GetMergedRegions:output_type -> volvoxgrid.v1.MergedRegionsResponse
+	228, // 496: volvoxgrid.v1.VolvoxGridService.GetMemoryUsage:output_type -> volvoxgrid.v1.MemoryUsageResponse
+	234, // 497: volvoxgrid.v1.VolvoxGridService.Clipboard:output_type -> volvoxgrid.v1.ClipboardResponse
+	236, // 498: volvoxgrid.v1.VolvoxGridService.Export:output_type -> volvoxgrid.v1.ExportResponse
+	238, // 499: volvoxgrid.v1.VolvoxGridService.Print:output_type -> volvoxgrid.v1.PrintResponse
+	241, // 500: volvoxgrid.v1.VolvoxGridService.Archive:output_type -> volvoxgrid.v1.ArchiveResponse
+	281, // 501: volvoxgrid.v1.VolvoxGridService.ResizeViewport:output_type -> volvoxgrid.v1.ResizeViewportResponse
+	282, // 502: volvoxgrid.v1.VolvoxGridService.SetRedraw:output_type -> volvoxgrid.v1.SetRedrawResponse
+	283, // 503: volvoxgrid.v1.VolvoxGridService.Refresh:output_type -> volvoxgrid.v1.RefreshResponse
+	284, // 504: volvoxgrid.v1.VolvoxGridService.LoadDemo:output_type -> volvoxgrid.v1.LoadDemoResponse
+	261, // 505: volvoxgrid.v1.VolvoxGridService.GetDemoData:output_type -> volvoxgrid.v1.GetDemoDataResponse
+	301, // 506: volvoxgrid.v1.VolvoxGridService.RenderSession:output_type -> volvoxgrid.v1.RenderOutput
+	311, // 507: volvoxgrid.v1.VolvoxGridService.EventStream:output_type -> volvoxgrid.v1.GridEvent
+	461, // [461:508] is the sub-list for method output_type
+	414, // [414:461] is the sub-list for method input_type
+	414, // [414:414] is the sub-list for extension type_name
+	414, // [414:414] is the sub-list for extension extendee
+	0,   // [0:414] is the sub-list for field type_name
 }
 
 func init() { file_volvoxgrid_proto_init() }
@@ -27816,43 +30231,38 @@ func file_volvoxgrid_proto_init() {
 	file_volvoxgrid_proto_msgTypes[6].OneofWrappers = []any{}
 	file_volvoxgrid_proto_msgTypes[9].OneofWrappers = []any{}
 	file_volvoxgrid_proto_msgTypes[10].OneofWrappers = []any{}
-	file_volvoxgrid_proto_msgTypes[13].OneofWrappers = []any{
+	file_volvoxgrid_proto_msgTypes[14].OneofWrappers = []any{
 		(*CellValue_Text)(nil),
 		(*CellValue_Number)(nil),
 		(*CellValue_Flag)(nil),
 		(*CellValue_Raw)(nil),
 		(*CellValue_Timestamp)(nil),
 	}
-	file_volvoxgrid_proto_msgTypes[16].OneofWrappers = []any{}
-	file_volvoxgrid_proto_msgTypes[17].OneofWrappers = []any{}
-	file_volvoxgrid_proto_msgTypes[18].OneofWrappers = []any{}
-	file_volvoxgrid_proto_msgTypes[19].OneofWrappers = []any{}
+	file_volvoxgrid_proto_msgTypes[17].OneofWrappers = []any{
+		(*ScalarValue_StringValue)(nil),
+		(*ScalarValue_NumberValue)(nil),
+		(*ScalarValue_BoolValue)(nil),
+		(*ScalarValue_BytesValue)(nil),
+	}
 	file_volvoxgrid_proto_msgTypes[20].OneofWrappers = []any{}
 	file_volvoxgrid_proto_msgTypes[21].OneofWrappers = []any{}
-	file_volvoxgrid_proto_msgTypes[22].OneofWrappers = []any{}
 	file_volvoxgrid_proto_msgTypes[23].OneofWrappers = []any{}
-	file_volvoxgrid_proto_msgTypes[24].OneofWrappers = []any{
-		(*HeaderMarkSize_Ratio)(nil),
-		(*HeaderMarkSize_Px)(nil),
-	}
 	file_volvoxgrid_proto_msgTypes[25].OneofWrappers = []any{}
-	file_volvoxgrid_proto_msgTypes[26].OneofWrappers = []any{}
-	file_volvoxgrid_proto_msgTypes[28].OneofWrappers = []any{}
-	file_volvoxgrid_proto_msgTypes[29].OneofWrappers = []any{}
+	file_volvoxgrid_proto_msgTypes[30].OneofWrappers = []any{}
 	file_volvoxgrid_proto_msgTypes[33].OneofWrappers = []any{}
 	file_volvoxgrid_proto_msgTypes[34].OneofWrappers = []any{}
 	file_volvoxgrid_proto_msgTypes[35].OneofWrappers = []any{}
 	file_volvoxgrid_proto_msgTypes[36].OneofWrappers = []any{}
+	file_volvoxgrid_proto_msgTypes[37].OneofWrappers = []any{}
 	file_volvoxgrid_proto_msgTypes[38].OneofWrappers = []any{}
-	file_volvoxgrid_proto_msgTypes[39].OneofWrappers = []any{}
+	file_volvoxgrid_proto_msgTypes[39].OneofWrappers = []any{
+		(*HeaderMarkSize_Ratio)(nil),
+		(*HeaderMarkSize_Px)(nil),
+	}
 	file_volvoxgrid_proto_msgTypes[40].OneofWrappers = []any{}
 	file_volvoxgrid_proto_msgTypes[41].OneofWrappers = []any{}
-	file_volvoxgrid_proto_msgTypes[42].OneofWrappers = []any{}
 	file_volvoxgrid_proto_msgTypes[43].OneofWrappers = []any{}
 	file_volvoxgrid_proto_msgTypes[44].OneofWrappers = []any{}
-	file_volvoxgrid_proto_msgTypes[45].OneofWrappers = []any{}
-	file_volvoxgrid_proto_msgTypes[46].OneofWrappers = []any{}
-	file_volvoxgrid_proto_msgTypes[47].OneofWrappers = []any{}
 	file_volvoxgrid_proto_msgTypes[48].OneofWrappers = []any{}
 	file_volvoxgrid_proto_msgTypes[49].OneofWrappers = []any{}
 	file_volvoxgrid_proto_msgTypes[50].OneofWrappers = []any{}
@@ -27861,52 +30271,70 @@ func file_volvoxgrid_proto_init() {
 	file_volvoxgrid_proto_msgTypes[53].OneofWrappers = []any{}
 	file_volvoxgrid_proto_msgTypes[54].OneofWrappers = []any{}
 	file_volvoxgrid_proto_msgTypes[55].OneofWrappers = []any{}
+	file_volvoxgrid_proto_msgTypes[56].OneofWrappers = []any{}
 	file_volvoxgrid_proto_msgTypes[57].OneofWrappers = []any{}
 	file_volvoxgrid_proto_msgTypes[58].OneofWrappers = []any{}
 	file_volvoxgrid_proto_msgTypes[59].OneofWrappers = []any{}
+	file_volvoxgrid_proto_msgTypes[60].OneofWrappers = []any{}
+	file_volvoxgrid_proto_msgTypes[61].OneofWrappers = []any{}
 	file_volvoxgrid_proto_msgTypes[62].OneofWrappers = []any{}
+	file_volvoxgrid_proto_msgTypes[64].OneofWrappers = []any{}
 	file_volvoxgrid_proto_msgTypes[65].OneofWrappers = []any{}
+	file_volvoxgrid_proto_msgTypes[66].OneofWrappers = []any{}
+	file_volvoxgrid_proto_msgTypes[67].OneofWrappers = []any{}
 	file_volvoxgrid_proto_msgTypes[68].OneofWrappers = []any{}
-	file_volvoxgrid_proto_msgTypes[73].OneofWrappers = []any{
+	file_volvoxgrid_proto_msgTypes[69].OneofWrappers = []any{}
+	file_volvoxgrid_proto_msgTypes[70].OneofWrappers = []any{}
+	file_volvoxgrid_proto_msgTypes[71].OneofWrappers = []any{}
+	file_volvoxgrid_proto_msgTypes[73].OneofWrappers = []any{}
+	file_volvoxgrid_proto_msgTypes[74].OneofWrappers = []any{}
+	file_volvoxgrid_proto_msgTypes[75].OneofWrappers = []any{}
+	file_volvoxgrid_proto_msgTypes[78].OneofWrappers = []any{}
+	file_volvoxgrid_proto_msgTypes[81].OneofWrappers = []any{}
+	file_volvoxgrid_proto_msgTypes[84].OneofWrappers = []any{}
+	file_volvoxgrid_proto_msgTypes[89].OneofWrappers = []any{
 		(*FieldMapping_ColIndex)(nil),
 		(*FieldMapping_ColKey)(nil),
 	}
-	file_volvoxgrid_proto_msgTypes[74].OneofWrappers = []any{}
-	file_volvoxgrid_proto_msgTypes[75].OneofWrappers = []any{}
-	file_volvoxgrid_proto_msgTypes[76].OneofWrappers = []any{
+	file_volvoxgrid_proto_msgTypes[90].OneofWrappers = []any{}
+	file_volvoxgrid_proto_msgTypes[91].OneofWrappers = []any{}
+	file_volvoxgrid_proto_msgTypes[92].OneofWrappers = []any{
 		(*LoadDataOptions_Csv)(nil),
 		(*LoadDataOptions_Json)(nil),
 	}
-	file_volvoxgrid_proto_msgTypes[77].OneofWrappers = []any{}
-	file_volvoxgrid_proto_msgTypes[78].OneofWrappers = []any{}
-	file_volvoxgrid_proto_msgTypes[85].OneofWrappers = []any{}
-	file_volvoxgrid_proto_msgTypes[87].OneofWrappers = []any{}
-	file_volvoxgrid_proto_msgTypes[89].OneofWrappers = []any{
+	file_volvoxgrid_proto_msgTypes[93].OneofWrappers = []any{}
+	file_volvoxgrid_proto_msgTypes[94].OneofWrappers = []any{}
+	file_volvoxgrid_proto_msgTypes[101].OneofWrappers = []any{}
+	file_volvoxgrid_proto_msgTypes[103].OneofWrappers = []any{}
+	file_volvoxgrid_proto_msgTypes[105].OneofWrappers = []any{
 		(*EditCommand_Start)(nil),
-		(*EditCommand_Commit)(nil),
-		(*EditCommand_Cancel)(nil),
-		(*EditCommand_SetText)(nil),
-		(*EditCommand_SetSelection)(nil),
-		(*EditCommand_Finish)(nil),
-		(*EditCommand_SetHighlights)(nil),
-		(*EditCommand_SetPreedit)(nil),
+		(*EditCommand_Session)(nil),
+		(*EditCommand_GetState)(nil),
 	}
-	file_volvoxgrid_proto_msgTypes[90].OneofWrappers = []any{}
-	file_volvoxgrid_proto_msgTypes[91].OneofWrappers = []any{}
-	file_volvoxgrid_proto_msgTypes[98].OneofWrappers = []any{}
-	file_volvoxgrid_proto_msgTypes[104].OneofWrappers = []any{}
-	file_volvoxgrid_proto_msgTypes[106].OneofWrappers = []any{
+	file_volvoxgrid_proto_msgTypes[106].OneofWrappers = []any{}
+	file_volvoxgrid_proto_msgTypes[108].OneofWrappers = []any{
+		(*EditorSessionCommand_ValueChanged)(nil),
+		(*EditorSessionCommand_SelectionChanged)(nil),
+		(*EditorSessionCommand_PreeditChanged)(nil),
+		(*EditorSessionCommand_Commit)(nil),
+		(*EditorSessionCommand_Cancel)(nil),
+		(*EditorSessionCommand_CustomAction)(nil),
+	}
+	file_volvoxgrid_proto_msgTypes[112].OneofWrappers = []any{}
+	file_volvoxgrid_proto_msgTypes[118].OneofWrappers = []any{}
+	file_volvoxgrid_proto_msgTypes[124].OneofWrappers = []any{}
+	file_volvoxgrid_proto_msgTypes[126].OneofWrappers = []any{
 		(*FindRequest_TextQuery)(nil),
 		(*FindRequest_RegexQuery)(nil),
 	}
-	file_volvoxgrid_proto_msgTypes[117].OneofWrappers = []any{
+	file_volvoxgrid_proto_msgTypes[137].OneofWrappers = []any{
 		(*ClipboardCommand_Copy)(nil),
 		(*ClipboardCommand_Cut)(nil),
 		(*ClipboardCommand_Paste)(nil),
 		(*ClipboardCommand_Delete)(nil),
 	}
-	file_volvoxgrid_proto_msgTypes[125].OneofWrappers = []any{}
-	file_volvoxgrid_proto_msgTypes[173].OneofWrappers = []any{
+	file_volvoxgrid_proto_msgTypes[145].OneofWrappers = []any{}
+	file_volvoxgrid_proto_msgTypes[193].OneofWrappers = []any{
 		(*RenderInput_Viewport)(nil),
 		(*RenderInput_Pointer)(nil),
 		(*RenderInput_Key)(nil),
@@ -27920,17 +30348,22 @@ func file_volvoxgrid_proto_init() {
 		(*RenderInput_TerminalViewport)(nil),
 		(*RenderInput_TerminalCommand)(nil),
 		(*RenderInput_CompareResponse)(nil),
+		(*RenderInput_EditValidationResponse)(nil),
+		(*RenderInput_EditorListItemsResponse)(nil),
 	}
-	file_volvoxgrid_proto_msgTypes[187].OneofWrappers = []any{
+	file_volvoxgrid_proto_msgTypes[195].OneofWrappers = []any{}
+	file_volvoxgrid_proto_msgTypes[209].OneofWrappers = []any{
 		(*RenderOutput_FrameDone)(nil),
 		(*RenderOutput_Selection)(nil),
 		(*RenderOutput_Cursor)(nil),
-		(*RenderOutput_EditRequest)(nil),
-		(*RenderOutput_DropdownRequest)(nil),
+		(*RenderOutput_EditorStarted)(nil),
+		(*RenderOutput_EditorUpdated)(nil),
+		(*RenderOutput_EditorEnded)(nil),
 		(*RenderOutput_TooltipRequest)(nil),
 		(*RenderOutput_GpuFrameDone)(nil),
 	}
-	file_volvoxgrid_proto_msgTypes[196].OneofWrappers = []any{
+	file_volvoxgrid_proto_msgTypes[216].OneofWrappers = []any{}
+	file_volvoxgrid_proto_msgTypes[219].OneofWrappers = []any{
 		(*GridEvent_CellFocusChanging)(nil),
 		(*GridEvent_CellFocusChanged)(nil),
 		(*GridEvent_SelectionChanging)(nil),
@@ -27945,10 +30378,9 @@ func file_volvoxgrid_proto_init() {
 		(*GridEvent_KeyDownEdit)(nil),
 		(*GridEvent_KeyPressEdit)(nil),
 		(*GridEvent_KeyUpEdit)(nil),
-		(*GridEvent_CellEditConfigureStyle)(nil),
-		(*GridEvent_CellEditConfigureWindow)(nil),
-		(*GridEvent_DropdownClosed)(nil),
-		(*GridEvent_DropdownOpened)(nil),
+		(*GridEvent_EditValidationRequest)(nil),
+		(*GridEvent_EditorListItemsRequest)(nil),
+		(*GridEvent_CustomEditorAction)(nil),
 		(*GridEvent_CellChanged)(nil),
 		(*GridEvent_RowStatusChange)(nil),
 		(*GridEvent_BeforeSort)(nil),
@@ -27991,7 +30423,6 @@ func file_volvoxgrid_proto_init() {
 		(*GridEvent_GetHeaderRow)(nil),
 		(*GridEvent_PullToRefreshTriggered)(nil),
 		(*GridEvent_PullToRefreshCanceled)(nil),
-		(*GridEvent_BeforeDropdownOpen)(nil),
 		(*GridEvent_TreeChildrenRequested)(nil),
 		(*GridEvent_BeforeTreeNodeToggle)(nil),
 		(*GridEvent_AfterTreeNodeToggle)(nil),
@@ -28003,8 +30434,8 @@ func file_volvoxgrid_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_volvoxgrid_proto_rawDesc), len(file_volvoxgrid_proto_rawDesc)),
-			NumEnums:      82,
-			NumMessages:   263,
+			NumEnums:      92,
+			NumMessages:   284,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

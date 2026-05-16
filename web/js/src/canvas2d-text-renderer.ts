@@ -5,9 +5,25 @@
  * text measurement and pixel-level rendering into the engine's buffer.
  */
 
-export function createCanvas2DTextRenderer(wasm: any) {
+import {
+  browserFontFallbackStack,
+  quoteFontFamily,
+  type BrowserFontFallbackOptions,
+} from './font-fallbacks.js';
+
+export interface Canvas2DTextRendererOptions {
+  fontFallbacksEnabled?: boolean;
+  wasm?: BrowserFontFallbackOptions['wasm'];
+}
+
+export function createCanvas2DTextRenderer(wasm: any, options: Canvas2DTextRendererOptions = {}) {
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+  const fontFallbacksEnabled = options.fontFallbacksEnabled ?? true;
+  const fallbackFontStack = browserFontFallbackStack({
+    fontFallbacksEnabled,
+    wasm: options.wasm ?? wasm,
+  });
 
   interface LineMetrics {
     lineHeight: number;
@@ -26,7 +42,11 @@ export function createCanvas2DTextRenderer(wasm: any) {
   }
 
   function getFontStyle(fontName: string, fontSize: number, bold: boolean, italic: boolean): string {
-    const family = fontName ? `"${fontName}", sans-serif` : 'sans-serif';
+    const family = fontName.trim() && fontFallbacksEnabled
+      ? `${quoteFontFamily(fontName.trim())}, ${fallbackFontStack}`
+      : fontName.trim()
+        ? quoteFontFamily(fontName.trim())
+        : fallbackFontStack;
     return `${italic ? 'italic ' : ''}${bold ? 'bold ' : ''}${fontSize}px ${family}`;
   }
 

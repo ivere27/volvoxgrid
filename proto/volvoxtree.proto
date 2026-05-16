@@ -56,7 +56,7 @@ message NodeCellUpdate {
   optional CheckedState checked = 5;
   ImageData picture = 6;
   optional ImageAlignment picture_align = 7;
-  optional Dropdown dropdown = 8;
+  EditorSpec editor = 8;
   // Full replacement, not a sparse patch. Empty `runs` clears rich text.
   optional RichText rich_text = 9;
 }

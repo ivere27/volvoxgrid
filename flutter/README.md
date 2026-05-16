@@ -18,7 +18,7 @@ A high-performance, pixel-rendered data grid widget for Flutter. The native Rust
 
 ```yaml
 dependencies:
-  volvoxgrid: ^0.8.8
+  volvoxgrid: ^0.8.9
 ```
 
 Native binaries are resolved automatically from Maven Central at build time. No manual downloads required.
@@ -30,7 +30,7 @@ By default, `VOLVOXGRID_SOURCE=maven` pulls pre-built binaries from Maven Centra
 | Variable | Default | Description |
 |---|---|---|
 | `VOLVOXGRID_SOURCE` | `maven` | `maven` or `local` |
-| `VOLVOXGRID_VERSION` | `0.8.8` | Maven artifact version |
+| `VOLVOXGRID_VERSION` | `0.8.9` | Maven artifact version |
 | `VOLVOXGRID_VARIANT` | empty | Set to `lite` for lite artifacts where the platform supports them |
 
 Text rendering follows the native artifact selected for the platform. Full native artifacts use the built-in Rust text engine. Android lite artifacts use Android OS text fallback through the Android host layer. iOS lite uses `VolvoxGridLite.xcframework` with CoreText/CoreGraphics fallback. Flutter macOS can use `volvoxgrid-desktop-lite` because the lite native runtime has a built-in CoreText fallback. Linux and Windows Flutter desktop should use the full desktop runtime for text. See [../TEXT_RENDERING.md](../TEXT_RENDERING.md).
@@ -187,7 +187,7 @@ VolvoxGridWidget(
 )
 ```
 
-Cancelable Flutter hooks currently cover `onBeforeEdit`, `onBeforeDropdownOpen`, `onCellEditValidating`, and `onBeforeSort`. The legacy raw `onCancelableEvent` callback is still available, but the event-specific `details.cancel = true` API is clearer for app code. If no hook is registered, the widget does not pause the engine for a decision; if a raw cancelable event is unhandled while the decision channel is active, the widget allows it with `cancel=false`.
+Cancelable Flutter hooks currently cover `onBeforeEdit`, `onCellEditValidating`, and `onBeforeSort`. The legacy raw `onCancelableEvent` callback is still available, but the event-specific `details.cancel = true` API is clearer for app code. If no hook is registered, the widget does not pause the engine for a decision; if a raw cancelable event is unhandled while the decision channel is active, the widget allows it with `cancel=false`.
 
 ### VolvoxGridController
 
@@ -380,11 +380,20 @@ await controller.setEditTrigger(EditTrigger.EDIT_TRIGGER_KEY_CLICK);
 await controller.commitEdit('new value');
 await controller.cancelEdit();
 
-// Column dropdown lists (pipe-delimited)
-await controller.setColDropdownItems(2, 'Option A|Option B|Option C');
+// Column list editor
+await controller.setColDropdown(2, ListEditorParams()
+  ..staticItems.addAll([
+    ListItem()..label = 'Option A',
+    ListItem()..label = 'Option B',
+    ListItem()..label = 'Option C',
+  ]));
 
-// Per-cell dropdown
-await controller.setCellDropdownItems(1, 2, 'Yes|No');
+// Per-cell list editor
+await controller.setCellDropdown(1, 2, ListEditorParams()
+  ..staticItems.addAll([
+    ListItem()..label = 'Yes',
+    ListItem()..label = 'No',
+  ]));
 ```
 
 #### Styling

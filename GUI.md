@@ -215,8 +215,9 @@ The render session also emits immediate UI-facing outputs:
 
 - `SelectionUpdate`
 - `CursorChange`
-- `EditRequest`
-- `DropdownRequest`
+- `EditorSessionStarted`
+- `EditorSessionUpdated`
+- `EditorSessionEnded`
 - `TooltipRequest`
 
 These are not the same as the long-lived semantic event stream. They exist so the host can react immediately to render-time UI needs.
@@ -389,8 +390,9 @@ GUI hosts usually need both render-coupled UI outputs and application-level even
 
 These arrive on `RenderOutput`:
 
-- `EditRequest`
-- `DropdownRequest`
+- `EditorSessionStarted`
+- `EditorSessionUpdated`
+- `EditorSessionEnded`
 - `TooltipRequest`
 - `CursorChange`
 - `SelectionUpdate`
@@ -417,7 +419,6 @@ Typical host behavior:
 Use `EventDecision` when the host needs to cancel a cancelable event such as:
 
 - `BeforeEdit`
-- `BeforeDropdownOpen`
 - `CellEditValidate`
 - `BeforeSort`
 - `BeforeNodeToggle`
@@ -428,6 +429,143 @@ Use `EventDecision` when the host needs to cancel a cancelable event such as:
 - `BeforeMouseDown`
 
 `cancel=true` means veto. `cancel=false` means allow, and is the correct default for an unhandled cancelable event when a decision channel is active.
+
+## Editor Session Lifecycle
+
+GUI editing is expressed as an editor session. The canonical wire shape is in `proto/volvoxgrid.proto`, but GUI hosts should follow the lifecycle below rather than treating each message independently.
+
+### Starting
+
+An edit can start from engine input handling or from the host calling `EditCommand.start`.
+
+`EditCommand.start` names the cell and the reason:
+
+- `EDIT_START_F2`, `EDIT_START_DOUBLE_CLICK`, and `EDIT_START_CLICK_CARET` create edit-mode sessions with a caret.
+- `EDIT_START_ENTER_KEY`, `EDIT_START_PRINTABLE_KEY`, `EDIT_START_IME_COMPOSITION`, and `EDIT_START_PROGRAMMATIC` create enter-mode sessions unless the engine has a more specific rule.
+- `seed_value` carries the printable key or IME text that opened the session.
+- `caret_position` is meaningful for click-caret starts.
+
+The render session then emits `EditorSessionStarted` with a full `EditorSession` snapshot. Hosts should cache this snapshot by `session_id`.
+
+### Edit UI Modes
+
+`EditorSession.ui_mode` is the authoritative mode for keyboard and overlay behavior.
+
+`EDIT_UI_MODE_ENTER` is spreadsheet-style entry:
+
+- the current cell text is selected when the session starts
+- the first printable key replaces the selected text
+- Enter commits without moving the grid cursor
+- Up/Down and similar navigation keys commit and move the grid cursor
+- Escape cancels and restores the original value
+
+`EDIT_UI_MODE_EDIT` is text-editor-style entry:
+
+- the caret is placed in the text, usually at the end or at `caret_position`
+- printable keys insert at the caret instead of replacing the whole cell
+- arrow keys move the caret or selection inside the editor
+- Enter commits unless the editor is multiline or the host/editor handles it specially
+- Escape cancels and restores the original value
+
+Hosts should use `ui_mode` from the session rather than re-deriving it from the key or pointer event. The engine derives it from `EditStartReason`; for example, F2, double-click, and click-caret starts normally produce edit mode, while Enter, printable-key, IME, and programmatic starts normally produce enter mode.
+
+### Presentation
+
+`EditorSession.editor.presentation` decides whether the host shows a native widget:
+
+- `EDITOR_CANVAS`: the engine draws the editor on the canvas. The host must not mount an overlay, but must still track the session for focus, clipboard, keyboard, and command routing.
+- `EDITOR_INLINE`, `EDITOR_POPUP_OVER`, `EDITOR_POPUP_UNDER`, `EDITOR_MODAL`: the host mounts a native editor surface using the session's geometry and editor spec.
+
+The engine default is `EDITOR_CANVAS`. Host wrappers that want native overlays must set a non-canvas presentation explicitly in their `EditorSpec`.
+
+`EditorSession.editor.owner` decides who owns the editor implementation:
+
+- `EDITOR_OWNER_ENGINE`: engine semantics and value model.
+- `EDITOR_OWNER_HOST_NATIVE`: host-provided native editor for a built-in editor kind.
+- `EDITOR_OWNER_CUSTOM`: application/custom editor identified by `custom_editor_id`.
+
+Presentation and owner are related but not interchangeable. A host should key overlay creation from `presentation`, then use `owner` and `kind` to choose the widget implementation.
+
+### List Editors
+
+List editor semantics come from `EditorSpec.kind` and `ListEditorParams.allow_custom_value`; presentation only decides who draws the editor surface.
+
+- `EDITOR_SELECT` with `allow_custom_value=false` is a read-only select/list editor. It may have list navigation and type-ahead search, but it must not expose caret movement, text selection, or mutating paste/cut behavior. Committed values must match a list item.
+- `EDITOR_COMBO` with `allow_custom_value=true` is an editable dropdown/combobox. It accepts custom typed text in addition to choosing a list item.
+
+Host wrappers that use native text editors for normal cell editing should still keep select/dropdown lists engine-owned and canvas-presented unless they implement the same select-only restrictions.
+
+### Commit Validation
+
+Commit-time validation is layered:
+
+- `ColumnDef.data_type` controls display, sort, formatting, and aggregation behavior. It does not by itself make editing numeric, date-only, or list-only.
+- `EditorSpec.kind` plus editor params controls built-in edit validation.
+- `CellEditValidate` is for application rules that cannot be expressed by the editor params.
+
+Built-in validation runs before `CellEditValidate`. If it fails with `VALIDATION_BLOCK`, the editor stays open and `EditorSession.validation_errors` / `EditorSessionUpdated.validation_errors` carries the error state.
+
+Built-in commit checks:
+
+- `EDITOR_NUMBER`: committed text must parse as a finite number; `NumberEditorParams.nullable=false` rejects empty text; `min` and `max` enforce numeric range.
+- `EDITOR_DATE_TIME`: non-empty committed text must parse as a date/time; `min_timestamp` and `max_timestamp` enforce range.
+- `EDITOR_SELECT`: committed text must match an enabled list item when static items are available.
+- `EDITOR_COMBO`: list items may be chosen, but custom text is allowed.
+- `EDITOR_TEXT` / `EDITOR_MULTILINE_TEXT`: `max_length` and `allow_newlines` are enforced at commit.
+
+Use `CellEditValidate` for cross-cell, cross-row, server, permission, duplicate-key, formula, or other business validation. For example, a `Margin` column can use `EDITOR_NUMBER` with `min=0` and `max=100`; a rule such as `Cost <= Sales` belongs in `CellEditValidate`.
+
+### Updating
+
+For an existing session, the engine emits `EditorSessionUpdated`. This is a sparse delta against the cached `EditorSessionStarted.session`.
+
+Host rules:
+
+- Ignore updates whose `session_id` does not match the active session.
+- Use `state_version` to reject stale value/selection/preedit work.
+- Apply only fields that are present.
+- Treat `value` and `selection` as authoritative when present.
+- Treat `viewport_rect` as a geometry move for overlay presentations.
+- Treat `visible=false` as hide without ending the session; keep the cached session and restore on `visible=true`.
+- Treat `validation_errors` as the current validation state when sent.
+- Honor `force_refocus=true` on the next host UI tick.
+
+Same-session value, selection, validation, geometry, and visibility changes must be handled as `EditorSessionUpdated`. A host should not require another `EditorSessionStarted` unless the `session_id` changes.
+
+### Sending Commands
+
+Hosts send editor mutations through `EditCommand.session`, which carries `EditorSessionCommand`.
+
+Every command should include the latest cached:
+
+- `session_id`
+- `state_version`
+
+The engine uses those fields for optimistic concurrency. Stale commands are ignored and the returned `EditState` is the authoritative current snapshot.
+
+Common commands:
+
+- `value_changed`: host overlay text/value changed.
+- `selection_changed`: host overlay caret/selection changed.
+- `preedit_changed`: IME composition changed or committed.
+- `commit`: accept the current or supplied value.
+- `cancel`: close the session without committing.
+- `custom_action`: custom editor button/action callback.
+
+### Ending
+
+The engine emits `EditorSessionEnded` when the session closes. The host should unmount any overlay, clear its cached session, and release session-specific focus/proxy state.
+
+`committed_value` is present for committed sessions. For canceled, reverted, focus-lost, removed-cell, or destroyed-grid sessions, use `reason` to decide host cleanup and application callbacks.
+
+### Synchronous State
+
+`EditCommand.get_state` returns `EditState`.
+
+- `active=false`: no session is open; ignore `session`.
+- `active=true`: `session` is a full current `EditorSession` snapshot.
+
+This is useful for wrappers, diagnostics, and reconnect paths. Render-session hosts should still use `EditorSessionStarted/Updated/Ended` as the primary live lifecycle.
 
 ## Text Rendering Strategy
 

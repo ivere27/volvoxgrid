@@ -1,6 +1,6 @@
 {
   "name": "@volvoxgrid/report",
-  "version": "0.8.8",
+  "version": "0.8.9",
   "description": "VolvoxGrid Report Engine & Designer",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",

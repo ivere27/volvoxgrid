@@ -182,22 +182,10 @@ func NewWithOptions[T any](libraryPath string, columns []Column[T], rows []T, op
 		return nil, fmt.Errorf("bubbletea.New: open terminal session: %w", err)
 	}
 	session.SetViewport(0, 0, width, height, true)
-	eventsCtx, eventsStop := context.WithCancel(context.Background())
-	events, err := grid.EventStream(eventsCtx)
-	if err != nil {
-		eventsStop()
-		_ = session.Close()
-		_ = grid.Destroy()
-		_ = client.Close()
-		return nil, fmt.Errorf("bubbletea.New: open event stream: %w", err)
-	}
 	m := &Model[T]{
 		client:        client,
 		grid:          grid,
 		session:       session,
-		events:        events,
-		eventsCtx:     eventsCtx,
-		eventsStop:    eventsStop,
 		columns:       columns,
 		rows:          rows,
 		opts:          opts,
@@ -207,6 +195,10 @@ func NewWithOptions[T any](libraryPath string, columns []Column[T], rows []T, op
 		renderDone:    make(chan renderMsg, 1),
 	}
 	m.screen.Resize(width, height)
+	if err := m.ensureEventStream(opts.OnCellEdit != nil); err != nil {
+		_ = m.Close()
+		return nil, fmt.Errorf("bubbletea.New: open event stream: %w", err)
+	}
 	if err := m.applyColumnsAndRows(); err != nil {
 		_ = m.Close()
 		return nil, err
@@ -288,6 +280,9 @@ func (m *Model[T]) Reset(columns []Column[T], rows []T, opts Options[T]) error {
 	m.rows = rows
 	m.opts = opts
 	m.mouse = mouseState{}
+	if err := m.ensureEventStream(opts.OnCellEdit != nil); err != nil {
+		return fmt.Errorf("bubbletea.Reset: open event stream: %w", err)
+	}
 	if err := m.grid.Configure(buildGridConfig(
 		opts.GridConfig,
 		nextRows,
@@ -643,6 +638,9 @@ func (m *Model[T]) handleEngineEvent(evt *pb.GridEvent) {
 	if evt == nil {
 		return
 	}
+	if evt.GetEventId() != 0 && m.session != nil {
+		_ = m.session.SendEventDecision(evt.GetEventId(), false)
+	}
 	if ae := evt.GetAfterEdit(); ae != nil {
 		cb := m.opts.OnCellEdit
 		if cb == nil {
@@ -724,6 +722,9 @@ func (m *Model[T]) tickCmd() tea.Cmd {
 }
 
 func (m *Model[T]) recvEventCmd() tea.Cmd {
+	if m.events == nil {
+		return nil
+	}
 	return func() tea.Msg {
 		evt, err := m.events.Recv()
 		if err != nil {
@@ -731,6 +732,31 @@ func (m *Model[T]) recvEventCmd() tea.Cmd {
 		}
 		return engineEventMsg{evt: evt}
 	}
+}
+
+func (m *Model[T]) ensureEventStream(enabled bool) error {
+	if !enabled {
+		if m.eventsStop != nil {
+			m.eventsStop()
+		}
+		m.events = nil
+		m.eventsCtx = nil
+		m.eventsStop = nil
+		return nil
+	}
+	if m.events != nil {
+		return nil
+	}
+	eventsCtx, eventsStop := context.WithCancel(context.Background())
+	events, err := m.grid.EventStream(eventsCtx)
+	if err != nil {
+		eventsStop()
+		return err
+	}
+	m.events = events
+	m.eventsCtx = eventsCtx
+	m.eventsStop = eventsStop
+	return nil
 }
 
 // renderNow renders a frame synchronously and updates View() immediately.
@@ -913,7 +939,9 @@ func buildGridConfig(user *pb.GridConfig, rows, cols int) *pb.GridConfig {
 	}
 	if config.Editing == nil {
 		config.Editing = &pb.EditConfig{
-			Trigger: pb.EditTrigger_EDIT_TRIGGER_KEY_CLICK.Enum(),
+			Activation: &pb.EditActivation{
+				Trigger: pb.EditTrigger_EDIT_TRIGGER_KEY_CLICK.Enum(),
+			},
 		}
 	}
 	if config.Indicators == nil {
@@ -942,8 +970,9 @@ func resetGridConfig(rows, cols int) *pb.GridConfig {
 			Mode: pb.SelectionMode_SELECTION_FREE.Enum(),
 		},
 		Editing: &pb.EditConfig{
-			Trigger:         pb.EditTrigger_EDIT_TRIGGER_KEY_CLICK.Enum(),
-			DropdownTrigger: pb.DropdownTrigger_DROPDOWN_NEVER.Enum(),
+			Activation: &pb.EditActivation{
+				Trigger: pb.EditTrigger_EDIT_TRIGGER_KEY_CLICK.Enum(),
+			},
 		},
 		Outline: &pb.OutlineConfig{
 			TreeIndicator:      pb.TreeIndicatorStyle_TREE_INDICATOR_NONE.Enum(),
@@ -1008,8 +1037,7 @@ func resetColumnDefs(count int) []*pb.ColumnDef {
 			Key:           proto.String(""),
 			SortOrder:     pb.SortOrder_SORT_NONE.Enum(),
 			SortType:      pb.SortType_SORT_TYPE_AUTO.Enum(),
-			Dropdown:      &pb.Dropdown{},
-			EditMask:      proto.String(""),
+			Editor:        &pb.EditorSpec{},
 			Indent:        proto.Int32(0),
 			Hidden:        proto.Bool(false),
 			Span:          proto.Bool(false),
@@ -1043,14 +1071,13 @@ func resetIndicators() *pb.IndicatorsConfig {
 		Visible:          proto.Bool(false),
 		BandRows:         proto.Int32(0),
 		DefaultRowHeight: proto.Int32(1),
-		ModeBits:         proto.Uint32(0),
+		CellModes:        &pb.ColIndicatorCellModes{},
 		AllowResize:      proto.Bool(false),
 		AllowReorder:     proto.Bool(false),
 		AllowMenu:        proto.Bool(false),
 	}
 	hiddenCorner := &pb.CornerIndicatorConfig{
-		Visible:  proto.Bool(false),
-		ModeBits: proto.Uint32(0),
+		Visible: proto.Bool(false),
 		Slots: []*pb.CornerIndicatorSlot{{
 			Kind:    pb.CornerIndicatorSlotKind_CORNER_SLOT_NONE.Enum(),
 			Width:   proto.Int32(0),
@@ -1119,8 +1146,12 @@ func defaultIndicators(rows int) *pb.IndicatorsConfig {
 			Visible:          proto.Bool(true),
 			BandRows:         proto.Int32(1),
 			DefaultRowHeight: proto.Int32(1),
-			ModeBits:         proto.Uint32(uint32(pb.ColIndicatorCellMode_COL_INDICATOR_CELL_HEADER_TEXT)),
-			AllowResize:      proto.Bool(false),
+			CellModes: &pb.ColIndicatorCellModes{
+				Modes: []pb.ColIndicatorCellMode{
+					pb.ColIndicatorCellMode_COL_INDICATOR_CELL_HEADER_TEXT,
+				},
+			},
+			AllowResize: proto.Bool(false),
 		},
 	}
 }

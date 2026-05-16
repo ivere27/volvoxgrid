@@ -21,8 +21,8 @@ public interface VolvoxGridController {
     boolean getShowColumnHeaders();
     void setShowColumnHeaders(boolean value);
 
-    int getColumnIndicatorTopModeBits();
-    void setColumnIndicatorTopModeBits(int value);
+    VolvoxGridColumnIndicatorConfig getColumnIndicatorTopConfig();
+    void setColumnIndicatorTopConfig(VolvoxGridColumnIndicatorConfig value);
 
     int getColumnIndicatorTopRowCount();
     void setColumnIndicatorTopRowCount(int value);
@@ -30,8 +30,8 @@ public interface VolvoxGridController {
     boolean getShowRowIndicator();
     void setShowRowIndicator(boolean value);
 
-    int getRowIndicatorStartModeBits();
-    void setRowIndicatorStartModeBits(int value);
+    VolvoxGridRowIndicatorConfig getRowIndicatorStartConfig();
+    void setRowIndicatorStartConfig(VolvoxGridRowIndicatorConfig value);
 
     int getRowIndicatorStartWidth();
     void setRowIndicatorStartWidth(int value);
@@ -70,6 +70,9 @@ public interface VolvoxGridController {
 
     void setRendererBackend(RendererBackend backend);
     RendererBackend rendererBackend();
+
+    boolean fontFallbackEnabled();
+    void setFontFallbackEnabled(boolean enabled);
 
     long renderLayerMask();
     void setRenderLayerMask(long mask);

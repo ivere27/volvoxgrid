@@ -356,14 +356,7 @@ public final class VolvoxGridDesktopExample {
         int height = Math.max(gridPanel.getHeight(), 600);
         float scale = Math.max((float) Toolkit.getDefaultToolkit().getScreenResolution() / 96.0f, 1.0f);
 
-        GridConfig config = GridConfig.newBuilder()
-            .setLayout(
-                LayoutConfig.newBuilder()
-                    .setRows(2)
-                    .setCols(2)
-                    .build()
-            )
-            .setIndicators(VolvoxGridDesktopController.defaultIndicatorsConfig())
+        GridConfig config = VolvoxGridDesktopController.defaultGridConfigBuilder(2, 2)
             .setRendering(
                 RenderConfig.newBuilder()
                     .setRendererMode(rendererMode)

@@ -17,13 +17,14 @@ VolvoxGrid has two input paths for non-IME events:
 1. **Keyboard**: adapters translate platform key events into a common `KeyEvent` protobuf carrying a virtual key code, modifier bitmask, and optional character.
 2. **Mouse/Pointer**: adapters translate platform pointer events into `PointerEvent` (down/up/move with coordinates, button, modifier) and `ScrollEvent` (delta).
 
-All adapters use web/Windows virtual key codes as the common key code space. The engine dispatches actions based on key code + modifier + current mode (non-editing, ENTER mode, EDIT mode).
+Adapters use web/Windows virtual key codes as the common key code space where the platform exposes them directly. Android forwards Android key codes for hardware keys; the engine handles the common Android/web differences such as Enter. The engine dispatches actions based on key code + modifier + current mode (non-editing, ENTER mode, EDIT mode).
 
-Three configuration knobs control editing behavior: `EditTrigger`, `TabBehavior`, and `host_key_dispatch`.
+Editing behavior is configured through `EditConfig.activation`, primarily
+`EditTrigger` and `TabBehavior`.
 
 ## Key Code Convention
 
-Key codes use web/Windows virtual key values. The common codes used by the engine:
+Key codes generally use web/Windows virtual key values. Android is the main exception; Android hardware key codes are forwarded directly and normalized by engine-side handling where needed. The common web/Windows codes used by the engine:
 
 | Key code | Key |
 |----------|-----|
@@ -80,20 +81,20 @@ The engine has three input modes that determine how keys are dispatched.
 
 The grid is focused but no cell editor is active. Arrow keys navigate, Enter/F2 start editing, Ctrl+C copies.
 
-### ENTER mode (`EditUiMode::EnterMode`)
+### ENTER mode (`EDIT_UI_MODE_ENTER`)
 
-Spreadsheet-style editing. Activated by pressing Enter or typing a printable character on a cell. Character keys replace the cell content. Arrows commit the edit and move to the adjacent cell. Enter commits and moves down.
+Spreadsheet-style editing. Usually activated by Enter, printable-key, IME, or programmatic starts. The current cell text starts selected, so the first printable key replaces it. Up/Down commit the edit and move to the adjacent row. Enter commits without moving the grid cursor.
 
-### EDIT mode (`EditUiMode::EditMode`)
+### EDIT mode (`EDIT_UI_MODE_EDIT`)
 
-F2-style editing. Activated by pressing F2 or double-clicking a cell. The caret is placed at the end of the existing text. Arrows move the caret within the text. Up moves caret to start, Down moves caret to end. Enter commits without moving.
+F2-style editing. Usually activated by F2, double-click, or click-caret starts. The caret is placed at the end of the existing text or at the clicked position. Left/Right move the caret within the text. For single-line editors, Up behaves like Home and Down behaves like End. Enter commits without moving.
 
-Defined in `engine/src/edit.rs`:
+Defined on the wire as `EditUiMode` and carried by `EditorSession.ui_mode`. Hosts should use the session value instead of re-deriving mode from the input event:
 
-```rust
-pub enum EditUiMode {
-    EnterMode,  // default — spreadsheet Enter-style
-    EditMode,   // F2-style
+```protobuf
+enum EditUiMode {
+  EDIT_UI_MODE_ENTER = 0;
+  EDIT_UI_MODE_EDIT  = 1;
 }
 ```
 
@@ -126,6 +127,7 @@ All key dispatch logic lives in `engine/src/input.rs`, functions `handle_key_dow
 | Cut | X | Ctrl | emits `Cut` event to host |
 | Paste | V | Ctrl | emits `Paste` event to host |
 | Toggle checkbox | Space | | only on boolean checkbox cells |
+| Open read-only select | Space | | only on `EDITOR_SELECT` / read-only dropdown cells; does not allow freeform text |
 | Begin edit (Enter) | Enter | | requires `EditTrigger >= KEY`; toggles checkbox if boolean cell |
 | Begin edit (F2) | F2 | | requires `EditTrigger >= KEY`; caret at end of existing text; skips checkbox cells |
 | Auto-start edit | any printable char | | requires `EditTrigger >= KEY`; clears cell, types character |
@@ -135,14 +137,15 @@ All key dispatch logic lives in `engine/src/input.rs`, functions `handle_key_dow
 
 | Action | Key | Modifier | Notes |
 |--------|-----|----------|-------|
-| Commit + move down | Enter | | skipped when `host_key_dispatch` |
-| Cancel edit | Escape | | restores original value; skipped when `host_key_dispatch` |
+| Commit | Enter | | does not move the grid cursor |
+| Cancel edit | Escape | | restores original value |
 | Commit + move up | Up Arrow | | commits and moves selection up |
 | Commit + move down | Down Arrow | | commits and moves selection down |
 | Move caret left | Left Arrow | | |
 | Move caret right | Right Arrow | | |
 | Move caret to start | Home | | |
 | Move caret to end | End | | |
+| Insert newline | Enter | Alt | when the editor accepts newline input |
 | Select all text | A | Ctrl | |
 | Backspace | Backspace | | |
 | Delete forward | Delete | | |
@@ -153,13 +156,14 @@ Dropdown-specific overrides in ENTER mode:
 |--------|-----|-------|
 | Move dropdown selection up | Up Arrow | when dropdown list is open |
 | Move dropdown selection down | Down Arrow | when dropdown list is open |
+| Ignore freeform text selection/cut/paste | Ctrl+A / Ctrl+X / Ctrl+V | read-only select/dropdown only; paste may only choose an exact list item |
 
 ### EDIT mode (editing)
 
 | Action | Key | Modifier | Notes |
 |--------|-----|----------|-------|
-| Commit | Enter | | skipped when `host_key_dispatch` |
-| Cancel edit | Escape | | restores original value; skipped when `host_key_dispatch` |
+| Commit | Enter | | |
+| Cancel edit | Escape | | restores original value |
 | Move caret left | Left Arrow | | within text |
 | Move caret right | Right Arrow | | within text |
 | Move caret to start | Up Arrow | | equivalent to Home |
@@ -236,7 +240,6 @@ The engine hit-tests pointer coordinates against these regions, defined in `engi
 **Checkbox cell click**:
 
 - Single click toggles the checkbox value
-- Skipped when `host_pointer_dispatch`
 
 **Dropdown button click**:
 
@@ -294,7 +297,7 @@ Defined in `proto/volvoxgrid.proto`:
 enum EditTrigger {
   EDIT_TRIGGER_NONE      = 0;  // no keyboard or click editing
   EDIT_TRIGGER_KEY       = 1;  // Enter, F2, and printable chars start editing
-  EDIT_TRIGGER_KEY_CLICK = 2;  // above + double-click starts editing
+  EDIT_TRIGGER_KEY_CLICK = 2;  // above + double-click/dropdown-click starts editing
 }
 ```
 
@@ -311,20 +314,24 @@ enum TabBehavior {
 }
 ```
 
-### EditConfig flags
+### EditConfig
 
 ```protobuf
 message EditConfig {
-  optional EditTrigger trigger              = 1;
-  optional TabBehavior tab_behavior         = 2;
-  optional bool        host_key_dispatch    = 7;
-  optional bool        host_pointer_dispatch = 8;
-  // ... other fields omitted
+  EditActivation activation = 1;
+  EditorSpec     default_editor = 2;
+  optional ComposeMethod compose_method = 3;
+}
+
+message EditActivation {
+  optional EditTrigger trigger = 1;
+  optional TabBehavior tab_behavior = 2;
+  optional bool single_click_edit = 3;
+  optional bool suppress_click_edit = 4;
+  optional bool commit_on_focus_lost = 5;
+  optional bool preserve_edit_on_navigation = 6;
 }
 ```
-
-- `host_key_dispatch`: when true, the engine stops handling edit-action keys (Enter to commit, Escape to cancel, arrows to navigate during edit). The host adapter drives editing via RPC (`EditCommand`) instead.
-- `host_pointer_dispatch`: when true, the engine stops handling pointer-driven selection changes and edit triggers. The host adapter drives selection and editing via RPC.
 
 ## Event Output
 
@@ -337,9 +344,9 @@ All events are defined in `engine/src/event.rs` as variants of `GridEventData`.
 | `KeyDown` | `key_code`, `modifier` | every key down |
 | `KeyUp` | `key_code`, `modifier` | every key up |
 | `KeyPress` | `key_ascii` | printable character input |
-| `KeyDownEdit` | `key_code`, `modifier` | key down while editing |
-| `KeyPressEdit` | `key_ascii` | character input while editing |
-| `KeyUpEdit` | `key_code`, `modifier` | key up while editing |
+| `KeyDownEdit` | `session_id`, `key_code`, `modifier` | key down while editing |
+| `KeyPressEdit` | `session_id`, `key_ascii` | character input while editing |
+| `KeyUpEdit` | `session_id`, `key_code`, `modifier` | key up while editing |
 | `MouseDown` | `button`, `modifier`, `x`, `y` | pointer down |
 | `MouseUp` | `button`, `modifier`, `x`, `y` | pointer up |
 | `MouseMove` | `button`, `modifier`, `x`, `y` | pointer move |

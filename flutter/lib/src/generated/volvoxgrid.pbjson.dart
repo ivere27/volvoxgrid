@@ -80,6 +80,26 @@ final $typed_data.Uint8List borderAppearanceDescriptor = $convert.base64Decode(
     'ChBCb3JkZXJBcHBlYXJhbmNlEhoKFkJPUkRFUl9BUFBFQVJBTkNFX0ZMQVQQABIcChhCT1JERV'
     'JfQVBQRUFSQU5DRV9SQUlTRUQQARIcChhCT1JERVJfQVBQRUFSQU5DRV9TVUJUTEUQAg==');
 
+@$core.Deprecated('Use themePresetDescriptor instead')
+const ThemePreset$json = {
+  '1': 'ThemePreset',
+  '2': [
+    {'1': 'THEME_NONE', '2': 0},
+    {'1': 'THEME_CLASSIC', '2': 1},
+    {'1': 'THEME_LIGHT', '2': 2},
+    {'1': 'THEME_DARK', '2': 3},
+    {'1': 'THEME_HIGH_CONTRAST', '2': 4},
+    {'1': 'THEME_MONOKAI', '2': 5},
+    {'1': 'THEME_AMBER', '2': 6},
+  ],
+};
+
+/// Descriptor for `ThemePreset`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List themePresetDescriptor = $convert.base64Decode(
+    'CgtUaGVtZVByZXNldBIOCgpUSEVNRV9OT05FEAASEQoNVEhFTUVfQ0xBU1NJQxABEg8KC1RIRU'
+    '1FX0xJR0hUEAISDgoKVEhFTUVfREFSSxADEhcKE1RIRU1FX0hJR0hfQ09OVFJBU1QQBBIRCg1U'
+    'SEVNRV9NT05PS0FJEAUSDwoLVEhFTUVfQU1CRVIQBg==');
+
 @$core.Deprecated('Use textEffectDescriptor instead')
 const TextEffect$json = {
   '1': 'TextEffect',
@@ -528,21 +548,6 @@ final $typed_data.Uint8List editTriggerDescriptor = $convert.base64Decode(
     'CgtFZGl0VHJpZ2dlchIVChFFRElUX1RSSUdHRVJfTk9ORRAAEhQKEEVESVRfVFJJR0dFUl9LRV'
     'kQARIaChZFRElUX1RSSUdHRVJfS0VZX0NMSUNLEAI=');
 
-@$core.Deprecated('Use dropdownTriggerDescriptor instead')
-const DropdownTrigger$json = {
-  '1': 'DropdownTrigger',
-  '2': [
-    {'1': 'DROPDOWN_NEVER', '2': 0},
-    {'1': 'DROPDOWN_ALWAYS', '2': 1},
-    {'1': 'DROPDOWN_ON_EDIT', '2': 2},
-  ],
-};
-
-/// Descriptor for `DropdownTrigger`. Decode as a `google.protobuf.EnumDescriptorProto`.
-final $typed_data.Uint8List dropdownTriggerDescriptor = $convert.base64Decode(
-    'Cg9Ecm9wZG93blRyaWdnZXISEgoORFJPUERPV05fTkVWRVIQABITCg9EUk9QRE9XTl9BTFdBWV'
-    'MQARIUChBEUk9QRE9XTl9PTl9FRElUEAI=');
-
 @$core.Deprecated('Use dropdownItemLayoutDescriptor instead')
 const DropdownItemLayout$json = {
   '1': 'DropdownItemLayout',
@@ -572,6 +577,130 @@ const TabBehavior$json = {
 /// Descriptor for `TabBehavior`. Decode as a `google.protobuf.EnumDescriptorProto`.
 final $typed_data.Uint8List tabBehaviorDescriptor = $convert.base64Decode(
     'CgtUYWJCZWhhdmlvchIQCgxUQUJfQ09OVFJPTFMQABINCglUQUJfQ0VMTFMQAQ==');
+
+@$core.Deprecated('Use editorKindDescriptor instead')
+const EditorKind$json = {
+  '1': 'EditorKind',
+  '2': [
+    {'1': 'EDITOR_KIND_UNSPECIFIED', '2': 0},
+    {'1': 'EDITOR_TEXT', '2': 1},
+    {'1': 'EDITOR_MULTILINE_TEXT', '2': 2},
+    {'1': 'EDITOR_NUMBER', '2': 3},
+    {'1': 'EDITOR_CHECKBOX', '2': 4},
+    {'1': 'EDITOR_SELECT', '2': 5},
+    {'1': 'EDITOR_COMBO', '2': 6},
+    {'1': 'EDITOR_DATE_TIME', '2': 7},
+    {'1': 'EDITOR_BUTTON', '2': 8},
+    {'1': 'EDITOR_CUSTOM', '2': 100},
+  ],
+};
+
+/// Descriptor for `EditorKind`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List editorKindDescriptor = $convert.base64Decode(
+    'CgpFZGl0b3JLaW5kEhsKF0VESVRPUl9LSU5EX1VOU1BFQ0lGSUVEEAASDwoLRURJVE9SX1RFWF'
+    'QQARIZChVFRElUT1JfTVVMVElMSU5FX1RFWFQQAhIRCg1FRElUT1JfTlVNQkVSEAMSEwoPRURJ'
+    'VE9SX0NIRUNLQk9YEAQSEQoNRURJVE9SX1NFTEVDVBAFEhAKDEVESVRPUl9DT01CTxAGEhQKEE'
+    'VESVRPUl9EQVRFX1RJTUUQBxIRCg1FRElUT1JfQlVUVE9OEAgSEQoNRURJVE9SX0NVU1RPTRBk');
+
+@$core.Deprecated('Use editorOwnerDescriptor instead')
+const EditorOwner$json = {
+  '1': 'EditorOwner',
+  '2': [
+    {'1': 'EDITOR_OWNER_ENGINE', '2': 0},
+    {'1': 'EDITOR_OWNER_HOST_NATIVE', '2': 1},
+    {'1': 'EDITOR_OWNER_CUSTOM', '2': 2},
+  ],
+};
+
+/// Descriptor for `EditorOwner`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List editorOwnerDescriptor = $convert.base64Decode(
+    'CgtFZGl0b3JPd25lchIXChNFRElUT1JfT1dORVJfRU5HSU5FEAASHAoYRURJVE9SX09XTkVSX0'
+    'hPU1RfTkFUSVZFEAESFwoTRURJVE9SX09XTkVSX0NVU1RPTRAC');
+
+@$core.Deprecated('Use editorPresentationDescriptor instead')
+const EditorPresentation$json = {
+  '1': 'EditorPresentation',
+  '2': [
+    {'1': 'EDITOR_CANVAS', '2': 0},
+    {'1': 'EDITOR_POPUP_OVER', '2': 1},
+    {'1': 'EDITOR_POPUP_UNDER', '2': 2},
+    {'1': 'EDITOR_MODAL', '2': 3},
+    {'1': 'EDITOR_INLINE', '2': 4},
+  ],
+};
+
+/// Descriptor for `EditorPresentation`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List editorPresentationDescriptor = $convert.base64Decode(
+    'ChJFZGl0b3JQcmVzZW50YXRpb24SEQoNRURJVE9SX0NBTlZBUxAAEhUKEUVESVRPUl9QT1BVUF'
+    '9PVkVSEAESFgoSRURJVE9SX1BPUFVQX1VOREVSEAISEAoMRURJVE9SX01PREFMEAMSEQoNRURJ'
+    'VE9SX0lOTElORRAE');
+
+@$core.Deprecated('Use validationModeDescriptor instead')
+const ValidationMode$json = {
+  '1': 'ValidationMode',
+  '2': [
+    {'1': 'VALIDATION_BLOCK', '2': 0},
+    {'1': 'VALIDATION_REVERT', '2': 1},
+    {'1': 'VALIDATION_ALLOW_INVALID', '2': 2},
+  ],
+};
+
+/// Descriptor for `ValidationMode`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List validationModeDescriptor = $convert.base64Decode(
+    'Cg5WYWxpZGF0aW9uTW9kZRIUChBWQUxJREFUSU9OX0JMT0NLEAASFQoRVkFMSURBVElPTl9SRV'
+    'ZFUlQQARIcChhWQUxJREFUSU9OX0FMTE9XX0lOVkFMSUQQAg==');
+
+@$core.Deprecated('Use validationTriggerDescriptor instead')
+const ValidationTrigger$json = {
+  '1': 'ValidationTrigger',
+  '2': [
+    {'1': 'VALIDATION_TRIGGER_ON_COMMIT', '2': 0},
+    {'1': 'VALIDATION_TRIGGER_ON_CHANGE', '2': 1},
+    {'1': 'VALIDATION_TRIGGER_ON_PAUSE', '2': 2},
+    {'1': 'VALIDATION_TRIGGER_ON_FOCUS_LOST', '2': 3},
+  ],
+};
+
+/// Descriptor for `ValidationTrigger`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List validationTriggerDescriptor = $convert.base64Decode(
+    'ChFWYWxpZGF0aW9uVHJpZ2dlchIgChxWQUxJREFUSU9OX1RSSUdHRVJfT05fQ09NTUlUEAASIA'
+    'ocVkFMSURBVElPTl9UUklHR0VSX09OX0NIQU5HRRABEh8KG1ZBTElEQVRJT05fVFJJR0dFUl9P'
+    'Tl9QQVVTRRACEiQKIFZBTElEQVRJT05fVFJJR0dFUl9PTl9GT0NVU19MT1NUEAM=');
+
+@$core.Deprecated('Use inputTypeDescriptor instead')
+const InputType$json = {
+  '1': 'InputType',
+  '2': [
+    {'1': 'INPUT_TYPE_TEXT', '2': 0},
+    {'1': 'INPUT_TYPE_NUMBER', '2': 1},
+    {'1': 'INPUT_TYPE_EMAIL', '2': 2},
+    {'1': 'INPUT_TYPE_URL', '2': 3},
+    {'1': 'INPUT_TYPE_PHONE', '2': 4},
+    {'1': 'INPUT_TYPE_PASSWORD', '2': 5},
+  ],
+};
+
+/// Descriptor for `InputType`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List inputTypeDescriptor = $convert.base64Decode(
+    'CglJbnB1dFR5cGUSEwoPSU5QVVRfVFlQRV9URVhUEAASFQoRSU5QVVRfVFlQRV9OVU1CRVIQAR'
+    'IUChBJTlBVVF9UWVBFX0VNQUlMEAISEgoOSU5QVVRfVFlQRV9VUkwQAxIUChBJTlBVVF9UWVBF'
+    'X1BIT05FEAQSFwoTSU5QVVRfVFlQRV9QQVNTV09SRBAF');
+
+@$core.Deprecated('Use buttonRoleDescriptor instead')
+const ButtonRole$json = {
+  '1': 'ButtonRole',
+  '2': [
+    {'1': 'BUTTON_ROLE_DEFAULT', '2': 0},
+    {'1': 'BUTTON_ROLE_ELLIPSIS', '2': 1},
+    {'1': 'BUTTON_ROLE_CLEAR', '2': 2},
+    {'1': 'BUTTON_ROLE_CUSTOM', '2': 3},
+  ],
+};
+
+/// Descriptor for `ButtonRole`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List buttonRoleDescriptor = $convert.base64Decode(
+    'CgpCdXR0b25Sb2xlEhcKE0JVVFRPTl9ST0xFX0RFRkFVTFQQABIYChRCVVRUT05fUk9MRV9FTE'
+    'xJUFNJUxABEhUKEUJVVFRPTl9ST0xFX0NMRUFSEAISFgoSQlVUVE9OX1JPTEVfQ1VTVE9NEAM=');
 
 @$core.Deprecated('Use sortOrderDescriptor instead')
 const SortOrder$json = {
@@ -1224,6 +1353,7 @@ const RowIndicatorSlotKind$json = {
     {'1': 'ROW_INDICATOR_SLOT_ACTION', '2': 12},
     {'1': 'ROW_INDICATOR_SLOT_STATUS_ICON', '2': 13},
     {'1': 'ROW_INDICATOR_SLOT_CUSTOM', '2': 14},
+    {'1': 'ROW_INDICATOR_SLOT_NUMBERS_DATA_ONLY', '2': 15},
   ],
 };
 
@@ -1238,7 +1368,7 @@ final $typed_data.Uint8List rowIndicatorSlotKindDescriptor = $convert.base64Deco
     'V19ST1cQCRIfChtST1dfSU5ESUNBVE9SX1NMT1RfRVhQQU5ERVIQChIdChlST1dfSU5ESUNBVE'
     '9SX1NMT1RfUkVTSVpFEAsSHQoZUk9XX0lORElDQVRPUl9TTE9UX0FDVElPThAMEiIKHlJPV19J'
     'TkRJQ0FUT1JfU0xPVF9TVEFUVVNfSUNPThANEh0KGVJPV19JTkRJQ0FUT1JfU0xPVF9DVVNUT0'
-    '0QDg==');
+    '0QDhIoCiRST1dfSU5ESUNBVE9SX1NMT1RfTlVNQkVSU19EQVRBX09OTFkQDw==');
 
 @$core.Deprecated('Use colIndicatorCellModeDescriptor instead')
 const ColIndicatorCellMode$json = {
@@ -1448,6 +1578,73 @@ final $typed_data.Uint8List cursorTypeDescriptor = $convert.base64Decode(
     'RVhUEAQSDwoLQ1VSU09SX0hBTkQQBRITCg9DVVJTT1JfTU9WRV9ST1cQBhIPCgtDVVJTT1JfV0'
     'FJVBAHEhYKEkNVUlNPUl9OT1RfQUxMT1dFRBAIEhQKEENVUlNPUl9DUk9TU0hBSVIQCRIPCgtD'
     'VVJTT1JfQ09QWRAK');
+
+@$core.Deprecated('Use editStartReasonDescriptor instead')
+const EditStartReason$json = {
+  '1': 'EditStartReason',
+  '2': [
+    {'1': 'EDIT_START_UNSPECIFIED', '2': 0},
+    {'1': 'EDIT_START_F2', '2': 1},
+    {'1': 'EDIT_START_DOUBLE_CLICK', '2': 2},
+    {'1': 'EDIT_START_CLICK_CARET', '2': 3},
+    {'1': 'EDIT_START_ENTER_KEY', '2': 4},
+    {'1': 'EDIT_START_PRINTABLE_KEY', '2': 5},
+    {'1': 'EDIT_START_IME_COMPOSITION', '2': 6},
+    {'1': 'EDIT_START_DROPDOWN_BUTTON', '2': 7},
+    {'1': 'EDIT_START_PROGRAMMATIC', '2': 8},
+  ],
+};
+
+/// Descriptor for `EditStartReason`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List editStartReasonDescriptor = $convert.base64Decode(
+    'Cg9FZGl0U3RhcnRSZWFzb24SGgoWRURJVF9TVEFSVF9VTlNQRUNJRklFRBAAEhEKDUVESVRfU1'
+    'RBUlRfRjIQARIbChdFRElUX1NUQVJUX0RPVUJMRV9DTElDSxACEhoKFkVESVRfU1RBUlRfQ0xJ'
+    'Q0tfQ0FSRVQQAxIYChRFRElUX1NUQVJUX0VOVEVSX0tFWRAEEhwKGEVESVRfU1RBUlRfUFJJTl'
+    'RBQkxFX0tFWRAFEh4KGkVESVRfU1RBUlRfSU1FX0NPTVBPU0lUSU9OEAYSHgoaRURJVF9TVEFS'
+    'VF9EUk9QRE9XTl9CVVRUT04QBxIbChdFRElUX1NUQVJUX1BST0dSQU1NQVRJQxAI');
+
+@$core.Deprecated('Use editEndReasonDescriptor instead')
+const EditEndReason$json = {
+  '1': 'EditEndReason',
+  '2': [
+    {'1': 'EDIT_END_UNSPECIFIED', '2': 0},
+    {'1': 'EDIT_END_COMMITTED', '2': 1},
+    {'1': 'EDIT_END_CANCELED', '2': 2},
+    {'1': 'EDIT_END_REVERTED_INVALID', '2': 3},
+    {'1': 'EDIT_END_FOCUS_LOST', '2': 4},
+    {'1': 'EDIT_END_CELL_REMOVED', '2': 5},
+    {'1': 'EDIT_END_GRID_DESTROYED', '2': 6},
+  ],
+};
+
+/// Descriptor for `EditEndReason`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List editEndReasonDescriptor = $convert.base64Decode(
+    'Cg1FZGl0RW5kUmVhc29uEhgKFEVESVRfRU5EX1VOU1BFQ0lGSUVEEAASFgoSRURJVF9FTkRfQ0'
+    '9NTUlUVEVEEAESFQoRRURJVF9FTkRfQ0FOQ0VMRUQQAhIdChlFRElUX0VORF9SRVZFUlRFRF9J'
+    'TlZBTElEEAMSFwoTRURJVF9FTkRfRk9DVVNfTE9TVBAEEhkKFUVESVRfRU5EX0NFTExfUkVNT1'
+    'ZFRBAFEhsKF0VESVRfRU5EX0dSSURfREVTVFJPWUVEEAY=');
+
+@$core.Deprecated('Use editorUpdateReasonDescriptor instead')
+const EditorUpdateReason$json = {
+  '1': 'EditorUpdateReason',
+  '2': [
+    {'1': 'EDITOR_UPDATE_UNSPECIFIED', '2': 0},
+    {'1': 'EDITOR_UPDATE_GEOMETRY', '2': 1},
+    {'1': 'EDITOR_UPDATE_VALIDATION', '2': 2},
+    {'1': 'EDITOR_UPDATE_NORMALIZED_VALUE', '2': 3},
+    {'1': 'EDITOR_UPDATE_PROGRAMMATIC_VALUE', '2': 4},
+    {'1': 'EDITOR_UPDATE_REMOTE_VALUE', '2': 5},
+    {'1': 'EDITOR_UPDATE_CUSTOM_PAYLOAD', '2': 6},
+  ],
+};
+
+/// Descriptor for `EditorUpdateReason`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List editorUpdateReasonDescriptor = $convert.base64Decode(
+    'ChJFZGl0b3JVcGRhdGVSZWFzb24SHQoZRURJVE9SX1VQREFURV9VTlNQRUNJRklFRBAAEhoKFk'
+    'VESVRPUl9VUERBVEVfR0VPTUVUUlkQARIcChhFRElUT1JfVVBEQVRFX1ZBTElEQVRJT04QAhIi'
+    'Ch5FRElUT1JfVVBEQVRFX05PUk1BTElaRURfVkFMVUUQAxIkCiBFRElUT1JfVVBEQVRFX1BST0'
+    'dSQU1NQVRJQ19WQUxVRRAEEh4KGkVESVRPUl9VUERBVEVfUkVNT1RFX1ZBTFVFEAUSIAocRURJ'
+    'VE9SX1VQREFURV9DVVNUT01fUEFZTE9BRBAG');
 
 @$core.Deprecated('Use fontDescriptor instead')
 const Font$json = {
@@ -1979,6 +2176,22 @@ final $typed_data.Uint8List cellRangeDescriptor = $convert.base64Decode(
     'CglDZWxsUmFuZ2USEgoEcm93MRgBIAEoBVIEcm93MRISCgRjb2wxGAIgASgFUgRjb2wxEhIKBH'
     'JvdzIYAyABKAVSBHJvdzISEgoEY29sMhgEIAEoBVIEY29sMg==');
 
+@$core.Deprecated('Use rectDescriptor instead')
+const Rect$json = {
+  '1': 'Rect',
+  '2': [
+    {'1': 'x', '3': 1, '4': 1, '5': 2, '10': 'x'},
+    {'1': 'y', '3': 2, '4': 1, '5': 2, '10': 'y'},
+    {'1': 'width', '3': 3, '4': 1, '5': 2, '10': 'width'},
+    {'1': 'height', '3': 4, '4': 1, '5': 2, '10': 'height'},
+  ],
+};
+
+/// Descriptor for `Rect`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List rectDescriptor = $convert.base64Decode(
+    'CgRSZWN0EgwKAXgYASABKAJSAXgSDAoBeRgCIAEoAlIBeRIUCgV3aWR0aBgDIAEoAlIFd2lkdG'
+    'gSFgoGaGVpZ2h0GAQgASgCUgZoZWlnaHQ=');
+
 @$core.Deprecated('Use cellValueDescriptor instead')
 const CellValue$json = {
   '1': 'CellValue',
@@ -1999,6 +2212,67 @@ final $typed_data.Uint8List cellValueDescriptor = $convert.base64Decode(
     'CglDZWxsVmFsdWUSFAoEdGV4dBgBIAEoCUgAUgR0ZXh0EhgKBm51bWJlchgCIAEoAUgAUgZudW'
     '1iZXISFAoEZmxhZxgDIAEoCEgAUgRmbGFnEhIKA3JhdxgEIAEoDEgAUgNyYXcSHgoJdGltZXN0'
     'YW1wGAUgASgDSABSCXRpbWVzdGFtcEIHCgV2YWx1ZQ==');
+
+@$core.Deprecated('Use structValueDescriptor instead')
+const StructValue$json = {
+  '1': 'StructValue',
+  '2': [
+    {
+      '1': 'fields',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.volvoxgrid.v1.StructField',
+      '10': 'fields'
+    },
+  ],
+};
+
+/// Descriptor for `StructValue`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List structValueDescriptor = $convert.base64Decode(
+    'CgtTdHJ1Y3RWYWx1ZRIyCgZmaWVsZHMYASADKAsyGi52b2x2b3hncmlkLnYxLlN0cnVjdEZpZW'
+    'xkUgZmaWVsZHM=');
+
+@$core.Deprecated('Use structFieldDescriptor instead')
+const StructField$json = {
+  '1': 'StructField',
+  '2': [
+    {'1': 'key', '3': 1, '4': 1, '5': 9, '10': 'key'},
+    {
+      '1': 'value',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.ScalarValue',
+      '10': 'value'
+    },
+  ],
+};
+
+/// Descriptor for `StructField`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List structFieldDescriptor = $convert.base64Decode(
+    'CgtTdHJ1Y3RGaWVsZBIQCgNrZXkYASABKAlSA2tleRIwCgV2YWx1ZRgCIAEoCzIaLnZvbHZveG'
+    'dyaWQudjEuU2NhbGFyVmFsdWVSBXZhbHVl');
+
+@$core.Deprecated('Use scalarValueDescriptor instead')
+const ScalarValue$json = {
+  '1': 'ScalarValue',
+  '2': [
+    {'1': 'string_value', '3': 1, '4': 1, '5': 9, '9': 0, '10': 'stringValue'},
+    {'1': 'number_value', '3': 2, '4': 1, '5': 1, '9': 0, '10': 'numberValue'},
+    {'1': 'bool_value', '3': 3, '4': 1, '5': 8, '9': 0, '10': 'boolValue'},
+    {'1': 'bytes_value', '3': 4, '4': 1, '5': 12, '9': 0, '10': 'bytesValue'},
+  ],
+  '8': [
+    {'1': 'value'},
+  ],
+};
+
+/// Descriptor for `ScalarValue`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List scalarValueDescriptor = $convert.base64Decode(
+    'CgtTY2FsYXJWYWx1ZRIjCgxzdHJpbmdfdmFsdWUYASABKAlIAFILc3RyaW5nVmFsdWUSIwoMbn'
+    'VtYmVyX3ZhbHVlGAIgASgBSABSC251bWJlclZhbHVlEh8KCmJvb2xfdmFsdWUYAyABKAhIAFIJ'
+    'Ym9vbFZhbHVlEiEKC2J5dGVzX3ZhbHVlGAQgASgMSABSCmJ5dGVzVmFsdWVCBwoFdmFsdWU=');
 
 @$core.Deprecated('Use richTextDescriptor instead')
 const RichText$json = {
@@ -2097,76 +2371,525 @@ final $typed_data.Uint8List textRunStyleDescriptor = $convert.base64Decode(
     'gEIAEoCUgCUgdsaW5rVXJsiAEBQg0KC19mb3JlZ3JvdW5kQgsKCV9iYXNlbGluZUILCglfbGlu'
     'a191cmw=');
 
-@$core.Deprecated('Use dropdownDescriptor instead')
-const Dropdown$json = {
-  '1': 'Dropdown',
+@$core.Deprecated('Use editorSpecDescriptor instead')
+const EditorSpec$json = {
+  '1': 'EditorSpec',
   '2': [
     {
-      '1': 'items',
+      '1': 'kind',
+      '3': 1,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.EditorKind',
+      '10': 'kind'
+    },
+    {
+      '1': 'owner',
+      '3': 2,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.EditorOwner',
+      '10': 'owner'
+    },
+    {
+      '1': 'presentation',
+      '3': 3,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.EditorPresentation',
+      '10': 'presentation'
+    },
+    {
+      '1': 'validation_mode',
+      '3': 4,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.ValidationMode',
+      '10': 'validationMode'
+    },
+    {
+      '1': 'validation_trigger',
+      '3': 5,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.ValidationTrigger',
+      '10': 'validationTrigger'
+    },
+    {
+      '1': 'validation_debounce_ms',
+      '3': 6,
+      '4': 1,
+      '5': 5,
+      '10': 'validationDebounceMs'
+    },
+    {
+      '1': 'custom_editor_id',
+      '3': 10,
+      '4': 1,
+      '5': 9,
+      '9': 0,
+      '10': 'customEditorId',
+      '17': true
+    },
+    {
+      '1': 'text',
+      '3': 11,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.TextEditorParams',
+      '10': 'text'
+    },
+    {
+      '1': 'number',
+      '3': 12,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.NumberEditorParams',
+      '10': 'number'
+    },
+    {
+      '1': 'checkbox',
+      '3': 13,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.CheckboxEditorParams',
+      '10': 'checkbox'
+    },
+    {
+      '1': 'list',
+      '3': 14,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.ListEditorParams',
+      '10': 'list'
+    },
+    {
+      '1': 'date_time',
+      '3': 15,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.DateTimeEditorParams',
+      '10': 'dateTime'
+    },
+    {
+      '1': 'actions',
+      '3': 16,
+      '4': 3,
+      '5': 11,
+      '6': '.volvoxgrid.v1.EditorAction',
+      '10': 'actions'
+    },
+    {
+      '1': 'custom_props',
+      '3': 17,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.StructValue',
+      '10': 'customProps'
+    },
+  ],
+  '8': [
+    {'1': '_custom_editor_id'},
+  ],
+};
+
+/// Descriptor for `EditorSpec`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List editorSpecDescriptor = $convert.base64Decode(
+    'CgpFZGl0b3JTcGVjEi0KBGtpbmQYASABKA4yGS52b2x2b3hncmlkLnYxLkVkaXRvcktpbmRSBG'
+    'tpbmQSMAoFb3duZXIYAiABKA4yGi52b2x2b3hncmlkLnYxLkVkaXRvck93bmVyUgVvd25lchJF'
+    'CgxwcmVzZW50YXRpb24YAyABKA4yIS52b2x2b3hncmlkLnYxLkVkaXRvclByZXNlbnRhdGlvbl'
+    'IMcHJlc2VudGF0aW9uEkYKD3ZhbGlkYXRpb25fbW9kZRgEIAEoDjIdLnZvbHZveGdyaWQudjEu'
+    'VmFsaWRhdGlvbk1vZGVSDnZhbGlkYXRpb25Nb2RlEk8KEnZhbGlkYXRpb25fdHJpZ2dlchgFIA'
+    'EoDjIgLnZvbHZveGdyaWQudjEuVmFsaWRhdGlvblRyaWdnZXJSEXZhbGlkYXRpb25UcmlnZ2Vy'
+    'EjQKFnZhbGlkYXRpb25fZGVib3VuY2VfbXMYBiABKAVSFHZhbGlkYXRpb25EZWJvdW5jZU1zEi'
+    '0KEGN1c3RvbV9lZGl0b3JfaWQYCiABKAlIAFIOY3VzdG9tRWRpdG9ySWSIAQESMwoEdGV4dBgL'
+    'IAEoCzIfLnZvbHZveGdyaWQudjEuVGV4dEVkaXRvclBhcmFtc1IEdGV4dBI5CgZudW1iZXIYDC'
+    'ABKAsyIS52b2x2b3hncmlkLnYxLk51bWJlckVkaXRvclBhcmFtc1IGbnVtYmVyEj8KCGNoZWNr'
+    'Ym94GA0gASgLMiMudm9sdm94Z3JpZC52MS5DaGVja2JveEVkaXRvclBhcmFtc1IIY2hlY2tib3'
+    'gSMwoEbGlzdBgOIAEoCzIfLnZvbHZveGdyaWQudjEuTGlzdEVkaXRvclBhcmFtc1IEbGlzdBJA'
+    'CglkYXRlX3RpbWUYDyABKAsyIy52b2x2b3hncmlkLnYxLkRhdGVUaW1lRWRpdG9yUGFyYW1zUg'
+    'hkYXRlVGltZRI1CgdhY3Rpb25zGBAgAygLMhsudm9sdm94Z3JpZC52MS5FZGl0b3JBY3Rpb25S'
+    'B2FjdGlvbnMSPQoMY3VzdG9tX3Byb3BzGBEgASgLMhoudm9sdm94Z3JpZC52MS5TdHJ1Y3RWYW'
+    'x1ZVILY3VzdG9tUHJvcHNCEwoRX2N1c3RvbV9lZGl0b3JfaWQ=');
+
+@$core.Deprecated('Use textEditorParamsDescriptor instead')
+const TextEditorParams$json = {
+  '1': 'TextEditorParams',
+  '2': [
+    {'1': 'max_length', '3': 1, '4': 1, '5': 5, '10': 'maxLength'},
+    {'1': 'mask', '3': 2, '4': 1, '5': 9, '10': 'mask'},
+    {'1': 'allow_newlines', '3': 3, '4': 1, '5': 8, '10': 'allowNewlines'},
+    {
+      '1': 'input_type',
+      '3': 4,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.InputType',
+      '10': 'inputType'
+    },
+  ],
+};
+
+/// Descriptor for `TextEditorParams`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List textEditorParamsDescriptor = $convert.base64Decode(
+    'ChBUZXh0RWRpdG9yUGFyYW1zEh0KCm1heF9sZW5ndGgYASABKAVSCW1heExlbmd0aBISCgRtYX'
+    'NrGAIgASgJUgRtYXNrEiUKDmFsbG93X25ld2xpbmVzGAMgASgIUg1hbGxvd05ld2xpbmVzEjcK'
+    'CmlucHV0X3R5cGUYBCABKA4yGC52b2x2b3hncmlkLnYxLklucHV0VHlwZVIJaW5wdXRUeXBl');
+
+@$core.Deprecated('Use numberEditorParamsDescriptor instead')
+const NumberEditorParams$json = {
+  '1': 'NumberEditorParams',
+  '2': [
+    {'1': 'min', '3': 1, '4': 1, '5': 1, '9': 0, '10': 'min', '17': true},
+    {'1': 'max', '3': 2, '4': 1, '5': 1, '9': 1, '10': 'max', '17': true},
+    {'1': 'step', '3': 3, '4': 1, '5': 1, '9': 2, '10': 'step', '17': true},
+    {'1': 'format', '3': 4, '4': 1, '5': 9, '10': 'format'},
+    {'1': 'nullable', '3': 5, '4': 1, '5': 8, '10': 'nullable'},
+  ],
+  '8': [
+    {'1': '_min'},
+    {'1': '_max'},
+    {'1': '_step'},
+  ],
+};
+
+/// Descriptor for `NumberEditorParams`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List numberEditorParamsDescriptor = $convert.base64Decode(
+    'ChJOdW1iZXJFZGl0b3JQYXJhbXMSFQoDbWluGAEgASgBSABSA21pbogBARIVCgNtYXgYAiABKA'
+    'FIAVIDbWF4iAEBEhcKBHN0ZXAYAyABKAFIAlIEc3RlcIgBARIWCgZmb3JtYXQYBCABKAlSBmZv'
+    'cm1hdBIaCghudWxsYWJsZRgFIAEoCFIIbnVsbGFibGVCBgoEX21pbkIGCgRfbWF4QgcKBV9zdG'
+    'Vw');
+
+@$core.Deprecated('Use checkboxEditorParamsDescriptor instead')
+const CheckboxEditorParams$json = {
+  '1': 'CheckboxEditorParams',
+  '2': [
+    {'1': 'three_state', '3': 1, '4': 1, '5': 8, '10': 'threeState'},
+  ],
+};
+
+/// Descriptor for `CheckboxEditorParams`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List checkboxEditorParamsDescriptor = $convert.base64Decode(
+    'ChRDaGVja2JveEVkaXRvclBhcmFtcxIfCgt0aHJlZV9zdGF0ZRgBIAEoCFIKdGhyZWVTdGF0ZQ'
+    '==');
+
+@$core.Deprecated('Use dateTimeEditorParamsDescriptor instead')
+const DateTimeEditorParams$json = {
+  '1': 'DateTimeEditorParams',
+  '2': [
+    {'1': 'format', '3': 1, '4': 1, '5': 9, '10': 'format'},
+    {
+      '1': 'min_timestamp',
+      '3': 2,
+      '4': 1,
+      '5': 3,
+      '9': 0,
+      '10': 'minTimestamp',
+      '17': true
+    },
+    {
+      '1': 'max_timestamp',
+      '3': 3,
+      '4': 1,
+      '5': 3,
+      '9': 1,
+      '10': 'maxTimestamp',
+      '17': true
+    },
+    {'1': 'date_only', '3': 4, '4': 1, '5': 8, '10': 'dateOnly'},
+    {'1': 'time_only', '3': 5, '4': 1, '5': 8, '10': 'timeOnly'},
+  ],
+  '8': [
+    {'1': '_min_timestamp'},
+    {'1': '_max_timestamp'},
+  ],
+};
+
+/// Descriptor for `DateTimeEditorParams`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List dateTimeEditorParamsDescriptor = $convert.base64Decode(
+    'ChREYXRlVGltZUVkaXRvclBhcmFtcxIWCgZmb3JtYXQYASABKAlSBmZvcm1hdBIoCg1taW5fdG'
+    'ltZXN0YW1wGAIgASgDSABSDG1pblRpbWVzdGFtcIgBARIoCg1tYXhfdGltZXN0YW1wGAMgASgD'
+    'SAFSDG1heFRpbWVzdGFtcIgBARIbCglkYXRlX29ubHkYBCABKAhSCGRhdGVPbmx5EhsKCXRpbW'
+    'Vfb25seRgFIAEoCFIIdGltZU9ubHlCEAoOX21pbl90aW1lc3RhbXBCEAoOX21heF90aW1lc3Rh'
+    'bXA=');
+
+@$core.Deprecated('Use editorActionDescriptor instead')
+const EditorAction$json = {
+  '1': 'EditorAction',
+  '2': [
+    {'1': 'action_id', '3': 1, '4': 1, '5': 9, '10': 'actionId'},
+    {'1': 'label', '3': 2, '4': 1, '5': 9, '10': 'label'},
+    {
+      '1': 'role',
+      '3': 3,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.ButtonRole',
+      '10': 'role'
+    },
+    {
+      '1': 'icon',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.ImageData',
+      '10': 'icon'
+    },
+  ],
+};
+
+/// Descriptor for `EditorAction`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List editorActionDescriptor = $convert.base64Decode(
+    'CgxFZGl0b3JBY3Rpb24SGwoJYWN0aW9uX2lkGAEgASgJUghhY3Rpb25JZBIUCgVsYWJlbBgCIA'
+    'EoCVIFbGFiZWwSLQoEcm9sZRgDIAEoDjIZLnZvbHZveGdyaWQudjEuQnV0dG9uUm9sZVIEcm9s'
+    'ZRIsCgRpY29uGAQgASgLMhgudm9sdm94Z3JpZC52MS5JbWFnZURhdGFSBGljb24=');
+
+@$core.Deprecated('Use listEditorParamsDescriptor instead')
+const ListEditorParams$json = {
+  '1': 'ListEditorParams',
+  '2': [
+    {
+      '1': 'static_items',
       '3': 1,
       '4': 3,
       '5': 11,
-      '6': '.volvoxgrid.v1.DropdownItem',
-      '10': 'items'
+      '6': '.volvoxgrid.v1.ListItem',
+      '10': 'staticItems'
+    },
+    {
+      '1': 'data_source',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.ListDataSource',
+      '10': 'dataSource'
     },
     {
       '1': 'allow_custom_value',
-      '3': 2,
+      '3': 3,
       '4': 1,
       '5': 8,
       '10': 'allowCustomValue'
     },
+    {'1': 'searchable', '3': 4, '4': 1, '5': 8, '10': 'searchable'},
+    {'1': 'multi_select', '3': 5, '4': 1, '5': 8, '10': 'multiSelect'},
     {
       '1': 'item_layout',
-      '3': 3,
+      '3': 6,
       '4': 1,
       '5': 14,
       '6': '.volvoxgrid.v1.DropdownItemLayout',
       '10': 'itemLayout'
     },
+  ],
+};
+
+/// Descriptor for `ListEditorParams`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listEditorParamsDescriptor = $convert.base64Decode(
+    'ChBMaXN0RWRpdG9yUGFyYW1zEjoKDHN0YXRpY19pdGVtcxgBIAMoCzIXLnZvbHZveGdyaWQudj'
+    'EuTGlzdEl0ZW1SC3N0YXRpY0l0ZW1zEj4KC2RhdGFfc291cmNlGAIgASgLMh0udm9sdm94Z3Jp'
+    'ZC52MS5MaXN0RGF0YVNvdXJjZVIKZGF0YVNvdXJjZRIsChJhbGxvd19jdXN0b21fdmFsdWUYAy'
+    'ABKAhSEGFsbG93Q3VzdG9tVmFsdWUSHgoKc2VhcmNoYWJsZRgEIAEoCFIKc2VhcmNoYWJsZRIh'
+    'CgxtdWx0aV9zZWxlY3QYBSABKAhSC211bHRpU2VsZWN0EkIKC2l0ZW1fbGF5b3V0GAYgASgOMi'
+    'Eudm9sdm94Z3JpZC52MS5Ecm9wZG93bkl0ZW1MYXlvdXRSCml0ZW1MYXlvdXQ=');
+
+@$core.Deprecated('Use listItemDescriptor instead')
+const ListItem$json = {
+  '1': 'ListItem',
+  '2': [
     {
-      '1': 'searchable',
-      '3': 4,
+      '1': 'value',
+      '3': 1,
       '4': 1,
-      '5': 8,
+      '5': 11,
+      '6': '.volvoxgrid.v1.CellValue',
+      '10': 'value'
+    },
+    {'1': 'label', '3': 2, '4': 1, '5': 9, '10': 'label'},
+    {'1': 'details', '3': 3, '4': 3, '5': 9, '10': 'details'},
+    {'1': 'disabled', '3': 4, '4': 1, '5': 8, '10': 'disabled'},
+  ],
+};
+
+/// Descriptor for `ListItem`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listItemDescriptor = $convert.base64Decode(
+    'CghMaXN0SXRlbRIuCgV2YWx1ZRgBIAEoCzIYLnZvbHZveGdyaWQudjEuQ2VsbFZhbHVlUgV2YW'
+    'x1ZRIUCgVsYWJlbBgCIAEoCVIFbGFiZWwSGAoHZGV0YWlscxgDIAMoCVIHZGV0YWlscxIaCghk'
+    'aXNhYmxlZBgEIAEoCFIIZGlzYWJsZWQ=');
+
+@$core.Deprecated('Use listDataSourceDescriptor instead')
+const ListDataSource$json = {
+  '1': 'ListDataSource',
+  '2': [
+    {'1': 'data_source_id', '3': 1, '4': 1, '5': 9, '10': 'dataSourceId'},
+    {'1': 'filterable', '3': 2, '4': 1, '5': 8, '10': 'filterable'},
+    {'1': 'pageable', '3': 3, '4': 1, '5': 8, '10': 'pageable'},
+    {'1': 'page_size', '3': 4, '4': 1, '5': 5, '10': 'pageSize'},
+  ],
+};
+
+/// Descriptor for `ListDataSource`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listDataSourceDescriptor = $convert.base64Decode(
+    'Cg5MaXN0RGF0YVNvdXJjZRIkCg5kYXRhX3NvdXJjZV9pZBgBIAEoCVIMZGF0YVNvdXJjZUlkEh'
+    '4KCmZpbHRlcmFibGUYAiABKAhSCmZpbHRlcmFibGUSGgoIcGFnZWFibGUYAyABKAhSCHBhZ2Vh'
+    'YmxlEhsKCXBhZ2Vfc2l6ZRgEIAEoBVIIcGFnZVNpemU=');
+
+@$core.Deprecated('Use editorValueDescriptor instead')
+const EditorValue$json = {
+  '1': 'EditorValue',
+  '2': [
+    {
+      '1': 'value',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.CellValue',
+      '10': 'value'
+    },
+    {
+      '1': 'edit_text',
+      '3': 2,
+      '4': 1,
+      '5': 9,
       '9': 0,
-      '10': 'searchable',
+      '10': 'editText',
+      '17': true
+    },
+    {
+      '1': 'display_text',
+      '3': 3,
+      '4': 1,
+      '5': 9,
+      '9': 1,
+      '10': 'displayText',
       '17': true
     },
   ],
   '8': [
-    {'1': '_searchable'},
+    {'1': '_edit_text'},
+    {'1': '_display_text'},
   ],
 };
 
-/// Descriptor for `Dropdown`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List dropdownDescriptor = $convert.base64Decode(
-    'CghEcm9wZG93bhIxCgVpdGVtcxgBIAMoCzIbLnZvbHZveGdyaWQudjEuRHJvcGRvd25JdGVtUg'
-    'VpdGVtcxIsChJhbGxvd19jdXN0b21fdmFsdWUYAiABKAhSEGFsbG93Q3VzdG9tVmFsdWUSQgoL'
-    'aXRlbV9sYXlvdXQYAyABKA4yIS52b2x2b3hncmlkLnYxLkRyb3Bkb3duSXRlbUxheW91dFIKaX'
-    'RlbUxheW91dBIjCgpzZWFyY2hhYmxlGAQgASgISABSCnNlYXJjaGFibGWIAQFCDQoLX3NlYXJj'
-    'aGFibGU=');
+/// Descriptor for `EditorValue`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List editorValueDescriptor = $convert.base64Decode(
+    'CgtFZGl0b3JWYWx1ZRIuCgV2YWx1ZRgBIAEoCzIYLnZvbHZveGdyaWQudjEuQ2VsbFZhbHVlUg'
+    'V2YWx1ZRIgCgllZGl0X3RleHQYAiABKAlIAFIIZWRpdFRleHSIAQESJgoMZGlzcGxheV90ZXh0'
+    'GAMgASgJSAFSC2Rpc3BsYXlUZXh0iAEBQgwKCl9lZGl0X3RleHRCDwoNX2Rpc3BsYXlfdGV4dA'
+    '==');
 
-@$core.Deprecated('Use dropdownItemDescriptor instead')
-const DropdownItem$json = {
-  '1': 'DropdownItem',
+@$core.Deprecated('Use textSelectionDescriptor instead')
+const TextSelection$json = {
+  '1': 'TextSelection',
   '2': [
-    {'1': 'value', '3': 1, '4': 1, '5': 9, '9': 0, '10': 'value', '17': true},
-    {'1': 'label', '3': 2, '4': 1, '5': 9, '9': 1, '10': 'label', '17': true},
-    {'1': 'details', '3': 3, '4': 3, '5': 9, '10': 'details'},
-    {'1': 'disabled', '3': 4, '4': 1, '5': 8, '10': 'disabled'},
+    {'1': 'start', '3': 1, '4': 1, '5': 5, '10': 'start'},
+    {'1': 'length', '3': 2, '4': 1, '5': 5, '10': 'length'},
+  ],
+};
+
+/// Descriptor for `TextSelection`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List textSelectionDescriptor = $convert.base64Decode(
+    'Cg1UZXh0U2VsZWN0aW9uEhQKBXN0YXJ0GAEgASgFUgVzdGFydBIWCgZsZW5ndGgYAiABKAVSBm'
+    'xlbmd0aA==');
+
+@$core.Deprecated('Use validationErrorDescriptor instead')
+const ValidationError$json = {
+  '1': 'ValidationError',
+  '2': [
+    {'1': 'code', '3': 1, '4': 1, '5': 9, '10': 'code'},
+    {'1': 'message', '3': 2, '4': 1, '5': 9, '10': 'message'},
+    {'1': 'blocking', '3': 3, '4': 1, '5': 8, '10': 'blocking'},
+  ],
+};
+
+/// Descriptor for `ValidationError`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List validationErrorDescriptor = $convert.base64Decode(
+    'Cg9WYWxpZGF0aW9uRXJyb3ISEgoEY29kZRgBIAEoCVIEY29kZRIYCgdtZXNzYWdlGAIgASgJUg'
+    'dtZXNzYWdlEhoKCGJsb2NraW5nGAMgASgIUghibG9ja2luZw==');
+
+@$core.Deprecated('Use editActivationDescriptor instead')
+const EditActivation$json = {
+  '1': 'EditActivation',
+  '2': [
+    {
+      '1': 'trigger',
+      '3': 1,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.EditTrigger',
+      '9': 0,
+      '10': 'trigger',
+      '17': true
+    },
+    {
+      '1': 'tab_behavior',
+      '3': 2,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.TabBehavior',
+      '9': 1,
+      '10': 'tabBehavior',
+      '17': true
+    },
+    {
+      '1': 'single_click_edit',
+      '3': 3,
+      '4': 1,
+      '5': 8,
+      '9': 2,
+      '10': 'singleClickEdit',
+      '17': true
+    },
+    {
+      '1': 'suppress_click_edit',
+      '3': 4,
+      '4': 1,
+      '5': 8,
+      '9': 3,
+      '10': 'suppressClickEdit',
+      '17': true
+    },
+    {
+      '1': 'commit_on_focus_lost',
+      '3': 5,
+      '4': 1,
+      '5': 8,
+      '9': 4,
+      '10': 'commitOnFocusLost',
+      '17': true
+    },
+    {
+      '1': 'preserve_edit_on_navigation',
+      '3': 6,
+      '4': 1,
+      '5': 8,
+      '9': 5,
+      '10': 'preserveEditOnNavigation',
+      '17': true
+    },
   ],
   '8': [
-    {'1': '_value'},
-    {'1': '_label'},
+    {'1': '_trigger'},
+    {'1': '_tab_behavior'},
+    {'1': '_single_click_edit'},
+    {'1': '_suppress_click_edit'},
+    {'1': '_commit_on_focus_lost'},
+    {'1': '_preserve_edit_on_navigation'},
   ],
 };
 
-/// Descriptor for `DropdownItem`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List dropdownItemDescriptor = $convert.base64Decode(
-    'CgxEcm9wZG93bkl0ZW0SGQoFdmFsdWUYASABKAlIAFIFdmFsdWWIAQESGQoFbGFiZWwYAiABKA'
-    'lIAVIFbGFiZWyIAQESGAoHZGV0YWlscxgDIAMoCVIHZGV0YWlscxIaCghkaXNhYmxlZBgEIAEo'
-    'CFIIZGlzYWJsZWRCCAoGX3ZhbHVlQggKBl9sYWJlbA==');
+/// Descriptor for `EditActivation`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List editActivationDescriptor = $convert.base64Decode(
+    'Cg5FZGl0QWN0aXZhdGlvbhI5Cgd0cmlnZ2VyGAEgASgOMhoudm9sdm94Z3JpZC52MS5FZGl0VH'
+    'JpZ2dlckgAUgd0cmlnZ2VyiAEBEkIKDHRhYl9iZWhhdmlvchgCIAEoDjIaLnZvbHZveGdyaWQu'
+    'djEuVGFiQmVoYXZpb3JIAVILdGFiQmVoYXZpb3KIAQESLwoRc2luZ2xlX2NsaWNrX2VkaXQYAy'
+    'ABKAhIAlIPc2luZ2xlQ2xpY2tFZGl0iAEBEjMKE3N1cHByZXNzX2NsaWNrX2VkaXQYBCABKAhI'
+    'A1IRc3VwcHJlc3NDbGlja0VkaXSIAQESNAoUY29tbWl0X29uX2ZvY3VzX2xvc3QYBSABKAhIBF'
+    'IRY29tbWl0T25Gb2N1c0xvc3SIAQESQgobcHJlc2VydmVfZWRpdF9vbl9uYXZpZ2F0aW9uGAYg'
+    'ASgISAVSGHByZXNlcnZlRWRpdE9uTmF2aWdhdGlvbogBAUIKCghfdHJpZ2dlckIPCg1fdGFiX2'
+    'JlaGF2aW9yQhQKEl9zaW5nbGVfY2xpY2tfZWRpdEIWChRfc3VwcHJlc3NfY2xpY2tfZWRpdEIX'
+    'ChVfY29tbWl0X29uX2ZvY3VzX2xvc3RCHgocX3ByZXNlcnZlX2VkaXRfb25fbmF2aWdhdGlvbg'
+    '==');
 
 @$core.Deprecated('Use scrollBarColorsDescriptor instead')
 const ScrollBarColors$json = {
@@ -3425,6 +4148,19 @@ const GridConfig$json = {
       '6': '.volvoxgrid.v1.IndicatorsConfig',
       '10': 'indicators'
     },
+    {
+      '1': 'theme_preset',
+      '3': 12,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.ThemePreset',
+      '9': 0,
+      '10': 'themePreset',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_theme_preset'},
   ],
 };
 
@@ -3440,8 +4176,9 @@ final $typed_data.Uint8List gridConfigDescriptor = $convert.base64Decode(
     'NwYW4SQgoLaW50ZXJhY3Rpb24YCCABKAsyIC52b2x2b3hncmlkLnYxLkludGVyYWN0aW9uQ29u'
     'ZmlnUgtpbnRlcmFjdGlvbhI5CglyZW5kZXJpbmcYCSABKAsyGy52b2x2b3hncmlkLnYxLlJlbm'
     'RlckNvbmZpZ1IJcmVuZGVyaW5nEhgKB3ZlcnNpb24YCiABKAlSB3ZlcnNpb24SPwoKaW5kaWNh'
-    'dG9ycxgLIAEoCzIfLnZvbHZveGdyaWQudjEuSW5kaWNhdG9yc0NvbmZpZ1IKaW5kaWNhdG9ycw'
-    '==');
+    'dG9ycxgLIAEoCzIfLnZvbHZveGdyaWQudjEuSW5kaWNhdG9yc0NvbmZpZ1IKaW5kaWNhdG9ycx'
+    'JCCgx0aGVtZV9wcmVzZXQYDCABKA4yGi52b2x2b3hncmlkLnYxLlRoZW1lUHJlc2V0SABSC3Ro'
+    'ZW1lUHJlc2V0iAEBQg8KDV90aGVtZV9wcmVzZXQ=');
 
 @$core.Deprecated('Use layoutConfigDescriptor instead')
 const LayoutConfig$json = {
@@ -3957,122 +4694,44 @@ const EditConfig$json = {
   '1': 'EditConfig',
   '2': [
     {
-      '1': 'trigger',
+      '1': 'activation',
       '3': 1,
       '4': 1,
-      '5': 14,
-      '6': '.volvoxgrid.v1.EditTrigger',
-      '9': 0,
-      '10': 'trigger',
-      '17': true
+      '5': 11,
+      '6': '.volvoxgrid.v1.EditActivation',
+      '10': 'activation'
     },
     {
-      '1': 'tab_behavior',
+      '1': 'default_editor',
       '3': 2,
       '4': 1,
-      '5': 14,
-      '6': '.volvoxgrid.v1.TabBehavior',
-      '9': 1,
-      '10': 'tabBehavior',
-      '17': true
-    },
-    {
-      '1': 'dropdown_trigger',
-      '3': 3,
-      '4': 1,
-      '5': 14,
-      '6': '.volvoxgrid.v1.DropdownTrigger',
-      '9': 2,
-      '10': 'dropdownTrigger',
-      '17': true
-    },
-    {
-      '1': 'dropdown_search',
-      '3': 4,
-      '4': 1,
-      '5': 8,
-      '9': 3,
-      '10': 'dropdownSearch',
-      '17': true
-    },
-    {
-      '1': 'max_length',
-      '3': 5,
-      '4': 1,
-      '5': 5,
-      '9': 4,
-      '10': 'maxLength',
-      '17': true
-    },
-    {'1': 'mask', '3': 6, '4': 1, '5': 9, '9': 5, '10': 'mask', '17': true},
-    {
-      '1': 'host_key_dispatch',
-      '3': 7,
-      '4': 1,
-      '5': 8,
-      '9': 6,
-      '10': 'hostKeyDispatch',
-      '17': true
-    },
-    {
-      '1': 'host_pointer_dispatch',
-      '3': 8,
-      '4': 1,
-      '5': 8,
-      '9': 7,
-      '10': 'hostPointerDispatch',
-      '17': true
-    },
-    {
-      '1': 'engine_compose',
-      '3': 9,
-      '4': 1,
-      '5': 8,
-      '9': 8,
-      '10': 'engineCompose',
-      '17': true
+      '5': 11,
+      '6': '.volvoxgrid.v1.EditorSpec',
+      '10': 'defaultEditor'
     },
     {
       '1': 'compose_method',
-      '3': 10,
+      '3': 3,
       '4': 1,
       '5': 14,
       '6': '.volvoxgrid.v1.ComposeMethod',
-      '9': 9,
+      '9': 0,
       '10': 'composeMethod',
       '17': true
     },
   ],
   '8': [
-    {'1': '_trigger'},
-    {'1': '_tab_behavior'},
-    {'1': '_dropdown_trigger'},
-    {'1': '_dropdown_search'},
-    {'1': '_max_length'},
-    {'1': '_mask'},
-    {'1': '_host_key_dispatch'},
-    {'1': '_host_pointer_dispatch'},
-    {'1': '_engine_compose'},
     {'1': '_compose_method'},
   ],
 };
 
 /// Descriptor for `EditConfig`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List editConfigDescriptor = $convert.base64Decode(
-    'CgpFZGl0Q29uZmlnEjkKB3RyaWdnZXIYASABKA4yGi52b2x2b3hncmlkLnYxLkVkaXRUcmlnZ2'
-    'VySABSB3RyaWdnZXKIAQESQgoMdGFiX2JlaGF2aW9yGAIgASgOMhoudm9sdm94Z3JpZC52MS5U'
-    'YWJCZWhhdmlvckgBUgt0YWJCZWhhdmlvcogBARJOChBkcm9wZG93bl90cmlnZ2VyGAMgASgOMh'
-    '4udm9sdm94Z3JpZC52MS5Ecm9wZG93blRyaWdnZXJIAlIPZHJvcGRvd25UcmlnZ2VyiAEBEiwK'
-    'D2Ryb3Bkb3duX3NlYXJjaBgEIAEoCEgDUg5kcm9wZG93blNlYXJjaIgBARIiCgptYXhfbGVuZ3'
-    'RoGAUgASgFSARSCW1heExlbmd0aIgBARIXCgRtYXNrGAYgASgJSAVSBG1hc2uIAQESLwoRaG9z'
-    'dF9rZXlfZGlzcGF0Y2gYByABKAhIBlIPaG9zdEtleURpc3BhdGNoiAEBEjcKFWhvc3RfcG9pbn'
-    'Rlcl9kaXNwYXRjaBgIIAEoCEgHUhNob3N0UG9pbnRlckRpc3BhdGNoiAEBEioKDmVuZ2luZV9j'
-    'b21wb3NlGAkgASgISAhSDWVuZ2luZUNvbXBvc2WIAQESSAoOY29tcG9zZV9tZXRob2QYCiABKA'
-    '4yHC52b2x2b3hncmlkLnYxLkNvbXBvc2VNZXRob2RICVINY29tcG9zZU1ldGhvZIgBAUIKCghf'
-    'dHJpZ2dlckIPCg1fdGFiX2JlaGF2aW9yQhMKEV9kcm9wZG93bl90cmlnZ2VyQhIKEF9kcm9wZG'
-    '93bl9zZWFyY2hCDQoLX21heF9sZW5ndGhCBwoFX21hc2tCFAoSX2hvc3Rfa2V5X2Rpc3BhdGNo'
-    'QhgKFl9ob3N0X3BvaW50ZXJfZGlzcGF0Y2hCEQoPX2VuZ2luZV9jb21wb3NlQhEKD19jb21wb3'
-    'NlX21ldGhvZA==');
+    'CgpFZGl0Q29uZmlnEj0KCmFjdGl2YXRpb24YASABKAsyHS52b2x2b3hncmlkLnYxLkVkaXRBY3'
+    'RpdmF0aW9uUgphY3RpdmF0aW9uEkAKDmRlZmF1bHRfZWRpdG9yGAIgASgLMhkudm9sdm94Z3Jp'
+    'ZC52MS5FZGl0b3JTcGVjUg1kZWZhdWx0RWRpdG9yEkgKDmNvbXBvc2VfbWV0aG9kGAMgASgOMh'
+    'wudm9sdm94Z3JpZC52MS5Db21wb3NlTWV0aG9kSABSDWNvbXBvc2VNZXRob2SIAQFCEQoPX2Nv'
+    'bXBvc2VfbWV0aG9k');
 
 @$core.Deprecated('Use pullToRefreshConfigDescriptor instead')
 const PullToRefreshConfig$json = {
@@ -4270,7 +4929,7 @@ const OutlineConfig$json = {
     },
     {
       '1': 'tree_color',
-      '3': 3,
+      '3': 2,
       '4': 1,
       '5': 13,
       '9': 1,
@@ -4279,7 +4938,7 @@ const OutlineConfig$json = {
     },
     {
       '1': 'group_total_position',
-      '3': 4,
+      '3': 3,
       '4': 1,
       '5': 14,
       '6': '.volvoxgrid.v1.GroupTotalPosition',
@@ -4289,7 +4948,7 @@ const OutlineConfig$json = {
     },
     {
       '1': 'multi_totals',
-      '3': 5,
+      '3': 4,
       '4': 1,
       '5': 8,
       '9': 3,
@@ -4298,7 +4957,7 @@ const OutlineConfig$json = {
     },
     {
       '1': 'indicator_indent',
-      '3': 6,
+      '3': 5,
       '4': 1,
       '5': 5,
       '9': 4,
@@ -4307,7 +4966,7 @@ const OutlineConfig$json = {
     },
     {
       '1': 'max_levels',
-      '3': 7,
+      '3': 6,
       '4': 1,
       '5': 5,
       '9': 5,
@@ -4316,7 +4975,7 @@ const OutlineConfig$json = {
     },
     {
       '1': 'show_level_buttons',
-      '3': 8,
+      '3': 7,
       '4': 1,
       '5': 8,
       '9': 6,
@@ -4325,7 +4984,7 @@ const OutlineConfig$json = {
     },
     {
       '1': 'label_column',
-      '3': 9,
+      '3': 8,
       '4': 1,
       '5': 5,
       '9': 7,
@@ -4334,7 +4993,7 @@ const OutlineConfig$json = {
     },
     {
       '1': 'icon_column',
-      '3': 10,
+      '3': 9,
       '4': 1,
       '5': 5,
       '9': 8,
@@ -4353,25 +5012,22 @@ const OutlineConfig$json = {
     {'1': '_label_column'},
     {'1': '_icon_column'},
   ],
-  '9': [
-    {'1': 2, '2': 3},
-  ],
 };
 
 /// Descriptor for `OutlineConfig`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List outlineConfigDescriptor = $convert.base64Decode(
     'Cg1PdXRsaW5lQ29uZmlnEk0KDnRyZWVfaW5kaWNhdG9yGAEgASgOMiEudm9sdm94Z3JpZC52MS'
-    '5UcmVlSW5kaWNhdG9yU3R5bGVIAFINdHJlZUluZGljYXRvcogBARIiCgp0cmVlX2NvbG9yGAMg'
-    'ASgNSAFSCXRyZWVDb2xvcogBARJYChRncm91cF90b3RhbF9wb3NpdGlvbhgEIAEoDjIhLnZvbH'
+    '5UcmVlSW5kaWNhdG9yU3R5bGVIAFINdHJlZUluZGljYXRvcogBARIiCgp0cmVlX2NvbG9yGAIg'
+    'ASgNSAFSCXRyZWVDb2xvcogBARJYChRncm91cF90b3RhbF9wb3NpdGlvbhgDIAEoDjIhLnZvbH'
     'ZveGdyaWQudjEuR3JvdXBUb3RhbFBvc2l0aW9uSAJSEmdyb3VwVG90YWxQb3NpdGlvbogBARIm'
-    'CgxtdWx0aV90b3RhbHMYBSABKAhIA1ILbXVsdGlUb3RhbHOIAQESLgoQaW5kaWNhdG9yX2luZG'
-    'VudBgGIAEoBUgEUg9pbmRpY2F0b3JJbmRlbnSIAQESIgoKbWF4X2xldmVscxgHIAEoBUgFUglt'
-    'YXhMZXZlbHOIAQESMQoSc2hvd19sZXZlbF9idXR0b25zGAggASgISAZSEHNob3dMZXZlbEJ1dH'
-    'RvbnOIAQESJgoMbGFiZWxfY29sdW1uGAkgASgFSAdSC2xhYmVsQ29sdW1uiAEBEiQKC2ljb25f'
-    'Y29sdW1uGAogASgFSAhSCmljb25Db2x1bW6IAQFCEQoPX3RyZWVfaW5kaWNhdG9yQg0KC190cm'
+    'CgxtdWx0aV90b3RhbHMYBCABKAhIA1ILbXVsdGlUb3RhbHOIAQESLgoQaW5kaWNhdG9yX2luZG'
+    'VudBgFIAEoBUgEUg9pbmRpY2F0b3JJbmRlbnSIAQESIgoKbWF4X2xldmVscxgGIAEoBUgFUglt'
+    'YXhMZXZlbHOIAQESMQoSc2hvd19sZXZlbF9idXR0b25zGAcgASgISAZSEHNob3dMZXZlbEJ1dH'
+    'RvbnOIAQESJgoMbGFiZWxfY29sdW1uGAggASgFSAdSC2xhYmVsQ29sdW1uiAEBEiQKC2ljb25f'
+    'Y29sdW1uGAkgASgFSAhSCmljb25Db2x1bW6IAQFCEQoPX3RyZWVfaW5kaWNhdG9yQg0KC190cm'
     'VlX2NvbG9yQhcKFV9ncm91cF90b3RhbF9wb3NpdGlvbkIPCg1fbXVsdGlfdG90YWxzQhMKEV9p'
     'bmRpY2F0b3JfaW5kZW50Qg0KC19tYXhfbGV2ZWxzQhUKE19zaG93X2xldmVsX2J1dHRvbnNCDw'
-    'oNX2xhYmVsX2NvbHVtbkIOCgxfaWNvbl9jb2x1bW5KBAgCEAM=');
+    'oNX2xhYmVsX2NvbHVtbkIOCgxfaWNvbl9jb2x1bW4=');
 
 @$core.Deprecated('Use spanConfigDescriptor instead')
 const SpanConfig$json = {
@@ -4689,6 +5345,15 @@ const RenderConfig$json = {
       '10': 'scrollBlit',
       '17': true
     },
+    {
+      '1': 'font_fallback_enabled',
+      '3': 12,
+      '4': 1,
+      '5': 8,
+      '9': 11,
+      '10': 'fontFallbackEnabled',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_renderer_mode'},
@@ -4702,6 +5367,7 @@ const RenderConfig$json = {
     {'1': '_render_layer_mask'},
     {'1': '_layer_profiling'},
     {'1': '_scroll_blit'},
+    {'1': '_font_fallback_enabled'},
   ],
 };
 
@@ -4718,11 +5384,32 @@ final $typed_data.Uint8List renderConfigDescriptor = $convert.base64Decode(
     'YXJnZXRfZnJhbWVfcmF0ZV9oehgIIAEoBUgHUhF0YXJnZXRGcmFtZVJhdGVIeogBARIvChFyZW'
     '5kZXJfbGF5ZXJfbWFzaxgJIAEoA0gIUg9yZW5kZXJMYXllck1hc2uIAQESLAoPbGF5ZXJfcHJv'
     'ZmlsaW5nGAogASgISAlSDmxheWVyUHJvZmlsaW5niAEBEiQKC3Njcm9sbF9ibGl0GAsgASgISA'
-    'pSCnNjcm9sbEJsaXSIAQFCEAoOX3JlbmRlcmVyX21vZGVCEAoOX2RlYnVnX292ZXJsYXlCFAoS'
-    'X2FuaW1hdGlvbl9lbmFibGVkQhgKFl9hbmltYXRpb25fZHVyYXRpb25fbXNCGAoWX3RleHRfbG'
-    'F5b3V0X2NhY2hlX2NhcEIPCg1fcHJlc2VudF9tb2RlQhQKEl9mcmFtZV9wYWNpbmdfbW9kZUIX'
-    'ChVfdGFyZ2V0X2ZyYW1lX3JhdGVfaHpCFAoSX3JlbmRlcl9sYXllcl9tYXNrQhIKEF9sYXllcl'
-    '9wcm9maWxpbmdCDgoMX3Njcm9sbF9ibGl0');
+    'pSCnNjcm9sbEJsaXSIAQESNwoVZm9udF9mYWxsYmFja19lbmFibGVkGAwgASgISAtSE2ZvbnRG'
+    'YWxsYmFja0VuYWJsZWSIAQFCEAoOX3JlbmRlcmVyX21vZGVCEAoOX2RlYnVnX292ZXJsYXlCFA'
+    'oSX2FuaW1hdGlvbl9lbmFibGVkQhgKFl9hbmltYXRpb25fZHVyYXRpb25fbXNCGAoWX3RleHRf'
+    'bGF5b3V0X2NhY2hlX2NhcEIPCg1fcHJlc2VudF9tb2RlQhQKEl9mcmFtZV9wYWNpbmdfbW9kZU'
+    'IXChVfdGFyZ2V0X2ZyYW1lX3JhdGVfaHpCFAoSX3JlbmRlcl9sYXllcl9tYXNrQhIKEF9sYXll'
+    'cl9wcm9maWxpbmdCDgoMX3Njcm9sbF9ibGl0QhgKFl9mb250X2ZhbGxiYWNrX2VuYWJsZWQ=');
+
+@$core.Deprecated('Use colIndicatorCellModesDescriptor instead')
+const ColIndicatorCellModes$json = {
+  '1': 'ColIndicatorCellModes',
+  '2': [
+    {
+      '1': 'modes',
+      '3': 1,
+      '4': 3,
+      '5': 14,
+      '6': '.volvoxgrid.v1.ColIndicatorCellMode',
+      '10': 'modes'
+    },
+  ],
+};
+
+/// Descriptor for `ColIndicatorCellModes`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List colIndicatorCellModesDescriptor = $convert.base64Decode(
+    'ChVDb2xJbmRpY2F0b3JDZWxsTW9kZXMSOQoFbW9kZXMYASADKA4yIy52b2x2b3hncmlkLnYxLk'
+    'NvbEluZGljYXRvckNlbGxNb2RlUgVtb2Rlcw==');
 
 @$core.Deprecated('Use rowIndicatorSlotDescriptor instead')
 const RowIndicatorSlot$json = {
@@ -4792,7 +5479,7 @@ const RowIndicatorConfig$json = {
     {'1': 'width', '3': 2, '4': 1, '5': 5, '9': 1, '10': 'width', '17': true},
     {
       '1': 'background',
-      '3': 4,
+      '3': 3,
       '4': 1,
       '5': 13,
       '9': 2,
@@ -4801,7 +5488,7 @@ const RowIndicatorConfig$json = {
     },
     {
       '1': 'foreground',
-      '3': 5,
+      '3': 4,
       '4': 1,
       '5': 13,
       '9': 3,
@@ -4810,7 +5497,7 @@ const RowIndicatorConfig$json = {
     },
     {
       '1': 'grid_lines',
-      '3': 6,
+      '3': 5,
       '4': 1,
       '5': 14,
       '6': '.volvoxgrid.v1.GridLineStyle',
@@ -4820,7 +5507,7 @@ const RowIndicatorConfig$json = {
     },
     {
       '1': 'grid_color',
-      '3': 7,
+      '3': 6,
       '4': 1,
       '5': 13,
       '9': 5,
@@ -4829,7 +5516,7 @@ const RowIndicatorConfig$json = {
     },
     {
       '1': 'auto_size',
-      '3': 8,
+      '3': 7,
       '4': 1,
       '5': 8,
       '9': 6,
@@ -4838,7 +5525,7 @@ const RowIndicatorConfig$json = {
     },
     {
       '1': 'allow_resize',
-      '3': 9,
+      '3': 8,
       '4': 1,
       '5': 8,
       '9': 7,
@@ -4847,7 +5534,7 @@ const RowIndicatorConfig$json = {
     },
     {
       '1': 'allow_select',
-      '3': 10,
+      '3': 9,
       '4': 1,
       '5': 8,
       '9': 8,
@@ -4856,7 +5543,7 @@ const RowIndicatorConfig$json = {
     },
     {
       '1': 'allow_reorder',
-      '3': 11,
+      '3': 10,
       '4': 1,
       '5': 8,
       '9': 9,
@@ -4865,7 +5552,7 @@ const RowIndicatorConfig$json = {
     },
     {
       '1': 'slots',
-      '3': 12,
+      '3': 11,
       '4': 3,
       '5': 11,
       '6': '.volvoxgrid.v1.RowIndicatorSlot',
@@ -4884,25 +5571,22 @@ const RowIndicatorConfig$json = {
     {'1': '_allow_select'},
     {'1': '_allow_reorder'},
   ],
-  '9': [
-    {'1': 3, '2': 4},
-  ],
 };
 
 /// Descriptor for `RowIndicatorConfig`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List rowIndicatorConfigDescriptor = $convert.base64Decode(
     'ChJSb3dJbmRpY2F0b3JDb25maWcSHQoHdmlzaWJsZRgBIAEoCEgAUgd2aXNpYmxliAEBEhkKBX'
-    'dpZHRoGAIgASgFSAFSBXdpZHRoiAEBEiMKCmJhY2tncm91bmQYBCABKA1IAlIKYmFja2dyb3Vu'
-    'ZIgBARIjCgpmb3JlZ3JvdW5kGAUgASgNSANSCmZvcmVncm91bmSIAQESQAoKZ3JpZF9saW5lcx'
-    'gGIAEoDjIcLnZvbHZveGdyaWQudjEuR3JpZExpbmVTdHlsZUgEUglncmlkTGluZXOIAQESIgoK'
-    'Z3JpZF9jb2xvchgHIAEoDUgFUglncmlkQ29sb3KIAQESIAoJYXV0b19zaXplGAggASgISAZSCG'
-    'F1dG9TaXpliAEBEiYKDGFsbG93X3Jlc2l6ZRgJIAEoCEgHUgthbGxvd1Jlc2l6ZYgBARImCgxh'
-    'bGxvd19zZWxlY3QYCiABKAhICFILYWxsb3dTZWxlY3SIAQESKAoNYWxsb3dfcmVvcmRlchgLIA'
-    'EoCEgJUgxhbGxvd1Jlb3JkZXKIAQESNQoFc2xvdHMYDCADKAsyHy52b2x2b3hncmlkLnYxLlJv'
+    'dpZHRoGAIgASgFSAFSBXdpZHRoiAEBEiMKCmJhY2tncm91bmQYAyABKA1IAlIKYmFja2dyb3Vu'
+    'ZIgBARIjCgpmb3JlZ3JvdW5kGAQgASgNSANSCmZvcmVncm91bmSIAQESQAoKZ3JpZF9saW5lcx'
+    'gFIAEoDjIcLnZvbHZveGdyaWQudjEuR3JpZExpbmVTdHlsZUgEUglncmlkTGluZXOIAQESIgoK'
+    'Z3JpZF9jb2xvchgGIAEoDUgFUglncmlkQ29sb3KIAQESIAoJYXV0b19zaXplGAcgASgISAZSCG'
+    'F1dG9TaXpliAEBEiYKDGFsbG93X3Jlc2l6ZRgIIAEoCEgHUgthbGxvd1Jlc2l6ZYgBARImCgxh'
+    'bGxvd19zZWxlY3QYCSABKAhICFILYWxsb3dTZWxlY3SIAQESKAoNYWxsb3dfcmVvcmRlchgKIA'
+    'EoCEgJUgxhbGxvd1Jlb3JkZXKIAQESNQoFc2xvdHMYCyADKAsyHy52b2x2b3hncmlkLnYxLlJv'
     'd0luZGljYXRvclNsb3RSBXNsb3RzQgoKCF92aXNpYmxlQggKBl93aWR0aEINCgtfYmFja2dyb3'
     'VuZEINCgtfZm9yZWdyb3VuZEINCgtfZ3JpZF9saW5lc0INCgtfZ3JpZF9jb2xvckIMCgpfYXV0'
     'b19zaXplQg8KDV9hbGxvd19yZXNpemVCDwoNX2FsbG93X3NlbGVjdEIQCg5fYWxsb3dfcmVvcm'
-    'RlckoECAMQBA==');
+    'Rlcg==');
 
 @$core.Deprecated('Use colIndicatorRowDefDescriptor instead')
 const ColIndicatorRowDef$json = {
@@ -4932,24 +5616,25 @@ const ColIndicatorCell$json = {
     {'1': 'col2', '3': 4, '4': 1, '5': 5, '9': 3, '10': 'col2', '17': true},
     {'1': 'text', '3': 5, '4': 1, '5': 9, '9': 4, '10': 'text', '17': true},
     {
-      '1': 'mode_bits',
+      '1': 'custom_key',
       '3': 6,
       '4': 1,
-      '5': 13,
-      '9': 5,
-      '10': 'modeBits',
-      '17': true
-    },
-    {
-      '1': 'custom_key',
-      '3': 7,
-      '4': 1,
       '5': 9,
-      '9': 6,
+      '9': 5,
       '10': 'customKey',
       '17': true
     },
-    {'1': 'data', '3': 8, '4': 1, '5': 12, '9': 7, '10': 'data', '17': true},
+    {'1': 'data', '3': 7, '4': 1, '5': 12, '9': 6, '10': 'data', '17': true},
+    {
+      '1': 'modes',
+      '3': 8,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.ColIndicatorCellModes',
+      '9': 7,
+      '10': 'modes',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_row1'},
@@ -4957,9 +5642,9 @@ const ColIndicatorCell$json = {
     {'1': '_col1'},
     {'1': '_col2'},
     {'1': '_text'},
-    {'1': '_mode_bits'},
     {'1': '_custom_key'},
     {'1': '_data'},
+    {'1': '_modes'},
   ],
 };
 
@@ -4967,10 +5652,11 @@ const ColIndicatorCell$json = {
 final $typed_data.Uint8List colIndicatorCellDescriptor = $convert.base64Decode(
     'ChBDb2xJbmRpY2F0b3JDZWxsEhcKBHJvdzEYASABKAVIAFIEcm93MYgBARIXCgRyb3cyGAIgAS'
     'gFSAFSBHJvdzKIAQESFwoEY29sMRgDIAEoBUgCUgRjb2wxiAEBEhcKBGNvbDIYBCABKAVIA1IE'
-    'Y29sMogBARIXCgR0ZXh0GAUgASgJSARSBHRleHSIAQESIAoJbW9kZV9iaXRzGAYgASgNSAVSCG'
-    '1vZGVCaXRziAEBEiIKCmN1c3RvbV9rZXkYByABKAlIBlIJY3VzdG9tS2V5iAEBEhcKBGRhdGEY'
-    'CCABKAxIB1IEZGF0YYgBAUIHCgVfcm93MUIHCgVfcm93MkIHCgVfY29sMUIHCgVfY29sMkIHCg'
-    'VfdGV4dEIMCgpfbW9kZV9iaXRzQg0KC19jdXN0b21fa2V5QgcKBV9kYXRh');
+    'Y29sMogBARIXCgR0ZXh0GAUgASgJSARSBHRleHSIAQESIgoKY3VzdG9tX2tleRgGIAEoCUgFUg'
+    'ljdXN0b21LZXmIAQESFwoEZGF0YRgHIAEoDEgGUgRkYXRhiAEBEj8KBW1vZGVzGAggASgLMiQu'
+    'dm9sdm94Z3JpZC52MS5Db2xJbmRpY2F0b3JDZWxsTW9kZXNIB1IFbW9kZXOIAQFCBwoFX3Jvdz'
+    'FCBwoFX3JvdzJCBwoFX2NvbDFCBwoFX2NvbDJCBwoFX3RleHRCDQoLX2N1c3RvbV9rZXlCBwoF'
+    'X2RhdGFCCAoGX21vZGVz');
 
 @$core.Deprecated('Use colIndicatorConfigDescriptor instead')
 const ColIndicatorConfig$json = {
@@ -5004,90 +5690,81 @@ const ColIndicatorConfig$json = {
       '17': true
     },
     {
-      '1': 'mode_bits',
+      '1': 'background',
       '3': 4,
       '4': 1,
       '5': 13,
       '9': 3,
-      '10': 'modeBits',
-      '17': true
-    },
-    {
-      '1': 'background',
-      '3': 5,
-      '4': 1,
-      '5': 13,
-      '9': 4,
       '10': 'background',
       '17': true
     },
     {
       '1': 'foreground',
-      '3': 6,
+      '3': 5,
       '4': 1,
       '5': 13,
-      '9': 5,
+      '9': 4,
       '10': 'foreground',
       '17': true
     },
     {
       '1': 'grid_lines',
-      '3': 7,
+      '3': 6,
       '4': 1,
       '5': 14,
       '6': '.volvoxgrid.v1.GridLineStyle',
-      '9': 6,
+      '9': 5,
       '10': 'gridLines',
       '17': true
     },
     {
       '1': 'grid_color',
-      '3': 8,
+      '3': 7,
       '4': 1,
       '5': 13,
-      '9': 7,
+      '9': 6,
       '10': 'gridColor',
       '17': true
     },
     {
       '1': 'auto_size',
-      '3': 9,
+      '3': 8,
       '4': 1,
       '5': 8,
-      '9': 8,
+      '9': 7,
       '10': 'autoSize',
       '17': true
     },
     {
       '1': 'allow_resize',
-      '3': 10,
+      '3': 9,
       '4': 1,
       '5': 8,
-      '9': 9,
+      '9': 8,
       '10': 'allowResize',
       '17': true
     },
     {
       '1': 'allow_reorder',
-      '3': 11,
+      '3': 10,
       '4': 1,
       '5': 8,
-      '9': 10,
+      '9': 9,
       '10': 'allowReorder',
       '17': true
     },
     {
       '1': 'allow_menu',
-      '3': 12,
+      '3': 11,
       '4': 1,
       '5': 8,
-      '9': 11,
+      '9': 10,
       '10': 'allowMenu',
       '17': true
     },
     {
       '1': 'row_defs',
-      '3': 13,
+      '3': 12,
       '4': 3,
       '5': 11,
       '6': '.volvoxgrid.v1.ColIndicatorRowDef',
@@ -5095,18 +5772,27 @@ const ColIndicatorConfig$json = {
     },
     {
       '1': 'cells',
-      '3': 14,
+      '3': 13,
       '4': 3,
       '5': 11,
       '6': '.volvoxgrid.v1.ColIndicatorCell',
       '10': 'cells'
+    },
+    {
+      '1': 'cell_modes',
+      '3': 14,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.ColIndicatorCellModes',
+      '9': 11,
+      '10': 'cellModes',
+      '17': true
     },
   ],
   '8': [
     {'1': '_visible'},
     {'1': '_default_row_height'},
     {'1': '_band_rows'},
-    {'1': '_mode_bits'},
     {'1': '_background'},
     {'1': '_foreground'},
     {'1': '_grid_lines'},
@@ -5115,6 +5801,7 @@ const ColIndicatorConfig$json = {
     {'1': '_allow_resize'},
     {'1': '_allow_reorder'},
     {'1': '_allow_menu'},
+    {'1': '_cell_modes'},
   ],
 };
 
@@ -5122,19 +5809,20 @@ const ColIndicatorConfig$json = {
 final $typed_data.Uint8List colIndicatorConfigDescriptor = $convert.base64Decode(
     'ChJDb2xJbmRpY2F0b3JDb25maWcSHQoHdmlzaWJsZRgBIAEoCEgAUgd2aXNpYmxliAEBEjEKEm'
     'RlZmF1bHRfcm93X2hlaWdodBgCIAEoBUgBUhBkZWZhdWx0Um93SGVpZ2h0iAEBEiAKCWJhbmRf'
-    'cm93cxgDIAEoBUgCUghiYW5kUm93c4gBARIgCgltb2RlX2JpdHMYBCABKA1IA1IIbW9kZUJpdH'
-    'OIAQESIwoKYmFja2dyb3VuZBgFIAEoDUgEUgpiYWNrZ3JvdW5kiAEBEiMKCmZvcmVncm91bmQY'
-    'BiABKA1IBVIKZm9yZWdyb3VuZIgBARJACgpncmlkX2xpbmVzGAcgASgOMhwudm9sdm94Z3JpZC'
-    '52MS5HcmlkTGluZVN0eWxlSAZSCWdyaWRMaW5lc4gBARIiCgpncmlkX2NvbG9yGAggASgNSAdS'
-    'CWdyaWRDb2xvcogBARIgCglhdXRvX3NpemUYCSABKAhICFIIYXV0b1NpemWIAQESJgoMYWxsb3'
-    'dfcmVzaXplGAogASgISAlSC2FsbG93UmVzaXpliAEBEigKDWFsbG93X3Jlb3JkZXIYCyABKAhI'
-    'ClIMYWxsb3dSZW9yZGVyiAEBEiIKCmFsbG93X21lbnUYDCABKAhIC1IJYWxsb3dNZW51iAEBEj'
-    'wKCHJvd19kZWZzGA0gAygLMiEudm9sdm94Z3JpZC52MS5Db2xJbmRpY2F0b3JSb3dEZWZSB3Jv'
-    'd0RlZnMSNQoFY2VsbHMYDiADKAsyHy52b2x2b3hncmlkLnYxLkNvbEluZGljYXRvckNlbGxSBW'
-    'NlbGxzQgoKCF92aXNpYmxlQhUKE19kZWZhdWx0X3Jvd19oZWlnaHRCDAoKX2JhbmRfcm93c0IM'
-    'CgpfbW9kZV9iaXRzQg0KC19iYWNrZ3JvdW5kQg0KC19mb3JlZ3JvdW5kQg0KC19ncmlkX2xpbm'
-    'VzQg0KC19ncmlkX2NvbG9yQgwKCl9hdXRvX3NpemVCDwoNX2FsbG93X3Jlc2l6ZUIQCg5fYWxs'
-    'b3dfcmVvcmRlckINCgtfYWxsb3dfbWVudQ==');
+    'cm93cxgDIAEoBUgCUghiYW5kUm93c4gBARIjCgpiYWNrZ3JvdW5kGAQgASgNSANSCmJhY2tncm'
+    '91bmSIAQESIwoKZm9yZWdyb3VuZBgFIAEoDUgEUgpmb3JlZ3JvdW5kiAEBEkAKCmdyaWRfbGlu'
+    'ZXMYBiABKA4yHC52b2x2b3hncmlkLnYxLkdyaWRMaW5lU3R5bGVIBVIJZ3JpZExpbmVziAEBEi'
+    'IKCmdyaWRfY29sb3IYByABKA1IBlIJZ3JpZENvbG9yiAEBEiAKCWF1dG9fc2l6ZRgIIAEoCEgH'
+    'UghhdXRvU2l6ZYgBARImCgxhbGxvd19yZXNpemUYCSABKAhICFILYWxsb3dSZXNpemWIAQESKA'
+    'oNYWxsb3dfcmVvcmRlchgKIAEoCEgJUgxhbGxvd1Jlb3JkZXKIAQESIgoKYWxsb3dfbWVudRgL'
+    'IAEoCEgKUglhbGxvd01lbnWIAQESPAoIcm93X2RlZnMYDCADKAsyIS52b2x2b3hncmlkLnYxLk'
+    'NvbEluZGljYXRvclJvd0RlZlIHcm93RGVmcxI1CgVjZWxscxgNIAMoCzIfLnZvbHZveGdyaWQu'
+    'djEuQ29sSW5kaWNhdG9yQ2VsbFIFY2VsbHMSSAoKY2VsbF9tb2RlcxgOIAEoCzIkLnZvbHZveG'
+    'dyaWQudjEuQ29sSW5kaWNhdG9yQ2VsbE1vZGVzSAtSCWNlbGxNb2Rlc4gBAUIKCghfdmlzaWJs'
+    'ZUIVChNfZGVmYXVsdF9yb3dfaGVpZ2h0QgwKCl9iYW5kX3Jvd3NCDQoLX2JhY2tncm91bmRCDQ'
+    'oLX2ZvcmVncm91bmRCDQoLX2dyaWRfbGluZXNCDQoLX2dyaWRfY29sb3JCDAoKX2F1dG9fc2l6'
+    'ZUIPCg1fYWxsb3dfcmVzaXplQhAKDl9hbGxvd19yZW9yZGVyQg0KC19hbGxvd19tZW51Qg0KC1'
+    '9jZWxsX21vZGVz');
 
 @$core.Deprecated('Use cornerIndicatorSlotDescriptor instead')
 const CornerIndicatorSlot$json = {
@@ -5213,45 +5901,36 @@ const CornerIndicatorConfig$json = {
       '17': true
     },
     {
-      '1': 'mode_bits',
+      '1': 'background',
       '3': 2,
       '4': 1,
       '5': 13,
       '9': 1,
-      '10': 'modeBits',
-      '17': true
-    },
-    {
-      '1': 'background',
-      '3': 3,
-      '4': 1,
-      '5': 13,
-      '9': 2,
       '10': 'background',
       '17': true
     },
     {
       '1': 'foreground',
-      '3': 4,
+      '3': 3,
       '4': 1,
       '5': 13,
-      '9': 3,
+      '9': 2,
       '10': 'foreground',
       '17': true
     },
     {
       '1': 'custom_key',
-      '3': 5,
+      '3': 4,
       '4': 1,
       '5': 9,
-      '9': 4,
+      '9': 3,
       '10': 'customKey',
       '17': true
     },
-    {'1': 'data', '3': 6, '4': 1, '5': 12, '9': 5, '10': 'data', '17': true},
+    {'1': 'data', '3': 5, '4': 1, '5': 12, '9': 4, '10': 'data', '17': true},
     {
       '1': 'slots',
-      '3': 7,
+      '3': 6,
       '4': 3,
       '5': 11,
       '6': '.volvoxgrid.v1.CornerIndicatorSlot',
@@ -5260,7 +5939,6 @@ const CornerIndicatorConfig$json = {
   ],
   '8': [
     {'1': '_visible'},
-    {'1': '_mode_bits'},
     {'1': '_background'},
     {'1': '_foreground'},
     {'1': '_custom_key'},
@@ -5271,12 +5949,11 @@ const CornerIndicatorConfig$json = {
 /// Descriptor for `CornerIndicatorConfig`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List cornerIndicatorConfigDescriptor = $convert.base64Decode(
     'ChVDb3JuZXJJbmRpY2F0b3JDb25maWcSHQoHdmlzaWJsZRgBIAEoCEgAUgd2aXNpYmxliAEBEi'
-    'AKCW1vZGVfYml0cxgCIAEoDUgBUghtb2RlQml0c4gBARIjCgpiYWNrZ3JvdW5kGAMgASgNSAJS'
-    'CmJhY2tncm91bmSIAQESIwoKZm9yZWdyb3VuZBgEIAEoDUgDUgpmb3JlZ3JvdW5kiAEBEiIKCm'
-    'N1c3RvbV9rZXkYBSABKAlIBFIJY3VzdG9tS2V5iAEBEhcKBGRhdGEYBiABKAxIBVIEZGF0YYgB'
-    'ARI4CgVzbG90cxgHIAMoCzIiLnZvbHZveGdyaWQudjEuQ29ybmVySW5kaWNhdG9yU2xvdFIFc2'
-    'xvdHNCCgoIX3Zpc2libGVCDAoKX21vZGVfYml0c0INCgtfYmFja2dyb3VuZEINCgtfZm9yZWdy'
-    'b3VuZEINCgtfY3VzdG9tX2tleUIHCgVfZGF0YQ==');
+    'MKCmJhY2tncm91bmQYAiABKA1IAVIKYmFja2dyb3VuZIgBARIjCgpmb3JlZ3JvdW5kGAMgASgN'
+    'SAJSCmZvcmVncm91bmSIAQESIgoKY3VzdG9tX2tleRgEIAEoCUgDUgljdXN0b21LZXmIAQESFw'
+    'oEZGF0YRgFIAEoDEgEUgRkYXRhiAEBEjgKBXNsb3RzGAYgAygLMiIudm9sdm94Z3JpZC52MS5D'
+    'b3JuZXJJbmRpY2F0b3JTbG90UgVzbG90c0IKCghfdmlzaWJsZUINCgtfYmFja2dyb3VuZEINCg'
+    'tfZm9yZWdyb3VuZEINCgtfY3VzdG9tX2tleUIHCgVfZGF0YQ==');
 
 @$core.Deprecated('Use indicatorColorsDescriptor instead')
 const IndicatorColors$json = {
@@ -5453,12 +6130,12 @@ const GridEventTarget$json = {
     },
     {'1': 'slot_index', '3': 3, '4': 1, '5': 5, '10': 'slotIndex'},
     {'1': 'slot_kind', '3': 4, '4': 1, '5': 5, '10': 'slotKind'},
-    {'1': 'sub_mode_bits', '3': 5, '4': 1, '5': 13, '10': 'subModeBits'},
-    {'1': 'custom_key', '3': 6, '4': 1, '5': 9, '10': 'customKey'},
-    {'1': 'text', '3': 7, '4': 1, '5': 9, '10': 'text'},
-    {'1': 'int_value', '3': 8, '4': 1, '5': 3, '10': 'intValue'},
-    {'1': 'status_flags', '3': 9, '4': 1, '5': 13, '10': 'statusFlags'},
-    {'1': 'data', '3': 10, '4': 1, '5': 12, '10': 'data'},
+    {'1': 'custom_key', '3': 5, '4': 1, '5': 9, '10': 'customKey'},
+    {'1': 'text', '3': 6, '4': 1, '5': 9, '10': 'text'},
+    {'1': 'int_value', '3': 7, '4': 1, '5': 3, '10': 'intValue'},
+    {'1': 'status_flags', '3': 8, '4': 1, '5': 13, '10': 'statusFlags'},
+    {'1': 'data', '3': 9, '4': 1, '5': 12, '10': 'data'},
+    {'1': 'sub_mode', '3': 10, '4': 1, '5': 5, '10': 'subMode'},
   ],
 };
 
@@ -5467,10 +6144,10 @@ final $typed_data.Uint8List gridEventTargetDescriptor = $convert.base64Decode(
     'Cg9HcmlkRXZlbnRUYXJnZXQSMQoEa2luZBgBIAEoDjIdLnZvbHZveGdyaWQudjEuR3JpZFRhcm'
     'dldEtpbmRSBGtpbmQSMAoEYmFuZBgCIAEoDjIcLnZvbHZveGdyaWQudjEuSW5kaWNhdG9yQmFu'
     'ZFIEYmFuZBIdCgpzbG90X2luZGV4GAMgASgFUglzbG90SW5kZXgSGwoJc2xvdF9raW5kGAQgAS'
-    'gFUghzbG90S2luZBIiCg1zdWJfbW9kZV9iaXRzGAUgASgNUgtzdWJNb2RlQml0cxIdCgpjdXN0'
-    'b21fa2V5GAYgASgJUgljdXN0b21LZXkSEgoEdGV4dBgHIAEoCVIEdGV4dBIbCglpbnRfdmFsdW'
-    'UYCCABKANSCGludFZhbHVlEiEKDHN0YXR1c19mbGFncxgJIAEoDVILc3RhdHVzRmxhZ3MSEgoE'
-    'ZGF0YRgKIAEoDFIEZGF0YQ==');
+    'gFUghzbG90S2luZBIdCgpjdXN0b21fa2V5GAUgASgJUgljdXN0b21LZXkSEgoEdGV4dBgGIAEo'
+    'CVIEdGV4dBIbCglpbnRfdmFsdWUYByABKANSCGludFZhbHVlEiEKDHN0YXR1c19mbGFncxgIIA'
+    'EoDVILc3RhdHVzRmxhZ3MSEgoEZGF0YRgJIAEoDFIEZGF0YRIZCghzdWJfbW9kZRgKIAEoBVIH'
+    'c3ViTW9kZQ==');
 
 @$core.Deprecated('Use indicatorFocusConfigDescriptor instead')
 const IndicatorFocusConfig$json = {
@@ -5723,65 +6400,54 @@ const ColumnDef$json = {
       '17': true
     },
     {
-      '1': 'dropdown',
+      '1': 'editor',
       '3': 13,
       '4': 1,
       '5': 11,
-      '6': '.volvoxgrid.v1.Dropdown',
-      '9': 11,
-      '10': 'dropdown',
-      '17': true
-    },
-    {
-      '1': 'edit_mask',
-      '3': 14,
-      '4': 1,
-      '5': 9,
-      '9': 12,
-      '10': 'editMask',
-      '17': true
+      '6': '.volvoxgrid.v1.EditorSpec',
+      '10': 'editor'
     },
     {
       '1': 'indent',
-      '3': 15,
+      '3': 14,
       '4': 1,
       '5': 5,
-      '9': 13,
+      '9': 11,
       '10': 'indent',
       '17': true
     },
     {
       '1': 'hidden',
-      '3': 16,
+      '3': 15,
       '4': 1,
       '5': 8,
-      '9': 14,
+      '9': 12,
       '10': 'hidden',
       '17': true
     },
-    {'1': 'span', '3': 17, '4': 1, '5': 8, '9': 15, '10': 'span', '17': true},
+    {'1': 'span', '3': 16, '4': 1, '5': 8, '9': 13, '10': 'span', '17': true},
     {
       '1': 'image_list',
-      '3': 18,
+      '3': 17,
       '4': 3,
       '5': 11,
       '6': '.volvoxgrid.v1.ImageData',
       '10': 'imageList'
     },
-    {'1': 'data', '3': 19, '4': 1, '5': 12, '9': 16, '10': 'data', '17': true},
+    {'1': 'data', '3': 18, '4': 1, '5': 12, '9': 14, '10': 'data', '17': true},
     {
       '1': 'sticky',
-      '3': 20,
+      '3': 19,
       '4': 1,
       '5': 14,
       '6': '.volvoxgrid.v1.StickyEdge',
-      '9': 17,
+      '9': 15,
       '10': 'sticky',
       '17': true
     },
     {
       '1': 'padding',
-      '3': 21,
+      '3': 20,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.Padding',
@@ -5789,7 +6455,7 @@ const ColumnDef$json = {
     },
     {
       '1': 'fixed_padding',
-      '3': 22,
+      '3': 21,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.Padding',
@@ -5797,49 +6463,49 @@ const ColumnDef$json = {
     },
     {
       '1': 'nullable',
-      '3': 23,
+      '3': 22,
       '4': 1,
       '5': 8,
-      '9': 18,
+      '9': 16,
       '10': 'nullable',
       '17': true
     },
     {
       '1': 'coercion_mode',
-      '3': 24,
+      '3': 23,
       '4': 1,
       '5': 14,
       '6': '.volvoxgrid.v1.CoercionMode',
-      '9': 19,
+      '9': 17,
       '10': 'coercionMode',
       '17': true
     },
     {
       '1': 'error_mode',
-      '3': 25,
+      '3': 24,
       '4': 1,
       '5': 14,
       '6': '.volvoxgrid.v1.WriteErrorMode',
-      '9': 20,
+      '9': 18,
       '10': 'errorMode',
       '17': true
     },
     {
       '1': 'interaction',
-      '3': 26,
+      '3': 25,
       '4': 1,
       '5': 14,
       '6': '.volvoxgrid.v1.CellInteraction',
-      '9': 21,
+      '9': 19,
       '10': 'interaction',
       '17': true
     },
     {
       '1': 'progress_color',
-      '3': 27,
+      '3': 26,
       '4': 1,
       '5': 13,
-      '9': 22,
+      '9': 20,
       '10': 'progressColor',
       '17': true
     },
@@ -5856,8 +6522,6 @@ const ColumnDef$json = {
     {'1': '_key'},
     {'1': '_sort_order'},
     {'1': '_sort_type'},
-    {'1': '_dropdown'},
-    {'1': '_edit_mask'},
     {'1': '_indent'},
     {'1': '_hidden'},
     {'1': '_span'},
@@ -5882,25 +6546,24 @@ final $typed_data.Uint8List columnDefDescriptor = $convert.base64Decode(
     'EhsKBmZvcm1hdBgJIAEoCUgHUgZmb3JtYXSIAQESFQoDa2V5GAogASgJSAhSA2tleYgBARI8Cg'
     'pzb3J0X29yZGVyGAsgASgOMhgudm9sdm94Z3JpZC52MS5Tb3J0T3JkZXJICVIJc29ydE9yZGVy'
     'iAEBEjkKCXNvcnRfdHlwZRgMIAEoDjIXLnZvbHZveGdyaWQudjEuU29ydFR5cGVIClIIc29ydF'
-    'R5cGWIAQESOAoIZHJvcGRvd24YDSABKAsyFy52b2x2b3hncmlkLnYxLkRyb3Bkb3duSAtSCGRy'
-    'b3Bkb3duiAEBEiAKCWVkaXRfbWFzaxgOIAEoCUgMUghlZGl0TWFza4gBARIbCgZpbmRlbnQYDy'
-    'ABKAVIDVIGaW5kZW50iAEBEhsKBmhpZGRlbhgQIAEoCEgOUgZoaWRkZW6IAQESFwoEc3BhbhgR'
-    'IAEoCEgPUgRzcGFuiAEBEjcKCmltYWdlX2xpc3QYEiADKAsyGC52b2x2b3hncmlkLnYxLkltYW'
-    'dlRGF0YVIJaW1hZ2VMaXN0EhcKBGRhdGEYEyABKAxIEFIEZGF0YYgBARI2CgZzdGlja3kYFCAB'
-    'KA4yGS52b2x2b3hncmlkLnYxLlN0aWNreUVkZ2VIEVIGc3RpY2t5iAEBEjAKB3BhZGRpbmcYFS'
-    'ABKAsyFi52b2x2b3hncmlkLnYxLlBhZGRpbmdSB3BhZGRpbmcSOwoNZml4ZWRfcGFkZGluZxgW'
-    'IAEoCzIWLnZvbHZveGdyaWQudjEuUGFkZGluZ1IMZml4ZWRQYWRkaW5nEh8KCG51bGxhYmxlGB'
-    'cgASgISBJSCG51bGxhYmxliAEBEkUKDWNvZXJjaW9uX21vZGUYGCABKA4yGy52b2x2b3hncmlk'
-    'LnYxLkNvZXJjaW9uTW9kZUgTUgxjb2VyY2lvbk1vZGWIAQESQQoKZXJyb3JfbW9kZRgZIAEoDj'
-    'IdLnZvbHZveGdyaWQudjEuV3JpdGVFcnJvck1vZGVIFFIJZXJyb3JNb2RliAEBEkUKC2ludGVy'
-    'YWN0aW9uGBogASgOMh4udm9sdm94Z3JpZC52MS5DZWxsSW50ZXJhY3Rpb25IFVILaW50ZXJhY3'
-    'Rpb26IAQESKgoOcHJvZ3Jlc3NfY29sb3IYGyABKA1IFlINcHJvZ3Jlc3NDb2xvcogBAUIICgZf'
-    'd2lkdGhCDAoKX21pbl93aWR0aEIMCgpfbWF4X3dpZHRoQgoKCF9jYXB0aW9uQggKBl9hbGlnbk'
-    'IOCgxfZml4ZWRfYWxpZ25CDAoKX2RhdGFfdHlwZUIJCgdfZm9ybWF0QgYKBF9rZXlCDQoLX3Nv'
-    'cnRfb3JkZXJCDAoKX3NvcnRfdHlwZUILCglfZHJvcGRvd25CDAoKX2VkaXRfbWFza0IJCgdfaW'
-    '5kZW50QgkKB19oaWRkZW5CBwoFX3NwYW5CBwoFX2RhdGFCCQoHX3N0aWNreUILCglfbnVsbGFi'
-    'bGVCEAoOX2NvZXJjaW9uX21vZGVCDQoLX2Vycm9yX21vZGVCDgoMX2ludGVyYWN0aW9uQhEKD1'
-    '9wcm9ncmVzc19jb2xvcg==');
+    'R5cGWIAQESMQoGZWRpdG9yGA0gASgLMhkudm9sdm94Z3JpZC52MS5FZGl0b3JTcGVjUgZlZGl0'
+    'b3ISGwoGaW5kZW50GA4gASgFSAtSBmluZGVudIgBARIbCgZoaWRkZW4YDyABKAhIDFIGaGlkZG'
+    'VuiAEBEhcKBHNwYW4YECABKAhIDVIEc3BhbogBARI3CgppbWFnZV9saXN0GBEgAygLMhgudm9s'
+    'dm94Z3JpZC52MS5JbWFnZURhdGFSCWltYWdlTGlzdBIXCgRkYXRhGBIgASgMSA5SBGRhdGGIAQ'
+    'ESNgoGc3RpY2t5GBMgASgOMhkudm9sdm94Z3JpZC52MS5TdGlja3lFZGdlSA9SBnN0aWNreYgB'
+    'ARIwCgdwYWRkaW5nGBQgASgLMhYudm9sdm94Z3JpZC52MS5QYWRkaW5nUgdwYWRkaW5nEjsKDW'
+    'ZpeGVkX3BhZGRpbmcYFSABKAsyFi52b2x2b3hncmlkLnYxLlBhZGRpbmdSDGZpeGVkUGFkZGlu'
+    'ZxIfCghudWxsYWJsZRgWIAEoCEgQUghudWxsYWJsZYgBARJFCg1jb2VyY2lvbl9tb2RlGBcgAS'
+    'gOMhsudm9sdm94Z3JpZC52MS5Db2VyY2lvbk1vZGVIEVIMY29lcmNpb25Nb2RliAEBEkEKCmVy'
+    'cm9yX21vZGUYGCABKA4yHS52b2x2b3hncmlkLnYxLldyaXRlRXJyb3JNb2RlSBJSCWVycm9yTW'
+    '9kZYgBARJFCgtpbnRlcmFjdGlvbhgZIAEoDjIeLnZvbHZveGdyaWQudjEuQ2VsbEludGVyYWN0'
+    'aW9uSBNSC2ludGVyYWN0aW9uiAEBEioKDnByb2dyZXNzX2NvbG9yGBogASgNSBRSDXByb2dyZX'
+    'NzQ29sb3KIAQFCCAoGX3dpZHRoQgwKCl9taW5fd2lkdGhCDAoKX21heF93aWR0aEIKCghfY2Fw'
+    'dGlvbkIICgZfYWxpZ25CDgoMX2ZpeGVkX2FsaWduQgwKCl9kYXRhX3R5cGVCCQoHX2Zvcm1hdE'
+    'IGCgRfa2V5Qg0KC19zb3J0X29yZGVyQgwKCl9zb3J0X3R5cGVCCQoHX2luZGVudEIJCgdfaGlk'
+    'ZGVuQgcKBV9zcGFuQgcKBV9kYXRhQgkKB19zdGlja3lCCwoJX251bGxhYmxlQhAKDl9jb2VyY2'
+    'lvbl9tb2RlQg0KC19lcnJvcl9tb2RlQg4KDF9pbnRlcmFjdGlvbkIRCg9fcHJvZ3Jlc3NfY29s'
+    'b3I=');
 
 @$core.Deprecated('Use defineColumnsRequestDescriptor instead')
 const DefineColumnsRequest$json = {
@@ -6128,14 +6791,12 @@ const CellUpdate$json = {
       '10': 'buttonPicture'
     },
     {
-      '1': 'dropdown',
+      '1': 'editor',
       '3': 9,
       '4': 1,
       '5': 11,
-      '6': '.volvoxgrid.v1.Dropdown',
-      '9': 2,
-      '10': 'dropdown',
-      '17': true
+      '6': '.volvoxgrid.v1.EditorSpec',
+      '10': 'editor'
     },
     {
       '1': 'sticky_row',
@@ -6143,7 +6804,7 @@ const CellUpdate$json = {
       '4': 1,
       '5': 14,
       '6': '.volvoxgrid.v1.StickyEdge',
-      '9': 3,
+      '9': 2,
       '10': 'stickyRow',
       '17': true
     },
@@ -6153,7 +6814,7 @@ const CellUpdate$json = {
       '4': 1,
       '5': 14,
       '6': '.volvoxgrid.v1.StickyEdge',
-      '9': 4,
+      '9': 3,
       '10': 'stickyCol',
       '17': true
     },
@@ -6163,7 +6824,7 @@ const CellUpdate$json = {
       '4': 1,
       '5': 14,
       '6': '.volvoxgrid.v1.CellInteraction',
-      '9': 5,
+      '9': 4,
       '10': 'interaction',
       '17': true
     },
@@ -6173,7 +6834,7 @@ const CellUpdate$json = {
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.BarcodeData',
-      '9': 6,
+      '9': 5,
       '10': 'barcode',
       '17': true
     },
@@ -6183,7 +6844,7 @@ const CellUpdate$json = {
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.RichText',
-      '9': 7,
+      '9': 6,
       '10': 'richText',
       '17': true
     },
@@ -6191,7 +6852,6 @@ const CellUpdate$json = {
   '8': [
     {'1': '_checked'},
     {'1': '_picture_align'},
-    {'1': '_dropdown'},
     {'1': '_sticky_row'},
     {'1': '_sticky_col'},
     {'1': '_interaction'},
@@ -6209,15 +6869,15 @@ final $typed_data.Uint8List cellUpdateDescriptor = $convert.base64Decode(
     'GC52b2x2b3hncmlkLnYxLkltYWdlRGF0YVIHcGljdHVyZRJHCg1waWN0dXJlX2FsaWduGAcgAS'
     'gOMh0udm9sdm94Z3JpZC52MS5JbWFnZUFsaWdubWVudEgBUgxwaWN0dXJlQWxpZ26IAQESPwoO'
     'YnV0dG9uX3BpY3R1cmUYCCABKAsyGC52b2x2b3hncmlkLnYxLkltYWdlRGF0YVINYnV0dG9uUG'
-    'ljdHVyZRI4Cghkcm9wZG93bhgJIAEoCzIXLnZvbHZveGdyaWQudjEuRHJvcGRvd25IAlIIZHJv'
-    'cGRvd26IAQESPQoKc3RpY2t5X3JvdxgKIAEoDjIZLnZvbHZveGdyaWQudjEuU3RpY2t5RWRnZU'
-    'gDUglzdGlja3lSb3eIAQESPQoKc3RpY2t5X2NvbBgLIAEoDjIZLnZvbHZveGdyaWQudjEuU3Rp'
-    'Y2t5RWRnZUgEUglzdGlja3lDb2yIAQESRQoLaW50ZXJhY3Rpb24YDCABKA4yHi52b2x2b3hncm'
-    'lkLnYxLkNlbGxJbnRlcmFjdGlvbkgFUgtpbnRlcmFjdGlvbogBARI5CgdiYXJjb2RlGA0gASgL'
-    'Mhoudm9sdm94Z3JpZC52MS5CYXJjb2RlRGF0YUgGUgdiYXJjb2RliAEBEjkKCXJpY2hfdGV4dB'
-    'gOIAEoCzIXLnZvbHZveGdyaWQudjEuUmljaFRleHRIB1IIcmljaFRleHSIAQFCCgoIX2NoZWNr'
-    'ZWRCEAoOX3BpY3R1cmVfYWxpZ25CCwoJX2Ryb3Bkb3duQg0KC19zdGlja3lfcm93Qg0KC19zdG'
-    'lja3lfY29sQg4KDF9pbnRlcmFjdGlvbkIKCghfYmFyY29kZUIMCgpfcmljaF90ZXh0');
+    'ljdHVyZRIxCgZlZGl0b3IYCSABKAsyGS52b2x2b3hncmlkLnYxLkVkaXRvclNwZWNSBmVkaXRv'
+    'chI9CgpzdGlja3lfcm93GAogASgOMhkudm9sdm94Z3JpZC52MS5TdGlja3lFZGdlSAJSCXN0aW'
+    'NreVJvd4gBARI9CgpzdGlja3lfY29sGAsgASgOMhkudm9sdm94Z3JpZC52MS5TdGlja3lFZGdl'
+    'SANSCXN0aWNreUNvbIgBARJFCgtpbnRlcmFjdGlvbhgMIAEoDjIeLnZvbHZveGdyaWQudjEuQ2'
+    'VsbEludGVyYWN0aW9uSARSC2ludGVyYWN0aW9uiAEBEjkKB2JhcmNvZGUYDSABKAsyGi52b2x2'
+    'b3hncmlkLnYxLkJhcmNvZGVEYXRhSAVSB2JhcmNvZGWIAQESOQoJcmljaF90ZXh0GA4gASgLMh'
+    'cudm9sdm94Z3JpZC52MS5SaWNoVGV4dEgGUghyaWNoVGV4dIgBAUIKCghfY2hlY2tlZEIQCg5f'
+    'cGljdHVyZV9hbGlnbkINCgtfc3RpY2t5X3Jvd0INCgtfc3RpY2t5X2NvbEIOCgxfaW50ZXJhY3'
+    'Rpb25CCgoIX2JhcmNvZGVCDAoKX3JpY2hfdGV4dA==');
 
 @$core.Deprecated('Use updateCellsRequestDescriptor instead')
 const UpdateCellsRequest$json = {
@@ -7062,67 +7722,22 @@ const EditCommand$json = {
       '10': 'start'
     },
     {
-      '1': 'commit',
+      '1': 'session',
       '3': 3,
       '4': 1,
       '5': 11,
-      '6': '.volvoxgrid.v1.EditCommit',
+      '6': '.volvoxgrid.v1.EditorSessionCommand',
       '9': 0,
-      '10': 'commit'
+      '10': 'session'
     },
     {
-      '1': 'cancel',
+      '1': 'get_state',
       '3': 4,
       '4': 1,
       '5': 11,
-      '6': '.volvoxgrid.v1.EditCancel',
+      '6': '.volvoxgrid.v1.EditGetState',
       '9': 0,
-      '10': 'cancel'
-    },
-    {
-      '1': 'set_text',
-      '3': 5,
-      '4': 1,
-      '5': 11,
-      '6': '.volvoxgrid.v1.EditSetText',
-      '9': 0,
-      '10': 'setText'
-    },
-    {
-      '1': 'set_selection',
-      '3': 6,
-      '4': 1,
-      '5': 11,
-      '6': '.volvoxgrid.v1.EditSetSelection',
-      '9': 0,
-      '10': 'setSelection'
-    },
-    {
-      '1': 'finish',
-      '3': 7,
-      '4': 1,
-      '5': 11,
-      '6': '.volvoxgrid.v1.EditFinish',
-      '9': 0,
-      '10': 'finish'
-    },
-    {
-      '1': 'set_highlights',
-      '3': 8,
-      '4': 1,
-      '5': 11,
-      '6': '.volvoxgrid.v1.EditSetHighlights',
-      '9': 0,
-      '10': 'setHighlights'
-    },
-    {
-      '1': 'set_preedit',
-      '3': 9,
-      '4': 1,
-      '5': 11,
-      '6': '.volvoxgrid.v1.EditSetPreedit',
-      '9': 0,
-      '10': 'setPreedit'
+      '10': 'getState'
     },
   ],
   '8': [
@@ -7133,15 +7748,10 @@ const EditCommand$json = {
 /// Descriptor for `EditCommand`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List editCommandDescriptor = $convert.base64Decode(
     'CgtFZGl0Q29tbWFuZBIXCgdncmlkX2lkGAEgASgDUgZncmlkSWQSMAoFc3RhcnQYAiABKAsyGC'
-    '52b2x2b3hncmlkLnYxLkVkaXRTdGFydEgAUgVzdGFydBIzCgZjb21taXQYAyABKAsyGS52b2x2'
-    'b3hncmlkLnYxLkVkaXRDb21taXRIAFIGY29tbWl0EjMKBmNhbmNlbBgEIAEoCzIZLnZvbHZveG'
-    'dyaWQudjEuRWRpdENhbmNlbEgAUgZjYW5jZWwSNwoIc2V0X3RleHQYBSABKAsyGi52b2x2b3hn'
-    'cmlkLnYxLkVkaXRTZXRUZXh0SABSB3NldFRleHQSRgoNc2V0X3NlbGVjdGlvbhgGIAEoCzIfLn'
-    'ZvbHZveGdyaWQudjEuRWRpdFNldFNlbGVjdGlvbkgAUgxzZXRTZWxlY3Rpb24SMwoGZmluaXNo'
-    'GAcgASgLMhkudm9sdm94Z3JpZC52MS5FZGl0RmluaXNoSABSBmZpbmlzaBJJCg5zZXRfaGlnaG'
-    'xpZ2h0cxgIIAEoCzIgLnZvbHZveGdyaWQudjEuRWRpdFNldEhpZ2hsaWdodHNIAFINc2V0SGln'
-    'aGxpZ2h0cxJACgtzZXRfcHJlZWRpdBgJIAEoCzIdLnZvbHZveGdyaWQudjEuRWRpdFNldFByZW'
-    'VkaXRIAFIKc2V0UHJlZWRpdEIJCgdjb21tYW5k');
+    '52b2x2b3hncmlkLnYxLkVkaXRTdGFydEgAUgVzdGFydBI/CgdzZXNzaW9uGAMgASgLMiMudm9s'
+    'dm94Z3JpZC52MS5FZGl0b3JTZXNzaW9uQ29tbWFuZEgAUgdzZXNzaW9uEjoKCWdldF9zdGF0ZR'
+    'gEIAEoCzIbLnZvbHZveGdyaWQudjEuRWRpdEdldFN0YXRlSABSCGdldFN0YXRlQgkKB2NvbW1h'
+    'bmQ=');
 
 @$core.Deprecated('Use editStartDescriptor instead')
 const EditStart$json = {
@@ -7150,72 +7760,211 @@ const EditStart$json = {
     {'1': 'row', '3': 1, '4': 1, '5': 5, '10': 'row'},
     {'1': 'col', '3': 2, '4': 1, '5': 5, '10': 'col'},
     {
-      '1': 'select_all',
+      '1': 'reason',
       '3': 3,
       '4': 1,
-      '5': 8,
-      '9': 0,
-      '10': 'selectAll',
-      '17': true
+      '5': 14,
+      '6': '.volvoxgrid.v1.EditStartReason',
+      '10': 'reason'
     },
     {
-      '1': 'caret_end',
+      '1': 'seed_value',
       '3': 4,
       '4': 1,
-      '5': 8,
-      '9': 1,
-      '10': 'caretEnd',
-      '17': true
+      '5': 11,
+      '6': '.volvoxgrid.v1.EditorValue',
+      '10': 'seedValue'
     },
     {
-      '1': 'seed_text',
+      '1': 'caret_position',
       '3': 5,
       '4': 1,
-      '5': 9,
-      '9': 2,
-      '10': 'seedText',
-      '17': true
-    },
-    {
-      '1': 'formula_mode',
-      '3': 6,
-      '4': 1,
-      '5': 8,
-      '9': 3,
-      '10': 'formulaMode',
+      '5': 5,
+      '9': 0,
+      '10': 'caretPosition',
       '17': true
     },
   ],
   '8': [
-    {'1': '_select_all'},
-    {'1': '_caret_end'},
-    {'1': '_seed_text'},
-    {'1': '_formula_mode'},
+    {'1': '_caret_position'},
   ],
 };
 
 /// Descriptor for `EditStart`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List editStartDescriptor = $convert.base64Decode(
-    'CglFZGl0U3RhcnQSEAoDcm93GAEgASgFUgNyb3cSEAoDY29sGAIgASgFUgNjb2wSIgoKc2VsZW'
-    'N0X2FsbBgDIAEoCEgAUglzZWxlY3RBbGyIAQESIAoJY2FyZXRfZW5kGAQgASgISAFSCGNhcmV0'
-    'RW5kiAEBEiAKCXNlZWRfdGV4dBgFIAEoCUgCUghzZWVkVGV4dIgBARImCgxmb3JtdWxhX21vZG'
-    'UYBiABKAhIA1ILZm9ybXVsYU1vZGWIAQFCDQoLX3NlbGVjdF9hbGxCDAoKX2NhcmV0X2VuZEIM'
-    'Cgpfc2VlZF90ZXh0Qg8KDV9mb3JtdWxhX21vZGU=');
+    'CglFZGl0U3RhcnQSEAoDcm93GAEgASgFUgNyb3cSEAoDY29sGAIgASgFUgNjb2wSNgoGcmVhc2'
+    '9uGAMgASgOMh4udm9sdm94Z3JpZC52MS5FZGl0U3RhcnRSZWFzb25SBnJlYXNvbhI5CgpzZWVk'
+    'X3ZhbHVlGAQgASgLMhoudm9sdm94Z3JpZC52MS5FZGl0b3JWYWx1ZVIJc2VlZFZhbHVlEioKDm'
+    'NhcmV0X3Bvc2l0aW9uGAUgASgFSABSDWNhcmV0UG9zaXRpb26IAQFCEQoPX2NhcmV0X3Bvc2l0'
+    'aW9u');
+
+@$core.Deprecated('Use editGetStateDescriptor instead')
+const EditGetState$json = {
+  '1': 'EditGetState',
+};
+
+/// Descriptor for `EditGetState`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List editGetStateDescriptor =
+    $convert.base64Decode('CgxFZGl0R2V0U3RhdGU=');
+
+@$core.Deprecated('Use editorSessionCommandDescriptor instead')
+const EditorSessionCommand$json = {
+  '1': 'EditorSessionCommand',
+  '2': [
+    {'1': 'session_id', '3': 1, '4': 1, '5': 3, '10': 'sessionId'},
+    {'1': 'state_version', '3': 2, '4': 1, '5': 4, '10': 'stateVersion'},
+    {
+      '1': 'value_changed',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.EditorValueChanged',
+      '9': 0,
+      '10': 'valueChanged'
+    },
+    {
+      '1': 'selection_changed',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.TextSelectionChanged',
+      '9': 0,
+      '10': 'selectionChanged'
+    },
+    {
+      '1': 'preedit_changed',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.EditorPreeditChanged',
+      '9': 0,
+      '10': 'preeditChanged'
+    },
+    {
+      '1': 'commit',
+      '3': 6,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.EditCommit',
+      '9': 0,
+      '10': 'commit'
+    },
+    {
+      '1': 'cancel',
+      '3': 7,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.EditCancel',
+      '9': 0,
+      '10': 'cancel'
+    },
+    {
+      '1': 'custom_action',
+      '3': 8,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.CustomEditorAction',
+      '9': 0,
+      '10': 'customAction'
+    },
+  ],
+  '8': [
+    {'1': 'command'},
+  ],
+};
+
+/// Descriptor for `EditorSessionCommand`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List editorSessionCommandDescriptor = $convert.base64Decode(
+    'ChRFZGl0b3JTZXNzaW9uQ29tbWFuZBIdCgpzZXNzaW9uX2lkGAEgASgDUglzZXNzaW9uSWQSIw'
+    'oNc3RhdGVfdmVyc2lvbhgCIAEoBFIMc3RhdGVWZXJzaW9uEkgKDXZhbHVlX2NoYW5nZWQYAyAB'
+    'KAsyIS52b2x2b3hncmlkLnYxLkVkaXRvclZhbHVlQ2hhbmdlZEgAUgx2YWx1ZUNoYW5nZWQSUg'
+    'oRc2VsZWN0aW9uX2NoYW5nZWQYBCABKAsyIy52b2x2b3hncmlkLnYxLlRleHRTZWxlY3Rpb25D'
+    'aGFuZ2VkSABSEHNlbGVjdGlvbkNoYW5nZWQSTgoPcHJlZWRpdF9jaGFuZ2VkGAUgASgLMiMudm'
+    '9sdm94Z3JpZC52MS5FZGl0b3JQcmVlZGl0Q2hhbmdlZEgAUg5wcmVlZGl0Q2hhbmdlZBIzCgZj'
+    'b21taXQYBiABKAsyGS52b2x2b3hncmlkLnYxLkVkaXRDb21taXRIAFIGY29tbWl0EjMKBmNhbm'
+    'NlbBgHIAEoCzIZLnZvbHZveGdyaWQudjEuRWRpdENhbmNlbEgAUgZjYW5jZWwSSAoNY3VzdG9t'
+    'X2FjdGlvbhgIIAEoCzIhLnZvbHZveGdyaWQudjEuQ3VzdG9tRWRpdG9yQWN0aW9uSABSDGN1c3'
+    'RvbUFjdGlvbkIJCgdjb21tYW5k');
+
+@$core.Deprecated('Use editorValueChangedDescriptor instead')
+const EditorValueChanged$json = {
+  '1': 'EditorValueChanged',
+  '2': [
+    {
+      '1': 'value',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.EditorValue',
+      '10': 'value'
+    },
+  ],
+};
+
+/// Descriptor for `EditorValueChanged`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List editorValueChangedDescriptor = $convert.base64Decode(
+    'ChJFZGl0b3JWYWx1ZUNoYW5nZWQSMAoFdmFsdWUYASABKAsyGi52b2x2b3hncmlkLnYxLkVkaX'
+    'RvclZhbHVlUgV2YWx1ZQ==');
+
+@$core.Deprecated('Use textSelectionChangedDescriptor instead')
+const TextSelectionChanged$json = {
+  '1': 'TextSelectionChanged',
+  '2': [
+    {
+      '1': 'selection',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.TextSelection',
+      '10': 'selection'
+    },
+  ],
+};
+
+/// Descriptor for `TextSelectionChanged`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List textSelectionChangedDescriptor = $convert.base64Decode(
+    'ChRUZXh0U2VsZWN0aW9uQ2hhbmdlZBI6CglzZWxlY3Rpb24YASABKAsyHC52b2x2b3hncmlkLn'
+    'YxLlRleHRTZWxlY3Rpb25SCXNlbGVjdGlvbg==');
+
+@$core.Deprecated('Use editorPreeditChangedDescriptor instead')
+const EditorPreeditChanged$json = {
+  '1': 'EditorPreeditChanged',
+  '2': [
+    {'1': 'text', '3': 1, '4': 1, '5': 9, '10': 'text'},
+    {'1': 'cursor', '3': 2, '4': 1, '5': 5, '10': 'cursor'},
+    {'1': 'commit', '3': 3, '4': 1, '5': 8, '10': 'commit'},
+  ],
+};
+
+/// Descriptor for `EditorPreeditChanged`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List editorPreeditChangedDescriptor = $convert.base64Decode(
+    'ChRFZGl0b3JQcmVlZGl0Q2hhbmdlZBISCgR0ZXh0GAEgASgJUgR0ZXh0EhYKBmN1cnNvchgCIA'
+    'EoBVIGY3Vyc29yEhYKBmNvbW1pdBgDIAEoCFIGY29tbWl0');
 
 @$core.Deprecated('Use editCommitDescriptor instead')
 const EditCommit$json = {
   '1': 'EditCommit',
   '2': [
-    {'1': 'text', '3': 1, '4': 1, '5': 9, '9': 0, '10': 'text', '17': true},
+    {
+      '1': 'value',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.EditorValue',
+      '9': 0,
+      '10': 'value',
+      '17': true
+    },
   ],
   '8': [
-    {'1': '_text'},
+    {'1': '_value'},
   ],
 };
 
 /// Descriptor for `EditCommit`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List editCommitDescriptor = $convert.base64Decode(
-    'CgpFZGl0Q29tbWl0EhcKBHRleHQYASABKAlIAFIEdGV4dIgBAUIHCgVfdGV4dA==');
+    'CgpFZGl0Q29tbWl0EjUKBXZhbHVlGAEgASgLMhoudm9sdm94Z3JpZC52MS5FZGl0b3JWYWx1ZU'
+    'gAUgV2YWx1ZYgBAUIICgZfdmFsdWU=');
 
 @$core.Deprecated('Use editCancelDescriptor instead')
 const EditCancel$json = {
@@ -7226,93 +7975,171 @@ const EditCancel$json = {
 final $typed_data.Uint8List editCancelDescriptor =
     $convert.base64Decode('CgpFZGl0Q2FuY2Vs');
 
-@$core.Deprecated('Use editSetTextDescriptor instead')
-const EditSetText$json = {
-  '1': 'EditSetText',
+@$core.Deprecated('Use customEditorActionDescriptor instead')
+const CustomEditorAction$json = {
+  '1': 'CustomEditorAction',
   '2': [
-    {'1': 'text', '3': 1, '4': 1, '5': 9, '10': 'text'},
+    {'1': 'action_id', '3': 1, '4': 1, '5': 9, '10': 'actionId'},
+    {
+      '1': 'payload',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.StructValue',
+      '10': 'payload'
+    },
   ],
 };
 
-/// Descriptor for `EditSetText`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List editSetTextDescriptor =
-    $convert.base64Decode('CgtFZGl0U2V0VGV4dBISCgR0ZXh0GAEgASgJUgR0ZXh0');
+/// Descriptor for `CustomEditorAction`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List customEditorActionDescriptor = $convert.base64Decode(
+    'ChJDdXN0b21FZGl0b3JBY3Rpb24SGwoJYWN0aW9uX2lkGAEgASgJUghhY3Rpb25JZBI0CgdwYX'
+    'lsb2FkGAIgASgLMhoudm9sdm94Z3JpZC52MS5TdHJ1Y3RWYWx1ZVIHcGF5bG9hZA==');
 
-@$core.Deprecated('Use editSetSelectionDescriptor instead')
-const EditSetSelection$json = {
-  '1': 'EditSetSelection',
+@$core.Deprecated('Use editorSessionDescriptor instead')
+const EditorSession$json = {
+  '1': 'EditorSession',
   '2': [
-    {'1': 'start', '3': 1, '4': 1, '5': 5, '10': 'start'},
-    {'1': 'length', '3': 2, '4': 1, '5': 5, '10': 'length'},
+    {'1': 'session_id', '3': 1, '4': 1, '5': 3, '10': 'sessionId'},
+    {'1': 'row', '3': 2, '4': 1, '5': 5, '10': 'row'},
+    {'1': 'col', '3': 3, '4': 1, '5': 5, '10': 'col'},
+    {
+      '1': 'viewport_rect',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.Rect',
+      '10': 'viewportRect'
+    },
+    {
+      '1': 'editor',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.EditorSpec',
+      '10': 'editor'
+    },
+    {
+      '1': 'value',
+      '3': 6,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.EditorValue',
+      '10': 'value'
+    },
+    {
+      '1': 'selection',
+      '3': 7,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.TextSelection',
+      '10': 'selection'
+    },
+    {
+      '1': 'ui_mode',
+      '3': 8,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.EditUiMode',
+      '10': 'uiMode'
+    },
+    {
+      '1': 'capabilities',
+      '3': 9,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.EditorCapabilities',
+      '10': 'capabilities'
+    },
+    {
+      '1': 'reason',
+      '3': 10,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.EditStartReason',
+      '10': 'reason'
+    },
+    {'1': 'state_version', '3': 11, '4': 1, '5': 4, '10': 'stateVersion'},
+    {'1': 'composing', '3': 12, '4': 1, '5': 8, '10': 'composing'},
+    {'1': 'preedit_text', '3': 13, '4': 1, '5': 9, '10': 'preeditText'},
+    {
+      '1': 'validation_errors',
+      '3': 14,
+      '4': 3,
+      '5': 11,
+      '6': '.volvoxgrid.v1.ValidationError',
+      '10': 'validationErrors'
+    },
   ],
 };
 
-/// Descriptor for `EditSetSelection`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List editSetSelectionDescriptor = $convert.base64Decode(
-    'ChBFZGl0U2V0U2VsZWN0aW9uEhQKBXN0YXJ0GAEgASgFUgVzdGFydBIWCgZsZW5ndGgYAiABKA'
-    'VSBmxlbmd0aA==');
+/// Descriptor for `EditorSession`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List editorSessionDescriptor = $convert.base64Decode(
+    'Cg1FZGl0b3JTZXNzaW9uEh0KCnNlc3Npb25faWQYASABKANSCXNlc3Npb25JZBIQCgNyb3cYAi'
+    'ABKAVSA3JvdxIQCgNjb2wYAyABKAVSA2NvbBI4Cg12aWV3cG9ydF9yZWN0GAQgASgLMhMudm9s'
+    'dm94Z3JpZC52MS5SZWN0Ugx2aWV3cG9ydFJlY3QSMQoGZWRpdG9yGAUgASgLMhkudm9sdm94Z3'
+    'JpZC52MS5FZGl0b3JTcGVjUgZlZGl0b3ISMAoFdmFsdWUYBiABKAsyGi52b2x2b3hncmlkLnYx'
+    'LkVkaXRvclZhbHVlUgV2YWx1ZRI6CglzZWxlY3Rpb24YByABKAsyHC52b2x2b3hncmlkLnYxLl'
+    'RleHRTZWxlY3Rpb25SCXNlbGVjdGlvbhIyCgd1aV9tb2RlGAggASgOMhkudm9sdm94Z3JpZC52'
+    'MS5FZGl0VWlNb2RlUgZ1aU1vZGUSRQoMY2FwYWJpbGl0aWVzGAkgASgLMiEudm9sdm94Z3JpZC'
+    '52MS5FZGl0b3JDYXBhYmlsaXRpZXNSDGNhcGFiaWxpdGllcxI2CgZyZWFzb24YCiABKA4yHi52'
+    'b2x2b3hncmlkLnYxLkVkaXRTdGFydFJlYXNvblIGcmVhc29uEiMKDXN0YXRlX3ZlcnNpb24YCy'
+    'ABKARSDHN0YXRlVmVyc2lvbhIcCgljb21wb3NpbmcYDCABKAhSCWNvbXBvc2luZxIhCgxwcmVl'
+    'ZGl0X3RleHQYDSABKAlSC3ByZWVkaXRUZXh0EksKEXZhbGlkYXRpb25fZXJyb3JzGA4gAygLMh'
+    '4udm9sdm94Z3JpZC52MS5WYWxpZGF0aW9uRXJyb3JSEHZhbGlkYXRpb25FcnJvcnM=');
 
-@$core.Deprecated('Use editSetPreeditDescriptor instead')
-const EditSetPreedit$json = {
-  '1': 'EditSetPreedit',
+@$core.Deprecated('Use editorCapabilitiesDescriptor instead')
+const EditorCapabilities$json = {
+  '1': 'EditorCapabilities',
   '2': [
-    {'1': 'text', '3': 1, '4': 1, '5': 9, '10': 'text'},
-    {'1': 'cursor', '3': 2, '4': 1, '5': 5, '10': 'cursor'},
-    {'1': 'commit', '3': 3, '4': 1, '5': 8, '10': 'commit'},
+    {
+      '1': 'accepts_text_input',
+      '3': 1,
+      '4': 1,
+      '5': 8,
+      '10': 'acceptsTextInput'
+    },
+    {
+      '1': 'supports_selection',
+      '3': 2,
+      '4': 1,
+      '5': 8,
+      '10': 'supportsSelection'
+    },
+    {'1': 'supports_cut', '3': 3, '4': 1, '5': 8, '10': 'supportsCut'},
+    {'1': 'supports_paste', '3': 4, '4': 1, '5': 8, '10': 'supportsPaste'},
+    {'1': 'supports_undo', '3': 5, '4': 1, '5': 8, '10': 'supportsUndo'},
   ],
 };
 
-/// Descriptor for `EditSetPreedit`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List editSetPreeditDescriptor = $convert.base64Decode(
-    'Cg5FZGl0U2V0UHJlZWRpdBISCgR0ZXh0GAEgASgJUgR0ZXh0EhYKBmN1cnNvchgCIAEoBVIGY3'
-    'Vyc29yEhYKBmNvbW1pdBgDIAEoCFIGY29tbWl0');
-
-@$core.Deprecated('Use editFinishDescriptor instead')
-const EditFinish$json = {
-  '1': 'EditFinish',
-};
-
-/// Descriptor for `EditFinish`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List editFinishDescriptor =
-    $convert.base64Decode('CgpFZGl0RmluaXNo');
+/// Descriptor for `EditorCapabilities`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List editorCapabilitiesDescriptor = $convert.base64Decode(
+    'ChJFZGl0b3JDYXBhYmlsaXRpZXMSLAoSYWNjZXB0c190ZXh0X2lucHV0GAEgASgIUhBhY2NlcH'
+    'RzVGV4dElucHV0Ei0KEnN1cHBvcnRzX3NlbGVjdGlvbhgCIAEoCFIRc3VwcG9ydHNTZWxlY3Rp'
+    'b24SIQoMc3VwcG9ydHNfY3V0GAMgASgIUgtzdXBwb3J0c0N1dBIlCg5zdXBwb3J0c19wYXN0ZR'
+    'gEIAEoCFINc3VwcG9ydHNQYXN0ZRIjCg1zdXBwb3J0c191bmRvGAUgASgIUgxzdXBwb3J0c1Vu'
+    'ZG8=');
 
 @$core.Deprecated('Use editStateDescriptor instead')
 const EditState$json = {
   '1': 'EditState',
   '2': [
     {'1': 'active', '3': 1, '4': 1, '5': 8, '10': 'active'},
-    {'1': 'row', '3': 2, '4': 1, '5': 5, '10': 'row'},
-    {'1': 'col', '3': 3, '4': 1, '5': 5, '10': 'col'},
-    {'1': 'text', '3': 4, '4': 1, '5': 9, '10': 'text'},
-    {'1': 'sel_start', '3': 5, '4': 1, '5': 5, '10': 'selStart'},
-    {'1': 'sel_length', '3': 6, '4': 1, '5': 5, '10': 'selLength'},
-    {'1': 'composing', '3': 7, '4': 1, '5': 8, '10': 'composing'},
-    {'1': 'preedit_text', '3': 8, '4': 1, '5': 9, '10': 'preeditText'},
     {
-      '1': 'ui_mode',
-      '3': 9,
+      '1': 'session',
+      '3': 2,
       '4': 1,
-      '5': 14,
-      '6': '.volvoxgrid.v1.EditUiMode',
-      '10': 'uiMode'
+      '5': 11,
+      '6': '.volvoxgrid.v1.EditorSession',
+      '10': 'session'
     },
-    {'1': 'x', '3': 10, '4': 1, '5': 2, '10': 'x'},
-    {'1': 'y', '3': 11, '4': 1, '5': 2, '10': 'y'},
-    {'1': 'width', '3': 12, '4': 1, '5': 2, '10': 'width'},
-    {'1': 'height', '3': 13, '4': 1, '5': 2, '10': 'height'},
-    {'1': 'max_length', '3': 14, '4': 1, '5': 5, '10': 'maxLength'},
   ],
 };
 
 /// Descriptor for `EditState`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List editStateDescriptor = $convert.base64Decode(
-    'CglFZGl0U3RhdGUSFgoGYWN0aXZlGAEgASgIUgZhY3RpdmUSEAoDcm93GAIgASgFUgNyb3cSEA'
-    'oDY29sGAMgASgFUgNjb2wSEgoEdGV4dBgEIAEoCVIEdGV4dBIbCglzZWxfc3RhcnQYBSABKAVS'
-    'CHNlbFN0YXJ0Eh0KCnNlbF9sZW5ndGgYBiABKAVSCXNlbExlbmd0aBIcCgljb21wb3NpbmcYBy'
-    'ABKAhSCWNvbXBvc2luZxIhCgxwcmVlZGl0X3RleHQYCCABKAlSC3ByZWVkaXRUZXh0EjIKB3Vp'
-    'X21vZGUYCSABKA4yGS52b2x2b3hncmlkLnYxLkVkaXRVaU1vZGVSBnVpTW9kZRIMCgF4GAogAS'
-    'gCUgF4EgwKAXkYCyABKAJSAXkSFAoFd2lkdGgYDCABKAJSBXdpZHRoEhYKBmhlaWdodBgNIAEo'
-    'AlIGaGVpZ2h0Eh0KCm1heF9sZW5ndGgYDiABKAVSCW1heExlbmd0aA==');
+    'CglFZGl0U3RhdGUSFgoGYWN0aXZlGAEgASgIUgZhY3RpdmUSNgoHc2Vzc2lvbhgCIAEoCzIcLn'
+    'ZvbHZveGdyaWQudjEuRWRpdG9yU2Vzc2lvblIHc2Vzc2lvbg==');
 
 @$core.Deprecated('Use sortColumnDescriptor instead')
 const SortColumn$json = {
@@ -8754,6 +9581,24 @@ const RenderInput$json = {
       '9': 0,
       '10': 'compareResponse'
     },
+    {
+      '1': 'edit_validation_response',
+      '3': 15,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.EditValidationResponse',
+      '9': 0,
+      '10': 'editValidationResponse'
+    },
+    {
+      '1': 'editor_list_items_response',
+      '3': 16,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.EditorListItemsResponse',
+      '9': 0,
+      '10': 'editorListItemsResponse'
+    },
   ],
   '8': [
     {'1': 'input'},
@@ -8778,7 +9623,10 @@ final $typed_data.Uint8List renderInputDescriptor = $convert.base64Decode(
     'RIAFIQdGVybWluYWxWaWV3cG9ydBJLChB0ZXJtaW5hbF9jb21tYW5kGA0gASgLMh4udm9sdm94'
     'Z3JpZC52MS5UZXJtaW5hbENvbW1hbmRIAFIPdGVybWluYWxDb21tYW5kEksKEGNvbXBhcmVfcm'
     'VzcG9uc2UYDiABKAsyHi52b2x2b3hncmlkLnYxLkNvbXBhcmVSZXNwb25zZUgAUg9jb21wYXJl'
-    'UmVzcG9uc2VCBwoFaW5wdXQ=');
+    'UmVzcG9uc2USYQoYZWRpdF92YWxpZGF0aW9uX3Jlc3BvbnNlGA8gASgLMiUudm9sdm94Z3JpZC'
+    '52MS5FZGl0VmFsaWRhdGlvblJlc3BvbnNlSABSFmVkaXRWYWxpZGF0aW9uUmVzcG9uc2USZQoa'
+    'ZWRpdG9yX2xpc3RfaXRlbXNfcmVzcG9uc2UYECABKAsyJi52b2x2b3hncmlkLnYxLkVkaXRvck'
+    'xpc3RJdGVtc1Jlc3BvbnNlSABSF2VkaXRvckxpc3RJdGVtc1Jlc3BvbnNlQgcKBWlucHV0');
 
 @$core.Deprecated('Use compareResponseDescriptor instead')
 const CompareResponse$json = {
@@ -8793,6 +9641,68 @@ const CompareResponse$json = {
 final $typed_data.Uint8List compareResponseDescriptor = $convert.base64Decode(
     'Cg9Db21wYXJlUmVzcG9uc2USHQoKcmVxdWVzdF9pZBgBIAEoA1IJcmVxdWVzdElkEhYKBnJlc3'
     'VsdBgCIAEoBVIGcmVzdWx0');
+
+@$core.Deprecated('Use editValidationResponseDescriptor instead')
+const EditValidationResponse$json = {
+  '1': 'EditValidationResponse',
+  '2': [
+    {'1': 'request_id', '3': 1, '4': 1, '5': 3, '10': 'requestId'},
+    {'1': 'session_id', '3': 2, '4': 1, '5': 3, '10': 'sessionId'},
+    {
+      '1': 'errors',
+      '3': 3,
+      '4': 3,
+      '5': 11,
+      '6': '.volvoxgrid.v1.ValidationError',
+      '10': 'errors'
+    },
+    {
+      '1': 'normalized_value',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.EditorValue',
+      '9': 0,
+      '10': 'normalizedValue',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_normalized_value'},
+  ],
+};
+
+/// Descriptor for `EditValidationResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List editValidationResponseDescriptor = $convert.base64Decode(
+    'ChZFZGl0VmFsaWRhdGlvblJlc3BvbnNlEh0KCnJlcXVlc3RfaWQYASABKANSCXJlcXVlc3RJZB'
+    'IdCgpzZXNzaW9uX2lkGAIgASgDUglzZXNzaW9uSWQSNgoGZXJyb3JzGAMgAygLMh4udm9sdm94'
+    'Z3JpZC52MS5WYWxpZGF0aW9uRXJyb3JSBmVycm9ycxJKChBub3JtYWxpemVkX3ZhbHVlGAQgAS'
+    'gLMhoudm9sdm94Z3JpZC52MS5FZGl0b3JWYWx1ZUgAUg9ub3JtYWxpemVkVmFsdWWIAQFCEwoR'
+    'X25vcm1hbGl6ZWRfdmFsdWU=');
+
+@$core.Deprecated('Use editorListItemsResponseDescriptor instead')
+const EditorListItemsResponse$json = {
+  '1': 'EditorListItemsResponse',
+  '2': [
+    {'1': 'request_id', '3': 1, '4': 1, '5': 3, '10': 'requestId'},
+    {'1': 'session_id', '3': 2, '4': 1, '5': 3, '10': 'sessionId'},
+    {
+      '1': 'items',
+      '3': 3,
+      '4': 3,
+      '5': 11,
+      '6': '.volvoxgrid.v1.ListItem',
+      '10': 'items'
+    },
+    {'1': 'has_more', '3': 4, '4': 1, '5': 8, '10': 'hasMore'},
+  ],
+};
+
+/// Descriptor for `EditorListItemsResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List editorListItemsResponseDescriptor = $convert.base64Decode(
+    'ChdFZGl0b3JMaXN0SXRlbXNSZXNwb25zZRIdCgpyZXF1ZXN0X2lkGAEgASgDUglyZXF1ZXN0SW'
+    'QSHQoKc2Vzc2lvbl9pZBgCIAEoA1IJc2Vzc2lvbklkEi0KBWl0ZW1zGAMgAygLMhcudm9sdm94'
+    'Z3JpZC52MS5MaXN0SXRlbVIFaXRlbXMSGQoIaGFzX21vcmUYBCABKAhSB2hhc01vcmU=');
 
 @$core.Deprecated('Use viewportStateDescriptor instead')
 const ViewportState$json = {
@@ -9107,26 +10017,35 @@ const RenderOutput$json = {
       '10': 'cursor'
     },
     {
-      '1': 'edit_request',
+      '1': 'editor_started',
       '3': 5,
       '4': 1,
       '5': 11,
-      '6': '.volvoxgrid.v1.EditRequest',
+      '6': '.volvoxgrid.v1.EditorSessionStarted',
       '9': 0,
-      '10': 'editRequest'
+      '10': 'editorStarted'
     },
     {
-      '1': 'dropdown_request',
+      '1': 'editor_updated',
       '3': 6,
       '4': 1,
       '5': 11,
-      '6': '.volvoxgrid.v1.DropdownRequest',
+      '6': '.volvoxgrid.v1.EditorSessionUpdated',
       '9': 0,
-      '10': 'dropdownRequest'
+      '10': 'editorUpdated'
+    },
+    {
+      '1': 'editor_ended',
+      '3': 7,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.EditorSessionEnded',
+      '9': 0,
+      '10': 'editorEnded'
     },
     {
       '1': 'tooltip_request',
-      '3': 7,
+      '3': 8,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.TooltipRequest',
@@ -9135,7 +10054,7 @@ const RenderOutput$json = {
     },
     {
       '1': 'gpu_frame_done',
-      '3': 8,
+      '3': 9,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.GpuFrameDone',
@@ -9153,13 +10072,14 @@ final $typed_data.Uint8List renderOutputDescriptor = $convert.base64Decode(
     'CgxSZW5kZXJPdXRwdXQSGgoIcmVuZGVyZWQYASABKAhSCHJlbmRlcmVkEjkKCmZyYW1lX2Rvbm'
     'UYAiABKAsyGC52b2x2b3hncmlkLnYxLkZyYW1lRG9uZUgAUglmcmFtZURvbmUSPgoJc2VsZWN0'
     'aW9uGAMgASgLMh4udm9sdm94Z3JpZC52MS5TZWxlY3Rpb25VcGRhdGVIAFIJc2VsZWN0aW9uEj'
-    'UKBmN1cnNvchgEIAEoCzIbLnZvbHZveGdyaWQudjEuQ3Vyc29yQ2hhbmdlSABSBmN1cnNvchI/'
-    'CgxlZGl0X3JlcXVlc3QYBSABKAsyGi52b2x2b3hncmlkLnYxLkVkaXRSZXF1ZXN0SABSC2VkaX'
-    'RSZXF1ZXN0EksKEGRyb3Bkb3duX3JlcXVlc3QYBiABKAsyHi52b2x2b3hncmlkLnYxLkRyb3Bk'
-    'b3duUmVxdWVzdEgAUg9kcm9wZG93blJlcXVlc3QSSAoPdG9vbHRpcF9yZXF1ZXN0GAcgASgLMh'
-    '0udm9sdm94Z3JpZC52MS5Ub29sdGlwUmVxdWVzdEgAUg50b29sdGlwUmVxdWVzdBJDCg5ncHVf'
-    'ZnJhbWVfZG9uZRgIIAEoCzIbLnZvbHZveGdyaWQudjEuR3B1RnJhbWVEb25lSABSDGdwdUZyYW'
-    '1lRG9uZUIHCgVldmVudA==');
+    'UKBmN1cnNvchgEIAEoCzIbLnZvbHZveGdyaWQudjEuQ3Vyc29yQ2hhbmdlSABSBmN1cnNvchJM'
+    'Cg5lZGl0b3Jfc3RhcnRlZBgFIAEoCzIjLnZvbHZveGdyaWQudjEuRWRpdG9yU2Vzc2lvblN0YX'
+    'J0ZWRIAFINZWRpdG9yU3RhcnRlZBJMCg5lZGl0b3JfdXBkYXRlZBgGIAEoCzIjLnZvbHZveGdy'
+    'aWQudjEuRWRpdG9yU2Vzc2lvblVwZGF0ZWRIAFINZWRpdG9yVXBkYXRlZBJGCgxlZGl0b3JfZW'
+    '5kZWQYByABKAsyIS52b2x2b3hncmlkLnYxLkVkaXRvclNlc3Npb25FbmRlZEgAUgtlZGl0b3JF'
+    'bmRlZBJICg90b29sdGlwX3JlcXVlc3QYCCABKAsyHS52b2x2b3hncmlkLnYxLlRvb2x0aXBSZX'
+    'F1ZXN0SABSDnRvb2x0aXBSZXF1ZXN0EkMKDmdwdV9mcmFtZV9kb25lGAkgASgLMhsudm9sdm94'
+    'Z3JpZC52MS5HcHVGcmFtZURvbmVIAFIMZ3B1RnJhbWVEb25lQgcKBWV2ZW50');
 
 @$core.Deprecated('Use frameDoneDescriptor instead')
 const FrameDone$json = {
@@ -9294,63 +10214,160 @@ final $typed_data.Uint8List cursorChangeDescriptor = $convert.base64Decode(
     'CgxDdXJzb3JDaGFuZ2USMQoGY3Vyc29yGAEgASgOMhkudm9sdm94Z3JpZC52MS5DdXJzb3JUeX'
     'BlUgZjdXJzb3I=');
 
-@$core.Deprecated('Use editRequestDescriptor instead')
-const EditRequest$json = {
-  '1': 'EditRequest',
+@$core.Deprecated('Use editorSessionStartedDescriptor instead')
+const EditorSessionStarted$json = {
+  '1': 'EditorSessionStarted',
   '2': [
-    {'1': 'row', '3': 1, '4': 1, '5': 5, '10': 'row'},
-    {'1': 'col', '3': 2, '4': 1, '5': 5, '10': 'col'},
-    {'1': 'x', '3': 3, '4': 1, '5': 2, '10': 'x'},
-    {'1': 'y', '3': 4, '4': 1, '5': 2, '10': 'y'},
-    {'1': 'width', '3': 5, '4': 1, '5': 2, '10': 'width'},
-    {'1': 'height', '3': 6, '4': 1, '5': 2, '10': 'height'},
-    {'1': 'current_value', '3': 7, '4': 1, '5': 9, '10': 'currentValue'},
-    {'1': 'edit_mask', '3': 8, '4': 1, '5': 9, '10': 'editMask'},
-    {'1': 'max_length', '3': 9, '4': 1, '5': 5, '10': 'maxLength'},
-    {'1': 'sel_start', '3': 10, '4': 1, '5': 5, '10': 'selStart'},
-    {'1': 'sel_length', '3': 11, '4': 1, '5': 5, '10': 'selLength'},
     {
-      '1': 'ui_mode',
-      '3': 12,
+      '1': 'session',
+      '3': 1,
       '4': 1,
-      '5': 14,
-      '6': '.volvoxgrid.v1.EditUiMode',
-      '10': 'uiMode'
+      '5': 11,
+      '6': '.volvoxgrid.v1.EditorSession',
+      '10': 'session'
     },
   ],
 };
 
-/// Descriptor for `EditRequest`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List editRequestDescriptor = $convert.base64Decode(
-    'CgtFZGl0UmVxdWVzdBIQCgNyb3cYASABKAVSA3JvdxIQCgNjb2wYAiABKAVSA2NvbBIMCgF4GA'
-    'MgASgCUgF4EgwKAXkYBCABKAJSAXkSFAoFd2lkdGgYBSABKAJSBXdpZHRoEhYKBmhlaWdodBgG'
-    'IAEoAlIGaGVpZ2h0EiMKDWN1cnJlbnRfdmFsdWUYByABKAlSDGN1cnJlbnRWYWx1ZRIbCgllZG'
-    'l0X21hc2sYCCABKAlSCGVkaXRNYXNrEh0KCm1heF9sZW5ndGgYCSABKAVSCW1heExlbmd0aBIb'
-    'CglzZWxfc3RhcnQYCiABKAVSCHNlbFN0YXJ0Eh0KCnNlbF9sZW5ndGgYCyABKAVSCXNlbExlbm'
-    'd0aBIyCgd1aV9tb2RlGAwgASgOMhkudm9sdm94Z3JpZC52MS5FZGl0VWlNb2RlUgZ1aU1vZGU=');
+/// Descriptor for `EditorSessionStarted`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List editorSessionStartedDescriptor = $convert.base64Decode(
+    'ChRFZGl0b3JTZXNzaW9uU3RhcnRlZBI2CgdzZXNzaW9uGAEgASgLMhwudm9sdm94Z3JpZC52MS'
+    '5FZGl0b3JTZXNzaW9uUgdzZXNzaW9u');
 
-@$core.Deprecated('Use dropdownRequestDescriptor instead')
-const DropdownRequest$json = {
-  '1': 'DropdownRequest',
+@$core.Deprecated('Use editorSessionUpdatedDescriptor instead')
+const EditorSessionUpdated$json = {
+  '1': 'EditorSessionUpdated',
   '2': [
-    {'1': 'row', '3': 1, '4': 1, '5': 5, '10': 'row'},
-    {'1': 'col', '3': 2, '4': 1, '5': 5, '10': 'col'},
-    {'1': 'x', '3': 3, '4': 1, '5': 2, '10': 'x'},
-    {'1': 'y', '3': 4, '4': 1, '5': 2, '10': 'y'},
-    {'1': 'width', '3': 5, '4': 1, '5': 2, '10': 'width'},
-    {'1': 'height', '3': 6, '4': 1, '5': 2, '10': 'height'},
-    {'1': 'items', '3': 7, '4': 3, '5': 9, '10': 'items'},
-    {'1': 'selected', '3': 8, '4': 1, '5': 5, '10': 'selected'},
-    {'1': 'editable', '3': 9, '4': 1, '5': 8, '10': 'editable'},
+    {'1': 'session_id', '3': 1, '4': 1, '5': 3, '10': 'sessionId'},
+    {'1': 'state_version', '3': 2, '4': 1, '5': 4, '10': 'stateVersion'},
+    {
+      '1': 'reason',
+      '3': 3,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.EditorUpdateReason',
+      '10': 'reason'
+    },
+    {
+      '1': 'viewport_rect',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.Rect',
+      '9': 0,
+      '10': 'viewportRect',
+      '17': true
+    },
+    {
+      '1': 'value',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.EditorValue',
+      '9': 1,
+      '10': 'value',
+      '17': true
+    },
+    {
+      '1': 'selection',
+      '3': 6,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.TextSelection',
+      '9': 2,
+      '10': 'selection',
+      '17': true
+    },
+    {
+      '1': 'visible',
+      '3': 7,
+      '4': 1,
+      '5': 8,
+      '9': 3,
+      '10': 'visible',
+      '17': true
+    },
+    {
+      '1': 'force_refocus',
+      '3': 8,
+      '4': 1,
+      '5': 8,
+      '9': 4,
+      '10': 'forceRefocus',
+      '17': true
+    },
+    {
+      '1': 'validation_errors',
+      '3': 9,
+      '4': 3,
+      '5': 11,
+      '6': '.volvoxgrid.v1.ValidationError',
+      '10': 'validationErrors'
+    },
+    {
+      '1': 'custom_payload',
+      '3': 10,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.StructValue',
+      '10': 'customPayload'
+    },
+  ],
+  '8': [
+    {'1': '_viewport_rect'},
+    {'1': '_value'},
+    {'1': '_selection'},
+    {'1': '_visible'},
+    {'1': '_force_refocus'},
   ],
 };
 
-/// Descriptor for `DropdownRequest`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List dropdownRequestDescriptor = $convert.base64Decode(
-    'Cg9Ecm9wZG93blJlcXVlc3QSEAoDcm93GAEgASgFUgNyb3cSEAoDY29sGAIgASgFUgNjb2wSDA'
-    'oBeBgDIAEoAlIBeBIMCgF5GAQgASgCUgF5EhQKBXdpZHRoGAUgASgCUgV3aWR0aBIWCgZoZWln'
-    'aHQYBiABKAJSBmhlaWdodBIUCgVpdGVtcxgHIAMoCVIFaXRlbXMSGgoIc2VsZWN0ZWQYCCABKA'
-    'VSCHNlbGVjdGVkEhoKCGVkaXRhYmxlGAkgASgIUghlZGl0YWJsZQ==');
+/// Descriptor for `EditorSessionUpdated`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List editorSessionUpdatedDescriptor = $convert.base64Decode(
+    'ChRFZGl0b3JTZXNzaW9uVXBkYXRlZBIdCgpzZXNzaW9uX2lkGAEgASgDUglzZXNzaW9uSWQSIw'
+    'oNc3RhdGVfdmVyc2lvbhgCIAEoBFIMc3RhdGVWZXJzaW9uEjkKBnJlYXNvbhgDIAEoDjIhLnZv'
+    'bHZveGdyaWQudjEuRWRpdG9yVXBkYXRlUmVhc29uUgZyZWFzb24SPQoNdmlld3BvcnRfcmVjdB'
+    'gEIAEoCzITLnZvbHZveGdyaWQudjEuUmVjdEgAUgx2aWV3cG9ydFJlY3SIAQESNQoFdmFsdWUY'
+    'BSABKAsyGi52b2x2b3hncmlkLnYxLkVkaXRvclZhbHVlSAFSBXZhbHVliAEBEj8KCXNlbGVjdG'
+    'lvbhgGIAEoCzIcLnZvbHZveGdyaWQudjEuVGV4dFNlbGVjdGlvbkgCUglzZWxlY3Rpb26IAQES'
+    'HQoHdmlzaWJsZRgHIAEoCEgDUgd2aXNpYmxliAEBEigKDWZvcmNlX3JlZm9jdXMYCCABKAhIBF'
+    'IMZm9yY2VSZWZvY3VziAEBEksKEXZhbGlkYXRpb25fZXJyb3JzGAkgAygLMh4udm9sdm94Z3Jp'
+    'ZC52MS5WYWxpZGF0aW9uRXJyb3JSEHZhbGlkYXRpb25FcnJvcnMSQQoOY3VzdG9tX3BheWxvYW'
+    'QYCiABKAsyGi52b2x2b3hncmlkLnYxLlN0cnVjdFZhbHVlUg1jdXN0b21QYXlsb2FkQhAKDl92'
+    'aWV3cG9ydF9yZWN0QggKBl92YWx1ZUIMCgpfc2VsZWN0aW9uQgoKCF92aXNpYmxlQhAKDl9mb3'
+    'JjZV9yZWZvY3Vz');
+
+@$core.Deprecated('Use editorSessionEndedDescriptor instead')
+const EditorSessionEnded$json = {
+  '1': 'EditorSessionEnded',
+  '2': [
+    {'1': 'session_id', '3': 1, '4': 1, '5': 3, '10': 'sessionId'},
+    {
+      '1': 'reason',
+      '3': 2,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.EditEndReason',
+      '10': 'reason'
+    },
+    {
+      '1': 'committed_value',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.EditorValue',
+      '10': 'committedValue'
+    },
+    {'1': 'state_version', '3': 4, '4': 1, '5': 4, '10': 'stateVersion'},
+  ],
+};
+
+/// Descriptor for `EditorSessionEnded`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List editorSessionEndedDescriptor = $convert.base64Decode(
+    'ChJFZGl0b3JTZXNzaW9uRW5kZWQSHQoKc2Vzc2lvbl9pZBgBIAEoA1IJc2Vzc2lvbklkEjQKBn'
+    'JlYXNvbhgCIAEoDjIcLnZvbHZveGdyaWQudjEuRWRpdEVuZFJlYXNvblIGcmVhc29uEkMKD2Nv'
+    'bW1pdHRlZF92YWx1ZRgDIAEoCzIaLnZvbHZveGdyaWQudjEuRWRpdG9yVmFsdWVSDmNvbW1pdH'
+    'RlZFZhbHVlEiMKDXN0YXRlX3ZlcnNpb24YBCABKARSDHN0YXRlVmVyc2lvbg==');
 
 @$core.Deprecated('Use tooltipRequestDescriptor instead')
 const TooltipRequest$json = {
@@ -9474,7 +10491,7 @@ const GridEvent$json = {
     },
     {
       '1': 'key_down_edit',
-      '3': 14,
+      '3': 13,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.KeyDownEditEvent',
@@ -9483,7 +10500,7 @@ const GridEvent$json = {
     },
     {
       '1': 'key_press_edit',
-      '3': 15,
+      '3': 14,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.KeyPressEditEvent',
@@ -9492,7 +10509,7 @@ const GridEvent$json = {
     },
     {
       '1': 'key_up_edit',
-      '3': 16,
+      '3': 15,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.KeyUpEditEvent',
@@ -9500,44 +10517,35 @@ const GridEvent$json = {
       '10': 'keyUpEdit'
     },
     {
-      '1': 'cell_edit_configure_style',
+      '1': 'edit_validation_request',
+      '3': 16,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.EditValidationRequest',
+      '9': 0,
+      '10': 'editValidationRequest'
+    },
+    {
+      '1': 'editor_list_items_request',
       '3': 17,
       '4': 1,
       '5': 11,
-      '6': '.volvoxgrid.v1.CellEditConfigureStyleEvent',
+      '6': '.volvoxgrid.v1.EditorListItemsRequest',
       '9': 0,
-      '10': 'cellEditConfigureStyle'
+      '10': 'editorListItemsRequest'
     },
     {
-      '1': 'cell_edit_configure_window',
+      '1': 'custom_editor_action',
       '3': 18,
       '4': 1,
       '5': 11,
-      '6': '.volvoxgrid.v1.CellEditConfigureWindowEvent',
+      '6': '.volvoxgrid.v1.CustomEditorActionEvent',
       '9': 0,
-      '10': 'cellEditConfigureWindow'
-    },
-    {
-      '1': 'dropdown_closed',
-      '3': 19,
-      '4': 1,
-      '5': 11,
-      '6': '.volvoxgrid.v1.DropdownClosedEvent',
-      '9': 0,
-      '10': 'dropdownClosed'
-    },
-    {
-      '1': 'dropdown_opened',
-      '3': 20,
-      '4': 1,
-      '5': 11,
-      '6': '.volvoxgrid.v1.DropdownOpenedEvent',
-      '9': 0,
-      '10': 'dropdownOpened'
+      '10': 'customEditorAction'
     },
     {
       '1': 'cell_changed',
-      '3': 21,
+      '3': 19,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.CellChangedEvent',
@@ -9546,7 +10554,7 @@ const GridEvent$json = {
     },
     {
       '1': 'row_status_change',
-      '3': 22,
+      '3': 20,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.RowStatusChangeEvent',
@@ -9555,7 +10563,7 @@ const GridEvent$json = {
     },
     {
       '1': 'before_sort',
-      '3': 23,
+      '3': 21,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.BeforeSortEvent',
@@ -9564,7 +10572,7 @@ const GridEvent$json = {
     },
     {
       '1': 'after_sort',
-      '3': 24,
+      '3': 22,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.AfterSortEvent',
@@ -9573,7 +10581,7 @@ const GridEvent$json = {
     },
     {
       '1': 'compare',
-      '3': 25,
+      '3': 23,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.CompareEvent',
@@ -9582,7 +10590,7 @@ const GridEvent$json = {
     },
     {
       '1': 'before_node_toggle',
-      '3': 26,
+      '3': 24,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.BeforeNodeToggleEvent',
@@ -9591,7 +10599,7 @@ const GridEvent$json = {
     },
     {
       '1': 'after_node_toggle',
-      '3': 27,
+      '3': 25,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.AfterNodeToggleEvent',
@@ -9600,7 +10608,7 @@ const GridEvent$json = {
     },
     {
       '1': 'before_scroll',
-      '3': 28,
+      '3': 26,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.BeforeScrollEvent',
@@ -9609,7 +10617,7 @@ const GridEvent$json = {
     },
     {
       '1': 'after_scroll',
-      '3': 29,
+      '3': 27,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.AfterScrollEvent',
@@ -9618,7 +10626,7 @@ const GridEvent$json = {
     },
     {
       '1': 'scroll_tooltip',
-      '3': 30,
+      '3': 28,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.ScrollTooltipEvent',
@@ -9627,7 +10635,7 @@ const GridEvent$json = {
     },
     {
       '1': 'before_user_resize',
-      '3': 31,
+      '3': 29,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.BeforeUserResizeEvent',
@@ -9636,7 +10644,7 @@ const GridEvent$json = {
     },
     {
       '1': 'after_user_resize',
-      '3': 32,
+      '3': 30,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.AfterUserResizeEvent',
@@ -9645,7 +10653,7 @@ const GridEvent$json = {
     },
     {
       '1': 'after_user_freeze',
-      '3': 33,
+      '3': 31,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.AfterUserFreezeEvent',
@@ -9654,7 +10662,7 @@ const GridEvent$json = {
     },
     {
       '1': 'before_move_column',
-      '3': 34,
+      '3': 32,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.BeforeMoveColumnEvent',
@@ -9663,7 +10671,7 @@ const GridEvent$json = {
     },
     {
       '1': 'after_move_column',
-      '3': 35,
+      '3': 33,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.AfterMoveColumnEvent',
@@ -9672,7 +10680,7 @@ const GridEvent$json = {
     },
     {
       '1': 'before_move_row',
-      '3': 36,
+      '3': 34,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.BeforeMoveRowEvent',
@@ -9681,7 +10689,7 @@ const GridEvent$json = {
     },
     {
       '1': 'after_move_row',
-      '3': 37,
+      '3': 35,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.AfterMoveRowEvent',
@@ -9690,7 +10698,7 @@ const GridEvent$json = {
     },
     {
       '1': 'before_mouse_down',
-      '3': 38,
+      '3': 36,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.BeforeMouseDownEvent',
@@ -9699,7 +10707,7 @@ const GridEvent$json = {
     },
     {
       '1': 'mouse_down',
-      '3': 39,
+      '3': 37,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.MouseDownEvent',
@@ -9708,7 +10716,7 @@ const GridEvent$json = {
     },
     {
       '1': 'mouse_up',
-      '3': 40,
+      '3': 38,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.MouseUpEvent',
@@ -9717,7 +10725,7 @@ const GridEvent$json = {
     },
     {
       '1': 'mouse_move',
-      '3': 41,
+      '3': 39,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.MouseMoveEvent',
@@ -9726,7 +10734,7 @@ const GridEvent$json = {
     },
     {
       '1': 'click',
-      '3': 42,
+      '3': 40,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.ClickEvent',
@@ -9735,7 +10743,7 @@ const GridEvent$json = {
     },
     {
       '1': 'dbl_click',
-      '3': 43,
+      '3': 41,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.DblClickEvent',
@@ -9744,7 +10752,7 @@ const GridEvent$json = {
     },
     {
       '1': 'key_down',
-      '3': 44,
+      '3': 42,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.KeyDownEvent',
@@ -9753,7 +10761,7 @@ const GridEvent$json = {
     },
     {
       '1': 'key_press',
-      '3': 45,
+      '3': 43,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.KeyPressEvent',
@@ -9762,7 +10770,7 @@ const GridEvent$json = {
     },
     {
       '1': 'key_up',
-      '3': 46,
+      '3': 44,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.KeyUpEvent',
@@ -9771,7 +10779,7 @@ const GridEvent$json = {
     },
     {
       '1': 'custom_render_cell',
-      '3': 47,
+      '3': 45,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.CustomRenderCellEvent',
@@ -9780,7 +10788,7 @@ const GridEvent$json = {
     },
     {
       '1': 'drag_start',
-      '3': 48,
+      '3': 46,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.DragStartEvent',
@@ -9789,7 +10797,7 @@ const GridEvent$json = {
     },
     {
       '1': 'drag_over',
-      '3': 49,
+      '3': 47,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.DragOverEvent',
@@ -9798,7 +10806,7 @@ const GridEvent$json = {
     },
     {
       '1': 'drag_drop',
-      '3': 50,
+      '3': 48,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.DragDropEvent',
@@ -9807,7 +10815,7 @@ const GridEvent$json = {
     },
     {
       '1': 'drag_complete',
-      '3': 51,
+      '3': 49,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.DragCompleteEvent',
@@ -9816,7 +10824,7 @@ const GridEvent$json = {
     },
     {
       '1': 'type_ahead_started',
-      '3': 52,
+      '3': 50,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.TypeAheadStartedEvent',
@@ -9825,7 +10833,7 @@ const GridEvent$json = {
     },
     {
       '1': 'type_ahead_ended',
-      '3': 53,
+      '3': 51,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.TypeAheadEndedEvent',
@@ -9834,7 +10842,7 @@ const GridEvent$json = {
     },
     {
       '1': 'data_refreshing',
-      '3': 54,
+      '3': 52,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.DataRefreshingEvent',
@@ -9843,7 +10851,7 @@ const GridEvent$json = {
     },
     {
       '1': 'data_refreshed',
-      '3': 55,
+      '3': 53,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.DataRefreshedEvent',
@@ -9852,7 +10860,7 @@ const GridEvent$json = {
     },
     {
       '1': 'filter_data',
-      '3': 56,
+      '3': 54,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.FilterDataEvent',
@@ -9861,7 +10869,7 @@ const GridEvent$json = {
     },
     {
       '1': 'error',
-      '3': 57,
+      '3': 55,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.ErrorEvent',
@@ -9870,7 +10878,7 @@ const GridEvent$json = {
     },
     {
       '1': 'before_page_break',
-      '3': 58,
+      '3': 56,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.BeforePageBreakEvent',
@@ -9879,7 +10887,7 @@ const GridEvent$json = {
     },
     {
       '1': 'start_page',
-      '3': 59,
+      '3': 57,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.StartPageEvent',
@@ -9888,7 +10896,7 @@ const GridEvent$json = {
     },
     {
       '1': 'get_header_row',
-      '3': 60,
+      '3': 58,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.GetHeaderRowEvent',
@@ -9897,7 +10905,7 @@ const GridEvent$json = {
     },
     {
       '1': 'pull_to_refresh_triggered',
-      '3': 61,
+      '3': 59,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.PullToRefreshTriggeredEvent',
@@ -9906,7 +10914,7 @@ const GridEvent$json = {
     },
     {
       '1': 'pull_to_refresh_canceled',
-      '3': 62,
+      '3': 60,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.PullToRefreshCanceledEvent',
@@ -9914,17 +10922,8 @@ const GridEvent$json = {
       '10': 'pullToRefreshCanceled'
     },
     {
-      '1': 'before_dropdown_open',
-      '3': 63,
-      '4': 1,
-      '5': 11,
-      '6': '.volvoxgrid.v1.BeforeDropdownOpenEvent',
-      '9': 0,
-      '10': 'beforeDropdownOpen'
-    },
-    {
       '1': 'tree_children_requested',
-      '3': 64,
+      '3': 61,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.TreeChildrenRequestedEvent',
@@ -9933,7 +10932,7 @@ const GridEvent$json = {
     },
     {
       '1': 'before_tree_node_toggle',
-      '3': 65,
+      '3': 62,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.BeforeTreeNodeToggleEvent',
@@ -9942,7 +10941,7 @@ const GridEvent$json = {
     },
     {
       '1': 'after_tree_node_toggle',
-      '3': 66,
+      '3': 63,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.AfterTreeNodeToggleEvent',
@@ -9951,7 +10950,7 @@ const GridEvent$json = {
     },
     {
       '1': 'tree_node_activate',
-      '3': 67,
+      '3': 64,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.TreeNodeActivateEvent',
@@ -9960,7 +10959,7 @@ const GridEvent$json = {
     },
     {
       '1': 'tree_node_context_menu',
-      '3': 68,
+      '3': 65,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.TreeNodeContextMenuEvent',
@@ -9991,83 +10990,80 @@ final $typed_data.Uint8List gridEventDescriptor = $convert.base64Decode(
     'gAUglhZnRlckVkaXQSVAoSY2VsbF9lZGl0X3ZhbGlkYXRlGAsgASgLMiQudm9sdm94Z3JpZC52'
     'MS5DZWxsRWRpdFZhbGlkYXRlRXZlbnRIAFIQY2VsbEVkaXRWYWxpZGF0ZRJOChBjZWxsX2VkaX'
     'RfY2hhbmdlGAwgASgLMiIudm9sdm94Z3JpZC52MS5DZWxsRWRpdENoYW5nZUV2ZW50SABSDmNl'
-    'bGxFZGl0Q2hhbmdlEkUKDWtleV9kb3duX2VkaXQYDiABKAsyHy52b2x2b3hncmlkLnYxLktleU'
-    'Rvd25FZGl0RXZlbnRIAFILa2V5RG93bkVkaXQSSAoOa2V5X3ByZXNzX2VkaXQYDyABKAsyIC52'
+    'bGxFZGl0Q2hhbmdlEkUKDWtleV9kb3duX2VkaXQYDSABKAsyHy52b2x2b3hncmlkLnYxLktleU'
+    'Rvd25FZGl0RXZlbnRIAFILa2V5RG93bkVkaXQSSAoOa2V5X3ByZXNzX2VkaXQYDiABKAsyIC52'
     'b2x2b3hncmlkLnYxLktleVByZXNzRWRpdEV2ZW50SABSDGtleVByZXNzRWRpdBI/CgtrZXlfdX'
-    'BfZWRpdBgQIAEoCzIdLnZvbHZveGdyaWQudjEuS2V5VXBFZGl0RXZlbnRIAFIJa2V5VXBFZGl0'
-    'EmcKGWNlbGxfZWRpdF9jb25maWd1cmVfc3R5bGUYESABKAsyKi52b2x2b3hncmlkLnYxLkNlbG'
-    'xFZGl0Q29uZmlndXJlU3R5bGVFdmVudEgAUhZjZWxsRWRpdENvbmZpZ3VyZVN0eWxlEmoKGmNl'
-    'bGxfZWRpdF9jb25maWd1cmVfd2luZG93GBIgASgLMisudm9sdm94Z3JpZC52MS5DZWxsRWRpdE'
-    'NvbmZpZ3VyZVdpbmRvd0V2ZW50SABSF2NlbGxFZGl0Q29uZmlndXJlV2luZG93Ek0KD2Ryb3Bk'
-    'b3duX2Nsb3NlZBgTIAEoCzIiLnZvbHZveGdyaWQudjEuRHJvcGRvd25DbG9zZWRFdmVudEgAUg'
-    '5kcm9wZG93bkNsb3NlZBJNCg9kcm9wZG93bl9vcGVuZWQYFCABKAsyIi52b2x2b3hncmlkLnYx'
-    'LkRyb3Bkb3duT3BlbmVkRXZlbnRIAFIOZHJvcGRvd25PcGVuZWQSRAoMY2VsbF9jaGFuZ2VkGB'
-    'UgASgLMh8udm9sdm94Z3JpZC52MS5DZWxsQ2hhbmdlZEV2ZW50SABSC2NlbGxDaGFuZ2VkElEK'
-    'EXJvd19zdGF0dXNfY2hhbmdlGBYgASgLMiMudm9sdm94Z3JpZC52MS5Sb3dTdGF0dXNDaGFuZ2'
-    'VFdmVudEgAUg9yb3dTdGF0dXNDaGFuZ2USQQoLYmVmb3JlX3NvcnQYFyABKAsyHi52b2x2b3hn'
-    'cmlkLnYxLkJlZm9yZVNvcnRFdmVudEgAUgpiZWZvcmVTb3J0Ej4KCmFmdGVyX3NvcnQYGCABKA'
-    'syHS52b2x2b3hncmlkLnYxLkFmdGVyU29ydEV2ZW50SABSCWFmdGVyU29ydBI3Cgdjb21wYXJl'
-    'GBkgASgLMhsudm9sdm94Z3JpZC52MS5Db21wYXJlRXZlbnRIAFIHY29tcGFyZRJUChJiZWZvcm'
-    'Vfbm9kZV90b2dnbGUYGiABKAsyJC52b2x2b3hncmlkLnYxLkJlZm9yZU5vZGVUb2dnbGVFdmVu'
-    'dEgAUhBiZWZvcmVOb2RlVG9nZ2xlElEKEWFmdGVyX25vZGVfdG9nZ2xlGBsgASgLMiMudm9sdm'
-    '94Z3JpZC52MS5BZnRlck5vZGVUb2dnbGVFdmVudEgAUg9hZnRlck5vZGVUb2dnbGUSRwoNYmVm'
-    'b3JlX3Njcm9sbBgcIAEoCzIgLnZvbHZveGdyaWQudjEuQmVmb3JlU2Nyb2xsRXZlbnRIAFIMYm'
-    'Vmb3JlU2Nyb2xsEkQKDGFmdGVyX3Njcm9sbBgdIAEoCzIfLnZvbHZveGdyaWQudjEuQWZ0ZXJT'
-    'Y3JvbGxFdmVudEgAUgthZnRlclNjcm9sbBJKCg5zY3JvbGxfdG9vbHRpcBgeIAEoCzIhLnZvbH'
-    'ZveGdyaWQudjEuU2Nyb2xsVG9vbHRpcEV2ZW50SABSDXNjcm9sbFRvb2x0aXASVAoSYmVmb3Jl'
-    'X3VzZXJfcmVzaXplGB8gASgLMiQudm9sdm94Z3JpZC52MS5CZWZvcmVVc2VyUmVzaXplRXZlbn'
-    'RIAFIQYmVmb3JlVXNlclJlc2l6ZRJRChFhZnRlcl91c2VyX3Jlc2l6ZRggIAEoCzIjLnZvbHZv'
-    'eGdyaWQudjEuQWZ0ZXJVc2VyUmVzaXplRXZlbnRIAFIPYWZ0ZXJVc2VyUmVzaXplElEKEWFmdG'
-    'VyX3VzZXJfZnJlZXplGCEgASgLMiMudm9sdm94Z3JpZC52MS5BZnRlclVzZXJGcmVlemVFdmVu'
-    'dEgAUg9hZnRlclVzZXJGcmVlemUSVAoSYmVmb3JlX21vdmVfY29sdW1uGCIgASgLMiQudm9sdm'
-    '94Z3JpZC52MS5CZWZvcmVNb3ZlQ29sdW1uRXZlbnRIAFIQYmVmb3JlTW92ZUNvbHVtbhJRChFh'
-    'ZnRlcl9tb3ZlX2NvbHVtbhgjIAEoCzIjLnZvbHZveGdyaWQudjEuQWZ0ZXJNb3ZlQ29sdW1uRX'
-    'ZlbnRIAFIPYWZ0ZXJNb3ZlQ29sdW1uEksKD2JlZm9yZV9tb3ZlX3JvdxgkIAEoCzIhLnZvbHZv'
-    'eGdyaWQudjEuQmVmb3JlTW92ZVJvd0V2ZW50SABSDWJlZm9yZU1vdmVSb3cSSAoOYWZ0ZXJfbW'
-    '92ZV9yb3cYJSABKAsyIC52b2x2b3hncmlkLnYxLkFmdGVyTW92ZVJvd0V2ZW50SABSDGFmdGVy'
-    'TW92ZVJvdxJRChFiZWZvcmVfbW91c2VfZG93bhgmIAEoCzIjLnZvbHZveGdyaWQudjEuQmVmb3'
-    'JlTW91c2VEb3duRXZlbnRIAFIPYmVmb3JlTW91c2VEb3duEj4KCm1vdXNlX2Rvd24YJyABKAsy'
-    'HS52b2x2b3hncmlkLnYxLk1vdXNlRG93bkV2ZW50SABSCW1vdXNlRG93bhI4Cghtb3VzZV91cB'
-    'goIAEoCzIbLnZvbHZveGdyaWQudjEuTW91c2VVcEV2ZW50SABSB21vdXNlVXASPgoKbW91c2Vf'
-    'bW92ZRgpIAEoCzIdLnZvbHZveGdyaWQudjEuTW91c2VNb3ZlRXZlbnRIAFIJbW91c2VNb3ZlEj'
-    'EKBWNsaWNrGCogASgLMhkudm9sdm94Z3JpZC52MS5DbGlja0V2ZW50SABSBWNsaWNrEjsKCWRi'
-    'bF9jbGljaxgrIAEoCzIcLnZvbHZveGdyaWQudjEuRGJsQ2xpY2tFdmVudEgAUghkYmxDbGljax'
-    'I4CghrZXlfZG93bhgsIAEoCzIbLnZvbHZveGdyaWQudjEuS2V5RG93bkV2ZW50SABSB2tleURv'
-    'd24SOwoJa2V5X3ByZXNzGC0gASgLMhwudm9sdm94Z3JpZC52MS5LZXlQcmVzc0V2ZW50SABSCG'
-    'tleVByZXNzEjIKBmtleV91cBguIAEoCzIZLnZvbHZveGdyaWQudjEuS2V5VXBFdmVudEgAUgVr'
-    'ZXlVcBJUChJjdXN0b21fcmVuZGVyX2NlbGwYLyABKAsyJC52b2x2b3hncmlkLnYxLkN1c3RvbV'
-    'JlbmRlckNlbGxFdmVudEgAUhBjdXN0b21SZW5kZXJDZWxsEj4KCmRyYWdfc3RhcnQYMCABKAsy'
-    'HS52b2x2b3hncmlkLnYxLkRyYWdTdGFydEV2ZW50SABSCWRyYWdTdGFydBI7CglkcmFnX292ZX'
-    'IYMSABKAsyHC52b2x2b3hncmlkLnYxLkRyYWdPdmVyRXZlbnRIAFIIZHJhZ092ZXISOwoJZHJh'
-    'Z19kcm9wGDIgASgLMhwudm9sdm94Z3JpZC52MS5EcmFnRHJvcEV2ZW50SABSCGRyYWdEcm9wEk'
-    'cKDWRyYWdfY29tcGxldGUYMyABKAsyIC52b2x2b3hncmlkLnYxLkRyYWdDb21wbGV0ZUV2ZW50'
-    'SABSDGRyYWdDb21wbGV0ZRJUChJ0eXBlX2FoZWFkX3N0YXJ0ZWQYNCABKAsyJC52b2x2b3hncm'
-    'lkLnYxLlR5cGVBaGVhZFN0YXJ0ZWRFdmVudEgAUhB0eXBlQWhlYWRTdGFydGVkEk4KEHR5cGVf'
-    'YWhlYWRfZW5kZWQYNSABKAsyIi52b2x2b3hncmlkLnYxLlR5cGVBaGVhZEVuZGVkRXZlbnRIAF'
-    'IOdHlwZUFoZWFkRW5kZWQSTQoPZGF0YV9yZWZyZXNoaW5nGDYgASgLMiIudm9sdm94Z3JpZC52'
-    'MS5EYXRhUmVmcmVzaGluZ0V2ZW50SABSDmRhdGFSZWZyZXNoaW5nEkoKDmRhdGFfcmVmcmVzaG'
-    'VkGDcgASgLMiEudm9sdm94Z3JpZC52MS5EYXRhUmVmcmVzaGVkRXZlbnRIAFINZGF0YVJlZnJl'
-    'c2hlZBJBCgtmaWx0ZXJfZGF0YRg4IAEoCzIeLnZvbHZveGdyaWQudjEuRmlsdGVyRGF0YUV2ZW'
-    '50SABSCmZpbHRlckRhdGESMQoFZXJyb3IYOSABKAsyGS52b2x2b3hncmlkLnYxLkVycm9yRXZl'
-    'bnRIAFIFZXJyb3ISUQoRYmVmb3JlX3BhZ2VfYnJlYWsYOiABKAsyIy52b2x2b3hncmlkLnYxLk'
-    'JlZm9yZVBhZ2VCcmVha0V2ZW50SABSD2JlZm9yZVBhZ2VCcmVhaxI+CgpzdGFydF9wYWdlGDsg'
-    'ASgLMh0udm9sdm94Z3JpZC52MS5TdGFydFBhZ2VFdmVudEgAUglzdGFydFBhZ2USSAoOZ2V0X2'
-    'hlYWRlcl9yb3cYPCABKAsyIC52b2x2b3hncmlkLnYxLkdldEhlYWRlclJvd0V2ZW50SABSDGdl'
-    'dEhlYWRlclJvdxJnChlwdWxsX3RvX3JlZnJlc2hfdHJpZ2dlcmVkGD0gASgLMioudm9sdm94Z3'
-    'JpZC52MS5QdWxsVG9SZWZyZXNoVHJpZ2dlcmVkRXZlbnRIAFIWcHVsbFRvUmVmcmVzaFRyaWdn'
-    'ZXJlZBJkChhwdWxsX3RvX3JlZnJlc2hfY2FuY2VsZWQYPiABKAsyKS52b2x2b3hncmlkLnYxLl'
-    'B1bGxUb1JlZnJlc2hDYW5jZWxlZEV2ZW50SABSFXB1bGxUb1JlZnJlc2hDYW5jZWxlZBJaChRi'
-    'ZWZvcmVfZHJvcGRvd25fb3Blbhg/IAEoCzImLnZvbHZveGdyaWQudjEuQmVmb3JlRHJvcGRvd2'
-    '5PcGVuRXZlbnRIAFISYmVmb3JlRHJvcGRvd25PcGVuEmMKF3RyZWVfY2hpbGRyZW5fcmVxdWVz'
-    'dGVkGEAgASgLMikudm9sdm94Z3JpZC52MS5UcmVlQ2hpbGRyZW5SZXF1ZXN0ZWRFdmVudEgAUh'
-    'V0cmVlQ2hpbGRyZW5SZXF1ZXN0ZWQSYQoXYmVmb3JlX3RyZWVfbm9kZV90b2dnbGUYQSABKAsy'
-    'KC52b2x2b3hncmlkLnYxLkJlZm9yZVRyZWVOb2RlVG9nZ2xlRXZlbnRIAFIUYmVmb3JlVHJlZU'
-    '5vZGVUb2dnbGUSXgoWYWZ0ZXJfdHJlZV9ub2RlX3RvZ2dsZRhCIAEoCzInLnZvbHZveGdyaWQu'
-    'djEuQWZ0ZXJUcmVlTm9kZVRvZ2dsZUV2ZW50SABSE2FmdGVyVHJlZU5vZGVUb2dnbGUSVAoSdH'
-    'JlZV9ub2RlX2FjdGl2YXRlGEMgASgLMiQudm9sdm94Z3JpZC52MS5UcmVlTm9kZUFjdGl2YXRl'
-    'RXZlbnRIAFIQdHJlZU5vZGVBY3RpdmF0ZRJeChZ0cmVlX25vZGVfY29udGV4dF9tZW51GEQgAS'
-    'gLMicudm9sdm94Z3JpZC52MS5UcmVlTm9kZUNvbnRleHRNZW51RXZlbnRIAFITdHJlZU5vZGVD'
-    'b250ZXh0TWVudUIHCgVldmVudA==');
+    'BfZWRpdBgPIAEoCzIdLnZvbHZveGdyaWQudjEuS2V5VXBFZGl0RXZlbnRIAFIJa2V5VXBFZGl0'
+    'El4KF2VkaXRfdmFsaWRhdGlvbl9yZXF1ZXN0GBAgASgLMiQudm9sdm94Z3JpZC52MS5FZGl0Vm'
+    'FsaWRhdGlvblJlcXVlc3RIAFIVZWRpdFZhbGlkYXRpb25SZXF1ZXN0EmIKGWVkaXRvcl9saXN0'
+    'X2l0ZW1zX3JlcXVlc3QYESABKAsyJS52b2x2b3hncmlkLnYxLkVkaXRvckxpc3RJdGVtc1JlcX'
+    'Vlc3RIAFIWZWRpdG9yTGlzdEl0ZW1zUmVxdWVzdBJaChRjdXN0b21fZWRpdG9yX2FjdGlvbhgS'
+    'IAEoCzImLnZvbHZveGdyaWQudjEuQ3VzdG9tRWRpdG9yQWN0aW9uRXZlbnRIAFISY3VzdG9tRW'
+    'RpdG9yQWN0aW9uEkQKDGNlbGxfY2hhbmdlZBgTIAEoCzIfLnZvbHZveGdyaWQudjEuQ2VsbENo'
+    'YW5nZWRFdmVudEgAUgtjZWxsQ2hhbmdlZBJRChFyb3dfc3RhdHVzX2NoYW5nZRgUIAEoCzIjLn'
+    'ZvbHZveGdyaWQudjEuUm93U3RhdHVzQ2hhbmdlRXZlbnRIAFIPcm93U3RhdHVzQ2hhbmdlEkEK'
+    'C2JlZm9yZV9zb3J0GBUgASgLMh4udm9sdm94Z3JpZC52MS5CZWZvcmVTb3J0RXZlbnRIAFIKYm'
+    'Vmb3JlU29ydBI+CgphZnRlcl9zb3J0GBYgASgLMh0udm9sdm94Z3JpZC52MS5BZnRlclNvcnRF'
+    'dmVudEgAUglhZnRlclNvcnQSNwoHY29tcGFyZRgXIAEoCzIbLnZvbHZveGdyaWQudjEuQ29tcG'
+    'FyZUV2ZW50SABSB2NvbXBhcmUSVAoSYmVmb3JlX25vZGVfdG9nZ2xlGBggASgLMiQudm9sdm94'
+    'Z3JpZC52MS5CZWZvcmVOb2RlVG9nZ2xlRXZlbnRIAFIQYmVmb3JlTm9kZVRvZ2dsZRJRChFhZn'
+    'Rlcl9ub2RlX3RvZ2dsZRgZIAEoCzIjLnZvbHZveGdyaWQudjEuQWZ0ZXJOb2RlVG9nZ2xlRXZl'
+    'bnRIAFIPYWZ0ZXJOb2RlVG9nZ2xlEkcKDWJlZm9yZV9zY3JvbGwYGiABKAsyIC52b2x2b3hncm'
+    'lkLnYxLkJlZm9yZVNjcm9sbEV2ZW50SABSDGJlZm9yZVNjcm9sbBJECgxhZnRlcl9zY3JvbGwY'
+    'GyABKAsyHy52b2x2b3hncmlkLnYxLkFmdGVyU2Nyb2xsRXZlbnRIAFILYWZ0ZXJTY3JvbGwSSg'
+    'oOc2Nyb2xsX3Rvb2x0aXAYHCABKAsyIS52b2x2b3hncmlkLnYxLlNjcm9sbFRvb2x0aXBFdmVu'
+    'dEgAUg1zY3JvbGxUb29sdGlwElQKEmJlZm9yZV91c2VyX3Jlc2l6ZRgdIAEoCzIkLnZvbHZveG'
+    'dyaWQudjEuQmVmb3JlVXNlclJlc2l6ZUV2ZW50SABSEGJlZm9yZVVzZXJSZXNpemUSUQoRYWZ0'
+    'ZXJfdXNlcl9yZXNpemUYHiABKAsyIy52b2x2b3hncmlkLnYxLkFmdGVyVXNlclJlc2l6ZUV2ZW'
+    '50SABSD2FmdGVyVXNlclJlc2l6ZRJRChFhZnRlcl91c2VyX2ZyZWV6ZRgfIAEoCzIjLnZvbHZv'
+    'eGdyaWQudjEuQWZ0ZXJVc2VyRnJlZXplRXZlbnRIAFIPYWZ0ZXJVc2VyRnJlZXplElQKEmJlZm'
+    '9yZV9tb3ZlX2NvbHVtbhggIAEoCzIkLnZvbHZveGdyaWQudjEuQmVmb3JlTW92ZUNvbHVtbkV2'
+    'ZW50SABSEGJlZm9yZU1vdmVDb2x1bW4SUQoRYWZ0ZXJfbW92ZV9jb2x1bW4YISABKAsyIy52b2'
+    'x2b3hncmlkLnYxLkFmdGVyTW92ZUNvbHVtbkV2ZW50SABSD2FmdGVyTW92ZUNvbHVtbhJLCg9i'
+    'ZWZvcmVfbW92ZV9yb3cYIiABKAsyIS52b2x2b3hncmlkLnYxLkJlZm9yZU1vdmVSb3dFdmVudE'
+    'gAUg1iZWZvcmVNb3ZlUm93EkgKDmFmdGVyX21vdmVfcm93GCMgASgLMiAudm9sdm94Z3JpZC52'
+    'MS5BZnRlck1vdmVSb3dFdmVudEgAUgxhZnRlck1vdmVSb3cSUQoRYmVmb3JlX21vdXNlX2Rvd2'
+    '4YJCABKAsyIy52b2x2b3hncmlkLnYxLkJlZm9yZU1vdXNlRG93bkV2ZW50SABSD2JlZm9yZU1v'
+    'dXNlRG93bhI+Cgptb3VzZV9kb3duGCUgASgLMh0udm9sdm94Z3JpZC52MS5Nb3VzZURvd25Fdm'
+    'VudEgAUgltb3VzZURvd24SOAoIbW91c2VfdXAYJiABKAsyGy52b2x2b3hncmlkLnYxLk1vdXNl'
+    'VXBFdmVudEgAUgdtb3VzZVVwEj4KCm1vdXNlX21vdmUYJyABKAsyHS52b2x2b3hncmlkLnYxLk'
+    '1vdXNlTW92ZUV2ZW50SABSCW1vdXNlTW92ZRIxCgVjbGljaxgoIAEoCzIZLnZvbHZveGdyaWQu'
+    'djEuQ2xpY2tFdmVudEgAUgVjbGljaxI7CglkYmxfY2xpY2sYKSABKAsyHC52b2x2b3hncmlkLn'
+    'YxLkRibENsaWNrRXZlbnRIAFIIZGJsQ2xpY2sSOAoIa2V5X2Rvd24YKiABKAsyGy52b2x2b3hn'
+    'cmlkLnYxLktleURvd25FdmVudEgAUgdrZXlEb3duEjsKCWtleV9wcmVzcxgrIAEoCzIcLnZvbH'
+    'ZveGdyaWQudjEuS2V5UHJlc3NFdmVudEgAUghrZXlQcmVzcxIyCgZrZXlfdXAYLCABKAsyGS52'
+    'b2x2b3hncmlkLnYxLktleVVwRXZlbnRIAFIFa2V5VXASVAoSY3VzdG9tX3JlbmRlcl9jZWxsGC'
+    '0gASgLMiQudm9sdm94Z3JpZC52MS5DdXN0b21SZW5kZXJDZWxsRXZlbnRIAFIQY3VzdG9tUmVu'
+    'ZGVyQ2VsbBI+CgpkcmFnX3N0YXJ0GC4gASgLMh0udm9sdm94Z3JpZC52MS5EcmFnU3RhcnRFdm'
+    'VudEgAUglkcmFnU3RhcnQSOwoJZHJhZ19vdmVyGC8gASgLMhwudm9sdm94Z3JpZC52MS5EcmFn'
+    'T3ZlckV2ZW50SABSCGRyYWdPdmVyEjsKCWRyYWdfZHJvcBgwIAEoCzIcLnZvbHZveGdyaWQudj'
+    'EuRHJhZ0Ryb3BFdmVudEgAUghkcmFnRHJvcBJHCg1kcmFnX2NvbXBsZXRlGDEgASgLMiAudm9s'
+    'dm94Z3JpZC52MS5EcmFnQ29tcGxldGVFdmVudEgAUgxkcmFnQ29tcGxldGUSVAoSdHlwZV9haG'
+    'VhZF9zdGFydGVkGDIgASgLMiQudm9sdm94Z3JpZC52MS5UeXBlQWhlYWRTdGFydGVkRXZlbnRI'
+    'AFIQdHlwZUFoZWFkU3RhcnRlZBJOChB0eXBlX2FoZWFkX2VuZGVkGDMgASgLMiIudm9sdm94Z3'
+    'JpZC52MS5UeXBlQWhlYWRFbmRlZEV2ZW50SABSDnR5cGVBaGVhZEVuZGVkEk0KD2RhdGFfcmVm'
+    'cmVzaGluZxg0IAEoCzIiLnZvbHZveGdyaWQudjEuRGF0YVJlZnJlc2hpbmdFdmVudEgAUg5kYX'
+    'RhUmVmcmVzaGluZxJKCg5kYXRhX3JlZnJlc2hlZBg1IAEoCzIhLnZvbHZveGdyaWQudjEuRGF0'
+    'YVJlZnJlc2hlZEV2ZW50SABSDWRhdGFSZWZyZXNoZWQSQQoLZmlsdGVyX2RhdGEYNiABKAsyHi'
+    '52b2x2b3hncmlkLnYxLkZpbHRlckRhdGFFdmVudEgAUgpmaWx0ZXJEYXRhEjEKBWVycm9yGDcg'
+    'ASgLMhkudm9sdm94Z3JpZC52MS5FcnJvckV2ZW50SABSBWVycm9yElEKEWJlZm9yZV9wYWdlX2'
+    'JyZWFrGDggASgLMiMudm9sdm94Z3JpZC52MS5CZWZvcmVQYWdlQnJlYWtFdmVudEgAUg9iZWZv'
+    'cmVQYWdlQnJlYWsSPgoKc3RhcnRfcGFnZRg5IAEoCzIdLnZvbHZveGdyaWQudjEuU3RhcnRQYW'
+    'dlRXZlbnRIAFIJc3RhcnRQYWdlEkgKDmdldF9oZWFkZXJfcm93GDogASgLMiAudm9sdm94Z3Jp'
+    'ZC52MS5HZXRIZWFkZXJSb3dFdmVudEgAUgxnZXRIZWFkZXJSb3cSZwoZcHVsbF90b19yZWZyZX'
+    'NoX3RyaWdnZXJlZBg7IAEoCzIqLnZvbHZveGdyaWQudjEuUHVsbFRvUmVmcmVzaFRyaWdnZXJl'
+    'ZEV2ZW50SABSFnB1bGxUb1JlZnJlc2hUcmlnZ2VyZWQSZAoYcHVsbF90b19yZWZyZXNoX2Nhbm'
+    'NlbGVkGDwgASgLMikudm9sdm94Z3JpZC52MS5QdWxsVG9SZWZyZXNoQ2FuY2VsZWRFdmVudEgA'
+    'UhVwdWxsVG9SZWZyZXNoQ2FuY2VsZWQSYwoXdHJlZV9jaGlsZHJlbl9yZXF1ZXN0ZWQYPSABKA'
+    'syKS52b2x2b3hncmlkLnYxLlRyZWVDaGlsZHJlblJlcXVlc3RlZEV2ZW50SABSFXRyZWVDaGls'
+    'ZHJlblJlcXVlc3RlZBJhChdiZWZvcmVfdHJlZV9ub2RlX3RvZ2dsZRg+IAEoCzIoLnZvbHZveG'
+    'dyaWQudjEuQmVmb3JlVHJlZU5vZGVUb2dnbGVFdmVudEgAUhRiZWZvcmVUcmVlTm9kZVRvZ2ds'
+    'ZRJeChZhZnRlcl90cmVlX25vZGVfdG9nZ2xlGD8gASgLMicudm9sdm94Z3JpZC52MS5BZnRlcl'
+    'RyZWVOb2RlVG9nZ2xlRXZlbnRIAFITYWZ0ZXJUcmVlTm9kZVRvZ2dsZRJUChJ0cmVlX25vZGVf'
+    'YWN0aXZhdGUYQCABKAsyJC52b2x2b3hncmlkLnYxLlRyZWVOb2RlQWN0aXZhdGVFdmVudEgAUh'
+    'B0cmVlTm9kZUFjdGl2YXRlEl4KFnRyZWVfbm9kZV9jb250ZXh0X21lbnUYQSABKAsyJy52b2x2'
+    'b3hncmlkLnYxLlRyZWVOb2RlQ29udGV4dE1lbnVFdmVudEgAUhN0cmVlTm9kZUNvbnRleHRNZW'
+    '51QgcKBWV2ZW50');
 
 @$core.Deprecated('Use cellFocusChangingEventDescriptor instead')
 const CellFocusChangingEvent$json = {
@@ -10284,120 +11280,117 @@ final $typed_data.Uint8List cellEditChangeEventDescriptor = $convert
 const KeyDownEditEvent$json = {
   '1': 'KeyDownEditEvent',
   '2': [
-    {'1': 'key_code', '3': 1, '4': 1, '5': 5, '10': 'keyCode'},
-    {'1': 'modifier', '3': 2, '4': 1, '5': 5, '10': 'modifier'},
+    {'1': 'session_id', '3': 1, '4': 1, '5': 3, '10': 'sessionId'},
+    {'1': 'key_code', '3': 2, '4': 1, '5': 5, '10': 'keyCode'},
+    {'1': 'modifier', '3': 3, '4': 1, '5': 5, '10': 'modifier'},
   ],
 };
 
 /// Descriptor for `KeyDownEditEvent`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List keyDownEditEventDescriptor = $convert.base64Decode(
-    'ChBLZXlEb3duRWRpdEV2ZW50EhkKCGtleV9jb2RlGAEgASgFUgdrZXlDb2RlEhoKCG1vZGlmaW'
-    'VyGAIgASgFUghtb2RpZmllcg==');
+    'ChBLZXlEb3duRWRpdEV2ZW50Eh0KCnNlc3Npb25faWQYASABKANSCXNlc3Npb25JZBIZCghrZX'
+    'lfY29kZRgCIAEoBVIHa2V5Q29kZRIaCghtb2RpZmllchgDIAEoBVIIbW9kaWZpZXI=');
 
 @$core.Deprecated('Use keyPressEditEventDescriptor instead')
 const KeyPressEditEvent$json = {
   '1': 'KeyPressEditEvent',
   '2': [
-    {'1': 'key_ascii', '3': 1, '4': 1, '5': 5, '10': 'keyAscii'},
+    {'1': 'session_id', '3': 1, '4': 1, '5': 3, '10': 'sessionId'},
+    {'1': 'key_ascii', '3': 2, '4': 1, '5': 5, '10': 'keyAscii'},
   ],
 };
 
 /// Descriptor for `KeyPressEditEvent`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List keyPressEditEventDescriptor = $convert.base64Decode(
-    'ChFLZXlQcmVzc0VkaXRFdmVudBIbCglrZXlfYXNjaWkYASABKAVSCGtleUFzY2lp');
+    'ChFLZXlQcmVzc0VkaXRFdmVudBIdCgpzZXNzaW9uX2lkGAEgASgDUglzZXNzaW9uSWQSGwoJa2'
+    'V5X2FzY2lpGAIgASgFUghrZXlBc2NpaQ==');
 
 @$core.Deprecated('Use keyUpEditEventDescriptor instead')
 const KeyUpEditEvent$json = {
   '1': 'KeyUpEditEvent',
   '2': [
-    {'1': 'key_code', '3': 1, '4': 1, '5': 5, '10': 'keyCode'},
-    {'1': 'modifier', '3': 2, '4': 1, '5': 5, '10': 'modifier'},
+    {'1': 'session_id', '3': 1, '4': 1, '5': 3, '10': 'sessionId'},
+    {'1': 'key_code', '3': 2, '4': 1, '5': 5, '10': 'keyCode'},
+    {'1': 'modifier', '3': 3, '4': 1, '5': 5, '10': 'modifier'},
   ],
 };
 
 /// Descriptor for `KeyUpEditEvent`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List keyUpEditEventDescriptor = $convert.base64Decode(
-    'Cg5LZXlVcEVkaXRFdmVudBIZCghrZXlfY29kZRgBIAEoBVIHa2V5Q29kZRIaCghtb2RpZmllch'
-    'gCIAEoBVIIbW9kaWZpZXI=');
+    'Cg5LZXlVcEVkaXRFdmVudBIdCgpzZXNzaW9uX2lkGAEgASgDUglzZXNzaW9uSWQSGQoIa2V5X2'
+    'NvZGUYAiABKAVSB2tleUNvZGUSGgoIbW9kaWZpZXIYAyABKAVSCG1vZGlmaWVy');
 
-@$core.Deprecated('Use cellEditConfigureStyleEventDescriptor instead')
-const CellEditConfigureStyleEvent$json = {
-  '1': 'CellEditConfigureStyleEvent',
+@$core.Deprecated('Use editValidationRequestDescriptor instead')
+const EditValidationRequest$json = {
+  '1': 'EditValidationRequest',
   '2': [
-    {'1': 'row', '3': 1, '4': 1, '5': 5, '10': 'row'},
-    {'1': 'col', '3': 2, '4': 1, '5': 5, '10': 'col'},
-  ],
-};
-
-/// Descriptor for `CellEditConfigureStyleEvent`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List cellEditConfigureStyleEventDescriptor =
-    $convert.base64Decode(
-        'ChtDZWxsRWRpdENvbmZpZ3VyZVN0eWxlRXZlbnQSEAoDcm93GAEgASgFUgNyb3cSEAoDY29sGA'
-        'IgASgFUgNjb2w=');
-
-@$core.Deprecated('Use cellEditConfigureWindowEventDescriptor instead')
-const CellEditConfigureWindowEvent$json = {
-  '1': 'CellEditConfigureWindowEvent',
-  '2': [
-    {'1': 'row', '3': 1, '4': 1, '5': 5, '10': 'row'},
-    {'1': 'col', '3': 2, '4': 1, '5': 5, '10': 'col'},
-  ],
-};
-
-/// Descriptor for `CellEditConfigureWindowEvent`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List cellEditConfigureWindowEventDescriptor =
-    $convert.base64Decode(
-        'ChxDZWxsRWRpdENvbmZpZ3VyZVdpbmRvd0V2ZW50EhAKA3JvdxgBIAEoBVIDcm93EhAKA2NvbB'
-        'gCIAEoBVIDY29s');
-
-@$core.Deprecated('Use beforeDropdownOpenEventDescriptor instead')
-const BeforeDropdownOpenEvent$json = {
-  '1': 'BeforeDropdownOpenEvent',
-  '2': [
-    {'1': 'row', '3': 1, '4': 1, '5': 5, '10': 'row'},
-    {'1': 'col', '3': 2, '4': 1, '5': 5, '10': 'col'},
-    {'1': 'x', '3': 3, '4': 1, '5': 2, '10': 'x'},
-    {'1': 'y', '3': 4, '4': 1, '5': 2, '10': 'y'},
-    {'1': 'width', '3': 5, '4': 1, '5': 2, '10': 'width'},
-    {'1': 'height', '3': 6, '4': 1, '5': 2, '10': 'height'},
+    {'1': 'request_id', '3': 1, '4': 1, '5': 3, '10': 'requestId'},
+    {'1': 'session_id', '3': 2, '4': 1, '5': 3, '10': 'sessionId'},
+    {'1': 'row', '3': 3, '4': 1, '5': 5, '10': 'row'},
+    {'1': 'col', '3': 4, '4': 1, '5': 5, '10': 'col'},
     {
-      '1': 'dropdown',
-      '3': 7,
+      '1': 'value',
+      '3': 5,
       '4': 1,
       '5': 11,
-      '6': '.volvoxgrid.v1.Dropdown',
-      '10': 'dropdown'
+      '6': '.volvoxgrid.v1.EditorValue',
+      '10': 'value'
     },
-    {'1': 'current_value', '3': 8, '4': 1, '5': 9, '10': 'currentValue'},
-    {'1': 'selected_index', '3': 9, '4': 1, '5': 5, '10': 'selectedIndex'},
   ],
 };
 
-/// Descriptor for `BeforeDropdownOpenEvent`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List beforeDropdownOpenEventDescriptor = $convert.base64Decode(
-    'ChdCZWZvcmVEcm9wZG93bk9wZW5FdmVudBIQCgNyb3cYASABKAVSA3JvdxIQCgNjb2wYAiABKA'
-    'VSA2NvbBIMCgF4GAMgASgCUgF4EgwKAXkYBCABKAJSAXkSFAoFd2lkdGgYBSABKAJSBXdpZHRo'
-    'EhYKBmhlaWdodBgGIAEoAlIGaGVpZ2h0EjMKCGRyb3Bkb3duGAcgASgLMhcudm9sdm94Z3JpZC'
-    '52MS5Ecm9wZG93blIIZHJvcGRvd24SIwoNY3VycmVudF92YWx1ZRgIIAEoCVIMY3VycmVudFZh'
-    'bHVlEiUKDnNlbGVjdGVkX2luZGV4GAkgASgFUg1zZWxlY3RlZEluZGV4');
+/// Descriptor for `EditValidationRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List editValidationRequestDescriptor = $convert.base64Decode(
+    'ChVFZGl0VmFsaWRhdGlvblJlcXVlc3QSHQoKcmVxdWVzdF9pZBgBIAEoA1IJcmVxdWVzdElkEh'
+    '0KCnNlc3Npb25faWQYAiABKANSCXNlc3Npb25JZBIQCgNyb3cYAyABKAVSA3JvdxIQCgNjb2wY'
+    'BCABKAVSA2NvbBIwCgV2YWx1ZRgFIAEoCzIaLnZvbHZveGdyaWQudjEuRWRpdG9yVmFsdWVSBX'
+    'ZhbHVl');
 
-@$core.Deprecated('Use dropdownClosedEventDescriptor instead')
-const DropdownClosedEvent$json = {
-  '1': 'DropdownClosedEvent',
+@$core.Deprecated('Use editorListItemsRequestDescriptor instead')
+const EditorListItemsRequest$json = {
+  '1': 'EditorListItemsRequest',
+  '2': [
+    {'1': 'request_id', '3': 1, '4': 1, '5': 3, '10': 'requestId'},
+    {'1': 'session_id', '3': 2, '4': 1, '5': 3, '10': 'sessionId'},
+    {'1': 'data_source_id', '3': 3, '4': 1, '5': 9, '10': 'dataSourceId'},
+    {'1': 'filter_text', '3': 4, '4': 1, '5': 9, '10': 'filterText'},
+    {'1': 'offset', '3': 5, '4': 1, '5': 5, '10': 'offset'},
+    {'1': 'limit', '3': 6, '4': 1, '5': 5, '10': 'limit'},
+  ],
 };
 
-/// Descriptor for `DropdownClosedEvent`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List dropdownClosedEventDescriptor =
-    $convert.base64Decode('ChNEcm9wZG93bkNsb3NlZEV2ZW50');
+/// Descriptor for `EditorListItemsRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List editorListItemsRequestDescriptor = $convert.base64Decode(
+    'ChZFZGl0b3JMaXN0SXRlbXNSZXF1ZXN0Eh0KCnJlcXVlc3RfaWQYASABKANSCXJlcXVlc3RJZB'
+    'IdCgpzZXNzaW9uX2lkGAIgASgDUglzZXNzaW9uSWQSJAoOZGF0YV9zb3VyY2VfaWQYAyABKAlS'
+    'DGRhdGFTb3VyY2VJZBIfCgtmaWx0ZXJfdGV4dBgEIAEoCVIKZmlsdGVyVGV4dBIWCgZvZmZzZX'
+    'QYBSABKAVSBm9mZnNldBIUCgVsaW1pdBgGIAEoBVIFbGltaXQ=');
 
-@$core.Deprecated('Use dropdownOpenedEventDescriptor instead')
-const DropdownOpenedEvent$json = {
-  '1': 'DropdownOpenedEvent',
+@$core.Deprecated('Use customEditorActionEventDescriptor instead')
+const CustomEditorActionEvent$json = {
+  '1': 'CustomEditorActionEvent',
+  '2': [
+    {'1': 'session_id', '3': 1, '4': 1, '5': 3, '10': 'sessionId'},
+    {'1': 'row', '3': 2, '4': 1, '5': 5, '10': 'row'},
+    {'1': 'col', '3': 3, '4': 1, '5': 5, '10': 'col'},
+    {'1': 'action_id', '3': 4, '4': 1, '5': 9, '10': 'actionId'},
+    {
+      '1': 'payload',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.StructValue',
+      '10': 'payload'
+    },
+  ],
 };
 
-/// Descriptor for `DropdownOpenedEvent`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List dropdownOpenedEventDescriptor =
-    $convert.base64Decode('ChNEcm9wZG93bk9wZW5lZEV2ZW50');
+/// Descriptor for `CustomEditorActionEvent`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List customEditorActionEventDescriptor = $convert.base64Decode(
+    'ChdDdXN0b21FZGl0b3JBY3Rpb25FdmVudBIdCgpzZXNzaW9uX2lkGAEgASgDUglzZXNzaW9uSW'
+    'QSEAoDcm93GAIgASgFUgNyb3cSEAoDY29sGAMgASgFUgNjb2wSGwoJYWN0aW9uX2lkGAQgASgJ'
+    'UghhY3Rpb25JZBI0CgdwYXlsb2FkGAUgASgLMhoudm9sdm94Z3JpZC52MS5TdHJ1Y3RWYWx1ZV'
+    'IHcGF5bG9hZA==');
 
 @$core.Deprecated('Use cellChangedEventDescriptor instead')
 const CellChangedEvent$json = {
@@ -11391,6 +12384,20 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.volvoxgrid.v1.Border': Border$json,
   '.volvoxgrid.v1.HoverConfig': HoverConfig$json,
   '.volvoxgrid.v1.EditConfig': EditConfig$json,
+  '.volvoxgrid.v1.EditActivation': EditActivation$json,
+  '.volvoxgrid.v1.EditorSpec': EditorSpec$json,
+  '.volvoxgrid.v1.TextEditorParams': TextEditorParams$json,
+  '.volvoxgrid.v1.NumberEditorParams': NumberEditorParams$json,
+  '.volvoxgrid.v1.CheckboxEditorParams': CheckboxEditorParams$json,
+  '.volvoxgrid.v1.ListEditorParams': ListEditorParams$json,
+  '.volvoxgrid.v1.ListItem': ListItem$json,
+  '.volvoxgrid.v1.CellValue': CellValue$json,
+  '.volvoxgrid.v1.ListDataSource': ListDataSource$json,
+  '.volvoxgrid.v1.DateTimeEditorParams': DateTimeEditorParams$json,
+  '.volvoxgrid.v1.EditorAction': EditorAction$json,
+  '.volvoxgrid.v1.StructValue': StructValue$json,
+  '.volvoxgrid.v1.StructField': StructField$json,
+  '.volvoxgrid.v1.ScalarValue': ScalarValue$json,
   '.volvoxgrid.v1.ScrollConfig': ScrollConfig$json,
   '.volvoxgrid.v1.ScrollBarConfig': ScrollBarConfig$json,
   '.volvoxgrid.v1.ScrollBarColors': ScrollBarColors$json,
@@ -11408,6 +12415,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.volvoxgrid.v1.ColIndicatorConfig': ColIndicatorConfig$json,
   '.volvoxgrid.v1.ColIndicatorRowDef': ColIndicatorRowDef$json,
   '.volvoxgrid.v1.ColIndicatorCell': ColIndicatorCell$json,
+  '.volvoxgrid.v1.ColIndicatorCellModes': ColIndicatorCellModes$json,
   '.volvoxgrid.v1.CornerIndicatorConfig': CornerIndicatorConfig$json,
   '.volvoxgrid.v1.CornerIndicatorSlot': CornerIndicatorSlot$json,
   '.volvoxgrid.v1.IndicatorFocusConfig': IndicatorFocusConfig$json,
@@ -11422,8 +12430,6 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.volvoxgrid.v1.LoadFontDataResponse': LoadFontDataResponse$json,
   '.volvoxgrid.v1.DefineColumnsRequest': DefineColumnsRequest$json,
   '.volvoxgrid.v1.ColumnDef': ColumnDef$json,
-  '.volvoxgrid.v1.Dropdown': Dropdown$json,
-  '.volvoxgrid.v1.DropdownItem': DropdownItem$json,
   '.volvoxgrid.v1.DefineColumnsResponse': DefineColumnsResponse$json,
   '.volvoxgrid.v1.GetSchemaRequest': GetSchemaRequest$json,
   '.volvoxgrid.v1.SchemaResponse': SchemaResponse$json,
@@ -11441,7 +12447,6 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.volvoxgrid.v1.MoveRowResponse': MoveRowResponse$json,
   '.volvoxgrid.v1.UpdateCellsRequest': UpdateCellsRequest$json,
   '.volvoxgrid.v1.CellUpdate': CellUpdate$json,
-  '.volvoxgrid.v1.CellValue': CellValue$json,
   '.volvoxgrid.v1.CellStyle': CellStyle$json,
   '.volvoxgrid.v1.BarcodeData': BarcodeData$json,
   '.volvoxgrid.v1.BarcodeEncodingOptions': BarcodeEncodingOptions$json,
@@ -11478,15 +12483,21 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.volvoxgrid.v1.SetLeftColResponse': SetLeftColResponse$json,
   '.volvoxgrid.v1.EditCommand': EditCommand$json,
   '.volvoxgrid.v1.EditStart': EditStart$json,
+  '.volvoxgrid.v1.EditorValue': EditorValue$json,
+  '.volvoxgrid.v1.EditorSessionCommand': EditorSessionCommand$json,
+  '.volvoxgrid.v1.EditorValueChanged': EditorValueChanged$json,
+  '.volvoxgrid.v1.TextSelectionChanged': TextSelectionChanged$json,
+  '.volvoxgrid.v1.TextSelection': TextSelection$json,
+  '.volvoxgrid.v1.EditorPreeditChanged': EditorPreeditChanged$json,
   '.volvoxgrid.v1.EditCommit': EditCommit$json,
   '.volvoxgrid.v1.EditCancel': EditCancel$json,
-  '.volvoxgrid.v1.EditSetText': EditSetText$json,
-  '.volvoxgrid.v1.EditSetSelection': EditSetSelection$json,
-  '.volvoxgrid.v1.EditFinish': EditFinish$json,
-  '.volvoxgrid.v1.EditSetHighlights': EditSetHighlights$json,
-  '.volvoxgrid.v1.HighlightRegion': HighlightRegion$json,
-  '.volvoxgrid.v1.EditSetPreedit': EditSetPreedit$json,
+  '.volvoxgrid.v1.CustomEditorAction': CustomEditorAction$json,
+  '.volvoxgrid.v1.EditGetState': EditGetState$json,
   '.volvoxgrid.v1.EditState': EditState$json,
+  '.volvoxgrid.v1.EditorSession': EditorSession$json,
+  '.volvoxgrid.v1.Rect': Rect$json,
+  '.volvoxgrid.v1.EditorCapabilities': EditorCapabilities$json,
+  '.volvoxgrid.v1.ValidationError': ValidationError$json,
   '.volvoxgrid.v1.SortRequest': SortRequest$json,
   '.volvoxgrid.v1.SortColumn': SortColumn$json,
   '.volvoxgrid.v1.SortResponse': SortResponse$json,
@@ -11550,13 +12561,16 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.volvoxgrid.v1.TerminalViewport': TerminalViewport$json,
   '.volvoxgrid.v1.TerminalCommand': TerminalCommand$json,
   '.volvoxgrid.v1.CompareResponse': CompareResponse$json,
+  '.volvoxgrid.v1.EditValidationResponse': EditValidationResponse$json,
+  '.volvoxgrid.v1.EditorListItemsResponse': EditorListItemsResponse$json,
   '.volvoxgrid.v1.RenderOutput': RenderOutput$json,
   '.volvoxgrid.v1.FrameDone': FrameDone$json,
   '.volvoxgrid.v1.FrameMetrics': FrameMetrics$json,
   '.volvoxgrid.v1.SelectionUpdate': SelectionUpdate$json,
   '.volvoxgrid.v1.CursorChange': CursorChange$json,
-  '.volvoxgrid.v1.EditRequest': EditRequest$json,
-  '.volvoxgrid.v1.DropdownRequest': DropdownRequest$json,
+  '.volvoxgrid.v1.EditorSessionStarted': EditorSessionStarted$json,
+  '.volvoxgrid.v1.EditorSessionUpdated': EditorSessionUpdated$json,
+  '.volvoxgrid.v1.EditorSessionEnded': EditorSessionEnded$json,
   '.volvoxgrid.v1.TooltipRequest': TooltipRequest$json,
   '.volvoxgrid.v1.GpuFrameDone': GpuFrameDone$json,
   '.volvoxgrid.v1.EventStreamRequest': EventStreamRequest$json,
@@ -11576,12 +12590,9 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.volvoxgrid.v1.KeyDownEditEvent': KeyDownEditEvent$json,
   '.volvoxgrid.v1.KeyPressEditEvent': KeyPressEditEvent$json,
   '.volvoxgrid.v1.KeyUpEditEvent': KeyUpEditEvent$json,
-  '.volvoxgrid.v1.CellEditConfigureStyleEvent':
-      CellEditConfigureStyleEvent$json,
-  '.volvoxgrid.v1.CellEditConfigureWindowEvent':
-      CellEditConfigureWindowEvent$json,
-  '.volvoxgrid.v1.DropdownClosedEvent': DropdownClosedEvent$json,
-  '.volvoxgrid.v1.DropdownOpenedEvent': DropdownOpenedEvent$json,
+  '.volvoxgrid.v1.EditValidationRequest': EditValidationRequest$json,
+  '.volvoxgrid.v1.EditorListItemsRequest': EditorListItemsRequest$json,
+  '.volvoxgrid.v1.CustomEditorActionEvent': CustomEditorActionEvent$json,
   '.volvoxgrid.v1.CellChangedEvent': CellChangedEvent$json,
   '.volvoxgrid.v1.RowStatusChangeEvent': RowStatusChangeEvent$json,
   '.volvoxgrid.v1.BeforeSortEvent': BeforeSortEvent$json,
@@ -11625,7 +12636,6 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.volvoxgrid.v1.PullToRefreshTriggeredEvent':
       PullToRefreshTriggeredEvent$json,
   '.volvoxgrid.v1.PullToRefreshCanceledEvent': PullToRefreshCanceledEvent$json,
-  '.volvoxgrid.v1.BeforeDropdownOpenEvent': BeforeDropdownOpenEvent$json,
   '.volvoxgrid.v1.TreeChildrenRequestedEvent': TreeChildrenRequestedEvent$json,
   '.volvoxgrid.v1.BeforeTreeNodeToggleEvent': BeforeTreeNodeToggleEvent$json,
   '.volvoxgrid.v1.AfterTreeNodeToggleEvent': AfterTreeNodeToggleEvent$json,

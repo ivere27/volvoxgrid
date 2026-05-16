@@ -23,7 +23,8 @@
 // 3. Two streaming interfaces.
 //    - RenderSession: bidirectional stream for the real-time render loop.
 //      The host sends input (viewport, pointer, key, buffer) and receives
-//      immediate render-coupled outputs (FrameDone, EditRequest, CursorChange).
+//      immediate render-coupled outputs (FrameDone, EditorSessionStarted,
+//      EditorSessionUpdated, CursorChange).
 //    - EventStream: server-streaming for semantic grid events (selection
 //      changed, before/after edit, sort, scroll, etc.).
 //    The split ensures that frame-rate-sensitive rendering is never blocked
@@ -205,6 +206,13 @@ message CellRange {
   int32 col2 = 4;
 }
 
+message Rect {
+  float x = 1;
+  float y = 2;
+  float width = 3;
+  float height = 4;
+}
+
 // Typed cell value. Maps to CellValueData in engine/src/cell.rs:
 //   text → Text(String), number → Number(f64), flag → Bool(bool),
 //   raw → Bytes(Vec<u8>), timestamp → Timestamp(i64).
@@ -217,6 +225,24 @@ message CellValue {
     bool   flag      = 3;
     bytes  raw       = 4;
     int64  timestamp = 5;  // epoch-ms (UTC)
+  }
+}
+
+message StructValue {
+  repeated StructField fields = 1;
+}
+
+message StructField {
+  string      key   = 1;
+  ScalarValue value = 2;
+}
+
+message ScalarValue {
+  oneof value {
+    string string_value = 1;
+    double number_value = 2;
+    bool   bool_value   = 3;
+    bytes  bytes_value  = 4;
   }
 }
 
@@ -270,6 +296,36 @@ enum BorderAppearance {
   BORDER_APPEARANCE_FLAT   = 0;
   BORDER_APPEARANCE_RAISED = 1;
   BORDER_APPEARANCE_SUBTLE = 2;
+}
+
+// Built-in visual themes. Each preset is a complete look — when applied via
+// GridConfig.theme_preset it sets StyleConfig (cell/fixed/header colors,
+// alternate row, sheet, grid lines, border appearance), SelectionConfig
+// visual fields (selection/hover/active cell/indicator row+col styles),
+// ScrollBarConfig (appearance + colors), and IndicatorsConfig (appearance +
+// colors). Other fields (modes, sizes, visibility, behavior toggles) are
+// left untouched.
+//
+// Resolution: inside a single Configure() call, the engine first applies the
+// preset's baked palette, then merges any explicit GridConfig fields. Explicit
+// fields always win. The preset itself is not stored — GetConfig() returns
+// the resolved values.
+enum ThemePreset {
+  THEME_NONE          = 0;  // no-op — leave existing style fields alone
+  THEME_CLASSIC       = 1;  // legacy datagrid look: raised borders,
+                            //   gray fixed cells, classic scrollbar/indicator,
+                            //   system-blue selection.
+  THEME_LIGHT         = 2;  // clean modern light: flat borders, soft gray
+                            //   header (#F9FAFB), indigo accent (#6366F1),
+                            //   overlay scrollbar, modern indicator.
+  THEME_DARK          = 3;  // clean modern dark: flat borders, #1E1E1E body,
+                            //   blue accent (#569CD6), modern scrollbar.
+  THEME_HIGH_CONTRAST = 4;  // accessibility: pure black/white/yellow palette,
+                            //   classic scrollbar+indicator (thick, solid).
+  THEME_MONOKAI       = 5;  // editor-style dark: #272822 body, pink/cyan/olive
+                            //   accents, flat borders.
+  THEME_AMBER         = 6;  // warm light theme: stone neutrals, amber accent
+                            //   (#F59E0B), amber selection (#D97706).
 }
 
 enum TextEffect {
@@ -518,12 +574,6 @@ enum EditTrigger {
   EDIT_TRIGGER_KEY_CLICK = 2;
 }
 
-enum DropdownTrigger {
-  DROPDOWN_NEVER   = 0;
-  DROPDOWN_ALWAYS  = 1;
-  DROPDOWN_ON_EDIT = 2;
-}
-
 enum DropdownItemLayout {
   DROPDOWN_ITEM_AUTO          = 0;
   DROPDOWN_ITEM_LABEL         = 1;
@@ -531,28 +581,172 @@ enum DropdownItemLayout {
   DROPDOWN_ITEM_LABEL_DETAILS = 3;
 }
 
-message Dropdown {
-  repeated DropdownItem items = 1;
-  // When true, the user may type/commit a value not present in `items`.
-  bool allow_custom_value = 2;
-  DropdownItemLayout item_layout = 3;
-  // Unset = use grid/global default; false/true override for this dropdown.
-  optional bool searchable = 4;
-}
-
-message DropdownItem {
-  // Value committed into the cell. If unset, commit `label`.
-  optional string value = 1;
-  // Text shown to the user.
-  optional string label = 2;
-  // Optional secondary/detail strings for richer host layouts.
-  repeated string details = 3;
-  bool disabled = 4;
-}
-
 enum TabBehavior {
   TAB_CONTROLS = 0;
   TAB_CELLS    = 1;
+}
+
+enum EditorKind {
+  EDITOR_KIND_UNSPECIFIED = 0;
+  EDITOR_TEXT             = 1;
+  EDITOR_MULTILINE_TEXT   = 2;
+  EDITOR_NUMBER           = 3;
+  EDITOR_CHECKBOX         = 4;
+  EDITOR_SELECT           = 5;  // read-only list/select; committed value must come from list
+  EDITOR_COMBO            = 6;  // editable dropdown/combobox; custom text is allowed
+  EDITOR_DATE_TIME        = 7;
+  EDITOR_BUTTON           = 8;
+  EDITOR_CUSTOM           = 100;
+}
+
+enum EditorOwner {
+  EDITOR_OWNER_ENGINE      = 0;
+  EDITOR_OWNER_HOST_NATIVE = 1;
+  EDITOR_OWNER_CUSTOM      = 2;
+}
+
+// Who renders the editor surface.
+//   CANVAS: engine draws on canvas; host tracks session only (no overlay).
+//   INLINE / POPUP_* / MODAL: host mounts an overlay widget at viewport_rect.
+// CANVAS is value 0 so that an unset/forgotten `presentation` field is the
+// safe default — no surprise host overlays.
+enum EditorPresentation {
+  EDITOR_CANVAS      = 0;  // engine-drawn; host MUST NOT mount an overlay
+  EDITOR_POPUP_OVER  = 1;  // host overlay anchored above the cell
+  EDITOR_POPUP_UNDER = 2;  // host overlay anchored below the cell
+  EDITOR_MODAL       = 3;  // host modal dialog (cell rect ignored)
+  EDITOR_INLINE      = 4;  // host overlay at the cell rect
+}
+
+enum ValidationMode {
+  VALIDATION_BLOCK         = 0;
+  VALIDATION_REVERT        = 1;
+  VALIDATION_ALLOW_INVALID = 2;
+}
+
+enum ValidationTrigger {
+  VALIDATION_TRIGGER_ON_COMMIT     = 0;
+  VALIDATION_TRIGGER_ON_CHANGE     = 1;
+  VALIDATION_TRIGGER_ON_PAUSE      = 2;
+  VALIDATION_TRIGGER_ON_FOCUS_LOST = 3;
+}
+
+enum InputType {
+  INPUT_TYPE_TEXT     = 0;
+  INPUT_TYPE_NUMBER   = 1;
+  INPUT_TYPE_EMAIL    = 2;
+  INPUT_TYPE_URL      = 3;
+  INPUT_TYPE_PHONE    = 4;
+  INPUT_TYPE_PASSWORD = 5;
+}
+
+enum ButtonRole {
+  BUTTON_ROLE_DEFAULT  = 0;
+  BUTTON_ROLE_ELLIPSIS = 1;
+  BUTTON_ROLE_CLEAR    = 2;
+  BUTTON_ROLE_CUSTOM   = 3;
+}
+
+message EditorSpec {
+  EditorKind         kind                   = 1;
+  EditorOwner        owner                  = 2;
+  EditorPresentation presentation           = 3;
+  ValidationMode     validation_mode        = 4;
+  ValidationTrigger  validation_trigger     = 5;
+  int32              validation_debounce_ms = 6;
+
+  optional string       custom_editor_id = 10;
+  TextEditorParams      text             = 11;
+  NumberEditorParams    number           = 12;
+  CheckboxEditorParams  checkbox         = 13;
+  ListEditorParams      list             = 14;
+  DateTimeEditorParams  date_time        = 15;
+  repeated EditorAction actions          = 16;
+  StructValue           custom_props     = 17;
+}
+
+message TextEditorParams {
+  int32     max_length     = 1;
+  string    mask           = 2;
+  bool      allow_newlines = 3;
+  InputType input_type     = 4;
+}
+
+message NumberEditorParams {
+  optional double min      = 1;
+  optional double max      = 2;
+  optional double step     = 3;
+  string          format   = 4;
+  bool            nullable = 5;
+}
+
+message CheckboxEditorParams {
+  bool three_state = 1;
+}
+
+message DateTimeEditorParams {
+  string         format        = 1;
+  optional int64 min_timestamp = 2;
+  optional int64 max_timestamp = 3;
+  bool           date_only     = 4;
+  bool           time_only     = 5;
+}
+
+message EditorAction {
+  string     action_id = 1;
+  string     label     = 2;
+  ButtonRole role      = 3;
+  ImageData  icon      = 4;
+}
+
+message ListEditorParams {
+  repeated ListItem       static_items       = 1;
+  ListDataSource          data_source        = 2;
+  // false => EDITOR_SELECT/read-only list; true => EDITOR_COMBO/editable dropdown.
+  bool                    allow_custom_value = 3;
+  bool                    searchable         = 4;
+  bool                    multi_select       = 5;
+  DropdownItemLayout      item_layout        = 6;
+}
+
+message ListItem {
+  CellValue       value    = 1;
+  string          label    = 2;
+  repeated string details  = 3;
+  bool            disabled = 4;
+}
+
+message ListDataSource {
+  string data_source_id = 1;
+  bool   filterable     = 2;
+  bool   pageable       = 3;
+  int32  page_size      = 4;
+}
+
+message EditorValue {
+  CellValue       value        = 1;
+  optional string edit_text    = 2;
+  optional string display_text = 3;
+}
+
+message TextSelection {
+  int32 start  = 1;
+  int32 length = 2;
+}
+
+message ValidationError {
+  string code     = 1;
+  string message  = 2;
+  bool   blocking = 3;
+}
+
+message EditActivation {
+  optional EditTrigger trigger                     = 1;
+  optional TabBehavior tab_behavior                = 2;
+  optional bool        single_click_edit           = 3;
+  optional bool        suppress_click_edit         = 4;
+  optional bool        commit_on_focus_lost        = 5;
+  optional bool        preserve_edit_on_navigation = 6;
 }
 
 // ── Sort ──
@@ -1110,6 +1304,11 @@ message GridConfig {
   RenderConfig      rendering   = 9;
   string            version     = 10;
   IndicatorsConfig  indicators  = 11;
+
+  // Apply a built-in visual theme before the other fields in this Configure()
+  // call. See ThemePreset for resolution rules. Not stored — GetConfig()
+  // returns the resolved style/selection/scrolling/indicators.
+  optional ThemePreset theme_preset = 12;
 }
 
 // ── Layout ──
@@ -1217,30 +1416,13 @@ message SelectionConfig {
 }
 
 // ── Editing ──
-// The engine maintains a full edit state machine (engine/src/edit.rs).
-// Two UI modes exist:
-//   EnterMode (default): Enter commits and moves cursor down.
-//     Character keys auto-replace cell content and start editing.
-//   EditMode (F2):       Caret placed at end. Escape cancels.
-//     Enter commits. Arrow keys move caret within text.
+// Edit defaults used when a column/cell does not provide a more specific
+// EditorSpec. Wrappers normally expose simpler high-level editor builders and
+// keep owner/presentation policy internal.
 message EditConfig {
-  optional EditTrigger     trigger              = 1;
-  optional TabBehavior     tab_behavior         = 2;
-  optional DropdownTrigger dropdown_trigger      = 3;
-  // When true, typing in a dropdown cell searches the list items.
-  optional bool            dropdown_search       = 4;
-  optional int32           max_length            = 5;  // 0 = unlimited
-  optional string          mask                  = 6;  // global edit mask, e.g. "(999) 999-9999"
-  // When true, the engine stops handling edit-action keys; the host
-  // adapter drives editing via RPC (EditCommand) instead.
-  optional bool            host_key_dispatch     = 7;
-  // When true, the engine stops handling pointer-driven selection/edit;
-  // the host adapter drives via RPC.
-  optional bool            host_pointer_dispatch = 8;
-  // Enables engine-side compose for platforms without a host IME.
-  optional bool            engine_compose        = 9;
-  // Selects the active engine-side compose algorithm.
-  optional ComposeMethod   compose_method        = 10;
+  EditActivation        activation     = 1;
+  EditorSpec            default_editor = 2;
+  optional ComposeMethod compose_method = 3;
 }
 
 // ── Scrolling ──
@@ -1282,18 +1464,17 @@ message ScrollConfig {
 //   outline_level = 0+: nested group levels
 message OutlineConfig {
   optional TreeIndicatorStyle tree_indicator       = 1;
-  reserved                                            2;  // was: tree_column
-  optional uint32             tree_color            = 3;  // ARGB; default 0xFF808080
-  optional GroupTotalPosition group_total_position  = 4;  // ABOVE or BELOW the group
+  optional uint32             tree_color            = 2;  // ARGB; default 0xFF808080
+  optional GroupTotalPosition group_total_position  = 3;  // ABOVE or BELOW the group
   // When true, repeated Subtotal() calls with the same group_on_col
   // reuse existing subtotal rows instead of inserting new ones, allowing
   // multiple aggregate columns (e.g. Sales + Cost) in a single row.
-  optional bool               multi_totals          = 5;
-  optional int32              indicator_indent      = 6;  // px per outline level; default = row height
-  optional int32              max_levels            = 7;  // highest corner level button (0..N)
-  optional bool               show_level_buttons    = 8;  // enable corner outline level controls
-  optional int32              label_column          = 9;  // column sourcing EXPANDER text label
-  optional int32              icon_column           = 10; // column sourcing EXPANDER icon text
+  optional bool               multi_totals          = 4;
+  optional int32              indicator_indent      = 5;  // px per outline level; default = row height
+  optional int32              max_levels            = 6;  // highest corner level button (0..N)
+  optional bool               show_level_buttons    = 7;  // enable corner outline level controls
+  optional int32              label_column          = 8;  // column sourcing EXPANDER text label
+  optional int32              icon_column           = 9;  // column sourcing EXPANDER icon text
 }
 
 // ── Cell Span ──
@@ -1387,6 +1568,10 @@ message RenderConfig {
   // when only scroll position changes. Only valid when no animation,
   // no editing, no background image, and not right-to-left.
   optional bool            scroll_blit           = 11;
+  // Enables font fallback for missing glyphs. When false, missing glyphs are
+  // skipped instead of using host/OS fallback or the engine's final tofu fallback.
+  // The debug overlay always uses its internal diagnostic font.
+  optional bool            font_fallback_enabled = 12;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1430,6 +1615,9 @@ enum RowIndicatorSlotKind {
   ROW_INDICATOR_SLOT_ACTION      = 12;
   ROW_INDICATOR_SLOT_STATUS_ICON = 13;
   ROW_INDICATOR_SLOT_CUSTOM      = 14;
+  // Same as NUMBERS, but only counts/numbers real data rows.
+  // Subtotal and outline (grand-total / group) rows render text = "".
+  ROW_INDICATOR_SLOT_NUMBERS_DATA_ONLY = 15;
 }
 
 enum ColIndicatorCellMode {
@@ -1449,6 +1637,10 @@ enum ColIndicatorCellMode {
   COL_INDICATOR_CELL_CUSTOM        = 4096;
 }
 
+message ColIndicatorCellModes {
+  repeated ColIndicatorCellMode modes = 1;
+}
+
 message RowIndicatorSlot {
   optional RowIndicatorSlotKind kind       = 1;
   optional int32                width      = 2;
@@ -1458,19 +1650,17 @@ message RowIndicatorSlot {
 }
 
 message RowIndicatorConfig {
-  reserved 3;
-
   optional bool             visible       = 1;
   optional int32            width         = 2;
-  optional uint32           background    = 4;
-  optional uint32           foreground    = 5;
-  optional GridLineStyle    grid_lines    = 6;
-  optional uint32           grid_color    = 7;
-  optional bool             auto_size     = 8;
-  optional bool             allow_resize  = 9;
-  optional bool             allow_select  = 10;
-  optional bool             allow_reorder = 11;
-  repeated RowIndicatorSlot slots         = 12;
+  optional uint32           background    = 3;
+  optional uint32           foreground    = 4;
+  optional GridLineStyle    grid_lines    = 5;
+  optional uint32           grid_color    = 6;
+  optional bool             auto_size     = 7;
+  optional bool             allow_resize  = 8;
+  optional bool             allow_select  = 9;
+  optional bool             allow_reorder = 10;
+  repeated RowIndicatorSlot slots         = 11;
 }
 
 message ColIndicatorRowDef {
@@ -1484,26 +1674,26 @@ message ColIndicatorCell {
   optional int32  col1       = 3;
   optional int32  col2       = 4;
   optional string text       = 5;
-  optional uint32 mode_bits  = 6;
-  optional string custom_key = 7;
-  optional bytes  data       = 8;
+  optional string custom_key = 6;
+  optional bytes  data       = 7;
+  optional ColIndicatorCellModes modes = 8;
 }
 
 message ColIndicatorConfig {
   optional bool              visible            = 1;
   optional int32             default_row_height = 2;
   optional int32             band_rows          = 3;
-  optional uint32            mode_bits          = 4;
-  optional uint32            background         = 5;
-  optional uint32            foreground         = 6;
-  optional GridLineStyle     grid_lines         = 7;
-  optional uint32            grid_color         = 8;
-  optional bool              auto_size          = 9;
-  optional bool              allow_resize       = 10;
-  optional bool              allow_reorder      = 11;
-  optional bool              allow_menu         = 12;
-  repeated ColIndicatorRowDef row_defs           = 13;
-  repeated ColIndicatorCell   cells              = 14;
+  optional uint32            background         = 4;
+  optional uint32            foreground         = 5;
+  optional GridLineStyle     grid_lines         = 6;
+  optional uint32            grid_color         = 7;
+  optional bool              auto_size          = 8;
+  optional bool              allow_resize       = 9;
+  optional bool              allow_reorder      = 10;
+  optional bool              allow_menu         = 11;
+  repeated ColIndicatorRowDef row_defs           = 12;
+  repeated ColIndicatorCell   cells              = 13;
+  optional ColIndicatorCellModes cell_modes       = 14;
 }
 
 enum CornerIndicatorSlotKind {
@@ -1524,12 +1714,11 @@ message CornerIndicatorSlot {
 
 message CornerIndicatorConfig {
   optional bool   visible    = 1;
-  optional uint32 mode_bits  = 2;
-  optional uint32 background = 3;
-  optional uint32 foreground = 4;
-  optional string custom_key = 5;
-  optional bytes  data       = 6;
-  repeated CornerIndicatorSlot slots = 7;
+  optional uint32 background = 2;
+  optional uint32 foreground = 3;
+  optional string custom_key = 4;
+  optional bytes  data       = 5;
+  repeated CornerIndicatorSlot slots = 6;
 }
 
 message IndicatorColors {
@@ -1569,6 +1758,8 @@ enum GridEventTargetFlag {
 // Identity (kind/band/slot_index/slot_kind) plus a value/status snapshot
 // the engine fills in based on slot_kind:
 //   ROW_INDICATOR_SLOT_NUMBERS       text = row number, int_value = row, status_flags |= SELECTED
+//   ROW_INDICATOR_SLOT_NUMBERS_DATA_ONLY  same as NUMBERS but counts data rows only;
+//                                         subtotal/outline rows: text = "", int_value = -1
 //   ROW_INDICATOR_SLOT_CURRENT       status_flags |= SELECTED on cursor row
 //   ROW_INDICATOR_SLOT_SELECTION     status_flags |= SELECTED when row in selection
 //   ROW_INDICATOR_SLOT_CHECKBOX      status_flags |= CHECKED when row in selection
@@ -1586,12 +1777,12 @@ message GridEventTarget {
   IndicatorBand  band          = 2;
   int32          slot_index    = 3;  // -1 when not associated with a configured slot/cell.
   int32          slot_kind     = 4;  // RowIndicatorSlotKind, CornerIndicatorSlotKind, or ColIndicatorCellMode value.
-  uint32         sub_mode_bits = 5;  // Col indicator sub-hit; 0 means the cell as a whole.
-  string         custom_key    = 6;
-  string         text          = 7;  // Human-readable label for this target (see comment above for per-kind meaning).
-  int64          int_value     = 8;  // Numeric value for this target (row number, sort priority, depth).
-  uint32         status_flags  = 9;  // Bitmask of GridEventTargetFlag values.
-  bytes          data          = 10; // Opaque payload, mirrors the slot's `data` field.
+  string         custom_key    = 5;
+  string         text          = 6;  // Human-readable label for this target (see comment above for per-kind meaning).
+  int64          int_value     = 7;  // Numeric value for this target (row number, sort priority, depth).
+  uint32         status_flags  = 8;  // Bitmask of GridEventTargetFlag values.
+  bytes          data          = 9;  // Opaque payload, mirrors the slot's `data` field.
+  int32          sub_mode      = 10; // ColIndicatorCellMode for a sub-hit; 0 means the cell as a whole.
 }
 
 message IndicatorFocusConfig {
@@ -1635,21 +1826,20 @@ message ColumnDef {
   optional string         key            = 10;
   optional SortOrder      sort_order     = 11;
   optional SortType       sort_type      = 12;
-  optional Dropdown       dropdown      = 13;
-  optional string         edit_mask      = 14;
-  optional int32          indent         = 15;
-  optional bool           hidden         = 16;
-  optional bool           span           = 17;
-  repeated ImageData      image_list     = 18;
-  optional bytes          data           = 19;
-  optional StickyEdge     sticky         = 20;
-  Padding                 padding        = 21;
-  Padding                 fixed_padding  = 22;
-  optional bool           nullable       = 23;
-  optional CoercionMode   coercion_mode  = 24;
-  optional WriteErrorMode error_mode     = 25;
-  optional CellInteraction interaction   = 26;
-  optional uint32         progress_color = 27;
+  EditorSpec              editor        = 13;
+  optional int32          indent         = 14;
+  optional bool           hidden         = 15;
+  optional bool           span           = 16;
+  repeated ImageData      image_list     = 17;
+  optional bytes          data           = 18;
+  optional StickyEdge     sticky         = 19;
+  Padding                 padding        = 20;
+  Padding                 fixed_padding  = 21;
+  optional bool           nullable       = 22;
+  optional CoercionMode   coercion_mode  = 23;
+  optional WriteErrorMode error_mode     = 24;
+  optional CellInteraction interaction   = 25;
+  optional uint32         progress_color = 26;
 }
 
 message DefineColumnsRequest {
@@ -1710,7 +1900,7 @@ message CellUpdate {
   ImageData              picture        = 6;
   optional ImageAlignment picture_align = 7;
   ImageData              button_picture = 8;
-  optional Dropdown      dropdown       = 9;
+  EditorSpec             editor         = 9;
   optional StickyEdge    sticky_row     = 10;
   optional StickyEdge    sticky_col     = 11;
   optional CellInteraction interaction  = 12;
@@ -1934,32 +2124,78 @@ message EditSetHighlights {
 message EditCommand {
   int64 grid_id = 1;
   oneof command {
-    EditStart         start          = 2;
-    EditCommit        commit         = 3;
-    EditCancel        cancel         = 4;
-    EditSetText       set_text       = 5;
-    EditSetSelection  set_selection  = 6;
-    EditFinish        finish         = 7;
-    EditSetHighlights set_highlights = 8;
-    EditSetPreedit    set_preedit    = 9;
+    EditStart            start     = 2;
+    EditorSessionCommand session   = 3;
+    EditGetState         get_state = 4;
   }
 }
 
+// Begin an edit session. The host MUST set `reason` to the gesture / source
+// that initiated the edit; the engine derives EditUiMode and the initial
+// selection from the reason:
+//   F2 / DOUBLE_CLICK / CLICK_CARET → EDIT  (caret-positioned, no select-all)
+//   everything else                 → ENTER (select-all, replace on first key)
+// Leaving `reason` as EDIT_START_UNSPECIFIED is treated as PROGRAMMATIC by the
+// engine but is a contract violation — hosts that drive edits from a user
+// gesture should always pass the matching enum value so audit logs and
+// telemetry can attribute sessions correctly.
+//
+// `caret_position` is consulted only when reason == EDIT_START_CLICK_CARET and
+// names the desired caret offset (UTF-16 code units) into the cell's text.
+// `seed_value` is used by IME / printable-key paths to push the keystroke
+// that triggered the session into the new editor's buffer.
 message EditStart {
-  int32           row          = 1;
-  int32           col          = 2;
-  optional bool   select_all   = 3;
-  optional bool   caret_end    = 4;
-  optional string seed_text    = 5;
-  optional bool   formula_mode = 6;
+  int32           row            = 1;
+  int32           col            = 2;
+  EditStartReason reason         = 3;
+  EditorValue     seed_value     = 4;
+  optional int32  caret_position = 5;
 }
 
-message EditCommit  { optional string text = 1; }
-message EditCancel  {}
-message EditSetText { string text = 1; }
-message EditSetSelection { int32 start = 1; int32 length = 2; }
-message EditSetPreedit { string text = 1; int32 cursor = 2; bool commit = 3; }
-message EditFinish  {}
+message EditGetState {}
+
+message EditorSessionCommand {
+  int64  session_id    = 1;
+  uint64 state_version = 2;
+
+  oneof command {
+    EditorValueChanged   value_changed     = 3;
+    TextSelectionChanged selection_changed = 4;
+    EditorPreeditChanged preedit_changed   = 5;
+    EditCommit           commit            = 6;
+    EditCancel           cancel            = 7;
+    CustomEditorAction   custom_action     = 8;
+  }
+}
+
+message EditorValueChanged {
+  EditorValue value = 1;
+}
+
+message TextSelectionChanged {
+  TextSelection selection = 1;
+}
+
+message EditorPreeditChanged {
+  string text   = 1;
+  int32  cursor = 2;
+  bool   commit = 3;
+}
+
+// Commit the active editor. When `value` is unset, the engine commits the
+// editor's current in-flight buffer (the last value_changed / preedit_changed
+// it accepted). Setting `value` overrides that buffer, used by hosts that
+// maintain their own text widget and want to push the final string at commit.
+message EditCommit {
+  optional EditorValue value = 1;
+}
+
+message EditCancel {}
+
+message CustomEditorAction {
+  string      action_id = 1;
+  StructValue payload   = 2;
+}
 
 enum ComposeMethod {
   COMPOSE_METHOD_NONE     = 0;
@@ -1979,22 +2215,72 @@ enum EditUiMode {
   EDIT_UI_MODE_EDIT  = 1;
 }
 
-// Returned by Edit() RPC. Reflects the engine's current edit state.
+// Canonical edit session shape. Carried by EditorSessionStarted (lifecycle)
+// and EditState (current state snapshot). All fields the engine has agreed
+// with the host on at session start, plus mutable runtime state.
+//
+// Wire-type note: `session_id` and `state_version` are 64-bit on the wire.
+// Use the binding's native 64-bit integer type and do NOT re-wrap:
+//   Rust prost  → i64 / u64
+//   Java/Kotlin → long
+//   .NET        → long / ulong
+//   Dart        → $fixnum.Int64 (already wrapped by protobuf-dart)
+//   JS / TS     → bigint
+//
+// Immutability:
+//   - session_id, row, col, editor, ui_mode, capabilities, reason are fixed
+//     for the lifetime of the session and never change between Started and
+//     subsequent Updated deltas.
+//   - viewport_rect, value, selection, composing, preedit_text, state_version,
+//     validation_errors are mutable and can change via EditorSessionUpdated.
+//
+// Presentation contract: when `editor.presentation == EDITOR_CANVAS`,
+// `viewport_rect` is meaningless (engine draws the editor on the canvas
+// itself). Hosts MUST NOT mount an overlay widget in that case; they MUST
+// still track the session for clipboard / keyboard routing.
+message EditorSession {
+  int64                    session_id        = 1;
+  int32                    row               = 2;
+  int32                    col               = 3;
+  Rect                     viewport_rect     = 4;
+  EditorSpec               editor            = 5;
+  EditorValue              value             = 6;
+  TextSelection            selection         = 7;
+  EditUiMode               ui_mode           = 8;
+  EditorCapabilities       capabilities      = 9;
+  EditStartReason          reason            = 10;
+  uint64                   state_version     = 11;
+  bool                     composing         = 12;
+  string                   preedit_text      = 13;
+  repeated ValidationError validation_errors = 14;
+}
+
+// Engine-declared editor capabilities. Derived once from
+// (EditorSpec.kind, EditorSpec.owner, ListEditorParams.allow_custom_value, …)
+// so every host gates UI affordances against the same truth.
+message EditorCapabilities {
+  bool accepts_text_input = 1;  // user can type freely into a mutable buffer
+  bool supports_selection = 2;  // caret/selection can move within text
+  bool supports_cut       = 3;
+  bool supports_paste     = 4;
+  bool supports_undo      = 5;
+}
+
+// Returned by Edit() RPC as a synchronous snapshot of the current edit
+// session, or its absence.
+//
+// `active == false` → no session is open; `session` is left at its proto
+//                     default (do not read its fields).
+// `active == true`  → `session` carries the full current state (same shape
+//                     as EditorSessionStarted.session). Field-level
+//                     invariants documented on EditorSession apply.
+//
+// Hosts that need to compose follow-up commands should read the session's
+// `session_id` + `state_version` and pass them to EditorSessionCommand for
+// optimistic concurrency.
 message EditState {
-  bool       active       = 1;   // true if a cell is being edited
-  int32      row          = 2;   // row being edited
-  int32      col          = 3;   // column being edited
-  string     text         = 4;   // current editor text
-  int32      sel_start    = 5;   // caret/selection start position
-  int32      sel_length   = 6;   // selection length (0 = caret only)
-  bool       composing    = 7;   // true during IME composition
-  string     preedit_text = 8;   // IME preedit string
-  EditUiMode ui_mode      = 9;
-  float      x            = 10;  // viewport-local cell rect X
-  float      y            = 11;  // viewport-local cell rect Y
-  float      width        = 12;  // cell rect width
-  float      height       = 13;  // cell rect height
-  int32      max_length   = 14;  // 0 = unlimited
+  bool          active  = 1;
+  EditorSession session = 2;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2422,7 +2708,8 @@ message LoadDemoResponse {}
 //   4. Engine renders into buffer, returns FrameDone with dirty rect
 //   5. Host blits dirty rect to screen
 //   6. Host forwards pointer/key/scroll events as they occur
-//   7. Engine returns EditRequest/DropdownRequest/CursorChange as needed
+//   7. Engine returns EditorSessionStarted/EditorSessionUpdated/CursorChange
+//      as needed
 //
 // GPU surface flow replaces step 3-4: host sends GpuSurfaceReady,
 // engine renders via wgpu directly to the native surface.
@@ -2435,19 +2722,21 @@ message LoadDemoResponse {}
 message RenderInput {
   int64 grid_id = 1;
   oneof input {
-    ViewportState   viewport       = 2;
-    PointerEvent    pointer        = 3;
-    KeyEvent        key            = 4;
-    BufferReady     buffer         = 5;
-    ScrollEvent     scroll         = 6;
-    EventDecision   event_decision = 7;
-    ZoomEvent       zoom           = 8;
-    GpuSurfaceReady gpu_surface    = 9;
-    TerminalInputBytes terminal_input        = 10;
+    ViewportState            viewport                   = 2;
+    PointerEvent             pointer                    = 3;
+    KeyEvent                 key                        = 4;
+    BufferReady              buffer                     = 5;
+    ScrollEvent              scroll                     = 6;
+    EventDecision            event_decision             = 7;
+    ZoomEvent                zoom                       = 8;
+    GpuSurfaceReady          gpu_surface                = 9;
+    TerminalInputBytes       terminal_input             = 10;
     TerminalCapabilities terminal_capabilities = 11;
-    TerminalViewport terminal_viewport       = 12;
-    TerminalCommand terminal_command         = 13;
-    CompareResponse compare_response         = 14;
+    TerminalViewport         terminal_viewport          = 12;
+    TerminalCommand          terminal_command           = 13;
+    CompareResponse          compare_response           = 14;
+    EditValidationResponse   edit_validation_response   = 15;
+    EditorListItemsResponse  editor_list_items_response = 16;
   }
 }
 
@@ -2457,6 +2746,20 @@ message RenderInput {
 message CompareResponse {
   int64 request_id = 1;
   int32 result     = 2;
+}
+
+message EditValidationResponse {
+  int64                    request_id       = 1;
+  int64                    session_id       = 2;
+  repeated ValidationError errors           = 3;
+  optional EditorValue     normalized_value = 4;
+}
+
+message EditorListItemsResponse {
+  int64             request_id = 1;
+  int64             session_id = 2;
+  repeated ListItem items      = 3;
+  bool              has_more   = 4;
 }
 
 message ViewportState {
@@ -2568,7 +2871,7 @@ message GpuSurfaceReady {
 // InteractionConfig.decision_timeout_ms with a finite value to enable a
 // watchdog; on timeout the engine emits ErrorEvent and auto-allows.
 //
-// Cancelable events: BeforeEdit, BeforeDropdownOpen, CellEditValidate, BeforeSort,
+// Cancelable events: BeforeEdit, CellEditValidate, BeforeSort,
 // BeforeNodeToggle, BeforeScroll, BeforeUserResize, BeforeMoveColumn,
 // BeforeMoveRow, BeforeMouseDown. Print-only BeforePageBreak is emitted
 // during synchronous rendering and is informational in this API.
@@ -2588,13 +2891,14 @@ message RenderOutput {
   // when rendered=false.
   bool rendered = 1;
   oneof event {
-    FrameDone       frame_done       = 2;
-    SelectionUpdate selection        = 3;
-    CursorChange    cursor           = 4;
-    EditRequest     edit_request     = 5;
-    DropdownRequest dropdown_request = 6;
-    TooltipRequest  tooltip_request  = 7;
-    GpuFrameDone    gpu_frame_done   = 8;
+    FrameDone             frame_done     = 2;
+    SelectionUpdate       selection      = 3;
+    CursorChange          cursor         = 4;
+    EditorSessionStarted  editor_started = 5;
+    EditorSessionUpdated  editor_updated = 6;
+    EditorSessionEnded    editor_ended   = 7;
+    TooltipRequest        tooltip_request = 8;
+    GpuFrameDone          gpu_frame_done = 9;
   }
 }
 
@@ -2668,38 +2972,82 @@ message CursorChange {
   CursorType cursor = 1;
 }
 
-// Emitted on RenderOutput when the engine wants the host to show an
-// edit overlay. The host should position a native text input at (x,y)
-// with the given dimensions and pre-fill it with current_value.
-// See runtime/src/lib.rs build_edit_request().
-message EditRequest {
-  int32      row           = 1;
-  int32      col           = 2;
-  float      x             = 3;   // viewport-local cell rect X
-  float      y             = 4;   // viewport-local cell rect Y
-  float      width         = 5;   // cell rect width
-  float      height        = 6;   // cell rect height
-  string     current_value = 7;   // text to pre-fill
-  string     edit_mask     = 8;   // format mask, e.g. "(999) 999-9999"
-  int32      max_length    = 9;   // 0 = unlimited
-  int32      sel_start     = 10;  // text selection start (caret position)
-  int32      sel_length    = 11;  // text selection length
-  // ENTER (0): Enter commits and moves cursor. Character keys replace content.
-  // EDIT (1):  F2 mode. Caret at end. Escape cancels.
-  EditUiMode ui_mode       = 12;
+// Gesture / source that initiated an edit. The engine derives EditUiMode from
+// this:
+//   F2, DOUBLE_CLICK, CLICK_CARET → EDIT  (caret-positioned, no select-all)
+//   everything else               → ENTER (select-all, replace on first key)
+enum EditStartReason {
+  EDIT_START_UNSPECIFIED     = 0;
+  EDIT_START_F2              = 1;
+  EDIT_START_DOUBLE_CLICK    = 2;
+  EDIT_START_CLICK_CARET     = 3;
+  EDIT_START_ENTER_KEY       = 4;
+  EDIT_START_PRINTABLE_KEY   = 5;
+  EDIT_START_IME_COMPOSITION = 6;
+  EDIT_START_DROPDOWN_BUTTON = 7;
+  EDIT_START_PROGRAMMATIC    = 8;
 }
 
-message DropdownRequest {
-  int32           row      = 1;
-  int32           col      = 2;
-  float           x        = 3;
-  float           y        = 4;
-  float           width    = 5;
-  float           height   = 6;
-  repeated string items    = 7;
-  int32           selected = 8;
-  // True if free-form text entry is allowed.
-  bool            editable = 9;
+enum EditEndReason {
+  EDIT_END_UNSPECIFIED      = 0;
+  EDIT_END_COMMITTED        = 1;
+  EDIT_END_CANCELED         = 2;
+  EDIT_END_REVERTED_INVALID = 3;
+  EDIT_END_FOCUS_LOST       = 4;
+  EDIT_END_CELL_REMOVED     = 5;
+  EDIT_END_GRID_DESTROYED   = 6;
+}
+
+enum EditorUpdateReason {
+  EDITOR_UPDATE_UNSPECIFIED        = 0;
+  EDITOR_UPDATE_GEOMETRY           = 1;
+  EDITOR_UPDATE_VALIDATION         = 2;
+  EDITOR_UPDATE_NORMALIZED_VALUE   = 3;
+  EDITOR_UPDATE_PROGRAMMATIC_VALUE = 4;
+  EDITOR_UPDATE_REMOTE_VALUE       = 5;
+  EDITOR_UPDATE_CUSTOM_PAYLOAD     = 6;
+}
+
+// Engine → host. Begins an editor session on the host side. Carries the full
+// EditorSession snapshot. For engine-drawn editors the EditorSpec inside
+// `session.editor` will have presentation = EDITOR_CANVAS; the host MUST
+// track the session for clipboard / keyboard routing but MUST NOT show an
+// overlay.
+message EditorSessionStarted {
+  EditorSession session = 1;
+}
+
+// Engine → host. Sparse delta against the last known session. Any field left
+// unset is unchanged; `validation_errors` is always authoritative when present.
+//
+// Why this is flat (not nested in `session` like EditorSessionStarted): this
+// is a partial update against a previously-Started snapshot, not a fresh
+// snapshot. Nesting it inside an EditorSession submessage would force every
+// reader to handle the "field present but inner field unset" case for each
+// mutable field, with no benefit since the immutable fields (row, col,
+// editor, ui_mode, …) are guaranteed unchanged.
+message EditorSessionUpdated {
+  int64              session_id    = 1;
+  uint64             state_version = 2;
+  EditorUpdateReason reason        = 3;
+
+  optional Rect            viewport_rect     = 4;
+  optional EditorValue     value             = 5;
+  optional TextSelection   selection         = 6;
+  optional bool            visible           = 7;
+  // Edge-triggered: when true, the host should re-focus its overlay widget on
+  // the next tick. Stale Updateds replayed across reconnect are gated by
+  // `state_version`.
+  optional bool            force_refocus     = 8;
+  repeated ValidationError validation_errors = 9;
+  StructValue              custom_payload    = 10;
+}
+
+message EditorSessionEnded {
+  int64         session_id      = 1;
+  EditEndReason reason          = 2;
+  EditorValue   committed_value = 3;
+  uint64        state_version   = 4;
 }
 
 message TooltipRequest {
@@ -2745,77 +3093,75 @@ message GridEvent {
     AfterEditEvent          after_edit            = 10;
     CellEditValidateEvent   cell_edit_validate    = 11;
     CellEditChangeEvent     cell_edit_change      = 12;
-    KeyDownEditEvent        key_down_edit         = 14;
-    KeyPressEditEvent       key_press_edit        = 15;
-    KeyUpEditEvent          key_up_edit           = 16;
-    CellEditConfigureStyleEvent  cell_edit_configure_style  = 17;
-    CellEditConfigureWindowEvent cell_edit_configure_window = 18;
-    DropdownClosedEvent     dropdown_closed       = 19;
-    DropdownOpenedEvent     dropdown_opened       = 20;
+    KeyDownEditEvent        key_down_edit         = 13;
+    KeyPressEditEvent       key_press_edit        = 14;
+    KeyUpEditEvent          key_up_edit           = 15;
+    EditValidationRequest   edit_validation_request = 16;
+    EditorListItemsRequest  editor_list_items_request = 17;
+    CustomEditorActionEvent custom_editor_action = 18;
     // Data
-    CellChangedEvent        cell_changed          = 21;
-    RowStatusChangeEvent    row_status_change     = 22;
+    CellChangedEvent        cell_changed          = 19;
+    RowStatusChangeEvent    row_status_change     = 20;
     // Sort
-    BeforeSortEvent         before_sort           = 23;
-    AfterSortEvent          after_sort            = 24;
-    CompareEvent            compare               = 25;
+    BeforeSortEvent         before_sort           = 21;
+    AfterSortEvent          after_sort            = 22;
+    CompareEvent            compare               = 23;
     // Outline
-    BeforeNodeToggleEvent   before_node_toggle    = 26;
-    AfterNodeToggleEvent    after_node_toggle     = 27;
+    BeforeNodeToggleEvent   before_node_toggle    = 24;
+    AfterNodeToggleEvent    after_node_toggle     = 25;
     // Scroll
-    BeforeScrollEvent       before_scroll         = 28;
-    AfterScrollEvent        after_scroll          = 29;
-    ScrollTooltipEvent      scroll_tooltip        = 30;
+    BeforeScrollEvent       before_scroll         = 26;
+    AfterScrollEvent        after_scroll          = 27;
+    ScrollTooltipEvent      scroll_tooltip        = 28;
     // Resize & Freeze
-    BeforeUserResizeEvent   before_user_resize    = 31;
-    AfterUserResizeEvent    after_user_resize     = 32;
-    AfterUserFreezeEvent    after_user_freeze     = 33;
+    BeforeUserResizeEvent   before_user_resize    = 29;
+    AfterUserResizeEvent    after_user_resize     = 30;
+    AfterUserFreezeEvent    after_user_freeze     = 31;
     // Column/Row move
-    BeforeMoveColumnEvent   before_move_column    = 34;
-    AfterMoveColumnEvent    after_move_column     = 35;
-    BeforeMoveRowEvent      before_move_row       = 36;
-    AfterMoveRowEvent       after_move_row        = 37;
+    BeforeMoveColumnEvent   before_move_column    = 32;
+    AfterMoveColumnEvent    after_move_column     = 33;
+    BeforeMoveRowEvent      before_move_row       = 34;
+    AfterMoveRowEvent       after_move_row        = 35;
     // Mouse
-    BeforeMouseDownEvent    before_mouse_down     = 38;
-    MouseDownEvent          mouse_down            = 39;
-    MouseUpEvent            mouse_up              = 40;
-    MouseMoveEvent          mouse_move            = 41;
-    ClickEvent              click                 = 42;
-    DblClickEvent           dbl_click             = 43;
+    BeforeMouseDownEvent    before_mouse_down     = 36;
+    MouseDownEvent          mouse_down            = 37;
+    MouseUpEvent            mouse_up              = 38;
+    MouseMoveEvent          mouse_move            = 39;
+    ClickEvent              click                 = 40;
+    DblClickEvent           dbl_click             = 41;
     // Keyboard
-    KeyDownEvent            key_down              = 44;
-    KeyPressEvent           key_press             = 45;
-    KeyUpEvent              key_up                = 46;
+    KeyDownEvent            key_down              = 42;
+    KeyPressEvent           key_press             = 43;
+    KeyUpEvent              key_up                = 44;
     // Drawing
-    CustomRenderCellEvent   custom_render_cell    = 47;
+    CustomRenderCellEvent   custom_render_cell    = 45;
     // Drag & Drop
-    DragStartEvent          drag_start            = 48;
-    DragOverEvent           drag_over             = 49;
-    DragDropEvent           drag_drop             = 50;
-    DragCompleteEvent       drag_complete         = 51;
+    DragStartEvent          drag_start            = 46;
+    DragOverEvent           drag_over             = 47;
+    DragDropEvent           drag_drop             = 48;
+    DragCompleteEvent       drag_complete         = 49;
     // Search
-    TypeAheadStartedEvent   type_ahead_started    = 52;
-    TypeAheadEndedEvent     type_ahead_ended      = 53;
+    TypeAheadStartedEvent   type_ahead_started    = 50;
+    TypeAheadEndedEvent     type_ahead_ended      = 51;
     // Data refresh
-    DataRefreshingEvent     data_refreshing       = 54;
-    DataRefreshedEvent      data_refreshed        = 55;
-    FilterDataEvent         filter_data           = 56;
+    DataRefreshingEvent     data_refreshing       = 52;
+    DataRefreshedEvent      data_refreshed        = 53;
+    FilterDataEvent         filter_data           = 54;
     // Error
-    ErrorEvent              error                 = 57;
+    ErrorEvent              error                 = 55;
     // Print
-    BeforePageBreakEvent    before_page_break     = 58;
-    StartPageEvent          start_page            = 59;
-    GetHeaderRowEvent       get_header_row        = 60;
+    BeforePageBreakEvent    before_page_break     = 56;
+    StartPageEvent          start_page            = 57;
+    GetHeaderRowEvent       get_header_row        = 58;
     // Pull to refresh
-    PullToRefreshTriggeredEvent pull_to_refresh_triggered = 61;
-    PullToRefreshCanceledEvent pull_to_refresh_canceled = 62;
-    BeforeDropdownOpenEvent before_dropdown_open = 63;
+    PullToRefreshTriggeredEvent pull_to_refresh_triggered = 59;
+    PullToRefreshCanceledEvent pull_to_refresh_canceled = 60;
     // Native tree model
-    TreeChildrenRequestedEvent tree_children_requested = 64;
-    BeforeTreeNodeToggleEvent  before_tree_node_toggle = 65;
-    AfterTreeNodeToggleEvent   after_tree_node_toggle  = 66;
-    TreeNodeActivateEvent      tree_node_activate      = 67;
-    TreeNodeContextMenuEvent   tree_node_context_menu  = 68;
+    TreeChildrenRequestedEvent tree_children_requested = 61;
+    BeforeTreeNodeToggleEvent  before_tree_node_toggle = 62;
+    AfterTreeNodeToggleEvent   after_tree_node_toggle  = 63;
+    TreeNodeActivateEvent      tree_node_activate      = 64;
+    TreeNodeContextMenuEvent   tree_node_context_menu  = 65;
   }
 }
 
@@ -2849,26 +3195,34 @@ message StartEditEvent    { int32 row = 1; int32 col = 2; }  // informational
 message AfterEditEvent    { int32 row = 1; int32 col = 2; string old_text = 3; string new_text = 4; }  // informational; old_text==new_text on cancel
 message CellEditValidateEvent { int32 row = 1; int32 col = 2; string edit_text = 3; }  // cancelable: cancel keeps editor open
 message CellEditChangeEvent   { string text = 1; }  // fired on every character insert
-message KeyDownEditEvent  { int32 key_code = 1; int32 modifier = 2; }
-message KeyPressEditEvent { int32 key_ascii = 1; }
-message KeyUpEditEvent    { int32 key_code = 1; int32 modifier = 2; }
-message CellEditConfigureStyleEvent  { int32 row = 1; int32 col = 2; }
-message CellEditConfigureWindowEvent { int32 row = 1; int32 col = 2; }
-message BeforeDropdownOpenEvent {
-  int32 row = 1;
-  int32 col = 2;
-  // Viewport-local cell rect. Hosts can use this when canceling the
-  // engine list and opening their own positioned popup.
-  float x = 3;
-  float y = 4;
-  float width = 5;
-  float height = 6;
-  Dropdown dropdown = 7;
-  string current_value = 8;
-  int32 selected_index = 9;
-}  // cancelable
-message DropdownClosedEvent {}
-message DropdownOpenedEvent {}
+message KeyDownEditEvent  { int64 session_id = 1; int32 key_code = 2; int32 modifier = 3; }
+message KeyPressEditEvent { int64 session_id = 1; int32 key_ascii = 2; }
+message KeyUpEditEvent    { int64 session_id = 1; int32 key_code = 2; int32 modifier = 3; }
+
+message EditValidationRequest {
+  int64       request_id = 1;
+  int64       session_id = 2;
+  int32       row        = 3;
+  int32       col        = 4;
+  EditorValue value      = 5;
+}
+
+message EditorListItemsRequest {
+  int64  request_id     = 1;
+  int64  session_id     = 2;
+  string data_source_id = 3;
+  string filter_text    = 4;
+  int32  offset         = 5;
+  int32  limit          = 6;
+}
+
+message CustomEditorActionEvent {
+  int64       session_id = 1;
+  int32       row        = 2;
+  int32       col        = 3;
+  string      action_id  = 4;
+  StructValue payload    = 5;
+}
 
 // ── Data Events ──
 message CellChangedEvent     { int32 row = 1; int32 col = 2; string old_text = 3; string new_text = 4; }

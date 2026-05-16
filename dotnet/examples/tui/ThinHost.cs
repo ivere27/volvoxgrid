@@ -775,46 +775,89 @@ namespace VolvoxGrid.DotNet.TuiSample
 
         private static string DebugEditCellLabel(EditState state)
         {
-            if (!DebugEditActive(state))
+            if (!DebugEditActive(state) || state.Session == null)
             {
                 return "--";
             }
-            return DebugCellLabel(state.Row, state.Col);
+            return DebugCellLabel(state.Session.Row, state.Session.Col);
         }
 
         private static string DebugEditSelectionLabel(EditState state)
         {
-            if (!DebugEditActive(state))
+            if (!DebugEditActive(state) || state.Session == null)
             {
                 return "--";
             }
-            return state.SelStart.ToString(CultureInfo.InvariantCulture)
+            var sel = state.Session.Selection;
+            int start = sel == null ? 0 : sel.Start;
+            int length = sel == null ? 0 : sel.Length;
+            return start.ToString(CultureInfo.InvariantCulture)
                 + "+"
-                + state.SelLength.ToString(CultureInfo.InvariantCulture);
+                + length.ToString(CultureInfo.InvariantCulture);
         }
 
         private static bool DebugEditComposing(EditState state)
         {
-            return state != null && state.Composing;
+            return state != null && state.Session != null && state.Session.Composing;
         }
 
         private static string DebugEditUiMode(EditState state)
         {
-            if (!DebugEditActive(state))
+            if (!DebugEditActive(state) || state.Session == null)
             {
                 return "--";
             }
-            return state.UiMode == EditUiMode.EDIT_UI_MODE_EDIT ? "EDIT" : "ENTER";
+            return state.Session.UiMode == EditUiMode.EDIT_UI_MODE_EDIT ? "EDIT" : "ENTER";
         }
 
         private static string DebugEditTextLabel(EditState state)
         {
-            return !DebugEditActive(state) ? "--" : DebugCompactText(state.Text, 20);
+            return !DebugEditActive(state) || state.Session == null
+                ? "--"
+                : DebugCompactText(EditorValueText(state.Session.Value), 20);
         }
 
         private static string DebugEditPreeditLabel(EditState state)
         {
-            return !DebugEditActive(state) ? "--" : DebugCompactText(state.PreeditText, 16);
+            return !DebugEditActive(state) || state.Session == null
+                ? "--"
+                : DebugCompactText(state.Session.PreeditText, 16);
+        }
+
+        private static string EditorValueText(EditorValue value)
+        {
+            if (value == null)
+            {
+                return string.Empty;
+            }
+            if (value.HasEditText)
+            {
+                return value.EditText ?? string.Empty;
+            }
+            if (value.HasDisplayText)
+            {
+                return value.DisplayText ?? string.Empty;
+            }
+            var cell = value.Value;
+            if (cell == null)
+            {
+                return string.Empty;
+            }
+            switch (cell.ValueCase)
+            {
+                case CellValue.ValueOneofCase.Text:
+                    return cell.Text ?? string.Empty;
+                case CellValue.ValueOneofCase.Number:
+                    return cell.Number.ToString(CultureInfo.InvariantCulture);
+                case CellValue.ValueOneofCase.Flag:
+                    return cell.Flag ? "true" : "false";
+                case CellValue.ValueOneofCase.Timestamp:
+                    return cell.Timestamp.ToString(CultureInfo.InvariantCulture);
+                case CellValue.ValueOneofCase.Raw:
+                    return cell.Raw == null ? string.Empty : Encoding.UTF8.GetString(cell.Raw);
+                default:
+                    return string.Empty;
+            }
         }
 
         private static string DebugFrameKind(VolvoxGridTerminalFrame frame)

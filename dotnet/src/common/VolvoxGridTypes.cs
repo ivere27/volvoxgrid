@@ -70,13 +70,6 @@ namespace VolvoxGrid.DotNet
         Cells = 1,
     }
 
-    public enum VolvoxGridDropdownTrigger
-    {
-        Never = 0,
-        Always = 1,
-        OnEdit = 2,
-    }
-
     public enum VolvoxGridCellHitArea
     {
         None = 0,
@@ -101,45 +94,6 @@ namespace VolvoxGrid.DotNet
         public bool Sort { get; set; }
         public bool Reorder { get; set; }
         public bool Chooser { get; set; }
-    }
-
-    [Flags]
-    public enum VolvoxGridRowIndicatorMode
-    {
-        None = 0,
-        Numbers = 1,
-        Current = 2,
-        Selection = 4,
-        Checkbox = 8,
-        Handle = 16,
-        Editing = 32,
-        Modified = 64,
-        Error = 128,
-        NewRow = 256,
-        Expander = 512,
-        Resize = 1024,
-        Action = 2048,
-        StatusIcon = 4096,
-        Custom = 8192,
-    }
-
-    [Flags]
-    public enum VolvoxGridColumnIndicatorMode
-    {
-        None = 0,
-        HeaderText = 1,
-        SortGlyph = 2,
-        SortPriority = 4,
-        FilterButton = 8,
-        FilterState = 16,
-        MenuButton = 32,
-        Chooser = 64,
-        DragReorder = 128,
-        HiddenMarker = 256,
-        ResizeHandle = 512,
-        SelectAll = 1024,
-        StatusIcon = 2048,
-        Custom = 4096,
     }
 
     public enum VolvoxGridIndicatorAppearance
@@ -174,6 +128,17 @@ namespace VolvoxGrid.DotNet
     {
         Above = 0,
         Below = 1,
+    }
+
+    public enum VolvoxGridThemePreset
+    {
+        None = 0,
+        Classic = 1,
+        Light = 2,
+        Dark = 3,
+        HighContrast = 4,
+        Monokai = 5,
+        Amber = 6,
     }
 
     public enum VolvoxGridAggregateType
@@ -340,6 +305,7 @@ namespace VolvoxGrid.DotNet
         public string Format { get; set; }
         public uint ProgressColor { get; set; }
         public VolvoxGridCellInteraction Interaction { get; set; }
+        public EditorSpec Editor { get; set; }
 
         public VolvoxGridColumn()
         {
@@ -352,6 +318,21 @@ namespace VolvoxGrid.DotNet
             Alignment = VolvoxGridAlign.General;
             DataType = VolvoxGridColumnDataType.String;
             Interaction = VolvoxGridCellInteraction.Unspecified;
+        }
+    }
+
+    public sealed class VolvoxGridSubtotalLevel
+    {
+        public int? GroupCol { get; set; }
+        public string Caption { get; set; }
+        public uint BackColor { get; set; }
+        public uint ForeColor { get; set; }
+
+        public VolvoxGridSubtotalLevel()
+        {
+            Caption = string.Empty;
+            BackColor = 0xFFEEF2FFu;
+            ForeColor = 0xFF111827u;
         }
     }
 
@@ -433,44 +414,6 @@ namespace VolvoxGrid.DotNet
             RowIndex = rowIndex;
             ColumnIndex = columnIndex;
             FieldName = fieldName ?? string.Empty;
-        }
-    }
-
-    public sealed class VolvoxGridBeforeDropdownOpenEventArgs : CancelEventArgs
-    {
-        public int RowIndex { get; private set; }
-        public int ColumnIndex { get; private set; }
-        public string FieldName { get; private set; }
-        public float X { get; private set; }
-        public float Y { get; private set; }
-        public float Width { get; private set; }
-        public float Height { get; private set; }
-        public Dropdown Dropdown { get; private set; }
-        public string CurrentValue { get; private set; }
-        public int SelectedIndex { get; private set; }
-
-        public VolvoxGridBeforeDropdownOpenEventArgs(
-            int rowIndex,
-            int columnIndex,
-            string fieldName,
-            float x,
-            float y,
-            float width,
-            float height,
-            Dropdown dropdown,
-            string currentValue,
-            int selectedIndex)
-        {
-            RowIndex = rowIndex;
-            ColumnIndex = columnIndex;
-            FieldName = fieldName ?? string.Empty;
-            X = x;
-            Y = y;
-            Width = width;
-            Height = height;
-            Dropdown = dropdown ?? new Dropdown();
-            CurrentValue = currentValue ?? string.Empty;
-            SelectedIndex = selectedIndex;
         }
     }
 

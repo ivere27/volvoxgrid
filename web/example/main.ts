@@ -11,91 +11,24 @@
  * so the host only provides platform glue.
  */
 
-import { VolvoxGrid, type VolvoxGridContextMenuRequest, type VolvoxGridDropdown } from "../js/src/volvoxgrid.js";
-import { setupDefaultInput } from "../js/src/default-input.js";
-import { createCanvas2DTextRenderer } from "../js/src/canvas2d-text-renderer.js";
 import {
-  AggregateType,
-  Align,
-  BarcodeCaptionOptionsFields,
-  BarcodeCaptionPosition,
-  BarcodeCheckDigitMode,
-  BarcodeDataFields,
-  BarcodeEncodingOptionsFields,
-  BarcodeQrErrorCorrection,
-  BarcodeRenderOptionsFields,
-  BarcodeSymbology,
-  BarcodeTextEncoding,
-  BorderFields,
-  BorderStyle,
-  BordersFields,
-  CellHitArea,
-  CellInteraction,
-  CellSpanMode,
-  CellStyleFields,
-  CellUpdateFields,
-  CellValueFields,
-  ColIndicatorCellMode,
-  ColIndicatorConfigFields,
-  ColumnDefFields,
-  ColumnDataType,
-  CornerIndicatorConfigFields,
-  CornerIndicatorSlotKind,
-  CornerIndicatorSlotFields,
-  DefineColumnsRequestFields,
-  DefineRowsRequestFields,
-  DropdownFields,
-  DropdownItemFields,
-  DropdownTrigger,
-  EditConfigFields,
   EditTrigger,
-  FillHandlePosition,
+  EditorUpdateReason,
   FocusBorderStyle,
-  FontFields,
-  FreezePolicyFields,
-  GridConfigFields,
-  GridLinesFields,
   GridLineStyle,
-  GroupTotalPosition,
-  HeaderFeaturesFields,
-  HeaderResizeHandleFields,
-  HeaderSeparatorFields,
-  HeaderStyleFields,
-  HighlightStyleFields,
-  HoverConfigFields,
-  ImageAlignment,
-  IndicatorAppearance,
-  IndicatorsConfigFields,
-  InteractionConfigFields,
-  LayoutConfigFields,
-  LoadDataStatus,
-  OutlineConfigFields,
-  PaddingFields,
   PresentMode,
-  RegionStyleFields,
   RenderLayerBit,
   RendererMode,
-  ResizePolicyFields,
-  RichTextFields,
-  RowDefFields,
-  RowIndicatorConfigFields,
-  RowIndicatorSlotKind,
-  RowIndicatorSlotFields,
-  ScrollConfigFields,
   ScrollBarsMode,
-  SelectionConfigFields,
   SelectionMode,
   SelectionVisibility,
-  SpanConfigFields,
-  SpanCompareMode,
-  StyleConfigFields,
-  TabBehavior,
-  TextBaseline,
-  TextFormatRunFields,
-  TreeIndicatorStyle,
-  TextRunStyleFields,
-  UpdateCellsRequestFields,
-} from "../js/src/generated/volvoxgrid_ffi.js";
+  VolvoxGrid,
+  createCanvas2DRasterizer,
+  createCanvas2DTextRenderer,
+  setupDefaultInput,
+  type VolvoxGridContextMenuRequest,
+  type VolvoxGridValidationError,
+} from "../js/src/index.js";
 import {
   GridEvent as GridEventMessage,
   GridEventEventOneofCase,
@@ -107,62 +40,35 @@ import {
   DOOM_RESOLUTIONS,
   type DoomAssetSource,
 } from "./doom.js";
+import { BARCODE_COLS, setupBarcodesJsonDemo } from "./barcodes.js";
+import {
+  CELL_HIT_AREA_TEXT,
+  CELL_INTERACTION_TEXT_LINK,
+  HIERARCHY_ACTION_COL,
+  HIERARCHY_COLS,
+  autoSizeHierarchyColumns,
+  setupHierarchyJsonDemo,
+} from "./hierarchy.js";
+import { SALES_COLS, setupSalesJsonDemo } from "./sales.js";
+import { STRESS_COLS, setupStressDemo } from "./stress.js";
+import {
+  type WasmModule,
+} from "./shared.js";
+
+const HOVER_NONE = 0;
+const HOVER_ROW = 1;
+const HOVER_COLUMN = 2;
+const HOVER_CELL = 4;
 
 type DemoMode = "stress" | "sales" | "hierarchy" | "barcodes" | "doom";
 type StandardDemoMode = Exclude<DemoMode, "doom">;
 type DoomDirectionCode = "ArrowUp" | "ArrowDown" | "ArrowLeft" | "ArrowRight";
 type DoomTouchActionCode = "ControlLeft" | "Space" | "Enter";
 
-const STRESS_ROWS = 1_000_000;
-const STRESS_COLS = 12;
-const SALES_COLS = 10;
-const HIERARCHY_COLS = 8;
-const BARCODE_COLS = 6;
-const SALES_STATUS_ITEMS = "Active|Pending|Shipped|Returned|Cancelled";
-const HIERARCHY_NAME_COL = 0;
-const HIERARCHY_TYPE_COL = 1;
-const HIERARCHY_DETAILS_COL = 5;
-const HIERARCHY_ACTION_COL = 6;
-const HIERARCHY_ICON_COL = 7;
-const HIERARCHY_FOLDER_ICON = "\uE2C7";
-enum NodeChildrenState {
-  NODE_LEAF = 1,
-  NODE_CHILDREN_LOADED = 4,
-}
-const NodeCellUpdateFields = {
-  node_id: 1,
-  col: 2,
-  value: 3,
-  style: 4,
-  rich_text: 9,
-} as const;
-const TreeNodeFields = {
-  node_id: 1,
-  parent_id: 2,
-  cells: 4,
-  children_state: 5,
-} as const;
-const LoadTreeRequestFields = {
-  grid_id: 1,
-  nodes: 2,
-  replace: 3,
-} as const;
-const CELL_INTERACTION_TEXT_LINK = CellInteraction.CELL_INTERACTION_TEXT_LINK;
-const CELL_HIT_AREA_TEXT = CellHitArea.HIT_TEXT;
 const FONT_FETCH_TIMEOUT_MS = 5000;
 const DEMO_DEFAULT_FONT_FAMILY = "Roboto";
 const MATERIAL_ICONS_FONT_URL =
   "https://cdn.jsdelivr.net/npm/material-design-icons@3.0.1/iconfont/MaterialIcons-Regular.ttf";
-const MATERIAL_ICON_CHEVRON_RIGHT = "\uE5CC";
-const MATERIAL_ICON_EXPAND_MORE = "\uE5CF";
-const ICON_SLOT_TREE_EXPANDED = 4;
-const ICON_SLOT_TREE_COLLAPSED = 5;
-const PB_TEXT_ENCODER = new TextEncoder();
-const PB_TEXT_DECODER = new TextDecoder();
-const HOVER_NONE = 0;
-const HOVER_ROW = 1;
-const HOVER_COLUMN = 2;
-const HOVER_CELL = 4;
 const RENDER_LAYER_PREFIX = "RENDER_LAYER_";
 type RenderLayerOption = { bit: number; label: string };
 const LAYER_OPTIONS: RenderLayerOption[] = Object.entries(RenderLayerBit)
@@ -187,48 +93,6 @@ function gridEventDebugObject(event: GridEventMessage): Record<string, unknown> 
   };
 }
 
-const SALES_COLUMN_SETUP = [
-  { caption: "Q", key: "Q", align: Align.ALIGN_CENTER_CENTER, dataType: undefined, format: undefined, dropdownItems: undefined, span: true },
-  { caption: "Region", key: "Region", align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, span: true },
-  { caption: "Category", key: "Category", align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, span: false },
-  { caption: "Product", key: "Product", align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, span: false },
-  { caption: "Sales", key: "Sales", align: Align.ALIGN_RIGHT_CENTER, dataType: ColumnDataType.COLUMN_DATA_CURRENCY, format: "$#,##0", dropdownItems: undefined, span: false },
-  { caption: "Cost", key: "Cost", align: Align.ALIGN_RIGHT_CENTER, dataType: ColumnDataType.COLUMN_DATA_CURRENCY, format: "$#,##0", dropdownItems: undefined, span: false },
-  { caption: "Margin%", key: "Margin", align: Align.ALIGN_CENTER_CENTER, dataType: ColumnDataType.COLUMN_DATA_NUMBER, format: undefined, dropdownItems: undefined, span: false },
-  { caption: "Flag", key: "Flag", align: Align.ALIGN_CENTER_CENTER, dataType: ColumnDataType.COLUMN_DATA_BOOLEAN, format: undefined, dropdownItems: undefined, span: false },
-  { caption: "Status", key: "Status", align: undefined, dataType: undefined, format: undefined, dropdownItems: SALES_STATUS_ITEMS, span: false },
-  { caption: "Notes", key: "Notes", align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, span: false },
-] as const;
-const HIERARCHY_COLUMN_SETUP = [
-  { caption: "Name", key: "Name", width: 260, align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined, hidden: true },
-  { caption: "Type", key: "Type", width: 80, align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined },
-  { caption: "Size", key: "Size", width: 80, align: Align.ALIGN_RIGHT_CENTER, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined },
-  { caption: "Modified", key: "Modified", width: 120, align: undefined, dataType: ColumnDataType.COLUMN_DATA_DATE, format: "short date", dropdownItems: undefined, interaction: undefined },
-  { caption: "Permissions", key: "Permissions", width: 100, align: Align.ALIGN_CENTER_CENTER, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined },
-  { caption: "Details", key: "Details", width: 180, align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined },
-  { caption: "Action", key: "Action", width: 92, align: Align.ALIGN_CENTER_CENTER, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: CellInteraction.CELL_INTERACTION_TEXT_LINK },
-  { caption: "Icon", key: "Icon", width: 24, align: Align.ALIGN_CENTER_CENTER, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined, hidden: true },
-] as const;
-const BARCODE_COLUMN_SETUP = [
-  { caption: "Symbology", key: "Symbology", align: Align.ALIGN_CENTER_CENTER },
-  { caption: "Payload", key: "Value" },
-  { caption: "TextEncoding", key: "TextEncoding", align: Align.ALIGN_CENTER_CENTER },
-  { caption: "Settings", key: "Label" },
-  { caption: "Barcode", key: "Barcode", align: Align.ALIGN_CENTER_CENTER },
-  { caption: "Notes", key: "Notes" },
-] as const;
-type DemoColumnSetup = {
-  caption: string;
-  key: string;
-  width?: number;
-  align?: number;
-  dataType?: number;
-  format?: string;
-  dropdownItems?: string;
-  interaction?: number;
-  hidden?: boolean;
-  span?: boolean;
-};
 type DemoFontAsset = {
   label: string;
   url: string;
@@ -237,136 +101,15 @@ type DemoFontAsset = {
   weight?: string;
   style?: string;
 };
-type HierarchyRichTextRunStyle = {
-  foreground?: string | number;
-  color?: string | number;
-  fg?: string | number;
-  family?: string;
-  families?: string[];
-  size?: number;
-  bold?: boolean;
-  italic?: boolean;
-  underline?: boolean;
-  strikethrough?: boolean;
-  strike?: boolean;
-  stretch?: number;
-  baseline?: string | number;
-  linkUrl?: string;
-  link_url?: string;
-  href?: string;
-  font?: HierarchyRichTextRunStyle;
+type DemoFontLoadResult = {
+  font: DemoFontAsset;
+  loaded: boolean;
 };
-type HierarchyRichTextRun = HierarchyRichTextRunStyle & {
-  start?: number;
-  startIndex?: number;
-  start_index?: number;
-  style?: HierarchyRichTextRunStyle;
+type DemoFontLoadSummary = {
+  anyLoaded: boolean;
+  missingFonts: string[];
+  missingTextFonts: string[];
 };
-type HierarchyRichTextCell = {
-  text?: string;
-  value?: string;
-  richText?: HierarchyRichTextRun[] | { runs?: HierarchyRichTextRun[] };
-  rich_text?: HierarchyRichTextRun[] | { runs?: HierarchyRichTextRun[] };
-};
-type HierarchyDemoRow = {
-  Id: string;
-  ParentId: string | null;
-  Name: string;
-  Type: string;
-  Size: string;
-  Modified: string;
-  Permissions: string;
-  Details?: string | HierarchyRichTextCell | null;
-  Action: string;
-};
-type BarcodeJsonRow = {
-  Symbology: string;
-  Value: string;
-  TextEncoding?: string;
-  QrEcc?: string;
-  Label: string;
-  Notes: string;
-};
-type DemoRowSetup = {
-  height?: number;
-  outlineLevel?: number;
-  isSubtotal?: boolean;
-};
-type DemoFontSpec = {
-  family?: string;
-  families?: string[];
-  size?: number;
-  bold?: boolean;
-  italic?: boolean;
-  underline?: boolean;
-  strikethrough?: boolean;
-  stretch?: number;
-};
-type DemoCellStyleSpec = {
-  background?: number;
-  foreground?: number;
-  align?: number;
-  font?: DemoFontSpec;
-  padding?: {
-    left?: number;
-    top?: number;
-    right?: number;
-    bottom?: number;
-  };
-  borderAll?: {
-    style: number;
-    color: number;
-  };
-};
-type BarcodeDemoPlan = {
-  symbology: number;
-  checkDigit: number;
-  textEncoding: number;
-  qrEcc: number;
-  foreground: number;
-  background: number;
-  alignment: number;
-  moduleSize: number;
-  quietZone: number;
-  barHeight: number;
-  narrowBarWidth: number;
-  captionPosition: number;
-  captionColor: number;
-  rowHeight: number;
-  optionsText: string;
-};
-type WasmModule = typeof import("./wasm/volvoxgrid_wasm.js");
-type HierarchyTreeWasmModule = WasmModule & {
-  volvox_tree_load_tree_pb?: (data: Uint8Array) => Uint8Array;
-};
-
-function hierarchyRowDepths(rows: ReadonlyArray<HierarchyDemoRow>): number[] {
-  const rowsById = new Map(rows.map((row) => [row.Id, row]));
-  const depthCache = new Map<string, number>();
-  const depthFor = (row: HierarchyDemoRow, visiting: Set<string>): number => {
-    const cached = depthCache.get(row.Id);
-    if (cached !== undefined) {
-      return cached;
-    }
-    if (visiting.has(row.Id)) {
-      throw new Error(`hierarchy demo data contains a parent cycle at ${row.Id}`);
-    }
-    visiting.add(row.Id);
-    const parentId = row.ParentId?.trim() ?? "";
-    let depth = 0;
-    if (parentId !== "") {
-      const parent = rowsById.get(parentId);
-      if (!parent) {
-        throw new Error(`hierarchy demo data references missing parent ${parentId}`);
-      }
-      depth = depthFor(parent, visiting) + 1;
-    }
-    visiting.delete(row.Id);
-    depthCache.set(row.Id, depth);
-    return depth;
-  };
-  return rows.map((row) => depthFor(row, new Set<string>()));
-}
 
 async function fetchFontWithTimeout(url: string): Promise<Uint8Array | null> {
   const ctrl = new AbortController();
@@ -606,10 +349,9 @@ async function loadBrowserFontFaces(font: DemoFontAsset, fontData: Uint8Array): 
     return false;
   }
 
-  const source = fontData.buffer.slice(
-    fontData.byteOffset,
-    fontData.byteOffset + fontData.byteLength,
-  );
+  const source: BufferSource = fontData.buffer instanceof ArrayBuffer
+    ? fontData.buffer.slice(fontData.byteOffset, fontData.byteOffset + fontData.byteLength)
+    : new Uint8Array(fontData).buffer;
   const loaded = await Promise.all(
     families.map(async (family) => {
       try {
@@ -629,26 +371,42 @@ async function loadBrowserFontFaces(font: DemoFontAsset, fontData: Uint8Array): 
   return loaded.some(Boolean);
 }
 
+function isIconFontAsset(font: DemoFontAsset): boolean {
+  return font.family === "Material Icons" || (font.aliases ?? []).includes("MaterialIcons");
+}
+
 function loadDemoFontsInBackground(
   wasmModule: WasmModule,
-): Promise<boolean> {
+): Promise<DemoFontLoadSummary> {
   const fonts = demoFontAssetsForLocales(browserLocaleHints());
 
   return Promise.all(
-    fonts.map(async (font) => {
+    fonts.map(async (font): Promise<DemoFontLoadResult> => {
       const fontData = await fetchFontWithTimeout(font.url);
       if (fontData) {
-        wasmModule.load_font(fontData);
-        await loadBrowserFontFaces(font, fontData);
-        console.info(`Loaded demo font: ${font.label}`);
-        return true;
+        try {
+          wasmModule.load_font(fontData);
+          await loadBrowserFontFaces(font, fontData);
+          console.info(`Loaded demo font: ${font.label}`);
+          return { font, loaded: true };
+        } catch (err) {
+          console.warn(`Could not register ${font.label}:`, err);
+        }
       } else {
         console.warn(`Could not load ${font.label} - some glyphs may be missing`);
-        return false;
       }
+      return { font, loaded: false };
     }),
   )
-    .then((results) => results.some(Boolean));
+    .then((results) => ({
+      anyLoaded: results.some((result) => result.loaded),
+      missingFonts: results
+        .filter((result) => !result.loaded)
+        .map((result) => result.font.label),
+      missingTextFonts: results
+        .filter((result) => !result.loaded && !isIconFontAsset(result.font))
+        .map((result) => result.font.label),
+    }));
 }
 
 /**
@@ -659,7 +417,16 @@ function loadDemoFontsInBackground(
  */
 function installAtomicsWaitAsyncGuard(): void {
   if (typeof Atomics === "undefined") return;
-  const atomics = Atomics as typeof Atomics & { __volvoxgridWaitAsyncGuarded?: boolean };
+  type AtomicsWaitAsync = (
+    ta: Int32Array,
+    index: number,
+    value: number,
+    timeout?: number,
+  ) => unknown;
+  const atomics = Atomics as typeof Atomics & {
+    waitAsync?: AtomicsWaitAsync;
+    __volvoxgridWaitAsyncGuarded?: boolean;
+  };
   if (atomics.__volvoxgridWaitAsyncGuarded) return;
   const real = atomics.waitAsync;
   if (typeof real !== "function") return;
@@ -681,7 +448,7 @@ function installAtomicsWaitAsyncGuard(): void {
     } catch {
       return { async: false, value: "not-equal" };
     }
-  }) as typeof Atomics.waitAsync;
+  }) as AtomicsWaitAsync;
   atomics.__volvoxgridWaitAsyncGuarded = true;
 }
 
@@ -751,1349 +518,6 @@ async function ensureDoomRemoteProxyWorker(baseUrl: string, isDev: boolean): Pro
   }
 }
 
-function pbEncodeVarint(value: bigint): number[] {
-  if (value < 0n) {
-    throw new RangeError("varint must be unsigned");
-  }
-  const out: number[] = [];
-  let v = value;
-  while (v >= 0x80n) {
-    out.push(Number((v & 0x7fn) | 0x80n));
-    v >>= 7n;
-  }
-  out.push(Number(v));
-  return out;
-}
-
-function pbEncodeTag(field: number, wireType: number): number[] {
-  return pbEncodeVarint(BigInt((field << 3) | wireType));
-}
-
-function pbEncodeMessageField(field: number, payload: Uint8Array): number[] {
-  return [
-    ...pbEncodeTag(field, 2),
-    ...pbEncodeVarint(BigInt(payload.length)),
-    ...payload,
-  ];
-}
-
-function pbEncodeBool(value: boolean): number[] {
-  return pbEncodeVarint(value ? 1n : 0n);
-}
-
-function pbEncodeInt32(value: number): number[] {
-  const i32 = BigInt.asIntN(32, BigInt(Math.trunc(value)));
-  return pbEncodeVarint(BigInt.asUintN(64, i32));
-}
-
-function pbEncodeStringField(field: number, value: string): number[] {
-  const bytes = PB_TEXT_ENCODER.encode(value);
-  return [
-    ...pbEncodeTag(field, 2),
-    ...pbEncodeVarint(BigInt(bytes.length)),
-    ...bytes,
-  ];
-}
-
-function pbEncodeInt32Field(field: number, value: number): number[] {
-  return [...pbEncodeTag(field, 0), ...pbEncodeInt32(value)];
-}
-
-function pbEncodeUint32Field(field: number, value: number): number[] {
-  return [...pbEncodeTag(field, 0), ...pbEncodeVarint(BigInt(value >>> 0))];
-}
-
-function pbEncodeFloatField(field: number, value: number): number[] {
-  const buf = new ArrayBuffer(4);
-  new DataView(buf).setFloat32(0, value, true);
-  return [...pbEncodeTag(field, 5), ...Array.from(new Uint8Array(buf))];
-}
-
-function pbEncodeBorder(style: number, color: number): Uint8Array {
-  const out: number[] = [];
-  out.push(...pbEncodeInt32Field(BorderFields.style, style));
-  out.push(...pbEncodeUint32Field(BorderFields.color, color));
-  return new Uint8Array(out);
-}
-
-function pbEncodeBordersAll(style: number, color: number): Uint8Array {
-  return new Uint8Array(pbEncodeMessageField(BordersFields.all, pbEncodeBorder(style, color)));
-}
-
-function pbEncodeFontPayload(font: DemoFontSpec): Uint8Array {
-  const out: number[] = [];
-  if (font.family != null && font.family !== "") {
-    out.push(...pbEncodeStringField(FontFields.family, font.family));
-  }
-  if (font.families != null) {
-    for (const family of font.families) {
-      if (family !== "") {
-        out.push(...pbEncodeStringField(FontFields.families, family));
-      }
-    }
-  }
-  if (font.size != null) {
-    out.push(...pbEncodeFloatField(FontFields.size, font.size));
-  }
-  if (font.bold != null) {
-    out.push(...pbEncodeTag(FontFields.bold, 0), ...pbEncodeBool(font.bold));
-  }
-  if (font.italic != null) {
-    out.push(...pbEncodeTag(FontFields.italic, 0), ...pbEncodeBool(font.italic));
-  }
-  if (font.underline != null) {
-    out.push(...pbEncodeTag(FontFields.underline, 0), ...pbEncodeBool(font.underline));
-  }
-  if (font.strikethrough != null) {
-    out.push(...pbEncodeTag(FontFields.strikethrough, 0), ...pbEncodeBool(font.strikethrough));
-  }
-  if (font.stretch != null) {
-    out.push(...pbEncodeFloatField(FontFields.stretch, font.stretch));
-  }
-  return new Uint8Array(out);
-}
-
-function pbEncodePaddingPayload(padding: DemoCellStyleSpec["padding"]): Uint8Array {
-  const out: number[] = [];
-  if (padding?.left != null) {
-    out.push(...pbEncodeInt32Field(PaddingFields.left, padding.left));
-  }
-  if (padding?.top != null) {
-    out.push(...pbEncodeInt32Field(PaddingFields.top, padding.top));
-  }
-  if (padding?.right != null) {
-    out.push(...pbEncodeInt32Field(PaddingFields.right, padding.right));
-  }
-  if (padding?.bottom != null) {
-    out.push(...pbEncodeInt32Field(PaddingFields.bottom, padding.bottom));
-  }
-  return new Uint8Array(out);
-}
-
-function pbEncodeCellStylePayload(style: DemoCellStyleSpec): Uint8Array {
-  const out: number[] = [];
-  if (style.background != null) {
-    out.push(...pbEncodeUint32Field(CellStyleFields.background, style.background));
-  }
-  if (style.foreground != null) {
-    out.push(...pbEncodeUint32Field(CellStyleFields.foreground, style.foreground));
-  }
-  if (style.align != null) {
-    out.push(...pbEncodeInt32Field(CellStyleFields.align, style.align));
-  }
-  if (style.font != null) {
-    const font = pbEncodeFontPayload(style.font);
-    if (font.length > 0) {
-      out.push(...pbEncodeMessageField(CellStyleFields.font, font));
-    }
-  }
-  if (style.padding != null) {
-    const padding = pbEncodePaddingPayload(style.padding);
-    if (padding.length > 0) {
-      out.push(...pbEncodeMessageField(CellStyleFields.padding, padding));
-    }
-  }
-  if (style.borderAll != null) {
-    out.push(...pbEncodeMessageField(CellStyleFields.borders, pbEncodeBordersAll(style.borderAll.style, style.borderAll.color)));
-  }
-  return new Uint8Array(out);
-}
-
-function pbEncodeCellValueText(text: string): Uint8Array {
-  return new Uint8Array(pbEncodeStringField(CellValueFields.text, text));
-}
-
-function parseArgb(value: string | number | undefined): number | undefined {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value >>> 0;
-  }
-  if (typeof value !== "string") {
-    return undefined;
-  }
-  const raw = value.trim();
-  if (raw === "") {
-    return undefined;
-  }
-  const hex = raw.replace(/^#|^0x/i, "");
-  if (/^[0-9a-fA-F]{6}$/.test(hex)) {
-    return (0xFF000000 | Number.parseInt(hex, 16)) >>> 0;
-  }
-  if (/^[0-9a-fA-F]{8}$/.test(hex)) {
-    return Number.parseInt(hex, 16) >>> 0;
-  }
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) ? parsed >>> 0 : undefined;
-}
-
-function parseTextBaseline(value: string | number | undefined): number | undefined {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return Math.trunc(value);
-  }
-  if (typeof value !== "string") {
-    return undefined;
-  }
-  switch (value.trim().toLowerCase()) {
-    case "normal":
-      return TextBaseline.TEXT_BASELINE_NORMAL;
-    case "superscript":
-    case "super":
-      return TextBaseline.TEXT_BASELINE_SUPERSCRIPT;
-    case "subscript":
-    case "sub":
-      return TextBaseline.TEXT_BASELINE_SUBSCRIPT;
-    default:
-      return undefined;
-  }
-}
-
-function pbEncodeRichTextRunStylePayload(run: HierarchyRichTextRun): Uint8Array {
-  const style = run.style ?? run;
-  const out: number[] = [];
-  const foreground = parseArgb(style.foreground ?? style.color ?? style.fg);
-  if (foreground != null) {
-    out.push(...pbEncodeUint32Field(TextRunStyleFields.foreground, foreground));
-  }
-
-  const fontSource = style.font ?? style;
-  const font = pbEncodeFontPayload({
-    family: fontSource.family,
-    families: fontSource.families,
-    size: fontSource.size,
-    bold: fontSource.bold,
-    italic: fontSource.italic,
-    underline: fontSource.underline,
-    strikethrough: fontSource.strikethrough ?? fontSource.strike,
-    stretch: fontSource.stretch,
-  });
-  if (font.length > 0) {
-    out.push(...pbEncodeMessageField(TextRunStyleFields.font, font));
-  }
-
-  const baseline = parseTextBaseline(style.baseline);
-  if (baseline != null) {
-    out.push(...pbEncodeInt32Field(TextRunStyleFields.baseline, baseline));
-  }
-  const linkUrl = style.linkUrl ?? style.link_url ?? style.href;
-  if (linkUrl != null && linkUrl !== "") {
-    out.push(...pbEncodeStringField(TextRunStyleFields.link_url, linkUrl));
-  }
-  return new Uint8Array(out);
-}
-
-function pbEncodeRichTextRun(run: HierarchyRichTextRun): Uint8Array {
-  const start = run.start ?? run.startIndex ?? run.start_index;
-  if (start == null || !Number.isFinite(start) || start < 0) {
-    return new Uint8Array();
-  }
-  const out: number[] = [];
-  out.push(...pbEncodeUint32Field(TextFormatRunFields.start_index, Math.trunc(start)));
-  const style = pbEncodeRichTextRunStylePayload(run);
-  if (style.length > 0) {
-    out.push(...pbEncodeMessageField(TextFormatRunFields.style, style));
-  }
-  return new Uint8Array(out);
-}
-
-function hierarchyRichTextRuns(
-  richText: HierarchyRichTextCell["richText"] | HierarchyRichTextCell["rich_text"],
-): HierarchyRichTextRun[] {
-  if (Array.isArray(richText)) {
-    return richText;
-  }
-  return richText?.runs ?? [];
-}
-
-function hierarchyDetailsCell(details: HierarchyDemoRow["Details"]): {
-  text: string;
-  richText?: Uint8Array;
-} {
-  if (typeof details === "string") {
-    return { text: details };
-  }
-  if (details == null) {
-    return { text: "" };
-  }
-
-  const text = details.text ?? details.value ?? "";
-  const runs = hierarchyRichTextRuns(details.richText ?? details.rich_text);
-  const encodedRuns = runs.map(pbEncodeRichTextRun).filter((run) => run.length > 0);
-  if (text === "" || encodedRuns.length === 0) {
-    return { text };
-  }
-
-  const out: number[] = [];
-  for (const run of encodedRuns) {
-    out.push(...pbEncodeMessageField(RichTextFields.runs, run));
-  }
-  return { text, richText: new Uint8Array(out) };
-}
-
-function pbEncodeBarcodeEncodingOptions(plan: BarcodeDemoPlan): Uint8Array {
-  const out: number[] = [];
-  if (plan.checkDigit !== BarcodeCheckDigitMode.CHECK_DIGIT_DEFAULT) {
-    out.push(...pbEncodeInt32Field(BarcodeEncodingOptionsFields.check_digit, plan.checkDigit));
-  }
-  if (plan.textEncoding !== BarcodeTextEncoding.BARCODE_TEXT_AUTO) {
-    out.push(...pbEncodeInt32Field(BarcodeEncodingOptionsFields.text_encoding, plan.textEncoding));
-  }
-  if (plan.qrEcc !== BarcodeQrErrorCorrection.QR_ECC_DEFAULT) {
-    out.push(...pbEncodeInt32Field(BarcodeEncodingOptionsFields.qr_ecc, plan.qrEcc));
-  }
-  return new Uint8Array(out);
-}
-
-function pbEncodeBarcodeRenderOptions(plan: BarcodeDemoPlan): Uint8Array {
-  const out: number[] = [];
-  if (plan.foreground !== 0) {
-    out.push(...pbEncodeUint32Field(BarcodeRenderOptionsFields.foreground, plan.foreground));
-  }
-  if (plan.background !== 0) {
-    out.push(...pbEncodeUint32Field(BarcodeRenderOptionsFields.background, plan.background));
-  }
-  if (plan.alignment !== ImageAlignment.IMG_ALIGN_STRETCH) {
-    out.push(...pbEncodeInt32Field(BarcodeRenderOptionsFields.alignment, plan.alignment));
-  }
-  if (plan.moduleSize !== 0) {
-    out.push(...pbEncodeUint32Field(BarcodeRenderOptionsFields.module_size, plan.moduleSize));
-  }
-  if (plan.quietZone !== 0) {
-    out.push(...pbEncodeUint32Field(BarcodeRenderOptionsFields.quiet_zone, plan.quietZone));
-  }
-  if (plan.barHeight !== 0) {
-    out.push(...pbEncodeUint32Field(BarcodeRenderOptionsFields.bar_height, plan.barHeight));
-  }
-  if (plan.narrowBarWidth !== 0) {
-    out.push(...pbEncodeUint32Field(BarcodeRenderOptionsFields.narrow_bar_width, plan.narrowBarWidth));
-  }
-  out.push(...pbEncodeTag(BarcodeRenderOptionsFields.show_size_warning, 0), ...pbEncodeBool(true));
-  out.push(...pbEncodeTag(BarcodeRenderOptionsFields.use_full_rect, 0), ...pbEncodeBool(true));
-  return new Uint8Array(out);
-}
-
-function pbEncodeBarcodeCaptionOptions(record: BarcodeJsonRow, plan: BarcodeDemoPlan): Uint8Array {
-  const out: number[] = [];
-  out.push(...pbEncodeInt32Field(BarcodeCaptionOptionsFields.position, plan.captionPosition));
-  out.push(...pbEncodeStringField(BarcodeCaptionOptionsFields.text, record.Label));
-  out.push(...pbEncodeUint32Field(BarcodeCaptionOptionsFields.color, plan.captionColor));
-  return new Uint8Array(out);
-}
-
-function pbEncodeBarcodeData(record: BarcodeJsonRow, plan: BarcodeDemoPlan): Uint8Array {
-  const out: number[] = [];
-  out.push(...pbEncodeInt32Field(BarcodeDataFields.symbology, plan.symbology));
-  const encoding = pbEncodeBarcodeEncodingOptions(plan);
-  if (encoding.length > 0) {
-    out.push(...pbEncodeMessageField(BarcodeDataFields.encoding, encoding));
-  }
-  const render = pbEncodeBarcodeRenderOptions(plan);
-  if (render.length > 0) {
-    out.push(...pbEncodeMessageField(BarcodeDataFields.render, render));
-  }
-  const caption = pbEncodeBarcodeCaptionOptions(record, plan);
-  if (caption.length > 0) {
-    out.push(...pbEncodeMessageField(BarcodeDataFields.caption, caption));
-  }
-  return new Uint8Array(out);
-}
-
-function pbEncodeCellUpdate(options: {
-  row: number;
-  col: number;
-  valueText?: string;
-  style?: DemoCellStyleSpec;
-  barcode?: Uint8Array;
-}): Uint8Array {
-  const out: number[] = [];
-  out.push(...pbEncodeInt32Field(CellUpdateFields.row, options.row));
-  out.push(...pbEncodeInt32Field(CellUpdateFields.col, options.col));
-  if (options.valueText != null) {
-    out.push(...pbEncodeMessageField(CellUpdateFields.value, pbEncodeCellValueText(options.valueText)));
-  }
-  if (options.style != null) {
-    const style = pbEncodeCellStylePayload(options.style);
-    if (style.length > 0) {
-      out.push(...pbEncodeMessageField(CellUpdateFields.style, style));
-    }
-  }
-  if (options.barcode != null) {
-    out.push(...pbEncodeMessageField(CellUpdateFields.barcode, options.barcode));
-  }
-  return new Uint8Array(out);
-}
-
-function pbEncodeUpdateCellsRequest(
-  gridId: number,
-  cells: readonly Uint8Array[],
-  atomic: boolean,
-): Uint8Array {
-  const out: number[] = [];
-  out.push(...pbEncodeTag(UpdateCellsRequestFields.grid_id, 0), ...pbEncodeVarint(BigInt(Math.trunc(gridId))));
-  for (const cell of cells) {
-    out.push(...pbEncodeMessageField(UpdateCellsRequestFields.cells, cell));
-  }
-  out.push(...pbEncodeTag(UpdateCellsRequestFields.atomic, 0), ...pbEncodeBool(atomic));
-  return new Uint8Array(out);
-}
-
-function pbEncodeTreeNodeCell(options: {
-  nodeId: string;
-  col: number;
-  text: string;
-  style?: DemoCellStyleSpec;
-  richText?: Uint8Array;
-}): Uint8Array {
-  const out: number[] = [];
-  out.push(...pbEncodeStringField(NodeCellUpdateFields.node_id, options.nodeId));
-  out.push(...pbEncodeInt32Field(NodeCellUpdateFields.col, options.col));
-  out.push(...pbEncodeMessageField(NodeCellUpdateFields.value, pbEncodeCellValueText(options.text)));
-  if (options.style != null) {
-    const style = pbEncodeCellStylePayload(options.style);
-    if (style.length > 0) {
-      out.push(...pbEncodeMessageField(NodeCellUpdateFields.style, style));
-    }
-  }
-  if (options.richText != null && options.richText.length > 0) {
-    out.push(...pbEncodeMessageField(NodeCellUpdateFields.rich_text, options.richText));
-  }
-  return new Uint8Array(out);
-}
-
-function pbEncodeHierarchyTreeNode(
-  row: HierarchyDemoRow,
-  hasChildren: boolean,
-): Uint8Array {
-  const out: number[] = [];
-  out.push(...pbEncodeStringField(TreeNodeFields.node_id, row.Id));
-  if (row.ParentId != null && row.ParentId !== "") {
-    out.push(...pbEncodeStringField(TreeNodeFields.parent_id, row.ParentId));
-  }
-  const details = hierarchyDetailsCell(row.Details);
-  const cells = [
-    pbEncodeTreeNodeCell({ nodeId: row.Id, col: HIERARCHY_NAME_COL, text: row.Name }),
-    pbEncodeTreeNodeCell({
-      nodeId: row.Id,
-      col: HIERARCHY_TYPE_COL,
-      text: row.Type,
-      style: row.Type === "Folder" ? { foreground: 0xFF92400E } : undefined,
-    }),
-    pbEncodeTreeNodeCell({ nodeId: row.Id, col: 2, text: row.Size }),
-    pbEncodeTreeNodeCell({ nodeId: row.Id, col: 3, text: row.Modified }),
-    pbEncodeTreeNodeCell({ nodeId: row.Id, col: 4, text: row.Permissions }),
-    pbEncodeTreeNodeCell({
-      nodeId: row.Id,
-      col: HIERARCHY_DETAILS_COL,
-      text: details.text,
-      richText: details.richText,
-    }),
-    pbEncodeTreeNodeCell({
-      nodeId: row.Id,
-      col: HIERARCHY_ACTION_COL,
-      text: row.Action,
-      style: { foreground: 0xFF2563EB },
-    }),
-    pbEncodeTreeNodeCell({
-      nodeId: row.Id,
-      col: HIERARCHY_ICON_COL,
-      text: row.Type === "Folder" ? HIERARCHY_FOLDER_ICON : "",
-    }),
-  ];
-  cells.forEach((cell) => {
-    out.push(...pbEncodeMessageField(TreeNodeFields.cells, cell));
-  });
-  out.push(...pbEncodeInt32Field(
-    TreeNodeFields.children_state,
-    hasChildren ? NodeChildrenState.NODE_CHILDREN_LOADED : NodeChildrenState.NODE_LEAF,
-  ));
-  return new Uint8Array(out);
-}
-
-function pbEncodeHierarchyLoadTreeRequest(
-  gridId: number,
-  rows: ReadonlyArray<HierarchyDemoRow>,
-): Uint8Array {
-  const parentIds = new Set(rows.map((row) => row.ParentId).filter((id): id is string => !!id));
-  const out: number[] = [];
-  out.push(...pbEncodeTag(LoadTreeRequestFields.grid_id, 0), ...pbEncodeVarint(BigInt(Math.trunc(gridId))));
-  rows.forEach((row) => {
-    out.push(...pbEncodeMessageField(LoadTreeRequestFields.nodes, pbEncodeHierarchyTreeNode(row, parentIds.has(row.Id))));
-  });
-  out.push(...pbEncodeTag(LoadTreeRequestFields.replace, 0), ...pbEncodeBool(true));
-  return new Uint8Array(out);
-}
-
-function pbEncodeGridLinesPayload(color: number): Uint8Array {
-  const out: number[] = [];
-  out.push(...pbEncodeInt32Field(GridLinesFields.style, GridLineStyle.GRIDLINE_SOLID));
-  out.push(...pbEncodeUint32Field(GridLinesFields.color, color));
-  return new Uint8Array(out);
-}
-
-function pbEncodeRegionStylePayload(background: number, foreground: number, gridColor: number): Uint8Array {
-  const out: number[] = [];
-  out.push(...pbEncodeUint32Field(RegionStyleFields.background, background));
-  out.push(...pbEncodeUint32Field(RegionStyleFields.foreground, foreground));
-  out.push(...pbEncodeMessageField(RegionStyleFields.grid_lines, pbEncodeGridLinesPayload(gridColor)));
-  return new Uint8Array(out);
-}
-
-function pbEncodeHeaderStylePayload(color: number): Uint8Array {
-  const separator: number[] = [];
-  separator.push(...pbEncodeTag(HeaderSeparatorFields.enabled, 0), ...pbEncodeBool(true));
-  separator.push(...pbEncodeUint32Field(HeaderSeparatorFields.color, color));
-  separator.push(...pbEncodeInt32Field(HeaderSeparatorFields.width, 1));
-
-  const resizeHandle: number[] = [];
-  resizeHandle.push(...pbEncodeTag(HeaderResizeHandleFields.enabled, 0), ...pbEncodeBool(true));
-  resizeHandle.push(...pbEncodeUint32Field(HeaderResizeHandleFields.color, color));
-  resizeHandle.push(...pbEncodeInt32Field(HeaderResizeHandleFields.width, 1));
-  resizeHandle.push(...pbEncodeInt32Field(HeaderResizeHandleFields.hit_width, 6));
-
-  const out: number[] = [];
-  out.push(...pbEncodeMessageField(HeaderStyleFields.separator, new Uint8Array(separator)));
-  out.push(...pbEncodeMessageField(HeaderStyleFields.resize_handle, new Uint8Array(resizeHandle)));
-  return new Uint8Array(out);
-}
-
-function pbEncodeHighlightStylePayload(options: {
-  background?: number;
-  foreground?: number;
-  borderStyle?: number;
-  borderColor?: number;
-  fillHandle?: number;
-  fillHandleColor?: number;
-}): Uint8Array {
-  const out: number[] = [];
-  if (options.background != null) {
-    out.push(...pbEncodeUint32Field(HighlightStyleFields.background, options.background));
-  }
-  if (options.foreground != null) {
-    out.push(...pbEncodeUint32Field(HighlightStyleFields.foreground, options.foreground));
-  }
-  if (options.borderStyle != null && options.borderColor != null) {
-    out.push(...pbEncodeMessageField(HighlightStyleFields.borders, pbEncodeBordersAll(options.borderStyle, options.borderColor)));
-  }
-  if (options.fillHandle != null) {
-    out.push(...pbEncodeInt32Field(HighlightStyleFields.fill_handle, options.fillHandle));
-  }
-  if (options.fillHandleColor != null) {
-    out.push(...pbEncodeUint32Field(HighlightStyleFields.fill_handle_color, options.fillHandleColor));
-  }
-  return new Uint8Array(out);
-}
-
-function pbEncodeColumnDef(
-  index: number,
-  setup: DemoColumnSetup,
-): Uint8Array {
-  const out: number[] = [];
-  out.push(...pbEncodeInt32Field(ColumnDefFields.index, index));
-  if (setup.width != null) {
-    out.push(...pbEncodeInt32Field(ColumnDefFields.width, setup.width));
-  }
-  out.push(...pbEncodeStringField(ColumnDefFields.caption, setup.caption));
-  if (setup.align != null) {
-    out.push(...pbEncodeInt32Field(ColumnDefFields.align, setup.align));
-  }
-  if (setup.dataType != null) {
-    out.push(...pbEncodeInt32Field(ColumnDefFields.data_type, setup.dataType));
-  }
-  if (setup.format != null) {
-    out.push(...pbEncodeStringField(ColumnDefFields.format, setup.format));
-  }
-  out.push(...pbEncodeStringField(ColumnDefFields.key, setup.key));
-  if (setup.dropdownItems != null) {
-    out.push(...pbEncodeMessageField(ColumnDefFields.dropdown, pbEncodeDropdownFromLabels(setup.dropdownItems)));
-  }
-  if (setup.hidden != null) {
-    out.push(...pbEncodeTag(ColumnDefFields.hidden, 0), ...pbEncodeBool(setup.hidden));
-  }
-  if (setup.span != null) {
-    out.push(...pbEncodeTag(ColumnDefFields.span, 0), ...pbEncodeBool(setup.span));
-  }
-  if (setup.interaction != null) {
-    out.push(...pbEncodeInt32Field(ColumnDefFields.interaction, setup.interaction));
-  }
-  return new Uint8Array(out);
-}
-
-function pbEncodeDropdownFromLabels(items: string): Uint8Array {
-  const out: number[] = [];
-  let source = items;
-  if (source.startsWith("|")) {
-    out.push(...pbEncodeTag(DropdownFields.allow_custom_value, 0), ...pbEncodeBool(true));
-    source = source.slice(1);
-  }
-  for (const label of source.split("|")) {
-    if (!label) continue;
-    out.push(...pbEncodeMessageField(
-      DropdownFields.items,
-      new Uint8Array(pbEncodeStringField(DropdownItemFields.label, label)),
-    ));
-  }
-  return new Uint8Array(out);
-}
-
-function dropdownFromLabels(items: string): VolvoxGridDropdown {
-  let source = items;
-  const dropdown: VolvoxGridDropdown = {
-    items: [],
-    allowCustomValue: source.startsWith("|"),
-  };
-  if (dropdown.allowCustomValue) {
-    source = source.slice(1);
-  }
-  for (const label of source.split("|")) {
-    if (!label) continue;
-    dropdown.items.push({ label });
-  }
-  return dropdown;
-}
-
-function pbEncodeDefineColumnsRequest(gridId: number, columns: readonly DemoColumnSetup[]): Uint8Array {
-  const out: number[] = [];
-  out.push(...pbEncodeTag(DefineColumnsRequestFields.grid_id, 0), ...pbEncodeVarint(BigInt(gridId)));
-  columns.forEach((column, index) => {
-    out.push(...pbEncodeMessageField(DefineColumnsRequestFields.columns, pbEncodeColumnDef(index, column)));
-  });
-  return new Uint8Array(out);
-}
-
-function pbEncodeRowDef(index: number, row: DemoRowSetup): Uint8Array {
-  const out: number[] = [];
-  out.push(...pbEncodeInt32Field(RowDefFields.index, index));
-  if (row.height != null) {
-    out.push(...pbEncodeInt32Field(RowDefFields.height, row.height));
-  }
-  if (row.isSubtotal != null) {
-    out.push(...pbEncodeTag(RowDefFields.is_subtotal, 0), ...pbEncodeBool(row.isSubtotal));
-  }
-  if (row.outlineLevel != null) {
-    out.push(...pbEncodeInt32Field(RowDefFields.outline_level, row.outlineLevel));
-  }
-  return new Uint8Array(out);
-}
-
-function pbEncodeDefineRowsRequest(
-  gridId: number,
-  rows: ReadonlyArray<DemoRowSetup>,
-): Uint8Array {
-  const out: number[] = [];
-  out.push(...pbEncodeTag(DefineRowsRequestFields.grid_id, 0), ...pbEncodeVarint(BigInt(gridId)));
-  rows.forEach((row, index) => {
-    out.push(...pbEncodeMessageField(DefineRowsRequestFields.rows, pbEncodeRowDef(index, row)));
-  });
-  return new Uint8Array(out);
-}
-
-function hierarchyOutlineWidth(maxOutlineDepth: number): number {
-  const buttonCount = Math.max(1, maxOutlineDepth + 1);
-  return Math.max(56, buttonCount * 20);
-}
-
-function hierarchyExpanderWidth(maxOutlineDepth: number): number {
-  return hierarchyOutlineWidth(maxOutlineDepth) + 280;
-}
-
-function applyHierarchyIconTheme(wasmModule: WasmModule, id: number): void {
-  const patchFontNames = (wasmModule as any).patch_icon_theme_default_font_names as
-    | ((gridId: number, fontNames: string[]) => void)
-    | undefined;
-  let patchedFontFamily = false;
-  if (typeof patchFontNames === "function") {
-    patchFontNames(id, ["Material Icons", "MaterialIcons"]);
-    patchedFontFamily = true;
-  }
-
-  const patchTextStyle = (wasmModule as any).patch_icon_theme_default_text_style as
-    | ((gridId: number, fontName?: string | null, fontSize?: number | null, bold?: boolean | null, italic?: boolean | null, color?: number | null) => void)
-    | undefined;
-  if (!patchedFontFamily && typeof patchTextStyle === "function") {
-    patchTextStyle(id, "Material Icons", null, null, null, null);
-  }
-
-  const setIconSlot = (wasmModule as any).set_icon_theme_slot as
-    | ((gridId: number, slot: number, icon: string) => void)
-    | undefined;
-  if (typeof setIconSlot === "function") {
-    setIconSlot(id, ICON_SLOT_TREE_EXPANDED, MATERIAL_ICON_EXPAND_MORE);
-    setIconSlot(id, ICON_SLOT_TREE_COLLAPSED, MATERIAL_ICON_CHEVRON_RIGHT);
-  }
-}
-
-function pbEncodeHierarchyOutlineConfig(maxOutlineDepth: number, maxOutlineLevel: number): Uint8Array {
-  const outlineWidth = hierarchyOutlineWidth(maxOutlineDepth);
-  const expanderWidth = hierarchyExpanderWidth(maxOutlineDepth);
-  const layout: number[] = [];
-  layout.push(...pbEncodeInt32Field(LayoutConfigFields.fixed_rows, 0));
-
-  const style: number[] = [];
-  style.push(...pbEncodeUint32Field(StyleConfigFields.background, 0xFFFFFFFF));
-  style.push(...pbEncodeUint32Field(StyleConfigFields.foreground, 0xFF1C1917));
-  style.push(...pbEncodeUint32Field(StyleConfigFields.alternate_background, 0xFFF5F5F4));
-  style.push(...pbEncodeUint32Field(StyleConfigFields.progress_color, 0xFFF59E0B));
-  style.push(...pbEncodeMessageField(StyleConfigFields.grid_lines, pbEncodeGridLinesPayload(0xFFE7E5E4)));
-  style.push(...pbEncodeMessageField(StyleConfigFields.fixed, pbEncodeRegionStylePayload(0xFFF5F5F4, 0xFF44403C, 0xFFD6D3D1)));
-  style.push(...pbEncodeMessageField(StyleConfigFields.frozen, pbEncodeRegionStylePayload(0xFFFFFFFF, 0xFF1C1917, 0xFFD6D3D1)));
-  style.push(...pbEncodeMessageField(StyleConfigFields.header, pbEncodeHeaderStylePayload(0xFFD6D3D1)));
-  style.push(...pbEncodeUint32Field(StyleConfigFields.sheet_background, 0xFFFAFAF9));
-  style.push(...pbEncodeUint32Field(StyleConfigFields.sheet_border, 0xFFD6D3D1));
-
-  const selectionStyle = pbEncodeHighlightStylePayload({
-    background: 0xFFD97706,
-    foreground: 0xFFFFFFFF,
-    fillHandle: FillHandlePosition.FILL_HANDLE_NONE,
-    fillHandleColor: 0xFFF59E0B,
-  });
-  const activeCellStyle = pbEncodeHighlightStylePayload({
-    background: 0x22000000,
-    foreground: 0xFFFFFFFF,
-    borderStyle: BorderStyle.BORDER_THICK,
-    borderColor: 0xFFF59E0B,
-  });
-  const hover: number[] = [];
-  hover.push(...pbEncodeTag(HoverConfigFields.cell, 0), ...pbEncodeBool(true));
-  hover.push(...pbEncodeMessageField(HoverConfigFields.cell_style, pbEncodeHighlightStylePayload({
-    background: 0x1AD97706,
-    borderStyle: BorderStyle.BORDER_THIN,
-    borderColor: 0xFFF59E0B,
-  })));
-  const selection: number[] = [];
-  selection.push(...pbEncodeInt32Field(SelectionConfigFields.mode, SelectionMode.SELECTION_FREE));
-  selection.push(...pbEncodeMessageField(SelectionConfigFields.style, selectionStyle));
-  selection.push(...pbEncodeMessageField(SelectionConfigFields.hover, new Uint8Array(hover)));
-  selection.push(...pbEncodeMessageField(SelectionConfigFields.active_cell_style, activeCellStyle));
-
-  const editing: number[] = [];
-  editing.push(...pbEncodeInt32Field(EditConfigFields.trigger, EditTrigger.EDIT_TRIGGER_NONE));
-  editing.push(...pbEncodeInt32Field(EditConfigFields.tab_behavior, TabBehavior.TAB_CELLS));
-  editing.push(...pbEncodeInt32Field(EditConfigFields.dropdown_trigger, DropdownTrigger.DROPDOWN_NEVER));
-
-  const scrolling: number[] = [];
-  scrolling.push(...pbEncodeInt32Field(ScrollConfigFields.scrollbars, ScrollBarsMode.SCROLLBAR_BOTH));
-  scrolling.push(...pbEncodeTag(ScrollConfigFields.fling_enabled, 0), ...pbEncodeBool(true));
-  scrolling.push(...pbEncodeFloatField(ScrollConfigFields.fling_impulse_gain, 220.0));
-  scrolling.push(...pbEncodeFloatField(ScrollConfigFields.fling_friction, 0.9));
-
-  const outline: number[] = [];
-  outline.push(...pbEncodeInt32Field(OutlineConfigFields.tree_indicator, TreeIndicatorStyle.TREE_INDICATOR_CONNECTORS_LEAF));
-  outline.push(...pbEncodeUint32Field(OutlineConfigFields.tree_color, 0xFFA8A29E));
-  outline.push(...pbEncodeInt32Field(OutlineConfigFields.indicator_indent, 20));
-  outline.push(...pbEncodeInt32Field(OutlineConfigFields.max_levels, Math.max(0, maxOutlineLevel)));
-  outline.push(...pbEncodeTag(OutlineConfigFields.show_level_buttons, 0), ...pbEncodeBool(true));
-  outline.push(...pbEncodeInt32Field(OutlineConfigFields.label_column, HIERARCHY_NAME_COL));
-  outline.push(...pbEncodeInt32Field(OutlineConfigFields.icon_column, HIERARCHY_ICON_COL));
-
-  const resize: number[] = [];
-  resize.push(...pbEncodeTag(ResizePolicyFields.columns, 0), ...pbEncodeBool(true));
-  resize.push(...pbEncodeTag(ResizePolicyFields.rows, 0), ...pbEncodeBool(false));
-  const freeze: number[] = [];
-  freeze.push(...pbEncodeTag(FreezePolicyFields.columns, 0), ...pbEncodeBool(true));
-  freeze.push(...pbEncodeTag(FreezePolicyFields.rows, 0), ...pbEncodeBool(true));
-  const headerFeatures: number[] = [];
-  headerFeatures.push(...pbEncodeTag(HeaderFeaturesFields.sort, 0), ...pbEncodeBool(false));
-  headerFeatures.push(...pbEncodeTag(HeaderFeaturesFields.reorder, 0), ...pbEncodeBool(false));
-  headerFeatures.push(...pbEncodeTag(HeaderFeaturesFields.chooser, 0), ...pbEncodeBool(false));
-  const interaction: number[] = [];
-  interaction.push(...pbEncodeMessageField(InteractionConfigFields.resize, new Uint8Array(resize)));
-  interaction.push(...pbEncodeMessageField(InteractionConfigFields.freeze, new Uint8Array(freeze)));
-  interaction.push(...pbEncodeTag(InteractionConfigFields.auto_size_mouse, 0), ...pbEncodeBool(true));
-  interaction.push(...pbEncodeMessageField(InteractionConfigFields.header_features, new Uint8Array(headerFeatures)));
-
-  const colTop: number[] = [];
-  colTop.push(...pbEncodeTag(ColIndicatorConfigFields.visible, 0), ...pbEncodeBool(true));
-  colTop.push(...pbEncodeInt32Field(ColIndicatorConfigFields.band_rows, 1));
-  colTop.push(...pbEncodeUint32Field(
-    ColIndicatorConfigFields.mode_bits,
-    ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT,
-  ));
-  colTop.push(...pbEncodeUint32Field(ColIndicatorConfigFields.background, 0xFFFAFAF9));
-  colTop.push(...pbEncodeUint32Field(ColIndicatorConfigFields.foreground, 0xFF1C1917));
-  colTop.push(...pbEncodeUint32Field(ColIndicatorConfigFields.grid_color, 0xFFD6D3D1));
-  colTop.push(...pbEncodeTag(ColIndicatorConfigFields.allow_resize, 0), ...pbEncodeBool(true));
-  const rowStart: number[] = [];
-  rowStart.push(...pbEncodeTag(RowIndicatorConfigFields.visible, 0), ...pbEncodeBool(true));
-  rowStart.push(...pbEncodeInt32Field(RowIndicatorConfigFields.width, expanderWidth));
-  rowStart.push(...pbEncodeUint32Field(RowIndicatorConfigFields.background, 0xFFFAFAF9));
-  rowStart.push(...pbEncodeUint32Field(RowIndicatorConfigFields.foreground, 0xFF57534E));
-  rowStart.push(...pbEncodeUint32Field(RowIndicatorConfigFields.grid_color, 0xFFD6D3D1));
-  rowStart.push(...pbEncodeTag(RowIndicatorConfigFields.auto_size, 0), ...pbEncodeBool(true));
-  rowStart.push(...pbEncodeTag(RowIndicatorConfigFields.allow_resize, 0), ...pbEncodeBool(true));
-  const expanderSlot: number[] = [];
-  expanderSlot.push(...pbEncodeInt32Field(RowIndicatorSlotFields.kind, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_EXPANDER));
-  expanderSlot.push(...pbEncodeInt32Field(RowIndicatorSlotFields.width, expanderWidth));
-  expanderSlot.push(...pbEncodeTag(RowIndicatorSlotFields.visible, 0), ...pbEncodeBool(true));
-  rowStart.push(...pbEncodeMessageField(RowIndicatorConfigFields.slots, new Uint8Array(expanderSlot)));
-  const cornerTopStart: number[] = [];
-  cornerTopStart.push(...pbEncodeTag(CornerIndicatorConfigFields.visible, 0), ...pbEncodeBool(true));
-  cornerTopStart.push(...pbEncodeUint32Field(CornerIndicatorConfigFields.background, 0xFFFAFAF9));
-  cornerTopStart.push(...pbEncodeUint32Field(CornerIndicatorConfigFields.foreground, 0xFF57534E));
-  const outlineLevelsSlot: number[] = [];
-  outlineLevelsSlot.push(...pbEncodeInt32Field(CornerIndicatorSlotFields.kind, CornerIndicatorSlotKind.CORNER_SLOT_OUTLINE_LEVELS));
-  outlineLevelsSlot.push(...pbEncodeInt32Field(CornerIndicatorSlotFields.width, outlineWidth));
-  outlineLevelsSlot.push(...pbEncodeTag(CornerIndicatorSlotFields.visible, 0), ...pbEncodeBool(true));
-  cornerTopStart.push(...pbEncodeMessageField(CornerIndicatorConfigFields.slots, new Uint8Array(outlineLevelsSlot)));
-  const indicators: number[] = [];
-  indicators.push(...pbEncodeMessageField(IndicatorsConfigFields.col_top, new Uint8Array(colTop)));
-  indicators.push(...pbEncodeMessageField(IndicatorsConfigFields.row_start, new Uint8Array(rowStart)));
-  indicators.push(...pbEncodeMessageField(IndicatorsConfigFields.corner_top_start, new Uint8Array(cornerTopStart)));
-  indicators.push(...pbEncodeInt32Field(IndicatorsConfigFields.appearance, IndicatorAppearance.INDICATOR_APPEARANCE_MODERN));
-  const gridConfig: number[] = [];
-  gridConfig.push(...pbEncodeMessageField(GridConfigFields.layout, new Uint8Array(layout)));
-  gridConfig.push(...pbEncodeMessageField(GridConfigFields.style, new Uint8Array(style)));
-  gridConfig.push(...pbEncodeMessageField(GridConfigFields.selection, new Uint8Array(selection)));
-  gridConfig.push(...pbEncodeMessageField(GridConfigFields.editing, new Uint8Array(editing)));
-  gridConfig.push(...pbEncodeMessageField(GridConfigFields.scrolling, new Uint8Array(scrolling)));
-  gridConfig.push(...pbEncodeMessageField(GridConfigFields.outline, new Uint8Array(outline)));
-  gridConfig.push(...pbEncodeMessageField(GridConfigFields.interaction, new Uint8Array(interaction)));
-  gridConfig.push(...pbEncodeMessageField(GridConfigFields.indicators, new Uint8Array(indicators)));
-  return new Uint8Array(gridConfig);
-}
-
-function pbEncodeSalesDemoConfig(): Uint8Array {
-  const layout: number[] = [];
-  layout.push(...pbEncodeInt32Field(LayoutConfigFields.fixed_rows, 0));
-  layout.push(...pbEncodeTag(LayoutConfigFields.extend_last_col, 0), ...pbEncodeBool(true));
-
-  const style: number[] = [];
-  style.push(...pbEncodeUint32Field(StyleConfigFields.background, 0xFFFFFFFF));
-  style.push(...pbEncodeUint32Field(StyleConfigFields.foreground, 0xFF111827));
-  style.push(...pbEncodeUint32Field(StyleConfigFields.alternate_background, 0xFFF9FAFB));
-  style.push(...pbEncodeUint32Field(StyleConfigFields.progress_color, 0xFF818CF8));
-  style.push(...pbEncodeMessageField(StyleConfigFields.grid_lines, pbEncodeGridLinesPayload(0xFFE5E7EB)));
-  style.push(...pbEncodeMessageField(StyleConfigFields.fixed, pbEncodeRegionStylePayload(0xFFF3F4F6, 0xFF374151, 0xFFD1D5DB)));
-  style.push(...pbEncodeMessageField(StyleConfigFields.frozen, pbEncodeRegionStylePayload(0xFFFFFFFF, 0xFF111827, 0xFFD1D5DB)));
-  style.push(...pbEncodeMessageField(StyleConfigFields.header, pbEncodeHeaderStylePayload(0xFFD1D5DB)));
-  style.push(...pbEncodeUint32Field(StyleConfigFields.sheet_background, 0xFFFAFAFB));
-  style.push(...pbEncodeUint32Field(StyleConfigFields.sheet_border, 0xFFD1D5DB));
-
-  const selectionStyle = pbEncodeHighlightStylePayload({
-    background: 0xFF6366F1,
-    foreground: 0xFFFFFFFF,
-    fillHandle: FillHandlePosition.FILL_HANDLE_NONE,
-    fillHandleColor: 0xFF818CF8,
-  });
-  const activeCellStyle = pbEncodeHighlightStylePayload({
-    background: 0x22000000,
-    foreground: 0xFFFFFFFF,
-    borderStyle: BorderStyle.BORDER_THICK,
-    borderColor: 0xFF818CF8,
-  });
-  const hover: number[] = [];
-  hover.push(...pbEncodeTag(HoverConfigFields.row, 0), ...pbEncodeBool(true));
-  hover.push(...pbEncodeTag(HoverConfigFields.column, 0), ...pbEncodeBool(true));
-  hover.push(...pbEncodeTag(HoverConfigFields.cell, 0), ...pbEncodeBool(true));
-  hover.push(...pbEncodeMessageField(HoverConfigFields.row_style, pbEncodeHighlightStylePayload({ background: 0x106366F1 })));
-  hover.push(...pbEncodeMessageField(HoverConfigFields.column_style, pbEncodeHighlightStylePayload({ background: 0x106366F1 })));
-  hover.push(...pbEncodeMessageField(HoverConfigFields.cell_style, pbEncodeHighlightStylePayload({
-    background: 0x1E818CF8,
-    borderStyle: BorderStyle.BORDER_THIN,
-    borderColor: 0xFF818CF8,
-  })));
-  const selection: number[] = [];
-  selection.push(...pbEncodeInt32Field(SelectionConfigFields.mode, SelectionMode.SELECTION_FREE));
-  selection.push(...pbEncodeMessageField(SelectionConfigFields.style, selectionStyle));
-  selection.push(...pbEncodeMessageField(SelectionConfigFields.hover, new Uint8Array(hover)));
-  selection.push(...pbEncodeMessageField(SelectionConfigFields.active_cell_style, activeCellStyle));
-
-  const editing: number[] = [];
-  editing.push(...pbEncodeInt32Field(EditConfigFields.trigger, EditTrigger.EDIT_TRIGGER_NONE));
-  editing.push(...pbEncodeInt32Field(EditConfigFields.tab_behavior, TabBehavior.TAB_CELLS));
-  editing.push(...pbEncodeInt32Field(EditConfigFields.dropdown_trigger, DropdownTrigger.DROPDOWN_ALWAYS));
-  editing.push(...pbEncodeTag(EditConfigFields.dropdown_search, 0), ...pbEncodeBool(false));
-
-  const scrolling: number[] = [];
-  scrolling.push(...pbEncodeInt32Field(ScrollConfigFields.scrollbars, ScrollBarsMode.SCROLLBAR_BOTH));
-  scrolling.push(...pbEncodeTag(ScrollConfigFields.fling_enabled, 0), ...pbEncodeBool(true));
-  scrolling.push(...pbEncodeFloatField(ScrollConfigFields.fling_impulse_gain, 220.0));
-  scrolling.push(...pbEncodeFloatField(ScrollConfigFields.fling_friction, 0.9));
-
-  const outline: number[] = [];
-  outline.push(...pbEncodeInt32Field(OutlineConfigFields.tree_indicator, TreeIndicatorStyle.TREE_INDICATOR_NONE));
-  outline.push(...pbEncodeInt32Field(OutlineConfigFields.group_total_position, GroupTotalPosition.GROUP_TOTAL_BELOW));
-  outline.push(...pbEncodeTag(OutlineConfigFields.multi_totals, 0), ...pbEncodeBool(true));
-  outline.push(...pbEncodeUint32Field(OutlineConfigFields.tree_color, 0xFF9CA3AF));
-
-  const span: number[] = [];
-  span.push(...pbEncodeInt32Field(SpanConfigFields.cell_span, CellSpanMode.CELL_SPAN_BY_ROW));
-  span.push(...pbEncodeInt32Field(SpanConfigFields.cell_span_fixed, CellSpanMode.CELL_SPAN_NONE));
-  span.push(...pbEncodeInt32Field(SpanConfigFields.cell_span_compare, SpanCompareMode.SPAN_COMPARE_NO_CASE));
-
-  const resize: number[] = [];
-  resize.push(...pbEncodeTag(ResizePolicyFields.columns, 0), ...pbEncodeBool(true));
-  resize.push(...pbEncodeTag(ResizePolicyFields.rows, 0), ...pbEncodeBool(true));
-  const freeze: number[] = [];
-  freeze.push(...pbEncodeTag(FreezePolicyFields.columns, 0), ...pbEncodeBool(true));
-  freeze.push(...pbEncodeTag(FreezePolicyFields.rows, 0), ...pbEncodeBool(true));
-  const headerFeatures: number[] = [];
-  headerFeatures.push(...pbEncodeTag(HeaderFeaturesFields.sort, 0), ...pbEncodeBool(true));
-  headerFeatures.push(...pbEncodeTag(HeaderFeaturesFields.reorder, 0), ...pbEncodeBool(true));
-  headerFeatures.push(...pbEncodeTag(HeaderFeaturesFields.chooser, 0), ...pbEncodeBool(false));
-  const interaction: number[] = [];
-  interaction.push(...pbEncodeMessageField(InteractionConfigFields.resize, new Uint8Array(resize)));
-  interaction.push(...pbEncodeMessageField(InteractionConfigFields.freeze, new Uint8Array(freeze)));
-  interaction.push(...pbEncodeTag(InteractionConfigFields.auto_size_mouse, 0), ...pbEncodeBool(true));
-  interaction.push(...pbEncodeMessageField(InteractionConfigFields.header_features, new Uint8Array(headerFeatures)));
-
-  const rowStart: number[] = [];
-  rowStart.push(...pbEncodeTag(RowIndicatorConfigFields.visible, 0), ...pbEncodeBool(true));
-  rowStart.push(...pbEncodeInt32Field(RowIndicatorConfigFields.width, 40));
-  rowStart.push(...pbEncodeUint32Field(RowIndicatorConfigFields.background, 0xFFF9FAFB));
-  rowStart.push(...pbEncodeUint32Field(RowIndicatorConfigFields.foreground, 0xFF6B7280));
-  rowStart.push(...pbEncodeUint32Field(RowIndicatorConfigFields.grid_color, 0xFFD1D5DB));
-  rowStart.push(...pbEncodeTag(RowIndicatorConfigFields.allow_resize, 0), ...pbEncodeBool(true));
-  const rowNumberSlot: number[] = [];
-  rowNumberSlot.push(...pbEncodeInt32Field(RowIndicatorSlotFields.kind, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NUMBERS));
-  rowNumberSlot.push(...pbEncodeInt32Field(RowIndicatorSlotFields.width, 40));
-  rowNumberSlot.push(...pbEncodeTag(RowIndicatorSlotFields.visible, 0), ...pbEncodeBool(true));
-  rowStart.push(...pbEncodeMessageField(RowIndicatorConfigFields.slots, new Uint8Array(rowNumberSlot)));
-  const colTop: number[] = [];
-  colTop.push(...pbEncodeTag(ColIndicatorConfigFields.visible, 0), ...pbEncodeBool(true));
-  colTop.push(...pbEncodeInt32Field(ColIndicatorConfigFields.default_row_height, 28));
-  colTop.push(...pbEncodeInt32Field(ColIndicatorConfigFields.band_rows, 1));
-  colTop.push(...pbEncodeUint32Field(
-    ColIndicatorConfigFields.mode_bits,
-    ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT |
-      ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH,
-  ));
-  colTop.push(...pbEncodeUint32Field(ColIndicatorConfigFields.background, 0xFFF9FAFB));
-  colTop.push(...pbEncodeUint32Field(ColIndicatorConfigFields.foreground, 0xFF111827));
-  colTop.push(...pbEncodeUint32Field(ColIndicatorConfigFields.grid_color, 0xFFD1D5DB));
-  colTop.push(...pbEncodeTag(ColIndicatorConfigFields.allow_resize, 0), ...pbEncodeBool(true));
-  const indicators: number[] = [];
-  indicators.push(...pbEncodeMessageField(IndicatorsConfigFields.row_start, new Uint8Array(rowStart)));
-  indicators.push(...pbEncodeMessageField(IndicatorsConfigFields.col_top, new Uint8Array(colTop)));
-  const gridConfig: number[] = [];
-  gridConfig.push(...pbEncodeMessageField(GridConfigFields.layout, new Uint8Array(layout)));
-  gridConfig.push(...pbEncodeMessageField(GridConfigFields.style, new Uint8Array(style)));
-  gridConfig.push(...pbEncodeMessageField(GridConfigFields.selection, new Uint8Array(selection)));
-  gridConfig.push(...pbEncodeMessageField(GridConfigFields.editing, new Uint8Array(editing)));
-  gridConfig.push(...pbEncodeMessageField(GridConfigFields.scrolling, new Uint8Array(scrolling)));
-  gridConfig.push(...pbEncodeMessageField(GridConfigFields.outline, new Uint8Array(outline)));
-  gridConfig.push(...pbEncodeMessageField(GridConfigFields.span, new Uint8Array(span)));
-  gridConfig.push(...pbEncodeMessageField(GridConfigFields.interaction, new Uint8Array(interaction)));
-  gridConfig.push(...pbEncodeMessageField(GridConfigFields.indicators, new Uint8Array(indicators)));
-  return new Uint8Array(gridConfig);
-}
-
-function applySalesSubtotalDecorations(grid: VolvoxGrid, subtotalRows: readonly number[]): void {
-  const uniqueRows = [...new Set(subtotalRows)].sort((a, b) => a - b);
-  for (const row of uniqueRows) {
-    const node = grid.getNode(row);
-    if (node != null && node.level <= 0) {
-      grid.mergeCells(row, 0, row, 1);
-    }
-  }
-}
-
-function setupSalesJsonDemo(grid: VolvoxGrid, wasmModule: WasmModule, id: number): void {
-  const prevId = grid.id;
-  if (id !== prevId) {
-    grid.useGrid(id);
-  }
-
-  try {
-    const salesData = grid.getDemoData("sales");
-    if (salesData.length === 0) {
-      throw new Error("embedded sales demo data is empty");
-    }
-    const gridHandle = BigInt(id);
-    grid.colCount = SALES_COLS;
-    wasmModule.volvox_grid_define_columns_pb(pbEncodeDefineColumnsRequest(id, SALES_COLUMN_SETUP));
-    const result = grid.loadData(salesData, {
-      autoCreateColumns: false,
-    });
-    if (result.status === LoadDataStatus.LOAD_FAILED) {
-      throw new Error("LoadData failed for embedded sales demo");
-    }
-    wasmModule.volvox_grid_define_columns_pb(pbEncodeDefineColumnsRequest(id, SALES_COLUMN_SETUP));
-    if (typeof wasmModule.volvox_grid_configure === "function") {
-      wasmModule.volvox_grid_configure(gridHandle, pbEncodeSalesDemoConfig());
-    }
-    grid.selectionMode = SelectionMode.SELECTION_FREE;
-    grid.dropdownTrigger = DropdownTrigger.DROPDOWN_ALWAYS;
-    grid.dropdownSearch = false;
-    grid.setHeaderFeatures({ sort: true, reorder: true, chooser: false });
-    grid.setColFormat(4, "$#,##0");
-    grid.setColFormat(5, "$#,##0");
-    grid.setColProgressColor(6, 0xFF818CF8);
-    grid.setColDropdown(8, dropdownFromLabels(SALES_STATUS_ITEMS));
-    grid.flingImpulseGain = 220.0;
-    grid.flingFriction = 0.9;
-    grid.subtotal(AggregateType.AGG_CLEAR, 0, 0, "", 0, 0, false);
-    applySalesSubtotalDecorations(grid, grid.subtotal(AggregateType.AGG_SUM, -1, 4, "Grand Total", 0xFFEEF2FF, 0xFF111827, true).rows);
-    applySalesSubtotalDecorations(grid, grid.subtotal(AggregateType.AGG_SUM, 0, 4, "", 0xFFF5F3FF, 0xFF111827, true).rows);
-    applySalesSubtotalDecorations(grid, grid.subtotal(AggregateType.AGG_SUM, 1, 4, "", 0xFFF8F7FF, 0xFF111827, true).rows);
-    applySalesSubtotalDecorations(grid, grid.subtotal(AggregateType.AGG_SUM, -1, 5, "Grand Total", 0xFFEEF2FF, 0xFF111827, true).rows);
-    applySalesSubtotalDecorations(grid, grid.subtotal(AggregateType.AGG_SUM, 0, 5, "", 0xFFF5F3FF, 0xFF111827, true).rows);
-    applySalesSubtotalDecorations(grid, grid.subtotal(AggregateType.AGG_SUM, 1, 5, "", 0xFFF8F7FF, 0xFF111827, true).rows);
-    grid.invalidate();
-  } finally {
-    if (id !== prevId) {
-      grid.useGrid(prevId);
-    }
-  }
-}
-
-function setupHierarchyJsonDemo(grid: VolvoxGrid, wasmModule: WasmModule, id: number): void {
-  const prevId = grid.id;
-  if (id !== prevId) {
-    grid.useGrid(id);
-  }
-
-  try {
-    const rawHierarchy = grid.getDemoData("hierarchy");
-    if (rawHierarchy.length === 0) {
-      throw new Error("embedded hierarchy demo data is empty");
-    }
-    const rawRows = JSON.parse(PB_TEXT_DECODER.decode(rawHierarchy)) as HierarchyDemoRow[];
-    const outlineLevels = hierarchyRowDepths(rawRows);
-    const minOutlineLevel = 0;
-    const maxOutlineLevel = outlineLevels.reduce((maxLevel, level) => Math.max(maxLevel, level), 0);
-    const maxOutlineDepth = Math.max(0, maxOutlineLevel - minOutlineLevel);
-    grid.colCount = HIERARCHY_COLS;
-    wasmModule.volvox_grid_define_columns_pb(pbEncodeDefineColumnsRequest(id, HIERARCHY_COLUMN_SETUP));
-    const loadTree = (wasmModule as HierarchyTreeWasmModule).volvox_tree_load_tree_pb;
-    if (typeof loadTree !== "function") {
-      throw new Error("Hierarchy demo requires VolvoxTreeService WASM support");
-    }
-    const response = loadTree(pbEncodeHierarchyLoadTreeRequest(id, rawRows));
-    if (!(response instanceof Uint8Array) || response.length === 0) {
-      throw new Error("VolvoxTreeService.LoadTree failed for embedded hierarchy demo");
-    }
-    if (typeof wasmModule.volvox_grid_configure === "function") {
-      wasmModule.volvox_grid_configure(
-        BigInt(id),
-        pbEncodeHierarchyOutlineConfig(maxOutlineDepth, maxOutlineLevel),
-      );
-    }
-    applyHierarchyIconTheme(wasmModule, id);
-
-    grid.selectionMode = SelectionMode.SELECTION_FREE;
-    grid.setHeaderFeatures({ sort: false, reorder: false, chooser: false });
-    grid.flingImpulseGain = 220.0;
-    grid.flingFriction = 0.9;
-    grid.editable = false;
-    grid.invalidate();
-  } finally {
-    if (id !== prevId) {
-      grid.useGrid(prevId);
-    }
-  }
-}
-
-function barcodeKey(value: string): string {
-  return value.replace(/[^0-9a-z]/gi, "").toUpperCase();
-}
-
-function barcodeTextEncodingFromRecord(record: BarcodeJsonRow, fallback: number): number {
-  switch (barcodeKey(record.TextEncoding ?? "")) {
-    case "UTF8":
-      return BarcodeTextEncoding.BARCODE_TEXT_UTF8;
-    case "GS1":
-      return BarcodeTextEncoding.BARCODE_TEXT_GS1;
-    case "AUTO":
-      return BarcodeTextEncoding.BARCODE_TEXT_AUTO;
-    default:
-      return fallback;
-  }
-}
-
-function barcodeTextEncodingLabel(textEncoding: number): string {
-  switch (textEncoding) {
-    case BarcodeTextEncoding.BARCODE_TEXT_UTF8:
-      return "UTF8";
-    case BarcodeTextEncoding.BARCODE_TEXT_GS1:
-      return "GS1";
-    default:
-      return "AUTO";
-  }
-}
-
-function barcodeTextEncodingDisplay(record: BarcodeJsonRow): string {
-  if (!record.TextEncoding) {
-    return "";
-  }
-  return barcodeTextEncodingLabel(barcodeTextEncodingFromRecord(record, BarcodeTextEncoding.BARCODE_TEXT_AUTO));
-}
-
-function barcodeQrEccFromRecord(record: BarcodeJsonRow, fallback: number): number {
-  switch (barcodeKey(record.QrEcc ?? "")) {
-    case "LOW":
-      return BarcodeQrErrorCorrection.QR_ECC_LOW;
-    case "MEDIUM":
-      return BarcodeQrErrorCorrection.QR_ECC_MEDIUM;
-    case "QUARTILE":
-      return BarcodeQrErrorCorrection.QR_ECC_QUARTILE;
-    case "HIGH":
-      return BarcodeQrErrorCorrection.QR_ECC_HIGH;
-    case "DEFAULT":
-      return BarcodeQrErrorCorrection.QR_ECC_DEFAULT;
-    default:
-      return fallback;
-  }
-}
-
-function barcodeQrEccLabel(qrEcc: number): string {
-  switch (qrEcc) {
-    case BarcodeQrErrorCorrection.QR_ECC_LOW:
-      return "LOW";
-    case BarcodeQrErrorCorrection.QR_ECC_MEDIUM:
-      return "MEDIUM";
-    case BarcodeQrErrorCorrection.QR_ECC_QUARTILE:
-      return "QUARTILE";
-    case BarcodeQrErrorCorrection.QR_ECC_HIGH:
-      return "HIGH";
-    default:
-      return "DEFAULT";
-  }
-}
-
-function barcodeDemoPlan(record: BarcodeJsonRow): BarcodeDemoPlan {
-  const plan: BarcodeDemoPlan = {
-    symbology: BarcodeSymbology.BARCODE_NONE,
-    checkDigit: BarcodeCheckDigitMode.CHECK_DIGIT_DEFAULT,
-    textEncoding: BarcodeTextEncoding.BARCODE_TEXT_AUTO,
-    qrEcc: BarcodeQrErrorCorrection.QR_ECC_DEFAULT,
-    foreground: 0xFF111827,
-    background: 0xFFFFFFFF,
-    alignment: ImageAlignment.IMG_ALIGN_CENTER_CENTER,
-    moduleSize: 0,
-    quietZone: 0,
-    barHeight: 0,
-    narrowBarWidth: 0,
-    captionPosition: BarcodeCaptionPosition.CAPTION_BOTTOM,
-    captionColor: 0xFF334155,
-    rowHeight: 96,
-    optionsText: "auto",
-  };
-
-  switch (barcodeKey(record.Symbology)) {
-    case "QR":
-    case "QRCODE":
-      plan.symbology = BarcodeSymbology.BARCODE_QR;
-      plan.textEncoding = barcodeTextEncodingFromRecord(record, BarcodeTextEncoding.BARCODE_TEXT_AUTO);
-      plan.qrEcc = barcodeQrEccFromRecord(record, BarcodeQrErrorCorrection.QR_ECC_DEFAULT);
-      plan.background = 0xFFF8FAFC;
-      plan.alignment = ImageAlignment.IMG_ALIGN_CENTER_CENTER;
-      plan.quietZone = 3;
-      plan.rowHeight = 150;
-      plan.captionColor = 0xFF1D4ED8;
-      plan.optionsText = `text=${barcodeTextEncodingLabel(plan.textEncoding)}, qr_ecc=${barcodeQrEccLabel(plan.qrEcc)}, quiet=3, size=auto`;
-      break;
-    case "CODE128": {
-      plan.symbology = BarcodeSymbology.BARCODE_CODE128;
-      plan.textEncoding = barcodeTextEncodingFromRecord(record, BarcodeTextEncoding.BARCODE_TEXT_AUTO);
-      plan.background = 0xFFECFDF5;
-      plan.alignment = ImageAlignment.IMG_ALIGN_STRETCH;
-      plan.quietZone = 10;
-      plan.captionColor = 0xFF047857;
-      plan.optionsText = `text=${barcodeTextEncodingLabel(plan.textEncoding)}, check=AUTO, quiet=10, size=auto`;
-      break;
-    }
-    case "CODE39":
-      plan.symbology = BarcodeSymbology.BARCODE_CODE39;
-      plan.checkDigit = BarcodeCheckDigitMode.CHECK_DIGIT_GENERATE;
-      plan.foreground = 0xFF7C2D12;
-      plan.background = 0xFFFFF7ED;
-      plan.quietZone = 8;
-      plan.captionPosition = BarcodeCaptionPosition.CAPTION_TOP;
-      plan.captionColor = 0xFFC2410C;
-      plan.optionsText = "check=GENERATE, quiet=8, size=auto, caption=TOP";
-      break;
-    case "CODE93":
-      plan.symbology = BarcodeSymbology.BARCODE_CODE93;
-      plan.foreground = 0xFF312E81;
-      plan.background = 0xFFEEF2FF;
-      plan.quietZone = 8;
-      plan.optionsText = "quiet=8, size=auto";
-      break;
-    case "CODE11":
-      plan.symbology = BarcodeSymbology.BARCODE_CODE11;
-      plan.foreground = 0xFF3F3F46;
-      plan.background = 0xFFF4F4F5;
-      plan.alignment = ImageAlignment.IMG_ALIGN_STRETCH;
-      plan.quietZone = 10;
-      plan.optionsText = "quiet=10, size=auto";
-      break;
-    case "EAN13":
-      plan.symbology = BarcodeSymbology.BARCODE_EAN13;
-      plan.foreground = 0xFF1F2937;
-      plan.quietZone = 12;
-      plan.optionsText = "check=AUTO, quiet=12, size=auto";
-      break;
-    case "EAN8":
-      plan.symbology = BarcodeSymbology.BARCODE_EAN8;
-      plan.foreground = 0xFF164E63;
-      plan.background = 0xFFECFEFF;
-      plan.quietZone = 10;
-      plan.optionsText = "check=AUTO, quiet=10, size=auto";
-      break;
-    case "UPCA":
-      plan.symbology = BarcodeSymbology.BARCODE_UPC_A;
-      plan.foreground = 0xFF365314;
-      plan.background = 0xFFF7FEE7;
-      plan.quietZone = 12;
-      plan.optionsText = "check=AUTO, quiet=12, size=auto";
-      break;
-    case "UPCE":
-      plan.symbology = BarcodeSymbology.BARCODE_UPC_E;
-      plan.foreground = 0xFF7F1D1D;
-      plan.background = 0xFFFEF2F2;
-      plan.quietZone = 10;
-      plan.optionsText = "check=AUTO, quiet=10, size=auto";
-      break;
-    case "EANSUPP":
-    case "EANSUPPLEMENT":
-    case "EANSUPPLEMENTAL":
-      plan.symbology = BarcodeSymbology.BARCODE_EAN_SUPP;
-      plan.foreground = 0xFF581C87;
-      plan.background = 0xFFFAF5FF;
-      plan.quietZone = 8;
-      plan.optionsText = "quiet=8, size=auto";
-      break;
-    case "ITF":
-      plan.symbology = BarcodeSymbology.BARCODE_ITF;
-      plan.checkDigit = BarcodeCheckDigitMode.CHECK_DIGIT_NONE;
-      plan.foreground = 0xFF0F766E;
-      plan.background = 0xFFF0FDFA;
-      plan.alignment = ImageAlignment.IMG_ALIGN_STRETCH;
-      plan.quietZone = 12;
-      plan.optionsText = "check=NONE, quiet=12, size=auto";
-      break;
-    case "STF":
-      plan.symbology = BarcodeSymbology.BARCODE_STF;
-      plan.foreground = 0xFF854D0E;
-      plan.background = 0xFFFEFCE8;
-      plan.alignment = ImageAlignment.IMG_ALIGN_STRETCH;
-      plan.quietZone = 10;
-      plan.optionsText = "quiet=10, size=auto";
-      break;
-    case "CODABAR":
-      plan.symbology = BarcodeSymbology.BARCODE_CODABAR;
-      plan.foreground = 0xFFBE123C;
-      plan.background = 0xFFFFF1F2;
-      plan.quietZone = 10;
-      plan.captionPosition = BarcodeCaptionPosition.CAPTION_NONE;
-      plan.optionsText = "quiet=10, size=auto, caption=NONE";
-      break;
-    default:
-      throw new Error(`unknown barcode symbology: ${record.Symbology}`);
-  }
-
-  return plan;
-}
-
-function setupBarcodesJsonDemo(grid: VolvoxGrid, wasmModule: WasmModule, id: number): void {
-  const prevId = grid.id;
-  if (id !== prevId) {
-    grid.useGrid(id);
-  }
-
-  try {
-    const barcodeData = grid.getDemoData("barcodes");
-    if (barcodeData.length === 0) {
-      throw new Error("embedded barcodes demo data is empty");
-    }
-    const records = JSON.parse(PB_TEXT_DECODER.decode(barcodeData)) as BarcodeJsonRow[];
-    const plans = records.map((record) => barcodeDemoPlan(record));
-
-    grid.colCount = BARCODE_COLS;
-    wasmModule.volvox_grid_define_columns_pb(pbEncodeDefineColumnsRequest(id, BARCODE_COLUMN_SETUP));
-    const result = grid.loadData(barcodeData, {
-      autoCreateColumns: false,
-    });
-    if (result.status === LoadDataStatus.LOAD_FAILED) {
-      throw new Error("LoadData failed for embedded barcodes demo");
-    }
-    wasmModule.volvox_grid_define_columns_pb(pbEncodeDefineColumnsRequest(id, BARCODE_COLUMN_SETUP));
-    if (typeof wasmModule.volvox_grid_configure === "function") {
-      wasmModule.volvox_grid_configure(BigInt(id), pbEncodeSalesDemoConfig());
-    }
-    wasmModule.volvox_grid_define_rows_pb(
-      pbEncodeDefineRowsRequest(
-        id,
-        plans.map((plan) => ({ height: plan.rowHeight })),
-      ),
-    );
-
-    const smallTextStyle: DemoCellStyleSpec = {
-      foreground: 0xFF475569,
-    };
-    const cells: Uint8Array[] = [];
-    records.forEach((record, index) => {
-      const plan = plans[index];
-      cells.push(pbEncodeCellUpdate({
-        row: index,
-        col: 2,
-        valueText: barcodeTextEncodingDisplay(record),
-        style: {
-          foreground: 0xFF475569,
-          align: Align.ALIGN_CENTER_CENTER,
-        },
-      }));
-      cells.push(pbEncodeCellUpdate({
-        row: index,
-        col: 3,
-        valueText: `${record.Label}\n${plan.optionsText}`,
-        style: smallTextStyle,
-      }));
-      cells.push(pbEncodeCellUpdate({
-        row: index,
-        col: 4,
-        valueText: record.Value,
-        style: {
-          background: plan.background,
-          align: Align.ALIGN_CENTER_CENTER,
-          padding: { left: 4, top: 4, right: 4, bottom: 4 },
-          borderAll: {
-            style: BorderStyle.BORDER_THIN,
-            color: 0xFFD1D5DB,
-          },
-        },
-        barcode: pbEncodeBarcodeData(record, plan),
-      }));
-      cells.push(pbEncodeCellUpdate({
-        row: index,
-        col: 5,
-        valueText: record.Notes,
-        style: smallTextStyle,
-      }));
-    });
-
-    const updateCells = (wasmModule as any).volvox_grid_update_cells_pb as
-      | ((request: Uint8Array) => Uint8Array)
-      | undefined;
-    if (typeof updateCells !== "function") {
-      throw new Error("volvox_grid_update_cells_pb is not available");
-    }
-    updateCells(pbEncodeUpdateCellsRequest(id, cells, true));
-
-    grid.selectionMode = SelectionMode.SELECTION_FREE;
-    grid.setHeaderFeatures({ sort: true, reorder: true, chooser: false });
-    grid.flingImpulseGain = 220.0;
-    grid.flingFriction = 0.9;
-    grid.invalidate();
-  } finally {
-    if (id !== prevId) {
-      grid.useGrid(prevId);
-    }
-  }
-}
-
-function pbEncodeSelectionHoverConfig(mode: number): Uint8Array {
-  const nextMode = Number.isFinite(mode) ? (Math.max(0, Math.trunc(mode)) >>> 0) : 0;
-  const hoverConfig: number[] = [];
-  hoverConfig.push(...pbEncodeTag(HoverConfigFields.row, 0), ...pbEncodeVarint((nextMode & HOVER_ROW) !== 0 ? 1n : 0n));
-  hoverConfig.push(...pbEncodeTag(HoverConfigFields.column, 0), ...pbEncodeVarint((nextMode & HOVER_COLUMN) !== 0 ? 1n : 0n));
-  hoverConfig.push(...pbEncodeTag(HoverConfigFields.cell, 0), ...pbEncodeVarint((nextMode & HOVER_CELL) !== 0 ? 1n : 0n));
-  const selectionConfig: number[] = [];
-  selectionConfig.push(...pbEncodeMessageField(SelectionConfigFields.hover, new Uint8Array(hoverConfig)));
-
-  const gridConfig: number[] = [];
-  gridConfig.push(...pbEncodeMessageField(GridConfigFields.selection, new Uint8Array(selectionConfig)));
-  return new Uint8Array(gridConfig);
-}
-
 async function main() {
   const status = document.getElementById("status")!;
   const canvas = document.getElementById("grid-canvas") as HTMLCanvasElement;
@@ -2146,11 +570,17 @@ async function main() {
       console.warn("WASM v1 runtime init failed (continuing with legacy APIs):", err);
     }
   }
+  const fontFallbacksEnabled = typeof (wasmModule as any).get_font_fallback_enabled === "function"
+    ? Boolean((wasmModule as any).get_font_fallback_enabled())
+    : true;
 
-  // Register Canvas2D text renderer only when the built-in engine is absent (Lite mode)
+  // Canvas2D is the primary text renderer in Lite mode and a browser-font
+  // fallback when remote font bytes are unavailable in the full WASM build.
   const hasBuiltinText = typeof (wasmModule as any).has_builtin_text_engine === "function"
     && (wasmModule as any).has_builtin_text_engine();
   let canvas2DRenderer: any = null;
+  let useCanvas2DTextRenderer = !hasBuiltinText;
+  let fullCanvas2DTextFallbackActive = false;
 
   const registerCanvas2DTextRenderer = (renderer: any, gridId?: number): void => {
     const wasmAny = wasmModule as any;
@@ -2173,10 +603,56 @@ async function main() {
     }
   };
 
-  if (!hasBuiltinText && typeof (wasmModule as any).set_text_renderer === "function") {
-    canvas2DRenderer = createCanvas2DTextRenderer(wasmModule);
+  const ensureCanvas2DRenderer = (): any => {
+    if (canvas2DRenderer == null) {
+      canvas2DRenderer = createCanvas2DTextRenderer(wasmModule, {
+        fontFallbacksEnabled,
+        wasm: wasmModule,
+      });
+    }
     canvas2DRenderer.setCacheSize(selectedTextLayoutCacheCap());
-    registerCanvas2DTextRenderer(canvas2DRenderer);
+    return canvas2DRenderer;
+  };
+
+  const enableCanvas2DTextRenderer = (reason: string, gridIds: number[] = []): boolean => {
+    if (hasBuiltinText && !fontFallbacksEnabled) {
+      console.error(`Font fallback disabled; not using Canvas2D text fallback (${reason})`);
+      return false;
+    }
+    const wasmAny = wasmModule as any;
+    if (
+      typeof wasmAny.set_text_renderer !== "function"
+      && typeof wasmAny.set_text_renderer_with_cache !== "function"
+    ) {
+      return false;
+    }
+    const renderer = ensureCanvas2DRenderer();
+    registerCanvas2DTextRenderer(renderer);
+    for (const gridId of gridIds) {
+      registerCanvas2DTextRenderer(renderer, gridId);
+    }
+    if (hasBuiltinText) {
+      fullCanvas2DTextFallbackActive = true;
+    }
+    const wasAlreadyEnabled = useCanvas2DTextRenderer;
+    useCanvas2DTextRenderer = true;
+    if (!wasAlreadyEnabled) {
+      console.warn(`Using Canvas2D text renderer fallback (${reason})`);
+    }
+    return true;
+  };
+
+  if (
+    fontFallbacksEnabled
+    && hasBuiltinText
+    && typeof (wasmModule as any).set_glyph_rasterizer === "function"
+  ) {
+    (wasmModule as any).set_glyph_rasterizer(
+      createCanvas2DRasterizer({ fontFallbacksEnabled, wasm: wasmModule }),
+    );
+  }
+
+  if (!hasBuiltinText && enableCanvas2DTextRenderer("Lite mode")) {
     console.info("Registered Canvas2D external text renderer (Lite mode)");
   }
 
@@ -2231,8 +707,8 @@ async function main() {
     }
 
     // Also register the external renderer for this specific grid (for measurement/auto-size)
-    if (!hasBuiltinText && typeof (wasmModule as any).set_grid_text_renderer === "function") {
-      const renderer = canvas2DRenderer ?? createCanvas2DTextRenderer(wasmModule);
+    if (useCanvas2DTextRenderer && typeof (wasmModule as any).set_grid_text_renderer === "function") {
+      const renderer = ensureCanvas2DRenderer();
       registerCanvas2DTextRenderer(renderer, id);
     }
 
@@ -2252,8 +728,8 @@ async function main() {
   };
 
   const grid = new VolvoxGrid(canvas, wasmModule, 2, SALES_COLS);
-  if (!hasBuiltinText && typeof (wasmModule as any).set_grid_text_renderer === "function") {
-    const renderer = canvas2DRenderer ?? createCanvas2DTextRenderer(wasmModule);
+  if (useCanvas2DTextRenderer && typeof (wasmModule as any).set_grid_text_renderer === "function") {
+    const renderer = ensureCanvas2DRenderer();
     registerCanvas2DTextRenderer(renderer, grid.id);
   }
   setupDefaultInput(grid, wasmModule, canvas);
@@ -2263,7 +739,25 @@ async function main() {
   if (typeof (wasmModule as any).get_render_layer_mask_lo === "function") {
     layerMask = normalizeLayerMask(Number((wasmModule as any).get_render_layer_mask_lo(grid.id)));
   }
-  const demoFontsReady = loadDemoFontsInBackground(wasmModule);
+  const demoFontsReady = loadDemoFontsInBackground(wasmModule).then((summary) => {
+    if (hasBuiltinText && summary.missingTextFonts.length > 0) {
+      if (!fontFallbacksEnabled) {
+        console.error(
+          `Required demo font(s) failed and font fallback is disabled: ${summary.missingTextFonts.join(", ")}`,
+        );
+        return summary;
+      }
+      const enabled = enableCanvas2DTextRenderer(
+        `font download failed: ${summary.missingTextFonts.join(", ")}`,
+        [grid.id],
+      );
+      if (enabled) {
+        applyActiveRenderSettings();
+        grid.invalidate();
+      }
+    }
+    return summary;
+  });
 
   // Prefer MAILBOX for lower-latency GPU presentation when available.
   grid.presentMode = PresentMode.PRESENT_MAILBOX;
@@ -2281,6 +775,7 @@ async function main() {
   let demoFontsResolved = false;
   const hierarchyFontAutosizedGridIds = new Set<number>();
   let activeRendererMode = RendererMode.RENDERER_CPU;
+  let warnedGpuCanvasTextFallback = false;
   let scrollBlitEnabled = false;
   let editEnabled = false;
   let doomGridId: number | null = null;
@@ -2501,6 +996,40 @@ async function main() {
     }
   }
 
+  function logDebugValidationErrors(
+    source: string,
+    sessionId: bigint,
+    validationErrors: VolvoxGridValidationError[],
+    force: boolean = false,
+  ): void {
+    if (!debugEventLoggingEnabled || (!force && validationErrors.length === 0)) {
+      return;
+    }
+    console.log("VolvoxGrid validation_errors", {
+      source,
+      sessionId: sessionId.toString(),
+      validation_errors: validationErrors,
+    });
+  }
+
+  function validationErrorSummary(validationErrors: VolvoxGridValidationError[]): string {
+    return validationErrors
+      .map((error) => error.message || error.code)
+      .filter((message) => message.length > 0)
+      .join("; ");
+  }
+
+  function updateExampleValidationFeedback(
+    validationErrors: VolvoxGridValidationError[],
+    forceClear: boolean = false,
+  ): void {
+    if (validationErrors.length > 0) {
+      updateStatus(`Validation: ${validationErrorSummary(validationErrors)}`);
+    } else if (forceClear) {
+      updateStatus();
+    }
+  }
+
   function drainHierarchyActionClickEvents(rawEvent: Uint8Array): void {
     if (currentDemo !== "hierarchy") {
       return;
@@ -2530,6 +1059,20 @@ async function main() {
   grid.onGridEventRaw = (rawEvent: Uint8Array) => {
     logDebugGridEvent(rawEvent);
     drainHierarchyActionClickEvents(rawEvent);
+  };
+  grid.onEditorSessionStarted = (details) => {
+    logDebugValidationErrors("editor_started", details.sessionId, details.validationErrors);
+    updateExampleValidationFeedback(details.validationErrors);
+  };
+  grid.onEditorSessionUpdated = (details) => {
+    const isValidationUpdate = details.reason === EditorUpdateReason.EDITOR_UPDATE_VALIDATION;
+    logDebugValidationErrors(
+      "editor_updated",
+      details.sessionId,
+      details.validationErrors,
+      isValidationUpdate,
+    );
+    updateExampleValidationFeedback(details.validationErrors, isValidationUpdate);
   };
 
   function normalizeLayerMask(raw: number): number {
@@ -2585,32 +1128,8 @@ async function main() {
       return;
     }
 
-    const autoSizeGrid = (wasmModule as any).volvox_grid_auto_size as
-      | ((gridId: bigint, colFrom: number, colTo: number, equal: boolean, maxWidth: number) => Uint8Array)
-      | undefined;
-    if (typeof autoSizeGrid === "function") {
-      autoSizeGrid(BigInt(id), 0, HIERARCHY_COLS - 1, false, 0);
-      if (grid.id === id) {
-        grid.invalidate();
-      }
-      hierarchyFontAutosizedGridIds.add(id);
-      return;
-    }
-
-    const prevId = grid.id;
-    if (id !== prevId) {
-      grid.useGrid(id);
-    }
-
-    try {
-      grid.autoSize(0, HIERARCHY_COLS - 1);
-      grid.invalidate();
-      hierarchyFontAutosizedGridIds.add(id);
-    } finally {
-      if (id !== prevId) {
-        grid.useGrid(prevId);
-      }
-    }
+    autoSizeHierarchyColumns(grid, wasmModule, id);
+    hierarchyFontAutosizedGridIds.add(id);
   }
 
   void demoFontsReady.then(() => {
@@ -2727,16 +1246,22 @@ async function main() {
   }
 
   function setGridHoverMode(id: number, mode: number): void {
-    const configure = (wasmModule as any).volvox_grid_configure as
-      | ((gridId: bigint, config: Uint8Array) => Uint8Array)
-      | undefined;
-    if (typeof configure !== "function") {
-      return;
+    const prevId = grid.id;
+    if (id !== prevId) {
+      grid.useGrid(id);
     }
     try {
-      configure(BigInt(Math.trunc(id)), pbEncodeSelectionHoverConfig(mode));
+      grid.setSelectionHover({
+        row: (mode & HOVER_ROW) !== 0,
+        column: (mode & HOVER_COLUMN) !== 0,
+        cell: (mode & HOVER_CELL) !== 0,
+      });
     } catch (err) {
       console.warn("VolvoxGrid: failed to update hover mode", err);
+    } finally {
+      if (id !== prevId) {
+        grid.useGrid(prevId);
+      }
     }
   }
 
@@ -2829,7 +1354,17 @@ async function main() {
   }
 
   function applyActiveRenderSettings(): void {
-    grid.rendererMode = activeRendererMode;
+    const rendererMode = fullCanvas2DTextFallbackActive && activeRendererMode === RendererMode.RENDERER_GPU
+      ? RendererMode.RENDERER_CPU
+      : activeRendererMode;
+    if (
+      rendererMode !== activeRendererMode
+      && !warnedGpuCanvasTextFallback
+    ) {
+      warnedGpuCanvasTextFallback = true;
+      console.warn("GPU rendering disabled while Canvas2D whole-text font fallback is active");
+    }
+    grid.rendererMode = rendererMode;
     grid.scrollBlit = scrollBlitEnabled;
     grid.debugOverlay = chkDebug.checked;
     debugEventLoggingEnabled = chkDebug.checked;
@@ -3256,21 +1791,21 @@ async function main() {
 
     switch (mode) {
       case "stress":
-        wasmModule.demo_setup_stress_grid(id);
+        setupStressDemo(grid, id);
         break;
       case "sales":
-        setupSalesJsonDemo(grid, wasmModule, id);
+        setupSalesJsonDemo(grid, id);
         break;
       case "hierarchy":
         setupHierarchyJsonDemo(grid, wasmModule, id);
         break;
       case "barcodes":
-        setupBarcodesJsonDemo(grid, wasmModule, id);
+        setupBarcodesJsonDemo(grid, id);
         break;
     }
 
     setGridHoverMode(id, chkHover.checked ? hoverModeForDemo(mode) : HOVER_NONE);
-    wasmModule.set_fast_scroll_enabled(id, true);
+    grid.fastScrollEnabled = true;
     applyDemoViewDefaults(mode);
     setGridEditable(id, editEnabled);
     grid.captureZoomBase();
@@ -3647,7 +2182,7 @@ async function main() {
     if (currentDemo !== "stress") return;
     dataRows += 100_000;
     grid.rowCount = dataRows + 1;
-    wasmModule.demo_materialize_visible_rows(grid.id, 48);
+    grid.rawWasm.demo_materialize_visible_rows(grid.id, 48);
     grid.invalidate();
     updateStatus();
   });

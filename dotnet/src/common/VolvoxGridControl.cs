@@ -42,7 +42,6 @@ namespace VolvoxGrid.DotNet
         private bool _cancelableEventChannelRequested;
 
         private EventHandler<VolvoxGridBeforeEditEventArgs> _beforeEdit;
-        private EventHandler<VolvoxGridBeforeDropdownOpenEventArgs> _beforeDropdownOpen;
         private EventHandler<VolvoxGridCellEditValidatingEventArgs> _cellEditValidating;
         private EventHandler<VolvoxGridBeforeSortEventArgs> _beforeSort;
         private EventHandler<VolvoxGridCompareEventArgs> _compare;
@@ -57,64 +56,26 @@ namespace VolvoxGrid.DotNet
             return new CornerIndicatorSlot { Kind = kind, Width = width, Visible = true };
         }
 
+        private const int DefaultRowIndicatorWidth = 40;
+
         private static List<RowIndicatorSlot> DefaultRowIndicatorSlots()
         {
             return new List<RowIndicatorSlot>
             {
-                RowIndicatorSlot(RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CURRENT, 18),
-                RowIndicatorSlot(RowIndicatorSlotKind.ROW_INDICATOR_SLOT_SELECTION, 17),
+                RowIndicatorSlot(RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NUMBERS, DefaultRowIndicatorWidth),
             };
         }
 
-        private static List<RowIndicatorSlot> RowIndicatorSlotsFromModeBits(VolvoxGridRowIndicatorMode value)
+        private static ColIndicatorCellModes DefaultColIndicatorCellModes()
         {
-            var slots = new List<RowIndicatorSlot>();
-            void Add(VolvoxGridRowIndicatorMode bit, RowIndicatorSlotKind kind, int width)
+            return new ColIndicatorCellModes
             {
-                if ((value & bit) != 0) slots.Add(RowIndicatorSlot(kind, width));
-            }
-
-            Add(VolvoxGridRowIndicatorMode.Numbers, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NUMBERS, 35);
-            Add(VolvoxGridRowIndicatorMode.Current, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CURRENT, 18);
-            Add(VolvoxGridRowIndicatorMode.Selection, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_SELECTION, 17);
-            Add(VolvoxGridRowIndicatorMode.Checkbox, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CHECKBOX, 18);
-            Add(VolvoxGridRowIndicatorMode.Handle, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_HANDLE, 18);
-            Add(VolvoxGridRowIndicatorMode.Editing, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_EDITING, 18);
-            Add(VolvoxGridRowIndicatorMode.Modified, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_MODIFIED, 18);
-            Add(VolvoxGridRowIndicatorMode.Error, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_ERROR, 18);
-            Add(VolvoxGridRowIndicatorMode.NewRow, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NEW_ROW, 18);
-            Add(VolvoxGridRowIndicatorMode.Expander, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_EXPANDER, 18);
-            Add(VolvoxGridRowIndicatorMode.Resize, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_RESIZE, 18);
-            Add(VolvoxGridRowIndicatorMode.Action, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_ACTION, 18);
-            Add(VolvoxGridRowIndicatorMode.StatusIcon, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_STATUS_ICON, 18);
-            Add(VolvoxGridRowIndicatorMode.Custom, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CUSTOM, 18);
-            return slots;
-        }
-
-        private static VolvoxGridRowIndicatorMode RowIndicatorModeBitsFromSlots(RowIndicatorConfig cfg)
-        {
-            VolvoxGridRowIndicatorMode mode = VolvoxGridRowIndicatorMode.None;
-            foreach (var slot in cfg.Slots)
-            {
-                switch (slot.Kind)
+                Modes =
                 {
-                    case RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NUMBERS: mode |= VolvoxGridRowIndicatorMode.Numbers; break;
-                    case RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CURRENT: mode |= VolvoxGridRowIndicatorMode.Current; break;
-                    case RowIndicatorSlotKind.ROW_INDICATOR_SLOT_SELECTION: mode |= VolvoxGridRowIndicatorMode.Selection; break;
-                    case RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CHECKBOX: mode |= VolvoxGridRowIndicatorMode.Checkbox; break;
-                    case RowIndicatorSlotKind.ROW_INDICATOR_SLOT_HANDLE: mode |= VolvoxGridRowIndicatorMode.Handle; break;
-                    case RowIndicatorSlotKind.ROW_INDICATOR_SLOT_EDITING: mode |= VolvoxGridRowIndicatorMode.Editing; break;
-                    case RowIndicatorSlotKind.ROW_INDICATOR_SLOT_MODIFIED: mode |= VolvoxGridRowIndicatorMode.Modified; break;
-                    case RowIndicatorSlotKind.ROW_INDICATOR_SLOT_ERROR: mode |= VolvoxGridRowIndicatorMode.Error; break;
-                    case RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NEW_ROW: mode |= VolvoxGridRowIndicatorMode.NewRow; break;
-                    case RowIndicatorSlotKind.ROW_INDICATOR_SLOT_EXPANDER: mode |= VolvoxGridRowIndicatorMode.Expander; break;
-                    case RowIndicatorSlotKind.ROW_INDICATOR_SLOT_RESIZE: mode |= VolvoxGridRowIndicatorMode.Resize; break;
-                    case RowIndicatorSlotKind.ROW_INDICATOR_SLOT_ACTION: mode |= VolvoxGridRowIndicatorMode.Action; break;
-                    case RowIndicatorSlotKind.ROW_INDICATOR_SLOT_STATUS_ICON: mode |= VolvoxGridRowIndicatorMode.StatusIcon; break;
-                    case RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CUSTOM: mode |= VolvoxGridRowIndicatorMode.Custom; break;
-                }
-            }
-            return mode;
+                    ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT,
+                    ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH,
+                },
+            };
         }
 
         public VolvoxGridControl()
@@ -127,7 +88,8 @@ namespace VolvoxGrid.DotNet
             _focusedColIndex = 0;
 
             _config = new GridConfig();
-            EnsureEditConfig().Trigger = (EditTrigger)VolvoxGridEditTrigger.KeyClick;
+            EnsureEditActivation().Trigger = (EditTrigger)VolvoxGridEditTrigger.KeyClick;
+            EnsureEditConfig().DefaultEditor = DefaultEngineTextEditorSpec();
             EnsureSelectionConfig().Mode = (Volvoxgrid.V1.SelectionMode)VolvoxGridSelectionMode.Free;
             EnsureSelectionConfig().Visibility = (Volvoxgrid.V1.SelectionVisibility)VolvoxGridSelectionVisibility.Always;
             EnsureSelectionConfig().Allow = true;
@@ -135,14 +97,20 @@ namespace VolvoxGrid.DotNet
             EnsureScrollConfig().Scrollbars = (ScrollBarsMode)VolvoxGridScrollBarsMode.Both;
             EnsureScrollConfig().FlingEnabled = false;
             EnsureScrollConfig().FastScroll = true;
+            EnsureScrollConfig().FlingImpulseGain = 220.0f;
+            EnsureScrollConfig().FlingFriction = 0.9f;
             EnsureRenderConfig().RendererMode = (RendererMode)VolvoxGridRendererMode.Auto;
             EnsureRenderConfig().FramePacingMode = (Volvoxgrid.V1.FramePacingMode)VolvoxFramePacingMode.Platform;
             EnsureRenderConfig().TargetFrameRateHz = 30;
+            EnsureInteractionConfig().Resize = new Volvoxgrid.V1.ResizePolicy { Columns = true, Rows = true, Uniform = false };
+            EnsureInteractionConfig().HeaderFeatures = new Volvoxgrid.V1.HeaderFeatures { Sort = true, Reorder = true, Chooser = false };
+            EnsureSpanConfig().CellSpan = (Volvoxgrid.V1.CellSpanMode)VolvoxGridCellSpanMode.Adjacent;
+            EnsureLayoutConfig().ExtendLastCol = true;
             EnsureColIndicatorTopConfig().Visible = true;
             EnsureColIndicatorTopConfig().BandRows = 1;
-            EnsureColIndicatorTopConfig().ModeBits = (uint)(VolvoxGridColumnIndicatorMode.HeaderText | VolvoxGridColumnIndicatorMode.SortGlyph);
+            EnsureColIndicatorTopConfig().CellModes = DefaultColIndicatorCellModes();
             EnsureRowIndicatorStartConfig().Visible = false;
-            EnsureRowIndicatorStartConfig().Width = 35;
+            EnsureRowIndicatorStartConfig().Width = DefaultRowIndicatorWidth;
             EnsureRowIndicatorStartConfig().Slots.AddRange(DefaultRowIndicatorSlots());
             _hostTextRenderer = new GdiTextRendererBridge();
 
@@ -170,16 +138,6 @@ namespace VolvoxGrid.DotNet
                 EnableCancelableEventChannel();
             }
             remove { _beforeEdit -= value; }
-        }
-
-        public event EventHandler<VolvoxGridBeforeDropdownOpenEventArgs> BeforeDropdownOpen
-        {
-            add
-            {
-                _beforeDropdownOpen += value;
-                EnableCancelableEventChannel();
-            }
-            remove { _beforeDropdownOpen -= value; }
         }
 
         public event EventHandler<VolvoxGridCellEditValidatingEventArgs> CellEditValidating
@@ -330,6 +288,20 @@ namespace VolvoxGrid.DotNet
             }
         }
 
+        public bool FontFallbackEnabled
+        {
+            get { return _config.Rendering == null || !_config.Rendering.HasFontFallbackEnabled || _config.Rendering.FontFallbackEnabled; }
+            set
+            {
+                var cfg = EnsureRenderConfig();
+                if (!cfg.HasFontFallbackEnabled || cfg.FontFallbackEnabled != value)
+                {
+                    cfg.FontFallbackEnabled = value;
+                    ApplyEngineConfig();
+                }
+            }
+        }
+
         public object DataSource
         {
             get { return _dataSource; }
@@ -344,43 +316,14 @@ namespace VolvoxGrid.DotNet
 
         public bool Editable
         {
-            get { return _config.Editing != null && (!_config.Editing.HasTrigger || _config.Editing.Trigger != EditTrigger.EDIT_TRIGGER_NONE); }
+            get { return _config.Editing != null && _config.Editing.Activation != null && _config.Editing.Activation.Trigger != EditTrigger.EDIT_TRIGGER_NONE; }
             set
             {
-                var cfg = EnsureEditConfig();
+                var cfg = EnsureEditActivation();
                 var trigger = value ? EditTrigger.EDIT_TRIGGER_KEY_CLICK : EditTrigger.EDIT_TRIGGER_NONE;
-                if (!cfg.HasTrigger || cfg.Trigger != trigger)
+                if (cfg.Trigger != trigger)
                 {
                     cfg.Trigger = trigger;
-                    ApplyEngineConfig();
-                }
-            }
-        }
-
-        public VolvoxGridDropdownTrigger DropdownTrigger
-        {
-            get { return _config.Editing != null && _config.Editing.HasDropdownTrigger ? (VolvoxGridDropdownTrigger)_config.Editing.DropdownTrigger : VolvoxGridDropdownTrigger.Never; }
-            set
-            {
-                var cfg = EnsureEditConfig();
-                var mapped = (Volvoxgrid.V1.DropdownTrigger)value;
-                if (!cfg.HasDropdownTrigger || cfg.DropdownTrigger != mapped)
-                {
-                    cfg.DropdownTrigger = mapped;
-                    ApplyEngineConfig();
-                }
-            }
-        }
-
-        public bool DropdownSearch
-        {
-            get { return _config.Editing != null && _config.Editing.HasDropdownSearch && _config.Editing.DropdownSearch; }
-            set
-            {
-                var cfg = EnsureEditConfig();
-                if (!cfg.HasDropdownSearch || cfg.DropdownSearch != value)
-                {
-                    cfg.DropdownSearch = value;
                     ApplyEngineConfig();
                 }
             }
@@ -390,15 +333,15 @@ namespace VolvoxGrid.DotNet
         {
             get
             {
-                return _config.Editing != null && _config.Editing.HasTabBehavior
-                    ? (VolvoxGridTabBehavior)_config.Editing.TabBehavior
+                return _config.Editing != null && _config.Editing.Activation != null && _config.Editing.Activation.HasTabBehavior
+                    ? (VolvoxGridTabBehavior)_config.Editing.Activation.TabBehavior
                     : VolvoxGridTabBehavior.Cells;
             }
             set
             {
-                var cfg = EnsureEditConfig();
+                var cfg = EnsureEditActivation();
                 var mapped = (Volvoxgrid.V1.TabBehavior)value;
-                if (!cfg.HasTabBehavior || cfg.TabBehavior != mapped)
+                if (cfg.TabBehavior != mapped)
                 {
                     cfg.TabBehavior = mapped;
                     ApplyEngineConfig();
@@ -661,6 +604,24 @@ namespace VolvoxGrid.DotNet
             }
         }
 
+        /// <summary>
+        /// Gets or applies the last requested theme preset. Manual style changes
+        /// do not round-trip back into this cached config value.
+        /// </summary>
+        public VolvoxGridThemePreset ThemePreset
+        {
+            get { return _config.HasThemePreset ? (VolvoxGridThemePreset)_config.ThemePreset : VolvoxGridThemePreset.None; }
+            set
+            {
+                var mapped = (Volvoxgrid.V1.ThemePreset)value;
+                if (!_config.HasThemePreset || _config.ThemePreset != mapped)
+                {
+                    _config.ThemePreset = mapped;
+                    ApplyEngineConfig();
+                }
+            }
+        }
+
         public bool FastScrollEnabled
         {
             get { return _config.Scrolling == null || !_config.Scrolling.HasFastScroll || _config.Scrolling.FastScroll; }
@@ -714,28 +675,24 @@ namespace VolvoxGrid.DotNet
                 if (!cfg.HasVisible || cfg.Visible != value)
                 {
                     cfg.Visible = value;
-                    if (value && !cfg.HasModeBits)
+                    if (value && !cfg.HasCellModes)
                     {
-                        cfg.ModeBits = (uint)(VolvoxGridColumnIndicatorMode.HeaderText | VolvoxGridColumnIndicatorMode.SortGlyph);
+                        cfg.CellModes = DefaultColIndicatorCellModes();
                     }
                     ApplyEngineConfig();
                 }
             }
         }
 
-        public VolvoxGridColumnIndicatorMode ColumnIndicatorTopModeBits
+        public ColIndicatorConfig ColumnIndicatorTopConfig
         {
-            get { var cfg = EnsureColIndicatorTopConfig(); return cfg.HasModeBits ? (VolvoxGridColumnIndicatorMode)cfg.ModeBits : VolvoxGridColumnIndicatorMode.None; }
+            get { return ColIndicatorConfig.ParseFrom(EnsureColIndicatorTopConfig().ToByteArray()); }
             set
             {
-                var cfg = EnsureColIndicatorTopConfig();
-                uint mapped = (uint)value;
-                if (!cfg.HasModeBits || cfg.ModeBits != mapped)
-                {
-                    cfg.ModeBits = mapped;
-                    if (mapped != 0u) cfg.Visible = true;
-                    ApplyEngineConfig();
-                }
+                EnsureIndicatorsConfig().ColTop = value == null
+                    ? new ColIndicatorConfig()
+                    : ColIndicatorConfig.ParseFrom(value.ToByteArray());
+                ApplyEngineConfig();
             }
         }
 
@@ -790,20 +747,15 @@ namespace VolvoxGrid.DotNet
             }
         }
 
-        public VolvoxGridRowIndicatorMode RowIndicatorStartModeBits
+        public RowIndicatorConfig RowIndicatorStartConfig
         {
-            get { var cfg = EnsureRowIndicatorStartConfig(); return RowIndicatorModeBitsFromSlots(cfg); }
+            get { return RowIndicatorConfig.ParseFrom(EnsureRowIndicatorStartConfig().ToByteArray()); }
             set
             {
-                var cfg = EnsureRowIndicatorStartConfig();
-                var mapped = RowIndicatorSlotsFromModeBits(value);
-                if (RowIndicatorModeBitsFromSlots(cfg) != value)
-                {
-                    cfg.Slots.Clear();
-                    cfg.Slots.AddRange(mapped);
-                    if (mapped.Count != 0) cfg.Visible = true;
-                    ApplyEngineConfig();
-                }
+                EnsureIndicatorsConfig().RowStart = value == null
+                    ? new RowIndicatorConfig()
+                    : RowIndicatorConfig.ParseFrom(value.ToByteArray());
+                ApplyEngineConfig();
             }
         }
 
@@ -1198,6 +1150,13 @@ namespace VolvoxGrid.DotNet
             return _config.Editing;
         }
 
+        private EditActivation EnsureEditActivation()
+        {
+            var cfg = EnsureEditConfig();
+            if (cfg.Activation == null) cfg.Activation = new EditActivation();
+            return cfg.Activation;
+        }
+
         private ScrollConfig EnsureScrollConfig()
         {
             if (_config.Scrolling == null) _config.Scrolling = new ScrollConfig();
@@ -1534,6 +1493,7 @@ namespace VolvoxGrid.DotNet
             if (source.HasRenderLayerMask) copy.RenderLayerMask = source.RenderLayerMask;
             if (source.HasLayerProfiling) copy.LayerProfiling = source.LayerProfiling;
             if (source.HasScrollBlit) copy.ScrollBlit = source.ScrollBlit;
+            if (source.HasFontFallbackEnabled) copy.FontFallbackEnabled = source.FontFallbackEnabled;
             return copy;
         }
 
@@ -1735,11 +1695,11 @@ namespace VolvoxGrid.DotNet
             VolvoxGridCellInteraction? interaction = null,
             string format = null,
             string key = null,
-            string dropdownItems = null,
             uint? progressColor = null,
             bool? span = null,
             VolvoxGridStickyEdge? sticky = null,
-            Dropdown dropdown = null)
+            ListEditorParams dropdown = null,
+            string caption = null)
         {
             if (!EnsureEngine()) return;
             try
@@ -1754,13 +1714,16 @@ namespace VolvoxGrid.DotNet
                 if (interaction.HasValue) def.Interaction = (CellInteraction)interaction.Value;
                 if (format != null) def.Format = format;
                 if (!string.IsNullOrEmpty(key)) def.Key = key;
-                if (dropdown != null) def.Dropdown = dropdown;
-                else if (dropdownItems != null) def.Dropdown = DropdownFromLegacyItems(dropdownItems);
+                if (caption != null) def.Caption = caption;
+                if (dropdown != null) def.Editor = ListEditorSpec(dropdown);
                 if (progressColor.HasValue) def.ProgressColor = progressColor.Value;
                 if (span.HasValue) def.Span = span.Value;
                 if (sticky.HasValue) def.Sticky = (StickyEdge)sticky.Value;
 
-                _client.DefineColumns(_gridId, new[] { def });
+                var columnsWithEditors = def.Editor == null && def.HasDataType
+                    ? ColumnsWithExistingEditors()
+                    : null;
+                _client.DefineColumns(_gridId, new[] { ApplyHostEditorDefault(def, columnsWithEditors) });
                 if (index >= 0 && index < _columns.Count)
                 {
                     var col = _columns[index];
@@ -1773,6 +1736,7 @@ namespace VolvoxGrid.DotNet
                     if (dataType.HasValue) col.DataType = dataType.Value;
                     if (interaction.HasValue) col.Interaction = interaction.Value;
                     if (format != null) col.Format = format;
+                    if (caption != null) col.Caption = caption;
                     if (progressColor.HasValue) col.ProgressColor = progressColor.Value;
                 }
                 _renderHost.RequestFrame();
@@ -1838,14 +1802,9 @@ namespace VolvoxGrid.DotNet
             DefineColumns(col, span: span);
         }
 
-        public void SetColDropdownItems(int col, string items)
+        public void SetColDropdown(int col, ListEditorParams dropdown)
         {
-            DefineColumns(col, dropdownItems: items ?? string.Empty);
-        }
-
-        public void SetColDropdown(int col, Dropdown dropdown)
-        {
-            DefineColumns(col, dropdown: dropdown ?? new Dropdown());
+            DefineColumns(col, dropdown: dropdown ?? new ListEditorParams());
         }
 
         public void SetColAlignment(int col, VolvoxGridAlign alignment)
@@ -1910,60 +1869,150 @@ namespace VolvoxGrid.DotNet
             catch (Exception ex) { _lastError = ex.Message; }
         }
 
-        public void SetCellDropdownItems(int row, int col, string items)
+        public void SetCellDropdown(int row, int col, ListEditorParams dropdown)
         {
             if (row < 0 || col < 0 || !EnsureEngine()) return;
             try
             {
                 _client.UpdateCells(
                     _gridId,
-                    new[] { new CellUpdate { Row = row, Col = col, Dropdown = DropdownFromLegacyItems(items ?? string.Empty) } },
+                    new[] { new CellUpdate { Row = row, Col = col, Editor = ListEditorSpec(dropdown ?? new ListEditorParams()) } },
                     false);
                 _renderHost.RequestFrame();
             }
             catch (Exception ex) { _lastError = ex.Message; }
         }
 
-        public void SetCellDropdown(int row, int col, Dropdown dropdown)
+        private static EditorSpec ListEditorSpec(ListEditorParams list)
         {
-            if (row < 0 || col < 0 || !EnsureEngine()) return;
+            return new EditorSpec
+            {
+                Kind = list != null && list.AllowCustomValue ? EditorKind.EDITOR_COMBO : EditorKind.EDITOR_SELECT,
+                Owner = EditorOwner.EDITOR_OWNER_ENGINE,
+                Presentation = EditorPresentation.EDITOR_CANVAS,
+                List = list ?? new ListEditorParams(),
+            };
+        }
+
+        private static EditorSpec DefaultHostTextEditorSpec()
+        {
+            return new EditorSpec
+            {
+                Kind = EditorKind.EDITOR_TEXT,
+                Owner = EditorOwner.EDITOR_OWNER_HOST_NATIVE,
+                Presentation = EditorPresentation.EDITOR_INLINE,
+            };
+        }
+
+        private static EditorSpec DefaultEngineTextEditorSpec()
+        {
+            return new EditorSpec
+            {
+                Kind = EditorKind.EDITOR_TEXT,
+                Owner = EditorOwner.EDITOR_OWNER_ENGINE,
+                Presentation = EditorPresentation.EDITOR_CANVAS,
+            };
+        }
+
+        private static EditorSpec DefaultHostNumberEditorSpec(bool nullable)
+        {
+            return new EditorSpec
+            {
+                Kind = EditorKind.EDITOR_NUMBER,
+                Owner = EditorOwner.EDITOR_OWNER_HOST_NATIVE,
+                Presentation = EditorPresentation.EDITOR_INLINE,
+                Number = new NumberEditorParams { Nullable = nullable },
+            };
+        }
+
+        private static EditorSpec DefaultEngineCheckboxEditorSpec()
+        {
+            return new EditorSpec
+            {
+                Kind = EditorKind.EDITOR_CHECKBOX,
+                Owner = EditorOwner.EDITOR_OWNER_ENGINE,
+                Presentation = EditorPresentation.EDITOR_CANVAS,
+                Checkbox = new CheckboxEditorParams { ThreeState = false },
+            };
+        }
+
+        private static ColumnDef ApplyHostEditorDefault(ColumnDef def)
+        {
+            return ApplyHostEditorDefault(def, null);
+        }
+
+        private static ColumnDef ApplyHostEditorDefault(ColumnDef def, ISet<int> columnsWithEditors)
+        {
+            if (def == null || def.Editor != null || !def.HasDataType) return def;
+            if (columnsWithEditors != null && columnsWithEditors.Contains(def.Index)) return def;
+            var next = ColumnDef.ParseFrom(def.ToByteArray());
+            switch (next.DataType)
+            {
+                case ColumnDataType.COLUMN_DATA_STRING:
+                    next.Editor = DefaultHostTextEditorSpec();
+                    break;
+                case ColumnDataType.COLUMN_DATA_NUMBER:
+                case ColumnDataType.COLUMN_DATA_CURRENCY:
+                    next.Editor = DefaultHostNumberEditorSpec(next.HasNullable ? next.Nullable : true);
+                    break;
+                case ColumnDataType.COLUMN_DATA_BOOLEAN:
+                    next.Editor = DefaultEngineCheckboxEditorSpec();
+                    break;
+            }
+            return next;
+        }
+
+        private HashSet<int> ColumnsWithExistingEditors()
+        {
+            var columns = new HashSet<int>();
+            if (_client == null || _gridId == 0) return columns;
             try
             {
-                _client.UpdateCells(
-                    _gridId,
-                    new[] { new CellUpdate { Row = row, Col = col, Dropdown = dropdown ?? new Dropdown() } },
-                    false);
-                _renderHost.RequestFrame();
-            }
-            catch (Exception ex) { _lastError = ex.Message; }
-        }
-
-        private static Dropdown DropdownFromLegacyItems(string items)
-        {
-            var dropdown = new Dropdown();
-            if (items == null) return dropdown;
-            if (items.StartsWith("|", StringComparison.Ordinal))
-            {
-                dropdown.AllowCustomValue = true;
-                items = items.Substring(1);
-            }
-            foreach (var raw in items.Split('|'))
-            {
-                if (string.IsNullOrEmpty(raw)) continue;
-                string value = null;
-                var label = raw;
-                if (raw.StartsWith("#", StringComparison.Ordinal))
+                var schema = _client.GetSchema(_gridId);
+                foreach (var column in schema == null ? new List<ColumnDef>() : schema.Columns)
                 {
-                    var semi = raw.IndexOf(';');
-                    if (semi > 1)
+                    if (column != null && column.Editor != null)
                     {
-                        value = raw.Substring(1, semi - 1);
-                        label = raw.Substring(semi + 1);
+                        columns.Add(column.Index);
                     }
                 }
-                dropdown.Items.Add(new DropdownItem { Value = value, Label = label });
             }
-            return dropdown;
+            catch (Exception ex)
+            {
+                _lastError = ex.Message;
+            }
+            return columns;
+        }
+
+        private static List<ColumnDef> ApplyHostEditorDefaults(IEnumerable<ColumnDef> columns)
+        {
+            return (columns ?? Enumerable.Empty<ColumnDef>())
+                .Select(ApplyHostEditorDefault)
+                .Where(c => c != null)
+                .ToList();
+        }
+
+        private void ApplyHostEditorDefaultsForInferredColumns(LoadDataResult result)
+        {
+            if (result == null || result.InferredColumns == null || result.InferredColumns.Count == 0) return;
+            var columnsWithEditors = new HashSet<int>(
+                (_client.GetSchema(_gridId).Columns ?? new List<ColumnDef>())
+                    .Where(c => c != null && c.Editor != null)
+                    .Select(c => c.Index));
+            var defs = new List<ColumnDef>();
+            foreach (var column in result.InferredColumns)
+            {
+                if (column == null || !column.HasDataType || columnsWithEditors.Contains(column.Index)) continue;
+                var def = new ColumnDef
+                {
+                    Index = column.Index,
+                    DataType = column.DataType,
+                };
+                if (column.HasNullable) def.Nullable = column.Nullable;
+                var prepared = ApplyHostEditorDefault(def);
+                if (prepared != null && prepared.Editor != null) defs.Add(prepared);
+            }
+            if (defs.Count > 0) _client.DefineColumns(_gridId, defs);
         }
 
         public void SetCellCheckedState(int row, int col, VolvoxGridCheckedState state)
@@ -2346,6 +2395,67 @@ namespace VolvoxGrid.DotNet
             return result;
         }
 
+        public void AddSubtotals(
+            IList<int> amountCols,
+            IList<VolvoxGridSubtotalLevel> levels,
+            VolvoxGridAggregateType aggregate = VolvoxGridAggregateType.Sum,
+            bool clearExisting = true,
+            int mergeColFrom = -1,
+            int mergeColTo = -1)
+        {
+            if (amountCols == null || levels == null) return;
+            if (_client == null || _gridId == 0) return;
+
+            WithRedrawSuspended(delegate
+            {
+                if (amountCols.Count > 1)
+                {
+                    EnsureOutlineConfig().MultiTotals = true;
+                    _client.ConfigureGrid(_gridId, new GridConfig { Outline = new OutlineConfig { MultiTotals = true } });
+                }
+                if (clearExisting)
+                {
+                    Subtotal(VolvoxGridAggregateType.Clear, 0, 0, "", 0, 0, false);
+                }
+                bool wantMerge = mergeColFrom >= 0 && mergeColTo >= mergeColFrom;
+                foreach (var level in levels)
+                {
+                    if (level == null) continue;
+                    int groupIndex = level.GroupCol.HasValue ? level.GroupCol.Value : -1;
+                    foreach (var col in amountCols)
+                    {
+                        var result = Subtotal(
+                            aggregate,
+                            groupIndex,
+                            col,
+                            level.Caption ?? string.Empty,
+                            level.BackColor,
+                            level.ForeColor,
+                            true);
+                        if (wantMerge)
+                        {
+                            MergeSubtotalLevelZero(result, mergeColFrom, mergeColTo);
+                        }
+                    }
+                }
+            }, true);
+        }
+
+        private void MergeSubtotalLevelZero(SubtotalResult result, int colFrom, int colTo)
+        {
+            if (result == null || result.Rows == null) return;
+            var seen = new HashSet<int>();
+            foreach (int row in result.Rows)
+            {
+                if (!seen.Add(row)) continue;
+                var node = GetNode(row);
+                if (node != null && node.Level <= 0)
+                {
+                    MergeCells(row, colFrom, row, colTo);
+                }
+            }
+        }
+
         public new void AutoSize(int colFrom = 0, int colTo = -1, bool equal = false, int maxWidth = 0)
         {
             if (_client == null || _gridId == 0) return;
@@ -2482,10 +2592,10 @@ namespace VolvoxGrid.DotNet
             catch (Exception ex) { _lastError = ex.Message; return new byte[0]; }
         }
 
-        public void BeginEdit(int row, int col, bool? selectAll = null, bool? caretEnd = null, string seedText = null)
+        public void BeginEdit(int row, int col, EditStartReason reason = EditStartReason.EDIT_START_PROGRAMMATIC, string seedText = null, int? caretPosition = null)
         {
             if (row < 0 || col < 0 || !EnsureEngine()) return;
-            try { _client.EditStart(_gridId, row, col, selectAll, caretEnd, seedText); _renderHost.RequestFrame(); }
+            try { _client.EditStart(_gridId, row, col, reason, seedText, caretPosition); _renderHost.RequestFrame(); }
             catch (Exception ex) { _lastError = ex.Message; }
         }
 
@@ -2559,7 +2669,8 @@ namespace VolvoxGrid.DotNet
             if (!EnsureEngine()) return;
             try
             {
-                _client.LoadData(_gridId, data ?? new byte[0]);
+                var result = _client.LoadData(_gridId, data ?? new byte[0], null);
+                if (result.Status != LoadDataStatus.LOAD_FAILED) ApplyHostEditorDefaultsForInferredColumns(result);
                 _engineManagedData = true;
                 _tableModel = null;
                 SyncRowCountFromEngine();
@@ -2574,7 +2685,8 @@ namespace VolvoxGrid.DotNet
             if (!EnsureEngine()) return;
             try
             {
-                _client.AppendData(_gridId, data ?? new byte[0]);
+                var result = _client.AppendData(_gridId, data ?? new byte[0], null);
+                if (result.Status != LoadDataStatus.LOAD_FAILED) ApplyHostEditorDefaultsForInferredColumns(result);
                 _engineManagedData = true;
                 _tableModel = null;
                 SyncRowCountFromEngine();
@@ -2753,7 +2865,7 @@ namespace VolvoxGrid.DotNet
             {
                 _tableModel = _mapper.Materialize(ResolveDataSource(_dataSource), _columns.Count == 0 ? null : BuildColumnDefinitions());
                 if (_columns.Count == 0 && _tableModel.Columns.Count > 0) PopulateColumnsFromModel(_tableModel.Columns);
-                _client.DefineColumns(_gridId, _tableModel.Columns);
+                _client.DefineColumns(_gridId, ApplyHostEditorDefaults(_tableModel.Columns));
                 _client.LoadTable(_gridId, _tableModel.RowCount, _tableModel.ColumnCount, _tableModel.FlatValues, true);
                 _client.Sort(_gridId, BuildSortColumns());
                 if (_tableModel.RowCount > 0) SelectCell(0, 0, false);
@@ -2797,8 +2909,6 @@ namespace VolvoxGrid.DotNet
             {
                 case GridEvent.EventOneofCase.BeforeEdit:
                     return OnBeforeEdit(evt);
-                case GridEvent.EventOneofCase.BeforeDropdownOpen:
-                    return OnBeforeDropdownOpen(evt);
                 case GridEvent.EventOneofCase.CellEditValidate:
                     return OnCellEditValidating(evt);
                 case GridEvent.EventOneofCase.BeforeSort:
@@ -2836,7 +2946,6 @@ namespace VolvoxGrid.DotNet
             switch (evt.EventCase)
             {
                 case GridEvent.EventOneofCase.BeforeEdit:
-                case GridEvent.EventOneofCase.BeforeDropdownOpen:
                 case GridEvent.EventOneofCase.CellEditValidate:
                 case GridEvent.EventOneofCase.BeforeSort:
                 case GridEvent.EventOneofCase.BeforeNodeToggle:
@@ -2960,29 +3069,6 @@ namespace VolvoxGrid.DotNet
             return args.Cancel;
         }
 
-        private bool? OnBeforeDropdownOpen(GridEvent evt)
-        {
-            if (_beforeDropdownOpen == null)
-            {
-                return _cancelableEventChannelRequested ? (bool?)false : null;
-            }
-
-            var before = evt.BeforeDropdownOpen;
-            var args = new VolvoxGridBeforeDropdownOpenEventArgs(
-                before.Row,
-                before.Col,
-                GetFieldName(before.Col),
-                before.X,
-                before.Y,
-                before.Width,
-                before.Height,
-                before.Dropdown,
-                before.CurrentValue,
-                before.SelectedIndex);
-            _beforeDropdownOpen.Invoke(this, args);
-            return args.Cancel;
-        }
-
         private bool? OnCellEditValidating(GridEvent evt)
         {
             if (_cellEditValidating == null)
@@ -3079,7 +3165,7 @@ namespace VolvoxGrid.DotNet
             }
         }
 
-        private List<ColumnDef> BuildColumnDefinitions() => _columns.Select((c, i) => new ColumnDef { Index = i, Key = c.FieldName, Caption = c.Caption, Width = c.Width, Hidden = !c.Visible, SortOrder = (Volvoxgrid.V1.SortOrder)c.SortDirection, SortType = (SortType)c.SortType, Align = (Align)c.Alignment, DataType = (ColumnDataType)c.DataType, Interaction = (CellInteraction)c.Interaction, Format = c.Format, ProgressColor = c.ProgressColor }).ToList();
+        private List<ColumnDef> BuildColumnDefinitions() => ApplyHostEditorDefaults(_columns.Select((c, i) => new ColumnDef { Index = i, Key = c.FieldName, Caption = c.Caption, Width = c.Width, Hidden = !c.Visible, SortOrder = (Volvoxgrid.V1.SortOrder)c.SortDirection, SortType = (SortType)c.SortType, Align = (Align)c.Alignment, DataType = (ColumnDataType)c.DataType, Interaction = (CellInteraction)c.Interaction, Format = c.Format, ProgressColor = c.ProgressColor, Editor = c.Editor }));
 
         private List<SortColumn> BuildSortColumns() => _columns.Select((c, i) => new { c, i }).Where(x => x.c.SortDirection != VolvoxGridSortDirection.None).Select(x => new SortColumn { Col = x.i, Order = (Volvoxgrid.V1.SortOrder)x.c.SortDirection, Type = (SortType)x.c.SortType }).ToList();
 
@@ -3101,7 +3187,8 @@ namespace VolvoxGrid.DotNet
                     DataType = s.HasDataType ? (VolvoxGridColumnDataType)s.DataType : VolvoxGridColumnDataType.String,
                     Interaction = s.HasInteraction ? (VolvoxGridCellInteraction)s.Interaction : VolvoxGridCellInteraction.Unspecified,
                     Format = s.HasFormat ? s.Format : null,
-                    ProgressColor = s.HasProgressColor ? s.ProgressColor : 0
+                    ProgressColor = s.HasProgressColor ? s.ProgressColor : 0,
+                    Editor = s.Editor
                 });
             }
         }

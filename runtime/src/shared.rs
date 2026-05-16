@@ -3,6 +3,7 @@
 use volvoxgrid_engine::proto::volvoxgrid::v1::*;
 
 type Grid = volvoxgrid_engine::grid::VolvoxGrid;
+pub(crate) use volvoxgrid_engine::edit::PreparedEditCommit;
 
 pub(crate) struct CreateGridSpec {
     pub rows: i32,
@@ -30,9 +31,10 @@ pub(crate) fn create_grid_spec(request: &CreateRequest) -> CreateGridSpec {
     }
 }
 
-pub(crate) const DEFAULT_COL_INDICATOR_MODE_BITS: u32 =
-    ColIndicatorCellMode::ColIndicatorCellHeaderText as u32
-        | ColIndicatorCellMode::ColIndicatorCellSortGlyph as u32;
+pub(crate) const DEFAULT_COL_INDICATOR_MODES: [i32; 2] = [
+    ColIndicatorCellMode::ColIndicatorCellHeaderText as i32,
+    ColIndicatorCellMode::ColIndicatorCellSortGlyph as i32,
+];
 
 fn default_row_indicator_slots() -> Vec<volvoxgrid_engine::indicator::RowIndicatorSlotState> {
     vec![
@@ -68,7 +70,7 @@ pub(crate) fn apply_default_indicator_bands(grid: &mut Grid) {
         grid.indicator_bands.col_top.default_row_height_px =
             volvoxgrid_engine::indicator::DEFAULT_COL_INDICATOR_ROW_HEIGHT;
     }
-    grid.indicator_bands.col_top.mode_bits = DEFAULT_COL_INDICATOR_MODE_BITS;
+    grid.indicator_bands.col_top.cell_modes = DEFAULT_COL_INDICATOR_MODES.to_vec();
     grid.layout.invalidate();
     grid.dirty = true;
 }
@@ -595,31 +597,51 @@ pub(crate) fn truncate_to_char_count(input: &str, max_chars: i32) -> String {
     input.chars().take(max_chars as usize).collect()
 }
 
-pub(crate) fn normalize_committed_edit_text(
+pub(crate) fn prepare_committed_edit_text(
     grid: &mut Grid,
     row: i32,
     col: i32,
+    old_text: &str,
     new_text: &str,
-) -> String {
-    let mut committed = truncate_to_char_count(new_text, grid.edit_max_length);
+) -> PreparedEditCommit {
+    let editor = active_editor_spec(grid, row, col);
+    volvoxgrid_engine::edit::prepare_committed_edit_text(
+        &editor,
+        old_text,
+        new_text,
+        grid.edit_max_length,
+    )
+}
 
-    if let Some(dropdown) = grid.configured_dropdown(row, col) {
-        if let Some(mapped) = volvoxgrid_engine::edit::translate_dropdown_display_to_value_typed(
-            &dropdown, &committed,
-        ) {
-            committed = mapped;
-        }
-    } else if col >= 0 && (col as usize) < grid.columns.len() {
-        let col_list = &grid.columns[col as usize].dropdown_items;
-        if !col_list.is_empty() {
-            if let Some(mapped) =
-                volvoxgrid_engine::edit::translate_dropdown_display_to_value(col_list, &committed)
-            {
-                committed = mapped;
-            }
-        }
+pub(crate) fn block_active_edit_commit(
+    grid: &mut Grid,
+    row: i32,
+    col: i32,
+    attempted: String,
+    errors: Vec<ValidationError>,
+) {
+    if grid.edit.is_active() && grid.edit.edit_row == row && grid.edit.edit_col == col {
+        grid.edit.update_text(attempted.clone());
+        grid.edit.set_sel_start(attempted.chars().count() as i32);
+        grid.edit.set_sel_length(0);
+        grid.edit.set_validation_errors(errors);
     }
-    committed
+    grid.mark_dirty();
+}
+
+pub(crate) fn set_active_edit_validation_errors(
+    grid: &mut Grid,
+    row: i32,
+    col: i32,
+    errors: Vec<ValidationError>,
+) {
+    if errors.is_empty() {
+        return;
+    }
+    if grid.edit.is_active() && grid.edit.edit_row == row && grid.edit.edit_col == col {
+        grid.edit.set_validation_errors(errors);
+        grid.mark_dirty();
+    }
 }
 
 pub(crate) fn apply_committed_edit_text(
@@ -664,9 +686,9 @@ pub(crate) fn begin_edit_session_core_opts(
     force: bool,
     emit_before_event: bool,
     emit_dropdown_event: bool,
-    select_all: Option<bool>,
-    caret_end: Option<bool>,
+    reason: EditStartReason,
     seed_text: Option<String>,
+    caret_position: Option<i32>,
     formula_mode: Option<bool>,
 ) {
     if !grid.can_begin_edit(row, col, force) {
@@ -694,13 +716,13 @@ pub(crate) fn begin_edit_session_core_opts(
 
     let stored_text = grid.cells.get_text(row, col).to_string();
     let display_text = grid.get_display_text(row, col);
-    grid.edit.start_edit_with_options(
+    grid.edit.start_edit_with(
         row,
         col,
+        reason,
         &display_text,
-        select_all,
-        caret_end,
         seed_text.as_deref(),
+        caret_position,
         formula_mode,
     );
     grid.edit.configure_compose(
@@ -735,15 +757,18 @@ pub(crate) fn begin_edit_session_core_opts(
     }
     grid.events
         .push(volvoxgrid_engine::event::GridEventData::StartEdit { row, col });
+    grid.mark_dirty();
 }
 
+/// Adjust an already-active edit session in place. Used when a host issues a
+/// new `EditCommand::Start` for the same cell that is already being edited —
+/// e.g. a click-caret arriving while the session is in ENTER mode.
 pub(crate) fn apply_edit_start_options(
     grid: &mut Grid,
     row: i32,
     col: i32,
-    select_all: Option<bool>,
-    click_caret: Option<i32>,
-    caret_end: Option<bool>,
+    reason: EditStartReason,
+    caret_position: Option<i32>,
     formula_mode: Option<bool>,
 ) {
     if !grid.edit.is_active() || grid.edit.edit_row != row || grid.edit.edit_col != col {
@@ -754,62 +779,647 @@ pub(crate) fn apply_edit_start_options(
         grid.edit.set_formula_mode(formula_mode);
     }
 
-    if caret_end == Some(true) || click_caret.is_some() {
-        grid.edit.ui_mode = volvoxgrid_engine::edit::EditUiMode::EditMode;
+    let new_mode = volvoxgrid_engine::edit::ui_mode_from_reason(reason);
+    if grid.edit.ui_mode != new_mode {
+        grid.edit.ui_mode = new_mode;
+        grid.edit.bump_state_version();
     }
 
-    if let Some(caret) = click_caret {
-        grid.edit.sel_start = caret;
-        grid.edit.sel_length = 0;
-        grid.mark_dirty();
-        return;
+    match new_mode {
+        volvoxgrid_engine::edit::EditUiMode::EditMode => {
+            let len = grid.edit.edit_text.chars().count() as i32;
+            let pos = match (reason, caret_position) {
+                (EditStartReason::EditStartClickCaret, Some(p)) => p.clamp(0, len),
+                _ => len,
+            };
+            grid.edit.set_sel_start(pos);
+            grid.edit.set_sel_length(0);
+            grid.mark_dirty();
+        }
+        volvoxgrid_engine::edit::EditUiMode::EnterMode => {
+            grid.edit.select_all();
+            grid.mark_dirty();
+        }
     }
+}
 
-    if caret_end == Some(true) {
-        grid.edit.sel_start = grid.edit.edit_text.chars().count() as i32;
-        grid.edit.sel_length = 0;
-        grid.mark_dirty();
-        return;
-    }
+/// Build an EditorSession snapshot for the currently-active session.
+/// Caller must have already ensured layout is valid.
+pub(crate) fn build_editor_session(grid: &Grid) -> EditorSession {
+    let row = grid.edit.edit_row;
+    let col = grid.edit.edit_col;
+    let (x, y, width, height) = grid
+        .cell_screen_rect(row, col)
+        .map(|(x, y, w, h)| (x as f32, y as f32, w as f32, h as f32))
+        .unwrap_or((0.0, 0.0, 0.0, 0.0));
 
-    if select_all == Some(true) {
-        grid.edit.sel_start = 0;
-        grid.edit.sel_length = grid.edit.edit_text.chars().count() as i32;
-        grid.mark_dirty();
+    let text = grid.edit.edit_text.clone();
+    let editor = active_editor_spec(grid, row, col);
+    let capabilities = capabilities_from(grid, &editor);
+    let reason = engine_start_reason(grid);
+    let ui_mode = engine_ui_mode(grid);
+
+    EditorSession {
+        session_id: grid.edit.session_serial as i64,
+        row,
+        col,
+        viewport_rect: Some(Rect {
+            x,
+            y,
+            width,
+            height,
+        }),
+        editor: Some(editor),
+        value: Some(editor_value_from_text(text)),
+        selection: Some(TextSelection {
+            start: grid.edit.sel_start,
+            length: grid.edit.sel_length,
+        }),
+        ui_mode: ui_mode as i32,
+        capabilities: Some(capabilities),
+        reason: reason as i32,
+        state_version: grid.edit.state_version,
+        composing: grid.edit.composing,
+        preedit_text: grid.edit.preedit_text.clone(),
+        validation_errors: grid.edit.validation_errors.clone(),
     }
+}
+
+fn editor_kind_accepts_text_input(kind_raw: i32) -> bool {
+    matches!(
+        EditorKind::try_from(kind_raw).unwrap_or(EditorKind::Unspecified),
+        EditorKind::EditorText
+            | EditorKind::EditorMultilineText
+            | EditorKind::EditorNumber
+            | EditorKind::EditorCombo
+    )
+}
+
+pub(crate) fn active_edit_accepts_text_input(grid: &Grid) -> bool {
+    if !grid.edit.is_active() {
+        return false;
+    }
+    let editor = active_editor_spec(grid, grid.edit.edit_row, grid.edit.edit_col);
+    editor_kind_accepts_text_input(editor.kind) && grid.edit.accepts_text_input()
+}
+
+fn capabilities_from(grid: &Grid, editor: &EditorSpec) -> EditorCapabilities {
+    let accepts_text =
+        editor_kind_accepts_text_input(editor.kind) && grid.edit.accepts_text_input();
+    EditorCapabilities {
+        accepts_text_input: accepts_text,
+        supports_selection: accepts_text,
+        supports_cut: accepts_text,
+        supports_paste: accepts_text,
+        supports_undo: accepts_text,
+    }
+}
+
+fn engine_ui_mode(grid: &Grid) -> EditUiMode {
+    match grid.edit.ui_mode {
+        volvoxgrid_engine::edit::EditUiMode::EnterMode => EditUiMode::Enter,
+        volvoxgrid_engine::edit::EditUiMode::EditMode => EditUiMode::Edit,
+    }
+}
+
+fn engine_start_reason(grid: &Grid) -> EditStartReason {
+    grid.edit.start_reason
 }
 
 pub(crate) fn edit_state_proto(grid: &mut Grid) -> EditState {
     if grid.edit.is_active() && !grid.layout.valid {
         grid.ensure_layout();
     }
-    let (x, y, width, height) = if grid.edit.is_active() {
-        grid.cell_screen_rect(grid.edit.edit_row, grid.edit.edit_col)
-            .map(|(x, y, w, h)| (x as f32, y as f32, w as f32, h as f32))
-            .unwrap_or((0.0, 0.0, 0.0, 0.0))
-    } else {
-        (0.0, 0.0, 0.0, 0.0)
-    };
-
-    EditState {
-        active: grid.edit.is_active(),
-        row: grid.edit.edit_row,
-        col: grid.edit.edit_col,
-        text: grid.edit.edit_text.clone(),
-        sel_start: grid.edit.sel_start,
-        sel_length: grid.edit.sel_length,
-        composing: grid.edit.composing,
-        preedit_text: grid.edit.preedit_text.clone(),
-        ui_mode: match grid.edit.ui_mode {
-            volvoxgrid_engine::edit::EditUiMode::EnterMode => EditUiMode::Enter as i32,
-            volvoxgrid_engine::edit::EditUiMode::EditMode => EditUiMode::Edit as i32,
-        },
-        x,
-        y,
-        width,
-        height,
-        max_length: grid.edit_max_length,
+    if !grid.edit.is_active() {
+        return EditState {
+            active: false,
+            session: None,
+        };
     }
+    EditState {
+        active: true,
+        session: Some(build_editor_session(grid)),
+    }
+}
+
+pub(crate) fn editor_value_from_text(text: String) -> EditorValue {
+    EditorValue {
+        value: Some(CellValue {
+            value: Some(cell_value::Value::Text(text.clone())),
+        }),
+        edit_text: Some(text.clone()),
+        display_text: Some(text),
+    }
+}
+
+fn struct_bool_or_string_field(props: Option<&StructValue>, key: &str) -> bool {
+    let Some(props) = props else {
+        return false;
+    };
+    props.fields.iter().any(|field| {
+        field.key == key
+            && field
+                .value
+                .as_ref()
+                .is_some_and(|value| match value.value.as_ref() {
+                    Some(scalar_value::Value::BoolValue(value)) => *value,
+                    Some(scalar_value::Value::StringValue(value)) => !value.is_empty(),
+                    _ => false,
+                })
+    })
+}
+
+fn editor_wants_async_validation(spec: &EditorSpec) -> bool {
+    let trigger =
+        ValidationTrigger::try_from(spec.validation_trigger).unwrap_or(ValidationTrigger::OnCommit);
+    matches!(
+        trigger,
+        ValidationTrigger::OnChange | ValidationTrigger::OnPause
+    ) || struct_bool_or_string_field(spec.custom_props.as_ref(), "async_validation")
+        || struct_bool_or_string_field(spec.custom_props.as_ref(), "validation_source_id")
+}
+
+pub(crate) fn queue_active_edit_validation_request(grid: &mut Grid, request_id: i64) -> bool {
+    if request_id <= 0 || !grid.edit.is_active() {
+        return false;
+    }
+    let row = grid.edit.edit_row;
+    let col = grid.edit.edit_col;
+    let spec = active_editor_spec(grid, row, col);
+    if !editor_wants_async_validation(&spec) {
+        return false;
+    }
+    grid.edit.last_validation_request_id = request_id;
+    grid.events.push_with_id(
+        request_id,
+        volvoxgrid_engine::event::GridEventData::EditValidationRequest {
+            request_id,
+            session_id: grid.edit.session_serial as i64,
+            row,
+            col,
+            value: editor_value_from_text(grid.edit.edit_text.clone()),
+        },
+    );
+    true
+}
+
+pub(crate) fn queue_active_editor_list_items_request(
+    grid: &mut Grid,
+    request_id: i64,
+    filter_text: Option<String>,
+    offset: i32,
+) -> bool {
+    if request_id <= 0 || !grid.edit.is_active() {
+        return false;
+    }
+    let row = grid.edit.edit_row;
+    let col = grid.edit.edit_col;
+    let spec = active_editor_spec(grid, row, col);
+    let Some(list) = spec.list else {
+        return false;
+    };
+    let Some(source) = list.data_source else {
+        return false;
+    };
+    if source.data_source_id.is_empty() {
+        return false;
+    }
+    grid.edit.last_list_items_request_id = request_id;
+    let limit = if source.page_size > 0 {
+        source.page_size
+    } else {
+        50
+    };
+    let filter_text = if source.filterable {
+        filter_text.unwrap_or_else(|| grid.edit.edit_text.clone())
+    } else {
+        String::new()
+    };
+    grid.events.push_with_id(
+        request_id,
+        volvoxgrid_engine::event::GridEventData::EditorListItemsRequest {
+            request_id,
+            session_id: grid.edit.session_serial as i64,
+            data_source_id: source.data_source_id,
+            filter_text,
+            offset: offset.max(0),
+            limit,
+        },
+    );
+    true
+}
+
+pub(crate) fn apply_edit_validation_response(
+    grid: &mut Grid,
+    response: EditValidationResponse,
+) -> bool {
+    if !grid.edit.is_active()
+        || response.session_id != grid.edit.session_serial as i64
+        || response.request_id <= 0
+        || response.request_id != grid.edit.last_validation_request_id
+    {
+        return false;
+    }
+    if let Some(value) = response.normalized_value {
+        let text = editor_value_to_text(&value);
+        grid.edit.update_text(text.clone());
+        grid.edit.set_sel_start(text.chars().count() as i32);
+        grid.edit.set_sel_length(0);
+    }
+    grid.edit.set_validation_errors(response.errors);
+    grid.mark_dirty();
+    true
+}
+
+pub(crate) fn apply_editor_list_items_response(
+    grid: &mut Grid,
+    response: EditorListItemsResponse,
+) -> bool {
+    if !grid.edit.is_active()
+        || response.session_id != grid.edit.session_serial as i64
+        || response.request_id <= 0
+        || response.request_id != grid.edit.last_list_items_request_id
+    {
+        return false;
+    }
+    let row = grid.edit.edit_row;
+    let col = grid.edit.edit_col;
+    let mut list = active_editor_spec(grid, row, col)
+        .list
+        .unwrap_or(ListEditorParams {
+            static_items: Vec::new(),
+            data_source: None,
+            allow_custom_value: grid.edit.dropdown_editable,
+            searchable: grid.effective_dropdown_search(row, col),
+            multi_select: false,
+            item_layout: DropdownItemLayout::DropdownItemAuto as i32,
+        });
+    list.static_items = response.items;
+    grid.edit.parse_dropdown(&list);
+    grid.mark_dirty();
+    true
+}
+
+pub(crate) fn editor_value_to_text(value: &EditorValue) -> String {
+    if let Some(text) = value.edit_text.as_ref() {
+        return text.clone();
+    }
+    value
+        .value
+        .as_ref()
+        .map(|value| match value.value.as_ref() {
+            Some(cell_value::Value::Text(v)) => v.clone(),
+            Some(cell_value::Value::Number(v)) => v.to_string(),
+            Some(cell_value::Value::Flag(v)) => v.to_string(),
+            Some(cell_value::Value::Raw(v)) => String::from_utf8_lossy(v).into_owned(),
+            Some(cell_value::Value::Timestamp(v)) => v.to_string(),
+            None => String::new(),
+        })
+        .unwrap_or_default()
+}
+
+fn effective_edit_mask(grid: &Grid, col: i32) -> String {
+    if col >= 0 && (col as usize) < grid.columns.len() {
+        let mask = &grid.columns[col as usize].edit_mask;
+        if !mask.is_empty() {
+            return mask.clone();
+        }
+    }
+    grid.edit_mask.clone()
+}
+
+fn configured_editor_spec(grid: &Grid, row: i32, col: i32) -> Option<EditorSpec> {
+    if row >= 0 && col >= 0 {
+        if let Some(editor) = grid
+            .cells
+            .get(row, col)
+            .and_then(|cell| cell.editor())
+            .cloned()
+        {
+            return Some(editor);
+        }
+    }
+    if col >= 0 {
+        if let Some(editor) = grid
+            .columns
+            .get(col as usize)
+            .and_then(|column| column.editor.clone())
+        {
+            return Some(editor);
+        }
+    }
+    grid.default_editor.clone()
+}
+
+pub(crate) fn active_editor_spec(grid: &Grid, row: i32, col: i32) -> EditorSpec {
+    let has_list = grid.edit.dropdown_count() > 0;
+    let mut spec = configured_editor_spec(grid, row, col).unwrap_or_else(|| EditorSpec {
+        kind: if has_list {
+            if grid.edit.dropdown_editable {
+                EditorKind::EditorCombo as i32
+            } else {
+                EditorKind::EditorSelect as i32
+            }
+        } else {
+            EditorKind::EditorText as i32
+        },
+        owner: EditorOwner::Engine as i32,
+        presentation: EditorPresentation::EditorCanvas as i32,
+        validation_mode: ValidationMode::ValidationBlock as i32,
+        validation_trigger: ValidationTrigger::OnCommit as i32,
+        validation_debounce_ms: 0,
+        custom_editor_id: None,
+        text: Some(TextEditorParams {
+            max_length: grid.edit_max_length,
+            mask: effective_edit_mask(grid, col),
+            allow_newlines: false,
+            input_type: InputType::Text as i32,
+        }),
+        number: None,
+        checkbox: None,
+        list: None,
+        date_time: None,
+        actions: Vec::new(),
+        custom_props: None,
+    });
+
+    if spec.kind == EditorKind::Unspecified as i32 {
+        spec.kind = if has_list {
+            if grid.edit.dropdown_editable {
+                EditorKind::EditorCombo as i32
+            } else {
+                EditorKind::EditorSelect as i32
+            }
+        } else {
+            EditorKind::EditorText as i32
+        };
+    }
+    if spec.text.is_none() && !has_list {
+        spec.text = Some(TextEditorParams {
+            max_length: grid.edit_max_length,
+            mask: effective_edit_mask(grid, col),
+            allow_newlines: spec.kind == EditorKind::EditorMultilineText as i32,
+            input_type: InputType::Text as i32,
+        });
+    }
+    if let Some(text) = spec.text.as_mut() {
+        if text.max_length == 0 {
+            text.max_length = grid.edit_max_length;
+        }
+        if text.mask.is_empty() {
+            text.mask = effective_edit_mask(grid, col);
+        }
+    }
+
+    if has_list {
+        let count = grid.edit.dropdown_count();
+        let mut static_items = Vec::with_capacity(count.max(0) as usize);
+        for i in 0..count {
+            let label = grid.edit.get_dropdown_item(i).to_string();
+            let data = grid.edit.get_dropdown_data(i).to_string();
+            static_items.push(ListItem {
+                value: Some(CellValue {
+                    value: Some(cell_value::Value::Text(if data.is_empty() {
+                        label.clone()
+                    } else {
+                        data
+                    })),
+                }),
+                label,
+                details: Vec::new(),
+                disabled: false,
+            });
+        }
+        let mut list = spec.list.unwrap_or(ListEditorParams {
+            static_items: Vec::new(),
+            data_source: None,
+            allow_custom_value: grid.edit.dropdown_editable,
+            searchable: grid.effective_dropdown_search(row, col),
+            multi_select: false,
+            item_layout: DropdownItemLayout::DropdownItemAuto as i32,
+        });
+        if list.static_items.is_empty() {
+            list.static_items = static_items;
+        }
+        list.allow_custom_value = grid.edit.dropdown_editable;
+        list.searchable = grid.effective_dropdown_search(row, col);
+        spec.list = Some(list);
+    }
+    spec
+}
+
+pub(crate) fn build_editor_started(
+    grid: &mut Grid,
+    row: i32,
+    col: i32,
+) -> Option<EditorSessionStarted> {
+    grid.cell_screen_rect(row, col)?;
+
+    if grid.edit.is_active() && grid.edit.edit_row == row && grid.edit.edit_col == col {
+        return Some(EditorSessionStarted {
+            session: Some(build_editor_session(grid)),
+        });
+    }
+
+    let (x, y, w, h) = grid.cell_screen_rect(row, col)?;
+    let current_value = grid.get_display_text(row, col);
+    let current_len = current_value.chars().count() as i32;
+    let editor = active_editor_spec(grid, row, col);
+    let capabilities = capabilities_from(grid, &editor);
+
+    Some(EditorSessionStarted {
+        session: Some(EditorSession {
+            session_id: grid.edit.session_serial as i64,
+            row,
+            col,
+            viewport_rect: Some(Rect {
+                x: x as f32,
+                y: y as f32,
+                width: w as f32,
+                height: h as f32,
+            }),
+            editor: Some(editor),
+            value: Some(editor_value_from_text(current_value)),
+            selection: Some(TextSelection {
+                start: 0,
+                length: current_len,
+            }),
+            ui_mode: EditUiMode::Enter as i32,
+            capabilities: Some(capabilities),
+            reason: EditStartReason::EditStartUnspecified as i32,
+            state_version: grid.edit.state_version,
+            composing: false,
+            preedit_text: String::new(),
+            validation_errors: Vec::new(),
+        }),
+    })
+}
+
+pub(crate) fn build_editor_updated_geometry(
+    req: &EditorSessionStarted,
+    viewport_rect: Option<Rect>,
+    visible: bool,
+    state_version: u64,
+) -> RenderOutput {
+    let session_id = req.session.as_ref().map(|s| s.session_id).unwrap_or(-1);
+    RenderOutput {
+        rendered: false,
+        event: Some(render_output::Event::EditorUpdated(EditorSessionUpdated {
+            session_id,
+            viewport_rect,
+            value: None,
+            selection: None,
+            validation_errors: Vec::new(),
+            force_refocus: None,
+            custom_payload: None,
+            reason: EditorUpdateReason::EditorUpdateGeometry as i32,
+            state_version,
+            visible: Some(visible),
+        })),
+    }
+}
+
+pub(crate) fn editor_update_reason_for_started_delta(
+    previous: &EditorSessionStarted,
+    current: &EditorSessionStarted,
+    state_changed: bool,
+) -> EditorUpdateReason {
+    if !state_changed {
+        return EditorUpdateReason::EditorUpdateGeometry;
+    }
+
+    let empty: &[ValidationError] = &[];
+    let previous_errors = previous
+        .session
+        .as_ref()
+        .map(|session| session.validation_errors.as_slice())
+        .unwrap_or(empty);
+    let current_errors = current
+        .session
+        .as_ref()
+        .map(|session| session.validation_errors.as_slice())
+        .unwrap_or(empty);
+    if previous_errors != current_errors {
+        EditorUpdateReason::EditorUpdateValidation
+    } else {
+        EditorUpdateReason::EditorUpdateUnspecified
+    }
+}
+
+pub(crate) fn build_editor_updated_from_started(
+    req: &EditorSessionStarted,
+    include_geometry: bool,
+    include_state: bool,
+    visible: Option<bool>,
+    reason: EditorUpdateReason,
+) -> RenderOutput {
+    let session = req.session.as_ref();
+    RenderOutput {
+        rendered: false,
+        event: Some(render_output::Event::EditorUpdated(EditorSessionUpdated {
+            session_id: session.map(|s| s.session_id).unwrap_or(-1),
+            state_version: session.map(|s| s.state_version).unwrap_or(0),
+            reason: reason as i32,
+            viewport_rect: include_geometry
+                .then(|| session.and_then(|s| s.viewport_rect.clone()))
+                .flatten(),
+            value: include_state
+                .then(|| session.and_then(|s| s.value.clone()))
+                .flatten(),
+            selection: include_state
+                .then(|| session.and_then(|s| s.selection.clone()))
+                .flatten(),
+            validation_errors: if include_state {
+                session
+                    .map(|s| s.validation_errors.clone())
+                    .unwrap_or_default()
+            } else {
+                Vec::new()
+            },
+            force_refocus: None,
+            custom_payload: None,
+            visible,
+        })),
+    }
+}
+
+pub(crate) fn build_editor_updated_state(
+    grid: &Grid,
+    reason: EditorUpdateReason,
+) -> Option<RenderOutput> {
+    if !grid.edit.is_active() {
+        return None;
+    }
+    Some(RenderOutput {
+        rendered: false,
+        event: Some(render_output::Event::EditorUpdated(EditorSessionUpdated {
+            session_id: grid.edit.session_serial as i64,
+            viewport_rect: None,
+            value: Some(editor_value_from_text(grid.edit.edit_text.clone())),
+            selection: Some(TextSelection {
+                start: grid.edit.sel_start,
+                length: grid.edit.sel_length,
+            }),
+            validation_errors: grid.edit.validation_errors.clone(),
+            force_refocus: None,
+            custom_payload: None,
+            reason: reason as i32,
+            state_version: grid.edit.state_version,
+            visible: None,
+        })),
+    })
+}
+
+pub(crate) fn build_editor_ended(grid: &Grid, previous: &EditorSessionStarted) -> RenderOutput {
+    let prev = previous.session.as_ref();
+    let session_id = prev.map(|s| s.session_id).unwrap_or(-1);
+    let prev_row = prev.map(|s| s.row).unwrap_or(-1);
+    let prev_col = prev.map(|s| s.col).unwrap_or(-1);
+    let prev_version = prev.map(|s| s.state_version).unwrap_or(0);
+
+    let ended = (session_id >= 0)
+        .then(|| grid.edit.ended_session_details(session_id as u64))
+        .flatten();
+    let reason = ended
+        .map(|(reason, _, _)| reason)
+        .unwrap_or(EditEndReason::EditEndUnspecified as i32);
+    let committed_value = if reason == EditEndReason::EditEndCommitted as i32 {
+        let text = ended
+            .and_then(|(_, text, _)| text.map(ToOwned::to_owned))
+            .unwrap_or_else(|| grid.get_display_text(prev_row, prev_col));
+        Some(editor_value_from_text(text))
+    } else {
+        None
+    };
+    let state_version = ended
+        .map(|(_, _, state_version)| state_version)
+        .unwrap_or(prev_version);
+    RenderOutput {
+        rendered: false,
+        event: Some(render_output::Event::EditorEnded(EditorSessionEnded {
+            session_id,
+            reason,
+            committed_value,
+            state_version,
+        })),
+    }
+}
+
+pub(crate) fn editor_session_command_is_current(
+    grid: &Grid,
+    session: &EditorSessionCommand,
+) -> bool {
+    if !grid.edit.is_active() {
+        return false;
+    }
+    let current_session_id = grid.edit.session_serial as i64;
+    if session.session_id != current_session_id {
+        return false;
+    }
+    if session.state_version != grid.edit.state_version {
+        return false;
+    }
+    true
 }
 
 pub(crate) fn expand_sort_request_columns(
@@ -833,4 +1443,82 @@ pub(crate) fn expand_sort_request_columns(
     }
 
     sort_keys
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn number_editor(min: Option<f64>, max: Option<f64>) -> EditorSpec {
+        EditorSpec {
+            kind: EditorKind::EditorNumber as i32,
+            validation_mode: ValidationMode::ValidationBlock as i32,
+            validation_trigger: ValidationTrigger::OnCommit as i32,
+            number: Some(NumberEditorParams {
+                min,
+                max,
+                step: None,
+                format: String::new(),
+                nullable: false,
+            }),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn prepare_committed_edit_text_uses_runtime_editor_resolution() {
+        let mut grid = volvoxgrid_engine::grid::VolvoxGrid::new(1, 320, 200, 2, 1, 1, 0);
+        grid.columns[0].editor = Some(number_editor(Some(0.0), Some(100.0)));
+
+        match prepare_committed_edit_text(&mut grid, 1, 0, "40", "120") {
+            PreparedEditCommit::Block { attempted, errors } => {
+                assert_eq!(attempted, "120");
+                assert_eq!(errors[0].code, "number.max");
+            }
+            other => panic!("unexpected commit result: {other:?}"),
+        }
+    }
+
+    fn editor_started_with_errors(
+        state_version: u64,
+        validation_errors: Vec<ValidationError>,
+    ) -> EditorSessionStarted {
+        EditorSessionStarted {
+            session: Some(EditorSession {
+                session_id: 7,
+                state_version,
+                validation_errors,
+                ..Default::default()
+            }),
+        }
+    }
+
+    #[test]
+    fn editor_delta_reason_marks_validation_error_changes() {
+        let previous = editor_started_with_errors(
+            3,
+            vec![ValidationError {
+                code: "number.invalid".to_string(),
+                message: "Enter a number.".to_string(),
+                blocking: true,
+            }],
+        );
+        let current = editor_started_with_errors(4, Vec::new());
+
+        assert_eq!(
+            editor_update_reason_for_started_delta(&previous, &current, true),
+            EditorUpdateReason::EditorUpdateValidation
+        );
+    }
+
+    #[test]
+    fn editor_delta_reason_keeps_generic_state_when_errors_do_not_change() {
+        let previous = editor_started_with_errors(3, Vec::new());
+        let current = editor_started_with_errors(4, Vec::new());
+
+        assert_eq!(
+            editor_update_reason_for_started_delta(&previous, &current, true),
+            EditorUpdateReason::EditorUpdateUnspecified
+        );
+    }
 }

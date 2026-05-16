@@ -71,6 +71,12 @@ func sendModelMsg[T any](t *testing.T, model *Model[T], msg tea.Msg) {
 	t.Helper()
 	_, cmd := model.Update(msg)
 	applyModelCmd(t, model, cmd)
+	switch msg.(type) {
+	case tea.KeyMsg, tea.MouseMsg:
+		if err := model.Refresh(); err != nil {
+			t.Fatalf("refresh after input: %v", err)
+		}
+	}
 }
 
 func doubleClickModelCell[T any](t *testing.T, model *Model[T]) {
@@ -101,8 +107,12 @@ func assertEditingCell(t *testing.T, model *Model[testRow], row, col int32) {
 	if !state.GetActive() {
 		t.Fatalf("native edit mode is not active")
 	}
-	if state.GetRow() != row || state.GetCol() != col {
-		t.Fatalf("editing cell = (%d,%d), want (%d,%d)", state.GetRow(), state.GetCol(), row, col)
+	session := state.GetSession()
+	if session == nil {
+		t.Fatalf("native edit session is missing")
+	}
+	if session.GetRow() != row || session.GetCol() != col {
+		t.Fatalf("editing cell = (%d,%d), want (%d,%d)", session.GetRow(), session.GetCol(), row, col)
 	}
 }
 

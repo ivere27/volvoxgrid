@@ -8,7 +8,7 @@ pub struct EventTarget {
     pub band: i32,
     pub slot_index: i32,
     pub slot_kind: i32,
-    pub sub_mode_bits: u32,
+    pub sub_mode: i32,
     pub custom_key: String,
     pub text: String,
     pub int_value: i64,
@@ -37,12 +37,12 @@ impl EventTarget {
             band: self.band,
             slot_index: self.slot_index,
             slot_kind: self.slot_kind,
-            sub_mode_bits: self.sub_mode_bits,
             custom_key: self.custom_key.clone(),
             text: self.text.clone(),
             int_value: self.int_value,
             status_flags: self.status_flags,
             data: self.data.clone(),
+            sub_mode: self.sub_mode,
         }
     }
 
@@ -58,7 +58,7 @@ impl Default for EventTarget {
             band: pb::IndicatorBand::Unspecified as i32,
             slot_index: -1,
             slot_kind: 0,
-            sub_mode_bits: 0,
+            sub_mode: 0,
             custom_key: String::new(),
             text: String::new(),
             int_value: 0,
@@ -132,15 +132,33 @@ pub enum GridEventData {
         text: String,
     },
     KeyDownEdit {
+        session_id: i64,
         key_code: i32,
         modifier: i32,
     },
     KeyPressEdit {
+        session_id: i64,
         key_ascii: i32,
     },
     KeyUpEdit {
+        session_id: i64,
         key_code: i32,
         modifier: i32,
+    },
+    EditValidationRequest {
+        request_id: i64,
+        session_id: i64,
+        row: i32,
+        col: i32,
+        value: pb::EditorValue,
+    },
+    EditorListItemsRequest {
+        request_id: i64,
+        session_id: i64,
+        data_source_id: String,
+        filter_text: String,
+        offset: i32,
+        limit: i32,
     },
     CellEditConfigureStyle {
         row: i32,
@@ -157,12 +175,19 @@ pub enum GridEventData {
         y: f32,
         width: f32,
         height: f32,
-        dropdown: pb::Dropdown,
+        dropdown: pb::ListEditorParams,
         current_value: String,
         selected_index: i32,
     },
     DropdownClosed,
     DropdownOpened,
+    CustomEditorAction {
+        session_id: i64,
+        row: i32,
+        col: i32,
+        action_id: String,
+        payload: Option<pb::StructValue>,
+    },
     CellChanged {
         row: i32,
         col: i32,
@@ -382,6 +407,11 @@ impl GridEventData {
             } => old_text.capacity() + new_text.capacity(),
             GridEventData::CellEditValidate { edit_text, .. } => edit_text.capacity(),
             GridEventData::CellEditChange { text } => text.capacity(),
+            GridEventData::EditorListItemsRequest {
+                data_source_id,
+                filter_text,
+                ..
+            } => data_source_id.capacity() + filter_text.capacity(),
             GridEventData::CellChanged {
                 old_text, new_text, ..
             } => old_text.capacity() + new_text.capacity(),

@@ -160,7 +160,7 @@ make sheet-lite
 make flutter-run
 make android
 make java-desktop-run
-make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.8.8-SNAPSHOT
+make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.8.9
 make dotnet-build
 make dotnet-run-release VOLVOXGRID_VARIANT=lite
 make gtk-test
@@ -206,9 +206,9 @@ Publishing:
 - `make publish_nuget`
 - `make publish_npm`
 
-Snapshot note:
+Internal Maven local flow:
 
-- `-SNAPSHOT` Docker packaging flows automatically install generated Maven artifacts, including lite artifacts, into `~/.m2/repository`
+- Internal Docker packaging flows can install generated Maven artifacts, including lite artifacts, into `~/.m2/repository` for local wrapper testing.
 
 ## Testing And Verification
 

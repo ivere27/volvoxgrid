@@ -19,8 +19,8 @@ repositories {
 }
 
 dependencies {
-    implementation("io.github.ivere27:volvoxgrid-desktop:0.8.8")
-    // or: implementation("io.github.ivere27:volvoxgrid-desktop-lite:0.8.8")
+    implementation("io.github.ivere27:volvoxgrid-desktop:0.8.9")
+    // or: implementation("io.github.ivere27:volvoxgrid-desktop-lite:0.8.9")
 }
 ```
 
@@ -35,8 +35,7 @@ The JAR bundles native libraries for Linux (x86, x86_64, armv7, aarch64), macOS 
 Use `VOLVOXGRID_VARIANT=lite` for local and Maven sample runs:
 
 ```bash
-make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.8.8
-make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.8.8-SNAPSHOT
+make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.8.9
 make java-desktop-run-release VOLVOXGRID_VARIANT=lite
 ```
 
@@ -148,8 +147,8 @@ gridPanel.setGridEventListener(event -> {
     if (event.hasAfterEdit()) { /* cell edited */ }
 });
 
-// Cancelable "before" events. Supported here: BeforeEdit, BeforeDropdownOpen,
-// CellEditValidate, BeforeSort. Unhandled cancelable events are allowed with
+// Cancelable "before" events. Supported here: BeforeEdit, CellEditValidate,
+// BeforeSort. Unhandled cancelable events are allowed with
 // cancel=false when the decision channel is active.
 gridPanel.setBeforeEditListener(details -> {
     if (details.getRow() == 0) {
@@ -169,9 +168,9 @@ gridPanel.setBeforeSortListener(details -> {
     }
 });
 
-// Edit request callback
-gridPanel.setEditRequestListener(request -> {
-    // handle inline edit requests
+// Editor session callback
+gridPanel.setEditorSessionStartedListener(session -> {
+    // handle inline editor sessions
 });
 ```
 

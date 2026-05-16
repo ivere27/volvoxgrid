@@ -182,6 +182,14 @@ namespace Volvoxgrid.V1
         BORDER_DOUBLE = 5,
     }
 
+    public enum ButtonRole
+    {
+        BUTTON_ROLE_DEFAULT = 0,
+        BUTTON_ROLE_ELLIPSIS = 1,
+        BUTTON_ROLE_CLEAR = 2,
+        BUTTON_ROLE_CUSTOM = 3,
+    }
+
     public enum CellHitArea
     {
         HIT_CELL = 0,
@@ -340,11 +348,28 @@ namespace Volvoxgrid.V1
         DROPDOWN_ITEM_LABEL_DETAILS = 3,
     }
 
-    public enum DropdownTrigger
+    public enum EditEndReason
     {
-        DROPDOWN_NEVER = 0,
-        DROPDOWN_ALWAYS = 1,
-        DROPDOWN_ON_EDIT = 2,
+        EDIT_END_UNSPECIFIED = 0,
+        EDIT_END_COMMITTED = 1,
+        EDIT_END_CANCELED = 2,
+        EDIT_END_REVERTED_INVALID = 3,
+        EDIT_END_FOCUS_LOST = 4,
+        EDIT_END_CELL_REMOVED = 5,
+        EDIT_END_GRID_DESTROYED = 6,
+    }
+
+    public enum EditStartReason
+    {
+        EDIT_START_UNSPECIFIED = 0,
+        EDIT_START_F2 = 1,
+        EDIT_START_DOUBLE_CLICK = 2,
+        EDIT_START_CLICK_CARET = 3,
+        EDIT_START_ENTER_KEY = 4,
+        EDIT_START_PRINTABLE_KEY = 5,
+        EDIT_START_IME_COMPOSITION = 6,
+        EDIT_START_DROPDOWN_BUTTON = 7,
+        EDIT_START_PROGRAMMATIC = 8,
     }
 
     public enum EditTrigger
@@ -358,6 +383,47 @@ namespace Volvoxgrid.V1
     {
         EDIT_UI_MODE_ENTER = 0,
         EDIT_UI_MODE_EDIT = 1,
+    }
+
+    public enum EditorKind
+    {
+        EDITOR_KIND_UNSPECIFIED = 0,
+        EDITOR_TEXT = 1,
+        EDITOR_MULTILINE_TEXT = 2,
+        EDITOR_NUMBER = 3,
+        EDITOR_CHECKBOX = 4,
+        EDITOR_SELECT = 5,
+        EDITOR_COMBO = 6,
+        EDITOR_DATE_TIME = 7,
+        EDITOR_BUTTON = 8,
+        EDITOR_CUSTOM = 100,
+    }
+
+    public enum EditorOwner
+    {
+        EDITOR_OWNER_ENGINE = 0,
+        EDITOR_OWNER_HOST_NATIVE = 1,
+        EDITOR_OWNER_CUSTOM = 2,
+    }
+
+    public enum EditorPresentation
+    {
+        EDITOR_CANVAS = 0,
+        EDITOR_POPUP_OVER = 1,
+        EDITOR_POPUP_UNDER = 2,
+        EDITOR_MODAL = 3,
+        EDITOR_INLINE = 4,
+    }
+
+    public enum EditorUpdateReason
+    {
+        EDITOR_UPDATE_UNSPECIFIED = 0,
+        EDITOR_UPDATE_GEOMETRY = 1,
+        EDITOR_UPDATE_VALIDATION = 2,
+        EDITOR_UPDATE_NORMALIZED_VALUE = 3,
+        EDITOR_UPDATE_PROGRAMMATIC_VALUE = 4,
+        EDITOR_UPDATE_REMOTE_VALUE = 5,
+        EDITOR_UPDATE_CUSTOM_PAYLOAD = 6,
     }
 
     public enum ErrorCode
@@ -524,6 +590,16 @@ namespace Volvoxgrid.V1
         INDICATOR_BAND_CORNER_BOTTOM_END = 8,
     }
 
+    public enum InputType
+    {
+        INPUT_TYPE_TEXT = 0,
+        INPUT_TYPE_NUMBER = 1,
+        INPUT_TYPE_EMAIL = 2,
+        INPUT_TYPE_URL = 3,
+        INPUT_TYPE_PHONE = 4,
+        INPUT_TYPE_PASSWORD = 5,
+    }
+
     public enum KeyEvent_Type
     {
         KEY_TYPE_UNSPECIFIED = 0,
@@ -646,6 +722,7 @@ namespace Volvoxgrid.V1
         ROW_INDICATOR_SLOT_ACTION = 12,
         ROW_INDICATOR_SLOT_STATUS_ICON = 13,
         ROW_INDICATOR_SLOT_CUSTOM = 14,
+        ROW_INDICATOR_SLOT_NUMBERS_DATA_ONLY = 15,
     }
 
     public enum ScrollBarAppearance
@@ -773,6 +850,17 @@ namespace Volvoxgrid.V1
         TEXT_RENDER_MONO = 3,
     }
 
+    public enum ThemePreset
+    {
+        THEME_NONE = 0,
+        THEME_CLASSIC = 1,
+        THEME_LIGHT = 2,
+        THEME_DARK = 3,
+        THEME_HIGH_CONTRAST = 4,
+        THEME_MONOKAI = 5,
+        THEME_AMBER = 6,
+    }
+
     public enum TreeIndicatorStyle
     {
         TREE_INDICATOR_NONE = 0,
@@ -794,6 +882,21 @@ namespace Volvoxgrid.V1
         TYPE_AUTO_DETECT = 0,
         TYPE_ALL_STRING = 1,
         TYPE_FROM_SCHEMA = 2,
+    }
+
+    public enum ValidationMode
+    {
+        VALIDATION_BLOCK = 0,
+        VALIDATION_REVERT = 1,
+        VALIDATION_ALLOW_INVALID = 2,
+    }
+
+    public enum ValidationTrigger
+    {
+        VALIDATION_TRIGGER_ON_COMMIT = 0,
+        VALIDATION_TRIGGER_ON_CHANGE = 1,
+        VALIDATION_TRIGGER_ON_PAUSE = 2,
+        VALIDATION_TRIGGER_ON_FOCUS_LOST = 3,
     }
 
     public enum WriteErrorMode
@@ -1685,65 +1788,6 @@ namespace Volvoxgrid.V1
         }
     }
 
-    public sealed class BeforeDropdownOpenEvent
-    {
-        public int Row { get; set; }
-        public int Col { get; set; }
-        public float X { get; set; }
-        public float Y { get; set; }
-        public float Width { get; set; }
-        public float Height { get; set; }
-        public Dropdown Dropdown { get; set; }
-        public string CurrentValue { get; set; } = "";
-        public int SelectedIndex { get; set; }
-
-        // ── Serialization ──
-
-        public byte[] ToByteArray()
-        {
-            var w = new ProtoWriter();
-            if (Row != 0) w.WriteInt32(1, Row);
-            if (Col != 0) w.WriteInt32(2, Col);
-            if (X != 0f) w.WriteFloat(3, X);
-            if (Y != 0f) w.WriteFloat(4, Y);
-            if (Width != 0f) w.WriteFloat(5, Width);
-            if (Height != 0f) w.WriteFloat(6, Height);
-            if (Dropdown != null) w.WriteMessageBytes(7, Dropdown.ToByteArray());
-            if (CurrentValue != null && CurrentValue.Length > 0) w.WriteString(8, CurrentValue);
-            if (SelectedIndex != 0) w.WriteInt32(9, SelectedIndex);
-            return w.ToArray();
-        }
-
-        // ── Deserialization ──
-
-        public static readonly MessageParser<BeforeDropdownOpenEvent> Parser = new MessageParser<BeforeDropdownOpenEvent>(data => ParseFrom(data));
-
-        public static BeforeDropdownOpenEvent ParseFrom(byte[] data)
-        {
-            if (data == null || data.Length == 0) return new BeforeDropdownOpenEvent();
-            var r = new ProtoReader(data);
-            var msg = new BeforeDropdownOpenEvent();
-            int field; ProtoWireType wire;
-            while (r.TryReadTag(out field, out wire))
-            {
-                switch (field)
-                {
-                    case 1: msg.Row = r.ReadInt32(); break;
-                    case 2: msg.Col = r.ReadInt32(); break;
-                    case 3: msg.X = r.ReadFloat(); break;
-                    case 4: msg.Y = r.ReadFloat(); break;
-                    case 5: msg.Width = r.ReadFloat(); break;
-                    case 6: msg.Height = r.ReadFloat(); break;
-                    case 7: msg.Dropdown = Dropdown.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 8: msg.CurrentValue = r.ReadString(); break;
-                    case 9: msg.SelectedIndex = r.ReadInt32(); break;
-                    default: r.SkipField(wire); break;
-                }
-            }
-            return msg;
-        }
-    }
-
     public sealed class BeforeEditEvent
     {
         public int Row { get; set; }
@@ -2418,82 +2462,6 @@ namespace Volvoxgrid.V1
         }
     }
 
-    public sealed class CellEditConfigureStyleEvent
-    {
-        public int Row { get; set; }
-        public int Col { get; set; }
-
-        // ── Serialization ──
-
-        public byte[] ToByteArray()
-        {
-            var w = new ProtoWriter();
-            if (Row != 0) w.WriteInt32(1, Row);
-            if (Col != 0) w.WriteInt32(2, Col);
-            return w.ToArray();
-        }
-
-        // ── Deserialization ──
-
-        public static readonly MessageParser<CellEditConfigureStyleEvent> Parser = new MessageParser<CellEditConfigureStyleEvent>(data => ParseFrom(data));
-
-        public static CellEditConfigureStyleEvent ParseFrom(byte[] data)
-        {
-            if (data == null || data.Length == 0) return new CellEditConfigureStyleEvent();
-            var r = new ProtoReader(data);
-            var msg = new CellEditConfigureStyleEvent();
-            int field; ProtoWireType wire;
-            while (r.TryReadTag(out field, out wire))
-            {
-                switch (field)
-                {
-                    case 1: msg.Row = r.ReadInt32(); break;
-                    case 2: msg.Col = r.ReadInt32(); break;
-                    default: r.SkipField(wire); break;
-                }
-            }
-            return msg;
-        }
-    }
-
-    public sealed class CellEditConfigureWindowEvent
-    {
-        public int Row { get; set; }
-        public int Col { get; set; }
-
-        // ── Serialization ──
-
-        public byte[] ToByteArray()
-        {
-            var w = new ProtoWriter();
-            if (Row != 0) w.WriteInt32(1, Row);
-            if (Col != 0) w.WriteInt32(2, Col);
-            return w.ToArray();
-        }
-
-        // ── Deserialization ──
-
-        public static readonly MessageParser<CellEditConfigureWindowEvent> Parser = new MessageParser<CellEditConfigureWindowEvent>(data => ParseFrom(data));
-
-        public static CellEditConfigureWindowEvent ParseFrom(byte[] data)
-        {
-            if (data == null || data.Length == 0) return new CellEditConfigureWindowEvent();
-            var r = new ProtoReader(data);
-            var msg = new CellEditConfigureWindowEvent();
-            int field; ProtoWireType wire;
-            while (r.TryReadTag(out field, out wire))
-            {
-                switch (field)
-                {
-                    case 1: msg.Row = r.ReadInt32(); break;
-                    case 2: msg.Col = r.ReadInt32(); break;
-                    default: r.SkipField(wire); break;
-                }
-            }
-            return msg;
-        }
-    }
-
     public sealed class CellEditValidateEvent
     {
         public int Row { get; set; }
@@ -2764,9 +2732,7 @@ namespace Volvoxgrid.V1
         public ImageAlignment PictureAlign { get { return _pictureAlign.GetValueOrDefault(); } set { _pictureAlign = value; } }
         public bool HasPictureAlign { get { return _pictureAlign.HasValue; } }
         public ImageData ButtonPicture { get; set; }
-        private Dropdown _dropdown;
-        public Dropdown Dropdown { get { return _dropdown; } set { _dropdown = value; } }
-        public bool HasDropdown { get { return _dropdown != null; } }
+        public EditorSpec Editor { get; set; }
         private StickyEdge? _stickyRow;
         public StickyEdge StickyRow { get { return _stickyRow.GetValueOrDefault(); } set { _stickyRow = value; } }
         public bool HasStickyRow { get { return _stickyRow.HasValue; } }
@@ -2798,8 +2764,7 @@ namespace Volvoxgrid.V1
             if (_pictureAlign.HasValue)
                 w.WriteInt32(7, (int)_pictureAlign.Value);
             if (ButtonPicture != null) w.WriteMessageBytes(8, ButtonPicture.ToByteArray());
-            if (_dropdown != null)
-                w.WriteMessageBytes(9, _dropdown.ToByteArray());
+            if (Editor != null) w.WriteMessageBytes(9, Editor.ToByteArray());
             if (_stickyRow.HasValue)
                 w.WriteInt32(10, (int)_stickyRow.Value);
             if (_stickyCol.HasValue)
@@ -2835,7 +2800,7 @@ namespace Volvoxgrid.V1
                     case 6: msg.Picture = ImageData.ParseFrom(r.ReadLengthDelimited()); break;
                     case 7: msg.PictureAlign = (ImageAlignment)r.ReadInt32(); break;
                     case 8: msg.ButtonPicture = ImageData.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 9: msg.Dropdown = Dropdown.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 9: msg.Editor = EditorSpec.ParseFrom(r.ReadLengthDelimited()); break;
                     case 10: msg.StickyRow = (StickyEdge)r.ReadInt32(); break;
                     case 11: msg.StickyCol = (StickyEdge)r.ReadInt32(); break;
                     case 12: msg.Interaction = (CellInteraction)r.ReadInt32(); break;
@@ -2953,6 +2918,41 @@ namespace Volvoxgrid.V1
                 switch (field)
                 {
                     case 1: msg.Cells.Add(CellData.ParseFrom(r.ReadLengthDelimited())); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class CheckboxEditorParams
+    {
+        public bool ThreeState { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (ThreeState) w.WriteBool(1, ThreeState);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<CheckboxEditorParams> Parser = new MessageParser<CheckboxEditorParams>(data => ParseFrom(data));
+
+        public static CheckboxEditorParams ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new CheckboxEditorParams();
+            var r = new ProtoReader(data);
+            var msg = new CheckboxEditorParams();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.ThreeState = r.ReadBool(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -3344,15 +3344,15 @@ namespace Volvoxgrid.V1
         private string _text;
         public string Text { get { return _text; } set { _text = value; } }
         public bool HasText { get { return _text != null; } }
-        private uint? _modeBits;
-        public uint ModeBits { get { return _modeBits.GetValueOrDefault(); } set { _modeBits = value; } }
-        public bool HasModeBits { get { return _modeBits.HasValue; } }
         private string _customKey;
         public string CustomKey { get { return _customKey; } set { _customKey = value; } }
         public bool HasCustomKey { get { return _customKey != null; } }
         private byte[] _data;
         public byte[] Data { get { return _data; } set { _data = value; } }
         public bool HasData { get { return _data != null; } }
+        private ColIndicatorCellModes _modes;
+        public ColIndicatorCellModes Modes { get { return _modes; } set { _modes = value; } }
+        public bool HasModes { get { return _modes != null; } }
 
         // ── Serialization ──
 
@@ -3369,12 +3369,12 @@ namespace Volvoxgrid.V1
                 w.WriteInt32(4, _col2.Value);
             if (_text != null)
                 w.WriteString(5, _text);
-            if (_modeBits.HasValue)
-                w.WriteInt32(6, unchecked((int)_modeBits.Value));
             if (_customKey != null)
-                w.WriteString(7, _customKey);
+                w.WriteString(6, _customKey);
             if (_data != null)
-                w.WriteBytes(8, _data);
+                w.WriteBytes(7, _data);
+            if (_modes != null)
+                w.WriteMessageBytes(8, _modes.ToByteArray());
             return w.ToArray();
         }
 
@@ -3397,9 +3397,56 @@ namespace Volvoxgrid.V1
                     case 3: msg.Col1 = r.ReadInt32(); break;
                     case 4: msg.Col2 = r.ReadInt32(); break;
                     case 5: msg.Text = r.ReadString(); break;
-                    case 6: msg.ModeBits = unchecked((uint)r.ReadInt32()); break;
-                    case 7: msg.CustomKey = r.ReadString(); break;
-                    case 8: msg.Data = r.ReadLengthDelimited(); break;
+                    case 6: msg.CustomKey = r.ReadString(); break;
+                    case 7: msg.Data = r.ReadLengthDelimited(); break;
+                    case 8: msg.Modes = ColIndicatorCellModes.ParseFrom(r.ReadLengthDelimited()); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class ColIndicatorCellModes
+    {
+        public List<ColIndicatorCellMode> Modes { get; private set; } = new List<ColIndicatorCellMode>();
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            foreach (var item in Modes)
+                w.WriteInt32(1, (int)item);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<ColIndicatorCellModes> Parser = new MessageParser<ColIndicatorCellModes>(data => ParseFrom(data));
+
+        public static ColIndicatorCellModes ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new ColIndicatorCellModes();
+            var r = new ProtoReader(data);
+            var msg = new ColIndicatorCellModes();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1:
+                        if (wire == ProtoWireType.LengthDelimited)
+                        {
+                            var packed = new ProtoReader(r.ReadLengthDelimited());
+                            while (!packed.IsEof)
+                                msg.Modes.Add((ColIndicatorCellMode)packed.ReadInt32());
+                        }
+                        else
+                        {
+                            msg.Modes.Add((ColIndicatorCellMode)r.ReadInt32());
+                        }
+                        break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -3418,9 +3465,6 @@ namespace Volvoxgrid.V1
         private int? _bandRows;
         public int BandRows { get { return _bandRows.GetValueOrDefault(); } set { _bandRows = value; } }
         public bool HasBandRows { get { return _bandRows.HasValue; } }
-        private uint? _modeBits;
-        public uint ModeBits { get { return _modeBits.GetValueOrDefault(); } set { _modeBits = value; } }
-        public bool HasModeBits { get { return _modeBits.HasValue; } }
         private uint? _background;
         public uint Background { get { return _background.GetValueOrDefault(); } set { _background = value; } }
         public bool HasBackground { get { return _background.HasValue; } }
@@ -3447,6 +3491,9 @@ namespace Volvoxgrid.V1
         public bool HasAllowMenu { get { return _allowMenu.HasValue; } }
         public List<ColIndicatorRowDef> RowDefs { get; private set; } = new List<ColIndicatorRowDef>();
         public List<ColIndicatorCell> Cells { get; private set; } = new List<ColIndicatorCell>();
+        private ColIndicatorCellModes _cellModes;
+        public ColIndicatorCellModes CellModes { get { return _cellModes; } set { _cellModes = value; } }
+        public bool HasCellModes { get { return _cellModes != null; } }
 
         // ── Serialization ──
 
@@ -3459,28 +3506,28 @@ namespace Volvoxgrid.V1
                 w.WriteInt32(2, _defaultRowHeight.Value);
             if (_bandRows.HasValue)
                 w.WriteInt32(3, _bandRows.Value);
-            if (_modeBits.HasValue)
-                w.WriteInt32(4, unchecked((int)_modeBits.Value));
             if (_background.HasValue)
-                w.WriteInt32(5, unchecked((int)_background.Value));
+                w.WriteInt32(4, unchecked((int)_background.Value));
             if (_foreground.HasValue)
-                w.WriteInt32(6, unchecked((int)_foreground.Value));
+                w.WriteInt32(5, unchecked((int)_foreground.Value));
             if (_gridLines.HasValue)
-                w.WriteInt32(7, (int)_gridLines.Value);
+                w.WriteInt32(6, (int)_gridLines.Value);
             if (_gridColor.HasValue)
-                w.WriteInt32(8, unchecked((int)_gridColor.Value));
+                w.WriteInt32(7, unchecked((int)_gridColor.Value));
             if (_autoSize.HasValue)
-                w.WriteBool(9, _autoSize.Value);
+                w.WriteBool(8, _autoSize.Value);
             if (_allowResize.HasValue)
-                w.WriteBool(10, _allowResize.Value);
+                w.WriteBool(9, _allowResize.Value);
             if (_allowReorder.HasValue)
-                w.WriteBool(11, _allowReorder.Value);
+                w.WriteBool(10, _allowReorder.Value);
             if (_allowMenu.HasValue)
-                w.WriteBool(12, _allowMenu.Value);
+                w.WriteBool(11, _allowMenu.Value);
             foreach (var item in RowDefs)
-                w.WriteMessageBytes(13, item.ToByteArray());
+                w.WriteMessageBytes(12, item.ToByteArray());
             foreach (var item in Cells)
-                w.WriteMessageBytes(14, item.ToByteArray());
+                w.WriteMessageBytes(13, item.ToByteArray());
+            if (_cellModes != null)
+                w.WriteMessageBytes(14, _cellModes.ToByteArray());
             return w.ToArray();
         }
 
@@ -3501,17 +3548,17 @@ namespace Volvoxgrid.V1
                     case 1: msg.Visible = r.ReadBool(); break;
                     case 2: msg.DefaultRowHeight = r.ReadInt32(); break;
                     case 3: msg.BandRows = r.ReadInt32(); break;
-                    case 4: msg.ModeBits = unchecked((uint)r.ReadInt32()); break;
-                    case 5: msg.Background = unchecked((uint)r.ReadInt32()); break;
-                    case 6: msg.Foreground = unchecked((uint)r.ReadInt32()); break;
-                    case 7: msg.GridLines = (GridLineStyle)r.ReadInt32(); break;
-                    case 8: msg.GridColor = unchecked((uint)r.ReadInt32()); break;
-                    case 9: msg.AutoSize = r.ReadBool(); break;
-                    case 10: msg.AllowResize = r.ReadBool(); break;
-                    case 11: msg.AllowReorder = r.ReadBool(); break;
-                    case 12: msg.AllowMenu = r.ReadBool(); break;
-                    case 13: msg.RowDefs.Add(ColIndicatorRowDef.ParseFrom(r.ReadLengthDelimited())); break;
-                    case 14: msg.Cells.Add(ColIndicatorCell.ParseFrom(r.ReadLengthDelimited())); break;
+                    case 4: msg.Background = unchecked((uint)r.ReadInt32()); break;
+                    case 5: msg.Foreground = unchecked((uint)r.ReadInt32()); break;
+                    case 6: msg.GridLines = (GridLineStyle)r.ReadInt32(); break;
+                    case 7: msg.GridColor = unchecked((uint)r.ReadInt32()); break;
+                    case 8: msg.AutoSize = r.ReadBool(); break;
+                    case 9: msg.AllowResize = r.ReadBool(); break;
+                    case 10: msg.AllowReorder = r.ReadBool(); break;
+                    case 11: msg.AllowMenu = r.ReadBool(); break;
+                    case 12: msg.RowDefs.Add(ColIndicatorRowDef.ParseFrom(r.ReadLengthDelimited())); break;
+                    case 13: msg.Cells.Add(ColIndicatorCell.ParseFrom(r.ReadLengthDelimited())); break;
+                    case 14: msg.CellModes = ColIndicatorCellModes.ParseFrom(r.ReadLengthDelimited()); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -3599,12 +3646,7 @@ namespace Volvoxgrid.V1
         private SortType? _sortType;
         public SortType SortType { get { return _sortType.GetValueOrDefault(); } set { _sortType = value; } }
         public bool HasSortType { get { return _sortType.HasValue; } }
-        private Dropdown _dropdown;
-        public Dropdown Dropdown { get { return _dropdown; } set { _dropdown = value; } }
-        public bool HasDropdown { get { return _dropdown != null; } }
-        private string _editMask;
-        public string EditMask { get { return _editMask; } set { _editMask = value; } }
-        public bool HasEditMask { get { return _editMask != null; } }
+        public EditorSpec Editor { get; set; }
         private int? _indent;
         public int Indent { get { return _indent.GetValueOrDefault(); } set { _indent = value; } }
         public bool HasIndent { get { return _indent.HasValue; } }
@@ -3667,34 +3709,31 @@ namespace Volvoxgrid.V1
                 w.WriteInt32(11, (int)_sortOrder.Value);
             if (_sortType.HasValue)
                 w.WriteInt32(12, (int)_sortType.Value);
-            if (_dropdown != null)
-                w.WriteMessageBytes(13, _dropdown.ToByteArray());
-            if (_editMask != null)
-                w.WriteString(14, _editMask);
+            if (Editor != null) w.WriteMessageBytes(13, Editor.ToByteArray());
             if (_indent.HasValue)
-                w.WriteInt32(15, _indent.Value);
+                w.WriteInt32(14, _indent.Value);
             if (_hidden.HasValue)
-                w.WriteBool(16, _hidden.Value);
+                w.WriteBool(15, _hidden.Value);
             if (_span.HasValue)
-                w.WriteBool(17, _span.Value);
+                w.WriteBool(16, _span.Value);
             foreach (var item in ImageList)
-                w.WriteMessageBytes(18, item.ToByteArray());
+                w.WriteMessageBytes(17, item.ToByteArray());
             if (_data != null)
-                w.WriteBytes(19, _data);
+                w.WriteBytes(18, _data);
             if (_sticky.HasValue)
-                w.WriteInt32(20, (int)_sticky.Value);
-            if (Padding != null) w.WriteMessageBytes(21, Padding.ToByteArray());
-            if (FixedPadding != null) w.WriteMessageBytes(22, FixedPadding.ToByteArray());
+                w.WriteInt32(19, (int)_sticky.Value);
+            if (Padding != null) w.WriteMessageBytes(20, Padding.ToByteArray());
+            if (FixedPadding != null) w.WriteMessageBytes(21, FixedPadding.ToByteArray());
             if (_nullable.HasValue)
-                w.WriteBool(23, _nullable.Value);
+                w.WriteBool(22, _nullable.Value);
             if (_coercionMode.HasValue)
-                w.WriteInt32(24, (int)_coercionMode.Value);
+                w.WriteInt32(23, (int)_coercionMode.Value);
             if (_errorMode.HasValue)
-                w.WriteInt32(25, (int)_errorMode.Value);
+                w.WriteInt32(24, (int)_errorMode.Value);
             if (_interaction.HasValue)
-                w.WriteInt32(26, (int)_interaction.Value);
+                w.WriteInt32(25, (int)_interaction.Value);
             if (_progressColor.HasValue)
-                w.WriteInt32(27, unchecked((int)_progressColor.Value));
+                w.WriteInt32(26, unchecked((int)_progressColor.Value));
             return w.ToArray();
         }
 
@@ -3724,21 +3763,20 @@ namespace Volvoxgrid.V1
                     case 10: msg.Key = r.ReadString(); break;
                     case 11: msg.SortOrder = (SortOrder)r.ReadInt32(); break;
                     case 12: msg.SortType = (SortType)r.ReadInt32(); break;
-                    case 13: msg.Dropdown = Dropdown.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 14: msg.EditMask = r.ReadString(); break;
-                    case 15: msg.Indent = r.ReadInt32(); break;
-                    case 16: msg.Hidden = r.ReadBool(); break;
-                    case 17: msg.Span = r.ReadBool(); break;
-                    case 18: msg.ImageList.Add(ImageData.ParseFrom(r.ReadLengthDelimited())); break;
-                    case 19: msg.Data = r.ReadLengthDelimited(); break;
-                    case 20: msg.Sticky = (StickyEdge)r.ReadInt32(); break;
-                    case 21: msg.Padding = Padding.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 22: msg.FixedPadding = Padding.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 23: msg.Nullable = r.ReadBool(); break;
-                    case 24: msg.CoercionMode = (CoercionMode)r.ReadInt32(); break;
-                    case 25: msg.ErrorMode = (WriteErrorMode)r.ReadInt32(); break;
-                    case 26: msg.Interaction = (CellInteraction)r.ReadInt32(); break;
-                    case 27: msg.ProgressColor = unchecked((uint)r.ReadInt32()); break;
+                    case 13: msg.Editor = EditorSpec.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 14: msg.Indent = r.ReadInt32(); break;
+                    case 15: msg.Hidden = r.ReadBool(); break;
+                    case 16: msg.Span = r.ReadBool(); break;
+                    case 17: msg.ImageList.Add(ImageData.ParseFrom(r.ReadLengthDelimited())); break;
+                    case 18: msg.Data = r.ReadLengthDelimited(); break;
+                    case 19: msg.Sticky = (StickyEdge)r.ReadInt32(); break;
+                    case 20: msg.Padding = Padding.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 21: msg.FixedPadding = Padding.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 22: msg.Nullable = r.ReadBool(); break;
+                    case 23: msg.CoercionMode = (CoercionMode)r.ReadInt32(); break;
+                    case 24: msg.ErrorMode = (WriteErrorMode)r.ReadInt32(); break;
+                    case 25: msg.Interaction = (CellInteraction)r.ReadInt32(); break;
+                    case 26: msg.ProgressColor = unchecked((uint)r.ReadInt32()); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -3903,9 +3941,6 @@ namespace Volvoxgrid.V1
         private bool? _visible;
         public bool Visible { get { return _visible.GetValueOrDefault(); } set { _visible = value; } }
         public bool HasVisible { get { return _visible.HasValue; } }
-        private uint? _modeBits;
-        public uint ModeBits { get { return _modeBits.GetValueOrDefault(); } set { _modeBits = value; } }
-        public bool HasModeBits { get { return _modeBits.HasValue; } }
         private uint? _background;
         public uint Background { get { return _background.GetValueOrDefault(); } set { _background = value; } }
         public bool HasBackground { get { return _background.HasValue; } }
@@ -3927,18 +3962,16 @@ namespace Volvoxgrid.V1
             var w = new ProtoWriter();
             if (_visible.HasValue)
                 w.WriteBool(1, _visible.Value);
-            if (_modeBits.HasValue)
-                w.WriteInt32(2, unchecked((int)_modeBits.Value));
             if (_background.HasValue)
-                w.WriteInt32(3, unchecked((int)_background.Value));
+                w.WriteInt32(2, unchecked((int)_background.Value));
             if (_foreground.HasValue)
-                w.WriteInt32(4, unchecked((int)_foreground.Value));
+                w.WriteInt32(3, unchecked((int)_foreground.Value));
             if (_customKey != null)
-                w.WriteString(5, _customKey);
+                w.WriteString(4, _customKey);
             if (_data != null)
-                w.WriteBytes(6, _data);
+                w.WriteBytes(5, _data);
             foreach (var item in Slots)
-                w.WriteMessageBytes(7, item.ToByteArray());
+                w.WriteMessageBytes(6, item.ToByteArray());
             return w.ToArray();
         }
 
@@ -3957,12 +3990,11 @@ namespace Volvoxgrid.V1
                 switch (field)
                 {
                     case 1: msg.Visible = r.ReadBool(); break;
-                    case 2: msg.ModeBits = unchecked((uint)r.ReadInt32()); break;
-                    case 3: msg.Background = unchecked((uint)r.ReadInt32()); break;
-                    case 4: msg.Foreground = unchecked((uint)r.ReadInt32()); break;
-                    case 5: msg.CustomKey = r.ReadString(); break;
-                    case 6: msg.Data = r.ReadLengthDelimited(); break;
-                    case 7: msg.Slots.Add(CornerIndicatorSlot.ParseFrom(r.ReadLengthDelimited())); break;
+                    case 2: msg.Background = unchecked((uint)r.ReadInt32()); break;
+                    case 3: msg.Foreground = unchecked((uint)r.ReadInt32()); break;
+                    case 4: msg.CustomKey = r.ReadString(); break;
+                    case 5: msg.Data = r.ReadLengthDelimited(); break;
+                    case 6: msg.Slots.Add(CornerIndicatorSlot.ParseFrom(r.ReadLengthDelimited())); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -4206,6 +4238,91 @@ namespace Volvoxgrid.V1
         }
     }
 
+    public sealed class CustomEditorAction
+    {
+        public string ActionId { get; set; } = "";
+        public StructValue Payload { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (ActionId != null && ActionId.Length > 0) w.WriteString(1, ActionId);
+            if (Payload != null) w.WriteMessageBytes(2, Payload.ToByteArray());
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<CustomEditorAction> Parser = new MessageParser<CustomEditorAction>(data => ParseFrom(data));
+
+        public static CustomEditorAction ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new CustomEditorAction();
+            var r = new ProtoReader(data);
+            var msg = new CustomEditorAction();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.ActionId = r.ReadString(); break;
+                    case 2: msg.Payload = StructValue.ParseFrom(r.ReadLengthDelimited()); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class CustomEditorActionEvent
+    {
+        public long SessionId { get; set; }
+        public int Row { get; set; }
+        public int Col { get; set; }
+        public string ActionId { get; set; } = "";
+        public StructValue Payload { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (SessionId != 0L) w.WriteInt64(1, SessionId);
+            if (Row != 0) w.WriteInt32(2, Row);
+            if (Col != 0) w.WriteInt32(3, Col);
+            if (ActionId != null && ActionId.Length > 0) w.WriteString(4, ActionId);
+            if (Payload != null) w.WriteMessageBytes(5, Payload.ToByteArray());
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<CustomEditorActionEvent> Parser = new MessageParser<CustomEditorActionEvent>(data => ParseFrom(data));
+
+        public static CustomEditorActionEvent ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new CustomEditorActionEvent();
+            var r = new ProtoReader(data);
+            var msg = new CustomEditorActionEvent();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.SessionId = r.ReadInt64(); break;
+                    case 2: msg.Row = r.ReadInt32(); break;
+                    case 3: msg.Col = r.ReadInt32(); break;
+                    case 4: msg.ActionId = r.ReadString(); break;
+                    case 5: msg.Payload = StructValue.ParseFrom(r.ReadLengthDelimited()); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
     public sealed class CustomRenderCellEvent
     {
         public int Row { get; set; }
@@ -4322,6 +4439,59 @@ namespace Volvoxgrid.V1
             {
                 switch (field)
                 {
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class DateTimeEditorParams
+    {
+        public string Format { get; set; } = "";
+        private long? _minTimestamp;
+        public long MinTimestamp { get { return _minTimestamp.GetValueOrDefault(); } set { _minTimestamp = value; } }
+        public bool HasMinTimestamp { get { return _minTimestamp.HasValue; } }
+        private long? _maxTimestamp;
+        public long MaxTimestamp { get { return _maxTimestamp.GetValueOrDefault(); } set { _maxTimestamp = value; } }
+        public bool HasMaxTimestamp { get { return _maxTimestamp.HasValue; } }
+        public bool DateOnly { get; set; }
+        public bool TimeOnly { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (Format != null && Format.Length > 0) w.WriteString(1, Format);
+            if (_minTimestamp.HasValue)
+                w.WriteInt64(2, _minTimestamp.Value);
+            if (_maxTimestamp.HasValue)
+                w.WriteInt64(3, _maxTimestamp.Value);
+            if (DateOnly) w.WriteBool(4, DateOnly);
+            if (TimeOnly) w.WriteBool(5, TimeOnly);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<DateTimeEditorParams> Parser = new MessageParser<DateTimeEditorParams>(data => ParseFrom(data));
+
+        public static DateTimeEditorParams ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new DateTimeEditorParams();
+            var r = new ProtoReader(data);
+            var msg = new DateTimeEditorParams();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.Format = r.ReadString(); break;
+                    case 2: msg.MinTimestamp = r.ReadInt64(); break;
+                    case 3: msg.MaxTimestamp = r.ReadInt64(); break;
+                    case 4: msg.DateOnly = r.ReadBool(); break;
+                    case 5: msg.TimeOnly = r.ReadBool(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -4734,222 +4904,67 @@ namespace Volvoxgrid.V1
         }
     }
 
-    public sealed class Dropdown
+    public sealed class EditActivation
     {
-        public List<DropdownItem> Items { get; private set; } = new List<DropdownItem>();
-        public bool AllowCustomValue { get; set; }
-        public DropdownItemLayout ItemLayout { get; set; }
-        private bool? _searchable;
-        public bool Searchable { get { return _searchable.GetValueOrDefault(); } set { _searchable = value; } }
-        public bool HasSearchable { get { return _searchable.HasValue; } }
+        private EditTrigger? _trigger;
+        public EditTrigger Trigger { get { return _trigger.GetValueOrDefault(); } set { _trigger = value; } }
+        public bool HasTrigger { get { return _trigger.HasValue; } }
+        private TabBehavior? _tabBehavior;
+        public TabBehavior TabBehavior { get { return _tabBehavior.GetValueOrDefault(); } set { _tabBehavior = value; } }
+        public bool HasTabBehavior { get { return _tabBehavior.HasValue; } }
+        private bool? _singleClickEdit;
+        public bool SingleClickEdit { get { return _singleClickEdit.GetValueOrDefault(); } set { _singleClickEdit = value; } }
+        public bool HasSingleClickEdit { get { return _singleClickEdit.HasValue; } }
+        private bool? _suppressClickEdit;
+        public bool SuppressClickEdit { get { return _suppressClickEdit.GetValueOrDefault(); } set { _suppressClickEdit = value; } }
+        public bool HasSuppressClickEdit { get { return _suppressClickEdit.HasValue; } }
+        private bool? _commitOnFocusLost;
+        public bool CommitOnFocusLost { get { return _commitOnFocusLost.GetValueOrDefault(); } set { _commitOnFocusLost = value; } }
+        public bool HasCommitOnFocusLost { get { return _commitOnFocusLost.HasValue; } }
+        private bool? _preserveEditOnNavigation;
+        public bool PreserveEditOnNavigation { get { return _preserveEditOnNavigation.GetValueOrDefault(); } set { _preserveEditOnNavigation = value; } }
+        public bool HasPreserveEditOnNavigation { get { return _preserveEditOnNavigation.HasValue; } }
 
         // ── Serialization ──
 
         public byte[] ToByteArray()
         {
             var w = new ProtoWriter();
-            foreach (var item in Items)
-                w.WriteMessageBytes(1, item.ToByteArray());
-            if (AllowCustomValue) w.WriteBool(2, AllowCustomValue);
-            if (ItemLayout != 0) w.WriteInt32(3, (int)ItemLayout);
-            if (_searchable.HasValue)
-                w.WriteBool(4, _searchable.Value);
+            if (_trigger.HasValue)
+                w.WriteInt32(1, (int)_trigger.Value);
+            if (_tabBehavior.HasValue)
+                w.WriteInt32(2, (int)_tabBehavior.Value);
+            if (_singleClickEdit.HasValue)
+                w.WriteBool(3, _singleClickEdit.Value);
+            if (_suppressClickEdit.HasValue)
+                w.WriteBool(4, _suppressClickEdit.Value);
+            if (_commitOnFocusLost.HasValue)
+                w.WriteBool(5, _commitOnFocusLost.Value);
+            if (_preserveEditOnNavigation.HasValue)
+                w.WriteBool(6, _preserveEditOnNavigation.Value);
             return w.ToArray();
         }
 
         // ── Deserialization ──
 
-        public static readonly MessageParser<Dropdown> Parser = new MessageParser<Dropdown>(data => ParseFrom(data));
+        public static readonly MessageParser<EditActivation> Parser = new MessageParser<EditActivation>(data => ParseFrom(data));
 
-        public static Dropdown ParseFrom(byte[] data)
+        public static EditActivation ParseFrom(byte[] data)
         {
-            if (data == null || data.Length == 0) return new Dropdown();
+            if (data == null || data.Length == 0) return new EditActivation();
             var r = new ProtoReader(data);
-            var msg = new Dropdown();
+            var msg = new EditActivation();
             int field; ProtoWireType wire;
             while (r.TryReadTag(out field, out wire))
             {
                 switch (field)
                 {
-                    case 1: msg.Items.Add(DropdownItem.ParseFrom(r.ReadLengthDelimited())); break;
-                    case 2: msg.AllowCustomValue = r.ReadBool(); break;
-                    case 3: msg.ItemLayout = (DropdownItemLayout)r.ReadInt32(); break;
-                    case 4: msg.Searchable = r.ReadBool(); break;
-                    default: r.SkipField(wire); break;
-                }
-            }
-            return msg;
-        }
-    }
-
-    public sealed class DropdownClosedEvent
-    {
-
-        // ── Serialization ──
-
-        public byte[] ToByteArray()
-        {
-            var w = new ProtoWriter();
-            return w.ToArray();
-        }
-
-        // ── Deserialization ──
-
-        public static readonly MessageParser<DropdownClosedEvent> Parser = new MessageParser<DropdownClosedEvent>(data => ParseFrom(data));
-
-        public static DropdownClosedEvent ParseFrom(byte[] data)
-        {
-            if (data == null || data.Length == 0) return new DropdownClosedEvent();
-            var r = new ProtoReader(data);
-            var msg = new DropdownClosedEvent();
-            int field; ProtoWireType wire;
-            while (r.TryReadTag(out field, out wire))
-            {
-                switch (field)
-                {
-                    default: r.SkipField(wire); break;
-                }
-            }
-            return msg;
-        }
-    }
-
-    public sealed class DropdownItem
-    {
-        private string _value;
-        public string Value { get { return _value; } set { _value = value; } }
-        public bool HasValue { get { return _value != null; } }
-        private string _label;
-        public string Label { get { return _label; } set { _label = value; } }
-        public bool HasLabel { get { return _label != null; } }
-        public List<string> Details { get; private set; } = new List<string>();
-        public bool Disabled { get; set; }
-
-        // ── Serialization ──
-
-        public byte[] ToByteArray()
-        {
-            var w = new ProtoWriter();
-            if (_value != null)
-                w.WriteString(1, _value);
-            if (_label != null)
-                w.WriteString(2, _label);
-            foreach (var item in Details)
-                w.WriteString(3, item);
-            if (Disabled) w.WriteBool(4, Disabled);
-            return w.ToArray();
-        }
-
-        // ── Deserialization ──
-
-        public static readonly MessageParser<DropdownItem> Parser = new MessageParser<DropdownItem>(data => ParseFrom(data));
-
-        public static DropdownItem ParseFrom(byte[] data)
-        {
-            if (data == null || data.Length == 0) return new DropdownItem();
-            var r = new ProtoReader(data);
-            var msg = new DropdownItem();
-            int field; ProtoWireType wire;
-            while (r.TryReadTag(out field, out wire))
-            {
-                switch (field)
-                {
-                    case 1: msg.Value = r.ReadString(); break;
-                    case 2: msg.Label = r.ReadString(); break;
-                    case 3: msg.Details.Add(r.ReadString()); break;
-                    case 4: msg.Disabled = r.ReadBool(); break;
-                    default: r.SkipField(wire); break;
-                }
-            }
-            return msg;
-        }
-    }
-
-    public sealed class DropdownOpenedEvent
-    {
-
-        // ── Serialization ──
-
-        public byte[] ToByteArray()
-        {
-            var w = new ProtoWriter();
-            return w.ToArray();
-        }
-
-        // ── Deserialization ──
-
-        public static readonly MessageParser<DropdownOpenedEvent> Parser = new MessageParser<DropdownOpenedEvent>(data => ParseFrom(data));
-
-        public static DropdownOpenedEvent ParseFrom(byte[] data)
-        {
-            if (data == null || data.Length == 0) return new DropdownOpenedEvent();
-            var r = new ProtoReader(data);
-            var msg = new DropdownOpenedEvent();
-            int field; ProtoWireType wire;
-            while (r.TryReadTag(out field, out wire))
-            {
-                switch (field)
-                {
-                    default: r.SkipField(wire); break;
-                }
-            }
-            return msg;
-        }
-    }
-
-    public sealed class DropdownRequest
-    {
-        public int Row { get; set; }
-        public int Col { get; set; }
-        public float X { get; set; }
-        public float Y { get; set; }
-        public float Width { get; set; }
-        public float Height { get; set; }
-        public List<string> Items { get; private set; } = new List<string>();
-        public int Selected { get; set; }
-        public bool Editable { get; set; }
-
-        // ── Serialization ──
-
-        public byte[] ToByteArray()
-        {
-            var w = new ProtoWriter();
-            if (Row != 0) w.WriteInt32(1, Row);
-            if (Col != 0) w.WriteInt32(2, Col);
-            if (X != 0f) w.WriteFloat(3, X);
-            if (Y != 0f) w.WriteFloat(4, Y);
-            if (Width != 0f) w.WriteFloat(5, Width);
-            if (Height != 0f) w.WriteFloat(6, Height);
-            foreach (var item in Items)
-                w.WriteString(7, item);
-            if (Selected != 0) w.WriteInt32(8, Selected);
-            if (Editable) w.WriteBool(9, Editable);
-            return w.ToArray();
-        }
-
-        // ── Deserialization ──
-
-        public static readonly MessageParser<DropdownRequest> Parser = new MessageParser<DropdownRequest>(data => ParseFrom(data));
-
-        public static DropdownRequest ParseFrom(byte[] data)
-        {
-            if (data == null || data.Length == 0) return new DropdownRequest();
-            var r = new ProtoReader(data);
-            var msg = new DropdownRequest();
-            int field; ProtoWireType wire;
-            while (r.TryReadTag(out field, out wire))
-            {
-                switch (field)
-                {
-                    case 1: msg.Row = r.ReadInt32(); break;
-                    case 2: msg.Col = r.ReadInt32(); break;
-                    case 3: msg.X = r.ReadFloat(); break;
-                    case 4: msg.Y = r.ReadFloat(); break;
-                    case 5: msg.Width = r.ReadFloat(); break;
-                    case 6: msg.Height = r.ReadFloat(); break;
-                    case 7: msg.Items.Add(r.ReadString()); break;
-                    case 8: msg.Selected = r.ReadInt32(); break;
-                    case 9: msg.Editable = r.ReadBool(); break;
+                    case 1: msg.Trigger = (EditTrigger)r.ReadInt32(); break;
+                    case 2: msg.TabBehavior = (TabBehavior)r.ReadInt32(); break;
+                    case 3: msg.SingleClickEdit = r.ReadBool(); break;
+                    case 4: msg.SuppressClickEdit = r.ReadBool(); break;
+                    case 5: msg.CommitOnFocusLost = r.ReadBool(); break;
+                    case 6: msg.PreserveEditOnNavigation = r.ReadBool(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -4995,32 +5010,17 @@ namespace Volvoxgrid.V1
         {
             None = 0,
             Start = 2,
-            Commit = 3,
-            Cancel = 4,
-            SetText = 5,
-            SetSelection = 6,
-            Finish = 7,
-            SetHighlights = 8,
-            SetPreedit = 9,
+            Session = 3,
+            GetState = 4,
         }
         public CommandOneofCase CommandCase { get; set; }
 
         private EditStart _start;
         public EditStart Start { get { return CommandCase == CommandOneofCase.Start ? _start : null; } set { _start = value; CommandCase = CommandOneofCase.Start; } }
-        private EditCommit _commit;
-        public EditCommit Commit { get { return CommandCase == CommandOneofCase.Commit ? _commit : null; } set { _commit = value; CommandCase = CommandOneofCase.Commit; } }
-        private EditCancel _cancel;
-        public EditCancel Cancel { get { return CommandCase == CommandOneofCase.Cancel ? _cancel : null; } set { _cancel = value; CommandCase = CommandOneofCase.Cancel; } }
-        private EditSetText _setText;
-        public EditSetText SetText { get { return CommandCase == CommandOneofCase.SetText ? _setText : null; } set { _setText = value; CommandCase = CommandOneofCase.SetText; } }
-        private EditSetSelection _setSelection;
-        public EditSetSelection SetSelection { get { return CommandCase == CommandOneofCase.SetSelection ? _setSelection : null; } set { _setSelection = value; CommandCase = CommandOneofCase.SetSelection; } }
-        private EditFinish _finish;
-        public EditFinish Finish { get { return CommandCase == CommandOneofCase.Finish ? _finish : null; } set { _finish = value; CommandCase = CommandOneofCase.Finish; } }
-        private EditSetHighlights _setHighlights;
-        public EditSetHighlights SetHighlights { get { return CommandCase == CommandOneofCase.SetHighlights ? _setHighlights : null; } set { _setHighlights = value; CommandCase = CommandOneofCase.SetHighlights; } }
-        private EditSetPreedit _setPreedit;
-        public EditSetPreedit SetPreedit { get { return CommandCase == CommandOneofCase.SetPreedit ? _setPreedit : null; } set { _setPreedit = value; CommandCase = CommandOneofCase.SetPreedit; } }
+        private EditorSessionCommand _session;
+        public EditorSessionCommand Session { get { return CommandCase == CommandOneofCase.Session ? _session : null; } set { _session = value; CommandCase = CommandOneofCase.Session; } }
+        private EditGetState _getState;
+        public EditGetState GetState { get { return CommandCase == CommandOneofCase.GetState ? _getState : null; } set { _getState = value; CommandCase = CommandOneofCase.GetState; } }
         public long GridId { get; set; }
 
         // ── Serialization ──
@@ -5034,26 +5034,11 @@ namespace Volvoxgrid.V1
                 case CommandOneofCase.Start:
                     if (_start != null) w.WriteMessageBytes(2, _start.ToByteArray());
                     break;
-                case CommandOneofCase.Commit:
-                    if (_commit != null) w.WriteMessageBytes(3, _commit.ToByteArray());
+                case CommandOneofCase.Session:
+                    if (_session != null) w.WriteMessageBytes(3, _session.ToByteArray());
                     break;
-                case CommandOneofCase.Cancel:
-                    if (_cancel != null) w.WriteMessageBytes(4, _cancel.ToByteArray());
-                    break;
-                case CommandOneofCase.SetText:
-                    if (_setText != null) w.WriteMessageBytes(5, _setText.ToByteArray());
-                    break;
-                case CommandOneofCase.SetSelection:
-                    if (_setSelection != null) w.WriteMessageBytes(6, _setSelection.ToByteArray());
-                    break;
-                case CommandOneofCase.Finish:
-                    if (_finish != null) w.WriteMessageBytes(7, _finish.ToByteArray());
-                    break;
-                case CommandOneofCase.SetHighlights:
-                    if (_setHighlights != null) w.WriteMessageBytes(8, _setHighlights.ToByteArray());
-                    break;
-                case CommandOneofCase.SetPreedit:
-                    if (_setPreedit != null) w.WriteMessageBytes(9, _setPreedit.ToByteArray());
+                case CommandOneofCase.GetState:
+                    if (_getState != null) w.WriteMessageBytes(4, _getState.ToByteArray());
                     break;
             }
             return w.ToArray();
@@ -5075,13 +5060,8 @@ namespace Volvoxgrid.V1
                 {
                     case 1: msg.GridId = r.ReadInt64(); break;
                     case 2: msg.Start = EditStart.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 3: msg.Commit = EditCommit.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 4: msg.Cancel = EditCancel.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 5: msg.SetText = EditSetText.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 6: msg.SetSelection = EditSetSelection.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 7: msg.Finish = EditFinish.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 8: msg.SetHighlights = EditSetHighlights.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 9: msg.SetPreedit = EditSetPreedit.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 3: msg.Session = EditorSessionCommand.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 4: msg.GetState = EditGetState.ParseFrom(r.ReadLengthDelimited()); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -5091,17 +5071,17 @@ namespace Volvoxgrid.V1
 
     public sealed class EditCommit
     {
-        private string _text;
-        public string Text { get { return _text; } set { _text = value; } }
-        public bool HasText { get { return _text != null; } }
+        private EditorValue _value;
+        public EditorValue Value { get { return _value; } set { _value = value; } }
+        public bool HasValue { get { return _value != null; } }
 
         // ── Serialization ──
 
         public byte[] ToByteArray()
         {
             var w = new ProtoWriter();
-            if (_text != null)
-                w.WriteString(1, _text);
+            if (_value != null)
+                w.WriteMessageBytes(1, _value.ToByteArray());
             return w.ToArray();
         }
 
@@ -5119,7 +5099,7 @@ namespace Volvoxgrid.V1
             {
                 switch (field)
                 {
-                    case 1: msg.Text = r.ReadString(); break;
+                    case 1: msg.Value = EditorValue.ParseFrom(r.ReadLengthDelimited()); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -5129,33 +5109,8 @@ namespace Volvoxgrid.V1
 
     public sealed class EditConfig
     {
-        private EditTrigger? _trigger;
-        public EditTrigger Trigger { get { return _trigger.GetValueOrDefault(); } set { _trigger = value; } }
-        public bool HasTrigger { get { return _trigger.HasValue; } }
-        private TabBehavior? _tabBehavior;
-        public TabBehavior TabBehavior { get { return _tabBehavior.GetValueOrDefault(); } set { _tabBehavior = value; } }
-        public bool HasTabBehavior { get { return _tabBehavior.HasValue; } }
-        private DropdownTrigger? _dropdownTrigger;
-        public DropdownTrigger DropdownTrigger { get { return _dropdownTrigger.GetValueOrDefault(); } set { _dropdownTrigger = value; } }
-        public bool HasDropdownTrigger { get { return _dropdownTrigger.HasValue; } }
-        private bool? _dropdownSearch;
-        public bool DropdownSearch { get { return _dropdownSearch.GetValueOrDefault(); } set { _dropdownSearch = value; } }
-        public bool HasDropdownSearch { get { return _dropdownSearch.HasValue; } }
-        private int? _maxLength;
-        public int MaxLength { get { return _maxLength.GetValueOrDefault(); } set { _maxLength = value; } }
-        public bool HasMaxLength { get { return _maxLength.HasValue; } }
-        private string _mask;
-        public string Mask { get { return _mask; } set { _mask = value; } }
-        public bool HasMask { get { return _mask != null; } }
-        private bool? _hostKeyDispatch;
-        public bool HostKeyDispatch { get { return _hostKeyDispatch.GetValueOrDefault(); } set { _hostKeyDispatch = value; } }
-        public bool HasHostKeyDispatch { get { return _hostKeyDispatch.HasValue; } }
-        private bool? _hostPointerDispatch;
-        public bool HostPointerDispatch { get { return _hostPointerDispatch.GetValueOrDefault(); } set { _hostPointerDispatch = value; } }
-        public bool HasHostPointerDispatch { get { return _hostPointerDispatch.HasValue; } }
-        private bool? _engineCompose;
-        public bool EngineCompose { get { return _engineCompose.GetValueOrDefault(); } set { _engineCompose = value; } }
-        public bool HasEngineCompose { get { return _engineCompose.HasValue; } }
+        public EditActivation Activation { get; set; }
+        public EditorSpec DefaultEditor { get; set; }
         private ComposeMethod? _composeMethod;
         public ComposeMethod ComposeMethod { get { return _composeMethod.GetValueOrDefault(); } set { _composeMethod = value; } }
         public bool HasComposeMethod { get { return _composeMethod.HasValue; } }
@@ -5165,26 +5120,10 @@ namespace Volvoxgrid.V1
         public byte[] ToByteArray()
         {
             var w = new ProtoWriter();
-            if (_trigger.HasValue)
-                w.WriteInt32(1, (int)_trigger.Value);
-            if (_tabBehavior.HasValue)
-                w.WriteInt32(2, (int)_tabBehavior.Value);
-            if (_dropdownTrigger.HasValue)
-                w.WriteInt32(3, (int)_dropdownTrigger.Value);
-            if (_dropdownSearch.HasValue)
-                w.WriteBool(4, _dropdownSearch.Value);
-            if (_maxLength.HasValue)
-                w.WriteInt32(5, _maxLength.Value);
-            if (_mask != null)
-                w.WriteString(6, _mask);
-            if (_hostKeyDispatch.HasValue)
-                w.WriteBool(7, _hostKeyDispatch.Value);
-            if (_hostPointerDispatch.HasValue)
-                w.WriteBool(8, _hostPointerDispatch.Value);
-            if (_engineCompose.HasValue)
-                w.WriteBool(9, _engineCompose.Value);
+            if (Activation != null) w.WriteMessageBytes(1, Activation.ToByteArray());
+            if (DefaultEditor != null) w.WriteMessageBytes(2, DefaultEditor.ToByteArray());
             if (_composeMethod.HasValue)
-                w.WriteInt32(10, (int)_composeMethod.Value);
+                w.WriteInt32(3, (int)_composeMethod.Value);
             return w.ToArray();
         }
 
@@ -5202,16 +5141,9 @@ namespace Volvoxgrid.V1
             {
                 switch (field)
                 {
-                    case 1: msg.Trigger = (EditTrigger)r.ReadInt32(); break;
-                    case 2: msg.TabBehavior = (TabBehavior)r.ReadInt32(); break;
-                    case 3: msg.DropdownTrigger = (DropdownTrigger)r.ReadInt32(); break;
-                    case 4: msg.DropdownSearch = r.ReadBool(); break;
-                    case 5: msg.MaxLength = r.ReadInt32(); break;
-                    case 6: msg.Mask = r.ReadString(); break;
-                    case 7: msg.HostKeyDispatch = r.ReadBool(); break;
-                    case 8: msg.HostPointerDispatch = r.ReadBool(); break;
-                    case 9: msg.EngineCompose = r.ReadBool(); break;
-                    case 10: msg.ComposeMethod = (ComposeMethod)r.ReadInt32(); break;
+                    case 1: msg.Activation = EditActivation.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 2: msg.DefaultEditor = EditorSpec.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 3: msg.ComposeMethod = (ComposeMethod)r.ReadInt32(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -5219,7 +5151,7 @@ namespace Volvoxgrid.V1
         }
     }
 
-    public sealed class EditFinish
+    public sealed class EditGetState
     {
 
         // ── Serialization ──
@@ -5232,86 +5164,18 @@ namespace Volvoxgrid.V1
 
         // ── Deserialization ──
 
-        public static readonly MessageParser<EditFinish> Parser = new MessageParser<EditFinish>(data => ParseFrom(data));
+        public static readonly MessageParser<EditGetState> Parser = new MessageParser<EditGetState>(data => ParseFrom(data));
 
-        public static EditFinish ParseFrom(byte[] data)
+        public static EditGetState ParseFrom(byte[] data)
         {
-            if (data == null || data.Length == 0) return new EditFinish();
+            if (data == null || data.Length == 0) return new EditGetState();
             var r = new ProtoReader(data);
-            var msg = new EditFinish();
+            var msg = new EditGetState();
             int field; ProtoWireType wire;
             while (r.TryReadTag(out field, out wire))
             {
                 switch (field)
                 {
-                    default: r.SkipField(wire); break;
-                }
-            }
-            return msg;
-        }
-    }
-
-    public sealed class EditRequest
-    {
-        public int Row { get; set; }
-        public int Col { get; set; }
-        public float X { get; set; }
-        public float Y { get; set; }
-        public float Width { get; set; }
-        public float Height { get; set; }
-        public string CurrentValue { get; set; } = "";
-        public string EditMask { get; set; } = "";
-        public int MaxLength { get; set; }
-        public int SelStart { get; set; }
-        public int SelLength { get; set; }
-        public EditUiMode UiMode { get; set; }
-
-        // ── Serialization ──
-
-        public byte[] ToByteArray()
-        {
-            var w = new ProtoWriter();
-            if (Row != 0) w.WriteInt32(1, Row);
-            if (Col != 0) w.WriteInt32(2, Col);
-            if (X != 0f) w.WriteFloat(3, X);
-            if (Y != 0f) w.WriteFloat(4, Y);
-            if (Width != 0f) w.WriteFloat(5, Width);
-            if (Height != 0f) w.WriteFloat(6, Height);
-            if (CurrentValue != null && CurrentValue.Length > 0) w.WriteString(7, CurrentValue);
-            if (EditMask != null && EditMask.Length > 0) w.WriteString(8, EditMask);
-            if (MaxLength != 0) w.WriteInt32(9, MaxLength);
-            if (SelStart != 0) w.WriteInt32(10, SelStart);
-            if (SelLength != 0) w.WriteInt32(11, SelLength);
-            if (UiMode != 0) w.WriteInt32(12, (int)UiMode);
-            return w.ToArray();
-        }
-
-        // ── Deserialization ──
-
-        public static readonly MessageParser<EditRequest> Parser = new MessageParser<EditRequest>(data => ParseFrom(data));
-
-        public static EditRequest ParseFrom(byte[] data)
-        {
-            if (data == null || data.Length == 0) return new EditRequest();
-            var r = new ProtoReader(data);
-            var msg = new EditRequest();
-            int field; ProtoWireType wire;
-            while (r.TryReadTag(out field, out wire))
-            {
-                switch (field)
-                {
-                    case 1: msg.Row = r.ReadInt32(); break;
-                    case 2: msg.Col = r.ReadInt32(); break;
-                    case 3: msg.X = r.ReadFloat(); break;
-                    case 4: msg.Y = r.ReadFloat(); break;
-                    case 5: msg.Width = r.ReadFloat(); break;
-                    case 6: msg.Height = r.ReadFloat(); break;
-                    case 7: msg.CurrentValue = r.ReadString(); break;
-                    case 8: msg.EditMask = r.ReadString(); break;
-                    case 9: msg.MaxLength = r.ReadInt32(); break;
-                    case 10: msg.SelStart = r.ReadInt32(); break;
-                    case 11: msg.SelLength = r.ReadInt32(); break;
-                    case 12: msg.UiMode = (EditUiMode)r.ReadInt32(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -5355,136 +5219,15 @@ namespace Volvoxgrid.V1
         }
     }
 
-    public sealed class EditSetPreedit
-    {
-        public string Text { get; set; } = "";
-        public int Cursor { get; set; }
-        public bool Commit { get; set; }
-
-        // ── Serialization ──
-
-        public byte[] ToByteArray()
-        {
-            var w = new ProtoWriter();
-            if (Text != null && Text.Length > 0) w.WriteString(1, Text);
-            if (Cursor != 0) w.WriteInt32(2, Cursor);
-            if (Commit) w.WriteBool(3, Commit);
-            return w.ToArray();
-        }
-
-        // ── Deserialization ──
-
-        public static readonly MessageParser<EditSetPreedit> Parser = new MessageParser<EditSetPreedit>(data => ParseFrom(data));
-
-        public static EditSetPreedit ParseFrom(byte[] data)
-        {
-            if (data == null || data.Length == 0) return new EditSetPreedit();
-            var r = new ProtoReader(data);
-            var msg = new EditSetPreedit();
-            int field; ProtoWireType wire;
-            while (r.TryReadTag(out field, out wire))
-            {
-                switch (field)
-                {
-                    case 1: msg.Text = r.ReadString(); break;
-                    case 2: msg.Cursor = r.ReadInt32(); break;
-                    case 3: msg.Commit = r.ReadBool(); break;
-                    default: r.SkipField(wire); break;
-                }
-            }
-            return msg;
-        }
-    }
-
-    public sealed class EditSetSelection
-    {
-        public int Start { get; set; }
-        public int Length { get; set; }
-
-        // ── Serialization ──
-
-        public byte[] ToByteArray()
-        {
-            var w = new ProtoWriter();
-            if (Start != 0) w.WriteInt32(1, Start);
-            if (Length != 0) w.WriteInt32(2, Length);
-            return w.ToArray();
-        }
-
-        // ── Deserialization ──
-
-        public static readonly MessageParser<EditSetSelection> Parser = new MessageParser<EditSetSelection>(data => ParseFrom(data));
-
-        public static EditSetSelection ParseFrom(byte[] data)
-        {
-            if (data == null || data.Length == 0) return new EditSetSelection();
-            var r = new ProtoReader(data);
-            var msg = new EditSetSelection();
-            int field; ProtoWireType wire;
-            while (r.TryReadTag(out field, out wire))
-            {
-                switch (field)
-                {
-                    case 1: msg.Start = r.ReadInt32(); break;
-                    case 2: msg.Length = r.ReadInt32(); break;
-                    default: r.SkipField(wire); break;
-                }
-            }
-            return msg;
-        }
-    }
-
-    public sealed class EditSetText
-    {
-        public string Text { get; set; } = "";
-
-        // ── Serialization ──
-
-        public byte[] ToByteArray()
-        {
-            var w = new ProtoWriter();
-            if (Text != null && Text.Length > 0) w.WriteString(1, Text);
-            return w.ToArray();
-        }
-
-        // ── Deserialization ──
-
-        public static readonly MessageParser<EditSetText> Parser = new MessageParser<EditSetText>(data => ParseFrom(data));
-
-        public static EditSetText ParseFrom(byte[] data)
-        {
-            if (data == null || data.Length == 0) return new EditSetText();
-            var r = new ProtoReader(data);
-            var msg = new EditSetText();
-            int field; ProtoWireType wire;
-            while (r.TryReadTag(out field, out wire))
-            {
-                switch (field)
-                {
-                    case 1: msg.Text = r.ReadString(); break;
-                    default: r.SkipField(wire); break;
-                }
-            }
-            return msg;
-        }
-    }
-
     public sealed class EditStart
     {
         public int Row { get; set; }
         public int Col { get; set; }
-        private bool? _selectAll;
-        public bool SelectAll { get { return _selectAll.GetValueOrDefault(); } set { _selectAll = value; } }
-        public bool HasSelectAll { get { return _selectAll.HasValue; } }
-        private bool? _caretEnd;
-        public bool CaretEnd { get { return _caretEnd.GetValueOrDefault(); } set { _caretEnd = value; } }
-        public bool HasCaretEnd { get { return _caretEnd.HasValue; } }
-        private string _seedText;
-        public string SeedText { get { return _seedText; } set { _seedText = value; } }
-        public bool HasSeedText { get { return _seedText != null; } }
-        private bool? _formulaMode;
-        public bool FormulaMode { get { return _formulaMode.GetValueOrDefault(); } set { _formulaMode = value; } }
-        public bool HasFormulaMode { get { return _formulaMode.HasValue; } }
+        public EditStartReason Reason { get; set; }
+        public EditorValue SeedValue { get; set; }
+        private int? _caretPosition;
+        public int CaretPosition { get { return _caretPosition.GetValueOrDefault(); } set { _caretPosition = value; } }
+        public bool HasCaretPosition { get { return _caretPosition.HasValue; } }
 
         // ── Serialization ──
 
@@ -5493,14 +5236,10 @@ namespace Volvoxgrid.V1
             var w = new ProtoWriter();
             if (Row != 0) w.WriteInt32(1, Row);
             if (Col != 0) w.WriteInt32(2, Col);
-            if (_selectAll.HasValue)
-                w.WriteBool(3, _selectAll.Value);
-            if (_caretEnd.HasValue)
-                w.WriteBool(4, _caretEnd.Value);
-            if (_seedText != null)
-                w.WriteString(5, _seedText);
-            if (_formulaMode.HasValue)
-                w.WriteBool(6, _formulaMode.Value);
+            if (Reason != 0) w.WriteInt32(3, (int)Reason);
+            if (SeedValue != null) w.WriteMessageBytes(4, SeedValue.ToByteArray());
+            if (_caretPosition.HasValue)
+                w.WriteInt32(5, _caretPosition.Value);
             return w.ToArray();
         }
 
@@ -5520,10 +5259,9 @@ namespace Volvoxgrid.V1
                 {
                     case 1: msg.Row = r.ReadInt32(); break;
                     case 2: msg.Col = r.ReadInt32(); break;
-                    case 3: msg.SelectAll = r.ReadBool(); break;
-                    case 4: msg.CaretEnd = r.ReadBool(); break;
-                    case 5: msg.SeedText = r.ReadString(); break;
-                    case 6: msg.FormulaMode = r.ReadBool(); break;
+                    case 3: msg.Reason = (EditStartReason)r.ReadInt32(); break;
+                    case 4: msg.SeedValue = EditorValue.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 5: msg.CaretPosition = r.ReadInt32(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -5534,19 +5272,7 @@ namespace Volvoxgrid.V1
     public sealed class EditState
     {
         public bool Active { get; set; }
-        public int Row { get; set; }
-        public int Col { get; set; }
-        public string Text { get; set; } = "";
-        public int SelStart { get; set; }
-        public int SelLength { get; set; }
-        public bool Composing { get; set; }
-        public string PreeditText { get; set; } = "";
-        public EditUiMode UiMode { get; set; }
-        public float X { get; set; }
-        public float Y { get; set; }
-        public float Width { get; set; }
-        public float Height { get; set; }
-        public int MaxLength { get; set; }
+        public EditorSession Session { get; set; }
 
         // ── Serialization ──
 
@@ -5554,19 +5280,7 @@ namespace Volvoxgrid.V1
         {
             var w = new ProtoWriter();
             if (Active) w.WriteBool(1, Active);
-            if (Row != 0) w.WriteInt32(2, Row);
-            if (Col != 0) w.WriteInt32(3, Col);
-            if (Text != null && Text.Length > 0) w.WriteString(4, Text);
-            if (SelStart != 0) w.WriteInt32(5, SelStart);
-            if (SelLength != 0) w.WriteInt32(6, SelLength);
-            if (Composing) w.WriteBool(7, Composing);
-            if (PreeditText != null && PreeditText.Length > 0) w.WriteString(8, PreeditText);
-            if (UiMode != 0) w.WriteInt32(9, (int)UiMode);
-            if (X != 0f) w.WriteFloat(10, X);
-            if (Y != 0f) w.WriteFloat(11, Y);
-            if (Width != 0f) w.WriteFloat(12, Width);
-            if (Height != 0f) w.WriteFloat(13, Height);
-            if (MaxLength != 0) w.WriteInt32(14, MaxLength);
+            if (Session != null) w.WriteMessageBytes(2, Session.ToByteArray());
             return w.ToArray();
         }
 
@@ -5585,19 +5299,802 @@ namespace Volvoxgrid.V1
                 switch (field)
                 {
                     case 1: msg.Active = r.ReadBool(); break;
+                    case 2: msg.Session = EditorSession.ParseFrom(r.ReadLengthDelimited()); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class EditValidationRequest
+    {
+        public long RequestId { get; set; }
+        public long SessionId { get; set; }
+        public int Row { get; set; }
+        public int Col { get; set; }
+        public EditorValue Value { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (RequestId != 0L) w.WriteInt64(1, RequestId);
+            if (SessionId != 0L) w.WriteInt64(2, SessionId);
+            if (Row != 0) w.WriteInt32(3, Row);
+            if (Col != 0) w.WriteInt32(4, Col);
+            if (Value != null) w.WriteMessageBytes(5, Value.ToByteArray());
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<EditValidationRequest> Parser = new MessageParser<EditValidationRequest>(data => ParseFrom(data));
+
+        public static EditValidationRequest ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new EditValidationRequest();
+            var r = new ProtoReader(data);
+            var msg = new EditValidationRequest();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.RequestId = r.ReadInt64(); break;
+                    case 2: msg.SessionId = r.ReadInt64(); break;
+                    case 3: msg.Row = r.ReadInt32(); break;
+                    case 4: msg.Col = r.ReadInt32(); break;
+                    case 5: msg.Value = EditorValue.ParseFrom(r.ReadLengthDelimited()); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class EditValidationResponse
+    {
+        public long RequestId { get; set; }
+        public long SessionId { get; set; }
+        public List<ValidationError> Errors { get; private set; } = new List<ValidationError>();
+        private EditorValue _normalizedValue;
+        public EditorValue NormalizedValue { get { return _normalizedValue; } set { _normalizedValue = value; } }
+        public bool HasNormalizedValue { get { return _normalizedValue != null; } }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (RequestId != 0L) w.WriteInt64(1, RequestId);
+            if (SessionId != 0L) w.WriteInt64(2, SessionId);
+            foreach (var item in Errors)
+                w.WriteMessageBytes(3, item.ToByteArray());
+            if (_normalizedValue != null)
+                w.WriteMessageBytes(4, _normalizedValue.ToByteArray());
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<EditValidationResponse> Parser = new MessageParser<EditValidationResponse>(data => ParseFrom(data));
+
+        public static EditValidationResponse ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new EditValidationResponse();
+            var r = new ProtoReader(data);
+            var msg = new EditValidationResponse();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.RequestId = r.ReadInt64(); break;
+                    case 2: msg.SessionId = r.ReadInt64(); break;
+                    case 3: msg.Errors.Add(ValidationError.ParseFrom(r.ReadLengthDelimited())); break;
+                    case 4: msg.NormalizedValue = EditorValue.ParseFrom(r.ReadLengthDelimited()); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class EditorAction
+    {
+        public string ActionId { get; set; } = "";
+        public string Label { get; set; } = "";
+        public ButtonRole Role { get; set; }
+        public ImageData Icon { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (ActionId != null && ActionId.Length > 0) w.WriteString(1, ActionId);
+            if (Label != null && Label.Length > 0) w.WriteString(2, Label);
+            if (Role != 0) w.WriteInt32(3, (int)Role);
+            if (Icon != null) w.WriteMessageBytes(4, Icon.ToByteArray());
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<EditorAction> Parser = new MessageParser<EditorAction>(data => ParseFrom(data));
+
+        public static EditorAction ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new EditorAction();
+            var r = new ProtoReader(data);
+            var msg = new EditorAction();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.ActionId = r.ReadString(); break;
+                    case 2: msg.Label = r.ReadString(); break;
+                    case 3: msg.Role = (ButtonRole)r.ReadInt32(); break;
+                    case 4: msg.Icon = ImageData.ParseFrom(r.ReadLengthDelimited()); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class EditorCapabilities
+    {
+        public bool AcceptsTextInput { get; set; }
+        public bool SupportsSelection { get; set; }
+        public bool SupportsCut { get; set; }
+        public bool SupportsPaste { get; set; }
+        public bool SupportsUndo { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (AcceptsTextInput) w.WriteBool(1, AcceptsTextInput);
+            if (SupportsSelection) w.WriteBool(2, SupportsSelection);
+            if (SupportsCut) w.WriteBool(3, SupportsCut);
+            if (SupportsPaste) w.WriteBool(4, SupportsPaste);
+            if (SupportsUndo) w.WriteBool(5, SupportsUndo);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<EditorCapabilities> Parser = new MessageParser<EditorCapabilities>(data => ParseFrom(data));
+
+        public static EditorCapabilities ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new EditorCapabilities();
+            var r = new ProtoReader(data);
+            var msg = new EditorCapabilities();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.AcceptsTextInput = r.ReadBool(); break;
+                    case 2: msg.SupportsSelection = r.ReadBool(); break;
+                    case 3: msg.SupportsCut = r.ReadBool(); break;
+                    case 4: msg.SupportsPaste = r.ReadBool(); break;
+                    case 5: msg.SupportsUndo = r.ReadBool(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class EditorListItemsRequest
+    {
+        public long RequestId { get; set; }
+        public long SessionId { get; set; }
+        public string DataSourceId { get; set; } = "";
+        public string FilterText { get; set; } = "";
+        public int Offset { get; set; }
+        public int Limit { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (RequestId != 0L) w.WriteInt64(1, RequestId);
+            if (SessionId != 0L) w.WriteInt64(2, SessionId);
+            if (DataSourceId != null && DataSourceId.Length > 0) w.WriteString(3, DataSourceId);
+            if (FilterText != null && FilterText.Length > 0) w.WriteString(4, FilterText);
+            if (Offset != 0) w.WriteInt32(5, Offset);
+            if (Limit != 0) w.WriteInt32(6, Limit);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<EditorListItemsRequest> Parser = new MessageParser<EditorListItemsRequest>(data => ParseFrom(data));
+
+        public static EditorListItemsRequest ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new EditorListItemsRequest();
+            var r = new ProtoReader(data);
+            var msg = new EditorListItemsRequest();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.RequestId = r.ReadInt64(); break;
+                    case 2: msg.SessionId = r.ReadInt64(); break;
+                    case 3: msg.DataSourceId = r.ReadString(); break;
+                    case 4: msg.FilterText = r.ReadString(); break;
+                    case 5: msg.Offset = r.ReadInt32(); break;
+                    case 6: msg.Limit = r.ReadInt32(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class EditorListItemsResponse
+    {
+        public long RequestId { get; set; }
+        public long SessionId { get; set; }
+        public List<ListItem> Items { get; private set; } = new List<ListItem>();
+        public bool HasMore { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (RequestId != 0L) w.WriteInt64(1, RequestId);
+            if (SessionId != 0L) w.WriteInt64(2, SessionId);
+            foreach (var item in Items)
+                w.WriteMessageBytes(3, item.ToByteArray());
+            if (HasMore) w.WriteBool(4, HasMore);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<EditorListItemsResponse> Parser = new MessageParser<EditorListItemsResponse>(data => ParseFrom(data));
+
+        public static EditorListItemsResponse ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new EditorListItemsResponse();
+            var r = new ProtoReader(data);
+            var msg = new EditorListItemsResponse();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.RequestId = r.ReadInt64(); break;
+                    case 2: msg.SessionId = r.ReadInt64(); break;
+                    case 3: msg.Items.Add(ListItem.ParseFrom(r.ReadLengthDelimited())); break;
+                    case 4: msg.HasMore = r.ReadBool(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class EditorPreeditChanged
+    {
+        public string Text { get; set; } = "";
+        public int Cursor { get; set; }
+        public bool Commit { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (Text != null && Text.Length > 0) w.WriteString(1, Text);
+            if (Cursor != 0) w.WriteInt32(2, Cursor);
+            if (Commit) w.WriteBool(3, Commit);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<EditorPreeditChanged> Parser = new MessageParser<EditorPreeditChanged>(data => ParseFrom(data));
+
+        public static EditorPreeditChanged ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new EditorPreeditChanged();
+            var r = new ProtoReader(data);
+            var msg = new EditorPreeditChanged();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.Text = r.ReadString(); break;
+                    case 2: msg.Cursor = r.ReadInt32(); break;
+                    case 3: msg.Commit = r.ReadBool(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class EditorSession
+    {
+        public long SessionId { get; set; }
+        public int Row { get; set; }
+        public int Col { get; set; }
+        public Rect ViewportRect { get; set; }
+        public EditorSpec Editor { get; set; }
+        public EditorValue Value { get; set; }
+        public TextSelection Selection { get; set; }
+        public EditUiMode UiMode { get; set; }
+        public EditorCapabilities Capabilities { get; set; }
+        public EditStartReason Reason { get; set; }
+        public ulong StateVersion { get; set; }
+        public bool Composing { get; set; }
+        public string PreeditText { get; set; } = "";
+        public List<ValidationError> ValidationErrors { get; private set; } = new List<ValidationError>();
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (SessionId != 0L) w.WriteInt64(1, SessionId);
+            if (Row != 0) w.WriteInt32(2, Row);
+            if (Col != 0) w.WriteInt32(3, Col);
+            if (ViewportRect != null) w.WriteMessageBytes(4, ViewportRect.ToByteArray());
+            if (Editor != null) w.WriteMessageBytes(5, Editor.ToByteArray());
+            if (Value != null) w.WriteMessageBytes(6, Value.ToByteArray());
+            if (Selection != null) w.WriteMessageBytes(7, Selection.ToByteArray());
+            if (UiMode != 0) w.WriteInt32(8, (int)UiMode);
+            if (Capabilities != null) w.WriteMessageBytes(9, Capabilities.ToByteArray());
+            if (Reason != 0) w.WriteInt32(10, (int)Reason);
+            if (Composing) w.WriteBool(12, Composing);
+            if (PreeditText != null && PreeditText.Length > 0) w.WriteString(13, PreeditText);
+            foreach (var item in ValidationErrors)
+                w.WriteMessageBytes(14, item.ToByteArray());
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<EditorSession> Parser = new MessageParser<EditorSession>(data => ParseFrom(data));
+
+        public static EditorSession ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new EditorSession();
+            var r = new ProtoReader(data);
+            var msg = new EditorSession();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.SessionId = r.ReadInt64(); break;
                     case 2: msg.Row = r.ReadInt32(); break;
                     case 3: msg.Col = r.ReadInt32(); break;
-                    case 4: msg.Text = r.ReadString(); break;
-                    case 5: msg.SelStart = r.ReadInt32(); break;
-                    case 6: msg.SelLength = r.ReadInt32(); break;
-                    case 7: msg.Composing = r.ReadBool(); break;
-                    case 8: msg.PreeditText = r.ReadString(); break;
-                    case 9: msg.UiMode = (EditUiMode)r.ReadInt32(); break;
-                    case 10: msg.X = r.ReadFloat(); break;
-                    case 11: msg.Y = r.ReadFloat(); break;
-                    case 12: msg.Width = r.ReadFloat(); break;
-                    case 13: msg.Height = r.ReadFloat(); break;
-                    case 14: msg.MaxLength = r.ReadInt32(); break;
+                    case 4: msg.ViewportRect = Rect.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 5: msg.Editor = EditorSpec.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 6: msg.Value = EditorValue.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 7: msg.Selection = TextSelection.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 8: msg.UiMode = (EditUiMode)r.ReadInt32(); break;
+                    case 9: msg.Capabilities = EditorCapabilities.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 10: msg.Reason = (EditStartReason)r.ReadInt32(); break;
+                    case 12: msg.Composing = r.ReadBool(); break;
+                    case 13: msg.PreeditText = r.ReadString(); break;
+                    case 14: msg.ValidationErrors.Add(ValidationError.ParseFrom(r.ReadLengthDelimited())); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class EditorSessionCommand
+    {
+        public enum CommandOneofCase
+        {
+            None = 0,
+            ValueChanged = 3,
+            SelectionChanged = 4,
+            PreeditChanged = 5,
+            Commit = 6,
+            Cancel = 7,
+            CustomAction = 8,
+        }
+        public CommandOneofCase CommandCase { get; set; }
+
+        private EditorValueChanged _valueChanged;
+        public EditorValueChanged ValueChanged { get { return CommandCase == CommandOneofCase.ValueChanged ? _valueChanged : null; } set { _valueChanged = value; CommandCase = CommandOneofCase.ValueChanged; } }
+        private TextSelectionChanged _selectionChanged;
+        public TextSelectionChanged SelectionChanged { get { return CommandCase == CommandOneofCase.SelectionChanged ? _selectionChanged : null; } set { _selectionChanged = value; CommandCase = CommandOneofCase.SelectionChanged; } }
+        private EditorPreeditChanged _preeditChanged;
+        public EditorPreeditChanged PreeditChanged { get { return CommandCase == CommandOneofCase.PreeditChanged ? _preeditChanged : null; } set { _preeditChanged = value; CommandCase = CommandOneofCase.PreeditChanged; } }
+        private EditCommit _commit;
+        public EditCommit Commit { get { return CommandCase == CommandOneofCase.Commit ? _commit : null; } set { _commit = value; CommandCase = CommandOneofCase.Commit; } }
+        private EditCancel _cancel;
+        public EditCancel Cancel { get { return CommandCase == CommandOneofCase.Cancel ? _cancel : null; } set { _cancel = value; CommandCase = CommandOneofCase.Cancel; } }
+        private CustomEditorAction _customAction;
+        public CustomEditorAction CustomAction { get { return CommandCase == CommandOneofCase.CustomAction ? _customAction : null; } set { _customAction = value; CommandCase = CommandOneofCase.CustomAction; } }
+        public long SessionId { get; set; }
+        public ulong StateVersion { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (SessionId != 0L) w.WriteInt64(1, SessionId);
+            switch (CommandCase)
+            {
+                case CommandOneofCase.ValueChanged:
+                    if (_valueChanged != null) w.WriteMessageBytes(3, _valueChanged.ToByteArray());
+                    break;
+                case CommandOneofCase.SelectionChanged:
+                    if (_selectionChanged != null) w.WriteMessageBytes(4, _selectionChanged.ToByteArray());
+                    break;
+                case CommandOneofCase.PreeditChanged:
+                    if (_preeditChanged != null) w.WriteMessageBytes(5, _preeditChanged.ToByteArray());
+                    break;
+                case CommandOneofCase.Commit:
+                    if (_commit != null) w.WriteMessageBytes(6, _commit.ToByteArray());
+                    break;
+                case CommandOneofCase.Cancel:
+                    if (_cancel != null) w.WriteMessageBytes(7, _cancel.ToByteArray());
+                    break;
+                case CommandOneofCase.CustomAction:
+                    if (_customAction != null) w.WriteMessageBytes(8, _customAction.ToByteArray());
+                    break;
+            }
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<EditorSessionCommand> Parser = new MessageParser<EditorSessionCommand>(data => ParseFrom(data));
+
+        public static EditorSessionCommand ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new EditorSessionCommand();
+            var r = new ProtoReader(data);
+            var msg = new EditorSessionCommand();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.SessionId = r.ReadInt64(); break;
+                    case 3: msg.ValueChanged = EditorValueChanged.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 4: msg.SelectionChanged = TextSelectionChanged.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 5: msg.PreeditChanged = EditorPreeditChanged.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 6: msg.Commit = EditCommit.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 7: msg.Cancel = EditCancel.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 8: msg.CustomAction = CustomEditorAction.ParseFrom(r.ReadLengthDelimited()); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class EditorSessionEnded
+    {
+        public long SessionId { get; set; }
+        public EditEndReason Reason { get; set; }
+        public EditorValue CommittedValue { get; set; }
+        public ulong StateVersion { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (SessionId != 0L) w.WriteInt64(1, SessionId);
+            if (Reason != 0) w.WriteInt32(2, (int)Reason);
+            if (CommittedValue != null) w.WriteMessageBytes(3, CommittedValue.ToByteArray());
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<EditorSessionEnded> Parser = new MessageParser<EditorSessionEnded>(data => ParseFrom(data));
+
+        public static EditorSessionEnded ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new EditorSessionEnded();
+            var r = new ProtoReader(data);
+            var msg = new EditorSessionEnded();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.SessionId = r.ReadInt64(); break;
+                    case 2: msg.Reason = (EditEndReason)r.ReadInt32(); break;
+                    case 3: msg.CommittedValue = EditorValue.ParseFrom(r.ReadLengthDelimited()); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class EditorSessionStarted
+    {
+        public EditorSession Session { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (Session != null) w.WriteMessageBytes(1, Session.ToByteArray());
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<EditorSessionStarted> Parser = new MessageParser<EditorSessionStarted>(data => ParseFrom(data));
+
+        public static EditorSessionStarted ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new EditorSessionStarted();
+            var r = new ProtoReader(data);
+            var msg = new EditorSessionStarted();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.Session = EditorSession.ParseFrom(r.ReadLengthDelimited()); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class EditorSessionUpdated
+    {
+        public long SessionId { get; set; }
+        public ulong StateVersion { get; set; }
+        public EditorUpdateReason Reason { get; set; }
+        private Rect _viewportRect;
+        public Rect ViewportRect { get { return _viewportRect; } set { _viewportRect = value; } }
+        public bool HasViewportRect { get { return _viewportRect != null; } }
+        private EditorValue _value;
+        public EditorValue Value { get { return _value; } set { _value = value; } }
+        public bool HasValue { get { return _value != null; } }
+        private TextSelection _selection;
+        public TextSelection Selection { get { return _selection; } set { _selection = value; } }
+        public bool HasSelection { get { return _selection != null; } }
+        private bool? _visible;
+        public bool Visible { get { return _visible.GetValueOrDefault(); } set { _visible = value; } }
+        public bool HasVisible { get { return _visible.HasValue; } }
+        private bool? _forceRefocus;
+        public bool ForceRefocus { get { return _forceRefocus.GetValueOrDefault(); } set { _forceRefocus = value; } }
+        public bool HasForceRefocus { get { return _forceRefocus.HasValue; } }
+        public List<ValidationError> ValidationErrors { get; private set; } = new List<ValidationError>();
+        public StructValue CustomPayload { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (SessionId != 0L) w.WriteInt64(1, SessionId);
+            if (Reason != 0) w.WriteInt32(3, (int)Reason);
+            if (_viewportRect != null)
+                w.WriteMessageBytes(4, _viewportRect.ToByteArray());
+            if (_value != null)
+                w.WriteMessageBytes(5, _value.ToByteArray());
+            if (_selection != null)
+                w.WriteMessageBytes(6, _selection.ToByteArray());
+            if (_visible.HasValue)
+                w.WriteBool(7, _visible.Value);
+            if (_forceRefocus.HasValue)
+                w.WriteBool(8, _forceRefocus.Value);
+            foreach (var item in ValidationErrors)
+                w.WriteMessageBytes(9, item.ToByteArray());
+            if (CustomPayload != null) w.WriteMessageBytes(10, CustomPayload.ToByteArray());
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<EditorSessionUpdated> Parser = new MessageParser<EditorSessionUpdated>(data => ParseFrom(data));
+
+        public static EditorSessionUpdated ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new EditorSessionUpdated();
+            var r = new ProtoReader(data);
+            var msg = new EditorSessionUpdated();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.SessionId = r.ReadInt64(); break;
+                    case 3: msg.Reason = (EditorUpdateReason)r.ReadInt32(); break;
+                    case 4: msg.ViewportRect = Rect.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 5: msg.Value = EditorValue.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 6: msg.Selection = TextSelection.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 7: msg.Visible = r.ReadBool(); break;
+                    case 8: msg.ForceRefocus = r.ReadBool(); break;
+                    case 9: msg.ValidationErrors.Add(ValidationError.ParseFrom(r.ReadLengthDelimited())); break;
+                    case 10: msg.CustomPayload = StructValue.ParseFrom(r.ReadLengthDelimited()); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class EditorSpec
+    {
+        public EditorKind Kind { get; set; }
+        public EditorOwner Owner { get; set; }
+        public EditorPresentation Presentation { get; set; }
+        public ValidationMode ValidationMode { get; set; }
+        public ValidationTrigger ValidationTrigger { get; set; }
+        public int ValidationDebounceMs { get; set; }
+        private string _customEditorId;
+        public string CustomEditorId { get { return _customEditorId; } set { _customEditorId = value; } }
+        public bool HasCustomEditorId { get { return _customEditorId != null; } }
+        public TextEditorParams Text { get; set; }
+        public NumberEditorParams Number { get; set; }
+        public CheckboxEditorParams Checkbox { get; set; }
+        public ListEditorParams List { get; set; }
+        public DateTimeEditorParams DateTime { get; set; }
+        public List<EditorAction> Actions { get; private set; } = new List<EditorAction>();
+        public StructValue CustomProps { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (Kind != 0) w.WriteInt32(1, (int)Kind);
+            if (Owner != 0) w.WriteInt32(2, (int)Owner);
+            if (Presentation != 0) w.WriteInt32(3, (int)Presentation);
+            if (ValidationMode != 0) w.WriteInt32(4, (int)ValidationMode);
+            if (ValidationTrigger != 0) w.WriteInt32(5, (int)ValidationTrigger);
+            if (ValidationDebounceMs != 0) w.WriteInt32(6, ValidationDebounceMs);
+            if (_customEditorId != null)
+                w.WriteString(10, _customEditorId);
+            if (Text != null) w.WriteMessageBytes(11, Text.ToByteArray());
+            if (Number != null) w.WriteMessageBytes(12, Number.ToByteArray());
+            if (Checkbox != null) w.WriteMessageBytes(13, Checkbox.ToByteArray());
+            if (List != null) w.WriteMessageBytes(14, List.ToByteArray());
+            if (DateTime != null) w.WriteMessageBytes(15, DateTime.ToByteArray());
+            foreach (var item in Actions)
+                w.WriteMessageBytes(16, item.ToByteArray());
+            if (CustomProps != null) w.WriteMessageBytes(17, CustomProps.ToByteArray());
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<EditorSpec> Parser = new MessageParser<EditorSpec>(data => ParseFrom(data));
+
+        public static EditorSpec ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new EditorSpec();
+            var r = new ProtoReader(data);
+            var msg = new EditorSpec();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.Kind = (EditorKind)r.ReadInt32(); break;
+                    case 2: msg.Owner = (EditorOwner)r.ReadInt32(); break;
+                    case 3: msg.Presentation = (EditorPresentation)r.ReadInt32(); break;
+                    case 4: msg.ValidationMode = (ValidationMode)r.ReadInt32(); break;
+                    case 5: msg.ValidationTrigger = (ValidationTrigger)r.ReadInt32(); break;
+                    case 6: msg.ValidationDebounceMs = r.ReadInt32(); break;
+                    case 10: msg.CustomEditorId = r.ReadString(); break;
+                    case 11: msg.Text = TextEditorParams.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 12: msg.Number = NumberEditorParams.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 13: msg.Checkbox = CheckboxEditorParams.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 14: msg.List = ListEditorParams.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 15: msg.DateTime = DateTimeEditorParams.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 16: msg.Actions.Add(EditorAction.ParseFrom(r.ReadLengthDelimited())); break;
+                    case 17: msg.CustomProps = StructValue.ParseFrom(r.ReadLengthDelimited()); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class EditorValue
+    {
+        public CellValue Value { get; set; }
+        private string _editText;
+        public string EditText { get { return _editText; } set { _editText = value; } }
+        public bool HasEditText { get { return _editText != null; } }
+        private string _displayText;
+        public string DisplayText { get { return _displayText; } set { _displayText = value; } }
+        public bool HasDisplayText { get { return _displayText != null; } }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (Value != null) w.WriteMessageBytes(1, Value.ToByteArray());
+            if (_editText != null)
+                w.WriteString(2, _editText);
+            if (_displayText != null)
+                w.WriteString(3, _displayText);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<EditorValue> Parser = new MessageParser<EditorValue>(data => ParseFrom(data));
+
+        public static EditorValue ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new EditorValue();
+            var r = new ProtoReader(data);
+            var msg = new EditorValue();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.Value = CellValue.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 2: msg.EditText = r.ReadString(); break;
+                    case 3: msg.DisplayText = r.ReadString(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class EditorValueChanged
+    {
+        public EditorValue Value { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (Value != null) w.WriteMessageBytes(1, Value.ToByteArray());
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<EditorValueChanged> Parser = new MessageParser<EditorValueChanged>(data => ParseFrom(data));
+
+        public static EditorValueChanged ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new EditorValueChanged();
+            var r = new ProtoReader(data);
+            var msg = new EditorValueChanged();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.Value = EditorValue.ParseFrom(r.ReadLengthDelimited()); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -6823,6 +7320,9 @@ namespace Volvoxgrid.V1
         public RenderConfig Rendering { get; set; }
         public string Version { get; set; } = "";
         public IndicatorsConfig Indicators { get; set; }
+        private ThemePreset? _themePreset;
+        public ThemePreset ThemePreset { get { return _themePreset.GetValueOrDefault(); } set { _themePreset = value; } }
+        public bool HasThemePreset { get { return _themePreset.HasValue; } }
 
         // ── Serialization ──
 
@@ -6840,6 +7340,8 @@ namespace Volvoxgrid.V1
             if (Rendering != null) w.WriteMessageBytes(9, Rendering.ToByteArray());
             if (Version != null && Version.Length > 0) w.WriteString(10, Version);
             if (Indicators != null) w.WriteMessageBytes(11, Indicators.ToByteArray());
+            if (_themePreset.HasValue)
+                w.WriteInt32(12, (int)_themePreset.Value);
             return w.ToArray();
         }
 
@@ -6868,6 +7370,7 @@ namespace Volvoxgrid.V1
                     case 9: msg.Rendering = RenderConfig.ParseFrom(r.ReadLengthDelimited()); break;
                     case 10: msg.Version = r.ReadString(); break;
                     case 11: msg.Indicators = IndicatorsConfig.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 12: msg.ThemePreset = (ThemePreset)r.ReadInt32(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -6891,61 +7394,59 @@ namespace Volvoxgrid.V1
             AfterEdit = 10,
             CellEditValidate = 11,
             CellEditChange = 12,
-            KeyDownEdit = 14,
-            KeyPressEdit = 15,
-            KeyUpEdit = 16,
-            CellEditConfigureStyle = 17,
-            CellEditConfigureWindow = 18,
-            DropdownClosed = 19,
-            DropdownOpened = 20,
-            CellChanged = 21,
-            RowStatusChange = 22,
-            BeforeSort = 23,
-            AfterSort = 24,
-            Compare = 25,
-            BeforeNodeToggle = 26,
-            AfterNodeToggle = 27,
-            BeforeScroll = 28,
-            AfterScroll = 29,
-            ScrollTooltip = 30,
-            BeforeUserResize = 31,
-            AfterUserResize = 32,
-            AfterUserFreeze = 33,
-            BeforeMoveColumn = 34,
-            AfterMoveColumn = 35,
-            BeforeMoveRow = 36,
-            AfterMoveRow = 37,
-            BeforeMouseDown = 38,
-            MouseDown = 39,
-            MouseUp = 40,
-            MouseMove = 41,
-            Click = 42,
-            DblClick = 43,
-            KeyDown = 44,
-            KeyPress = 45,
-            KeyUp = 46,
-            CustomRenderCell = 47,
-            DragStart = 48,
-            DragOver = 49,
-            DragDrop = 50,
-            DragComplete = 51,
-            TypeAheadStarted = 52,
-            TypeAheadEnded = 53,
-            DataRefreshing = 54,
-            DataRefreshed = 55,
-            FilterData = 56,
-            Error = 57,
-            BeforePageBreak = 58,
-            StartPage = 59,
-            GetHeaderRow = 60,
-            PullToRefreshTriggered = 61,
-            PullToRefreshCanceled = 62,
-            BeforeDropdownOpen = 63,
-            TreeChildrenRequested = 64,
-            BeforeTreeNodeToggle = 65,
-            AfterTreeNodeToggle = 66,
-            TreeNodeActivate = 67,
-            TreeNodeContextMenu = 68,
+            KeyDownEdit = 13,
+            KeyPressEdit = 14,
+            KeyUpEdit = 15,
+            EditValidationRequest = 16,
+            EditorListItemsRequest = 17,
+            CustomEditorAction = 18,
+            CellChanged = 19,
+            RowStatusChange = 20,
+            BeforeSort = 21,
+            AfterSort = 22,
+            Compare = 23,
+            BeforeNodeToggle = 24,
+            AfterNodeToggle = 25,
+            BeforeScroll = 26,
+            AfterScroll = 27,
+            ScrollTooltip = 28,
+            BeforeUserResize = 29,
+            AfterUserResize = 30,
+            AfterUserFreeze = 31,
+            BeforeMoveColumn = 32,
+            AfterMoveColumn = 33,
+            BeforeMoveRow = 34,
+            AfterMoveRow = 35,
+            BeforeMouseDown = 36,
+            MouseDown = 37,
+            MouseUp = 38,
+            MouseMove = 39,
+            Click = 40,
+            DblClick = 41,
+            KeyDown = 42,
+            KeyPress = 43,
+            KeyUp = 44,
+            CustomRenderCell = 45,
+            DragStart = 46,
+            DragOver = 47,
+            DragDrop = 48,
+            DragComplete = 49,
+            TypeAheadStarted = 50,
+            TypeAheadEnded = 51,
+            DataRefreshing = 52,
+            DataRefreshed = 53,
+            FilterData = 54,
+            Error = 55,
+            BeforePageBreak = 56,
+            StartPage = 57,
+            GetHeaderRow = 58,
+            PullToRefreshTriggered = 59,
+            PullToRefreshCanceled = 60,
+            TreeChildrenRequested = 61,
+            BeforeTreeNodeToggle = 62,
+            AfterTreeNodeToggle = 63,
+            TreeNodeActivate = 64,
+            TreeNodeContextMenu = 65,
         }
         public EventOneofCase EventCase { get; set; }
 
@@ -6977,14 +7478,12 @@ namespace Volvoxgrid.V1
         public KeyPressEditEvent KeyPressEdit { get { return EventCase == EventOneofCase.KeyPressEdit ? _keyPressEdit : null; } set { _keyPressEdit = value; EventCase = EventOneofCase.KeyPressEdit; } }
         private KeyUpEditEvent _keyUpEdit;
         public KeyUpEditEvent KeyUpEdit { get { return EventCase == EventOneofCase.KeyUpEdit ? _keyUpEdit : null; } set { _keyUpEdit = value; EventCase = EventOneofCase.KeyUpEdit; } }
-        private CellEditConfigureStyleEvent _cellEditConfigureStyle;
-        public CellEditConfigureStyleEvent CellEditConfigureStyle { get { return EventCase == EventOneofCase.CellEditConfigureStyle ? _cellEditConfigureStyle : null; } set { _cellEditConfigureStyle = value; EventCase = EventOneofCase.CellEditConfigureStyle; } }
-        private CellEditConfigureWindowEvent _cellEditConfigureWindow;
-        public CellEditConfigureWindowEvent CellEditConfigureWindow { get { return EventCase == EventOneofCase.CellEditConfigureWindow ? _cellEditConfigureWindow : null; } set { _cellEditConfigureWindow = value; EventCase = EventOneofCase.CellEditConfigureWindow; } }
-        private DropdownClosedEvent _dropdownClosed;
-        public DropdownClosedEvent DropdownClosed { get { return EventCase == EventOneofCase.DropdownClosed ? _dropdownClosed : null; } set { _dropdownClosed = value; EventCase = EventOneofCase.DropdownClosed; } }
-        private DropdownOpenedEvent _dropdownOpened;
-        public DropdownOpenedEvent DropdownOpened { get { return EventCase == EventOneofCase.DropdownOpened ? _dropdownOpened : null; } set { _dropdownOpened = value; EventCase = EventOneofCase.DropdownOpened; } }
+        private EditValidationRequest _editValidationRequest;
+        public EditValidationRequest EditValidationRequest { get { return EventCase == EventOneofCase.EditValidationRequest ? _editValidationRequest : null; } set { _editValidationRequest = value; EventCase = EventOneofCase.EditValidationRequest; } }
+        private EditorListItemsRequest _editorListItemsRequest;
+        public EditorListItemsRequest EditorListItemsRequest { get { return EventCase == EventOneofCase.EditorListItemsRequest ? _editorListItemsRequest : null; } set { _editorListItemsRequest = value; EventCase = EventOneofCase.EditorListItemsRequest; } }
+        private CustomEditorActionEvent _customEditorAction;
+        public CustomEditorActionEvent CustomEditorAction { get { return EventCase == EventOneofCase.CustomEditorAction ? _customEditorAction : null; } set { _customEditorAction = value; EventCase = EventOneofCase.CustomEditorAction; } }
         private CellChangedEvent _cellChanged;
         public CellChangedEvent CellChanged { get { return EventCase == EventOneofCase.CellChanged ? _cellChanged : null; } set { _cellChanged = value; EventCase = EventOneofCase.CellChanged; } }
         private RowStatusChangeEvent _rowStatusChange;
@@ -7069,8 +7568,6 @@ namespace Volvoxgrid.V1
         public PullToRefreshTriggeredEvent PullToRefreshTriggered { get { return EventCase == EventOneofCase.PullToRefreshTriggered ? _pullToRefreshTriggered : null; } set { _pullToRefreshTriggered = value; EventCase = EventOneofCase.PullToRefreshTriggered; } }
         private PullToRefreshCanceledEvent _pullToRefreshCanceled;
         public PullToRefreshCanceledEvent PullToRefreshCanceled { get { return EventCase == EventOneofCase.PullToRefreshCanceled ? _pullToRefreshCanceled : null; } set { _pullToRefreshCanceled = value; EventCase = EventOneofCase.PullToRefreshCanceled; } }
-        private BeforeDropdownOpenEvent _beforeDropdownOpen;
-        public BeforeDropdownOpenEvent BeforeDropdownOpen { get { return EventCase == EventOneofCase.BeforeDropdownOpen ? _beforeDropdownOpen : null; } set { _beforeDropdownOpen = value; EventCase = EventOneofCase.BeforeDropdownOpen; } }
         private TreeChildrenRequestedEvent _treeChildrenRequested;
         public TreeChildrenRequestedEvent TreeChildrenRequested { get { return EventCase == EventOneofCase.TreeChildrenRequested ? _treeChildrenRequested : null; } set { _treeChildrenRequested = value; EventCase = EventOneofCase.TreeChildrenRequested; } }
         private BeforeTreeNodeToggleEvent _beforeTreeNodeToggle;
@@ -7127,169 +7624,163 @@ namespace Volvoxgrid.V1
                     if (_cellEditChange != null) w.WriteMessageBytes(12, _cellEditChange.ToByteArray());
                     break;
                 case EventOneofCase.KeyDownEdit:
-                    if (_keyDownEdit != null) w.WriteMessageBytes(14, _keyDownEdit.ToByteArray());
+                    if (_keyDownEdit != null) w.WriteMessageBytes(13, _keyDownEdit.ToByteArray());
                     break;
                 case EventOneofCase.KeyPressEdit:
-                    if (_keyPressEdit != null) w.WriteMessageBytes(15, _keyPressEdit.ToByteArray());
+                    if (_keyPressEdit != null) w.WriteMessageBytes(14, _keyPressEdit.ToByteArray());
                     break;
                 case EventOneofCase.KeyUpEdit:
-                    if (_keyUpEdit != null) w.WriteMessageBytes(16, _keyUpEdit.ToByteArray());
+                    if (_keyUpEdit != null) w.WriteMessageBytes(15, _keyUpEdit.ToByteArray());
                     break;
-                case EventOneofCase.CellEditConfigureStyle:
-                    if (_cellEditConfigureStyle != null) w.WriteMessageBytes(17, _cellEditConfigureStyle.ToByteArray());
+                case EventOneofCase.EditValidationRequest:
+                    if (_editValidationRequest != null) w.WriteMessageBytes(16, _editValidationRequest.ToByteArray());
                     break;
-                case EventOneofCase.CellEditConfigureWindow:
-                    if (_cellEditConfigureWindow != null) w.WriteMessageBytes(18, _cellEditConfigureWindow.ToByteArray());
+                case EventOneofCase.EditorListItemsRequest:
+                    if (_editorListItemsRequest != null) w.WriteMessageBytes(17, _editorListItemsRequest.ToByteArray());
                     break;
-                case EventOneofCase.DropdownClosed:
-                    if (_dropdownClosed != null) w.WriteMessageBytes(19, _dropdownClosed.ToByteArray());
-                    break;
-                case EventOneofCase.DropdownOpened:
-                    if (_dropdownOpened != null) w.WriteMessageBytes(20, _dropdownOpened.ToByteArray());
+                case EventOneofCase.CustomEditorAction:
+                    if (_customEditorAction != null) w.WriteMessageBytes(18, _customEditorAction.ToByteArray());
                     break;
                 case EventOneofCase.CellChanged:
-                    if (_cellChanged != null) w.WriteMessageBytes(21, _cellChanged.ToByteArray());
+                    if (_cellChanged != null) w.WriteMessageBytes(19, _cellChanged.ToByteArray());
                     break;
                 case EventOneofCase.RowStatusChange:
-                    if (_rowStatusChange != null) w.WriteMessageBytes(22, _rowStatusChange.ToByteArray());
+                    if (_rowStatusChange != null) w.WriteMessageBytes(20, _rowStatusChange.ToByteArray());
                     break;
                 case EventOneofCase.BeforeSort:
-                    if (_beforeSort != null) w.WriteMessageBytes(23, _beforeSort.ToByteArray());
+                    if (_beforeSort != null) w.WriteMessageBytes(21, _beforeSort.ToByteArray());
                     break;
                 case EventOneofCase.AfterSort:
-                    if (_afterSort != null) w.WriteMessageBytes(24, _afterSort.ToByteArray());
+                    if (_afterSort != null) w.WriteMessageBytes(22, _afterSort.ToByteArray());
                     break;
                 case EventOneofCase.Compare:
-                    if (_compare != null) w.WriteMessageBytes(25, _compare.ToByteArray());
+                    if (_compare != null) w.WriteMessageBytes(23, _compare.ToByteArray());
                     break;
                 case EventOneofCase.BeforeNodeToggle:
-                    if (_beforeNodeToggle != null) w.WriteMessageBytes(26, _beforeNodeToggle.ToByteArray());
+                    if (_beforeNodeToggle != null) w.WriteMessageBytes(24, _beforeNodeToggle.ToByteArray());
                     break;
                 case EventOneofCase.AfterNodeToggle:
-                    if (_afterNodeToggle != null) w.WriteMessageBytes(27, _afterNodeToggle.ToByteArray());
+                    if (_afterNodeToggle != null) w.WriteMessageBytes(25, _afterNodeToggle.ToByteArray());
                     break;
                 case EventOneofCase.BeforeScroll:
-                    if (_beforeScroll != null) w.WriteMessageBytes(28, _beforeScroll.ToByteArray());
+                    if (_beforeScroll != null) w.WriteMessageBytes(26, _beforeScroll.ToByteArray());
                     break;
                 case EventOneofCase.AfterScroll:
-                    if (_afterScroll != null) w.WriteMessageBytes(29, _afterScroll.ToByteArray());
+                    if (_afterScroll != null) w.WriteMessageBytes(27, _afterScroll.ToByteArray());
                     break;
                 case EventOneofCase.ScrollTooltip:
-                    if (_scrollTooltip != null) w.WriteMessageBytes(30, _scrollTooltip.ToByteArray());
+                    if (_scrollTooltip != null) w.WriteMessageBytes(28, _scrollTooltip.ToByteArray());
                     break;
                 case EventOneofCase.BeforeUserResize:
-                    if (_beforeUserResize != null) w.WriteMessageBytes(31, _beforeUserResize.ToByteArray());
+                    if (_beforeUserResize != null) w.WriteMessageBytes(29, _beforeUserResize.ToByteArray());
                     break;
                 case EventOneofCase.AfterUserResize:
-                    if (_afterUserResize != null) w.WriteMessageBytes(32, _afterUserResize.ToByteArray());
+                    if (_afterUserResize != null) w.WriteMessageBytes(30, _afterUserResize.ToByteArray());
                     break;
                 case EventOneofCase.AfterUserFreeze:
-                    if (_afterUserFreeze != null) w.WriteMessageBytes(33, _afterUserFreeze.ToByteArray());
+                    if (_afterUserFreeze != null) w.WriteMessageBytes(31, _afterUserFreeze.ToByteArray());
                     break;
                 case EventOneofCase.BeforeMoveColumn:
-                    if (_beforeMoveColumn != null) w.WriteMessageBytes(34, _beforeMoveColumn.ToByteArray());
+                    if (_beforeMoveColumn != null) w.WriteMessageBytes(32, _beforeMoveColumn.ToByteArray());
                     break;
                 case EventOneofCase.AfterMoveColumn:
-                    if (_afterMoveColumn != null) w.WriteMessageBytes(35, _afterMoveColumn.ToByteArray());
+                    if (_afterMoveColumn != null) w.WriteMessageBytes(33, _afterMoveColumn.ToByteArray());
                     break;
                 case EventOneofCase.BeforeMoveRow:
-                    if (_beforeMoveRow != null) w.WriteMessageBytes(36, _beforeMoveRow.ToByteArray());
+                    if (_beforeMoveRow != null) w.WriteMessageBytes(34, _beforeMoveRow.ToByteArray());
                     break;
                 case EventOneofCase.AfterMoveRow:
-                    if (_afterMoveRow != null) w.WriteMessageBytes(37, _afterMoveRow.ToByteArray());
+                    if (_afterMoveRow != null) w.WriteMessageBytes(35, _afterMoveRow.ToByteArray());
                     break;
                 case EventOneofCase.BeforeMouseDown:
-                    if (_beforeMouseDown != null) w.WriteMessageBytes(38, _beforeMouseDown.ToByteArray());
+                    if (_beforeMouseDown != null) w.WriteMessageBytes(36, _beforeMouseDown.ToByteArray());
                     break;
                 case EventOneofCase.MouseDown:
-                    if (_mouseDown != null) w.WriteMessageBytes(39, _mouseDown.ToByteArray());
+                    if (_mouseDown != null) w.WriteMessageBytes(37, _mouseDown.ToByteArray());
                     break;
                 case EventOneofCase.MouseUp:
-                    if (_mouseUp != null) w.WriteMessageBytes(40, _mouseUp.ToByteArray());
+                    if (_mouseUp != null) w.WriteMessageBytes(38, _mouseUp.ToByteArray());
                     break;
                 case EventOneofCase.MouseMove:
-                    if (_mouseMove != null) w.WriteMessageBytes(41, _mouseMove.ToByteArray());
+                    if (_mouseMove != null) w.WriteMessageBytes(39, _mouseMove.ToByteArray());
                     break;
                 case EventOneofCase.Click:
-                    if (_click != null) w.WriteMessageBytes(42, _click.ToByteArray());
+                    if (_click != null) w.WriteMessageBytes(40, _click.ToByteArray());
                     break;
                 case EventOneofCase.DblClick:
-                    if (_dblClick != null) w.WriteMessageBytes(43, _dblClick.ToByteArray());
+                    if (_dblClick != null) w.WriteMessageBytes(41, _dblClick.ToByteArray());
                     break;
                 case EventOneofCase.KeyDown:
-                    if (_keyDown != null) w.WriteMessageBytes(44, _keyDown.ToByteArray());
+                    if (_keyDown != null) w.WriteMessageBytes(42, _keyDown.ToByteArray());
                     break;
                 case EventOneofCase.KeyPress:
-                    if (_keyPress != null) w.WriteMessageBytes(45, _keyPress.ToByteArray());
+                    if (_keyPress != null) w.WriteMessageBytes(43, _keyPress.ToByteArray());
                     break;
                 case EventOneofCase.KeyUp:
-                    if (_keyUp != null) w.WriteMessageBytes(46, _keyUp.ToByteArray());
+                    if (_keyUp != null) w.WriteMessageBytes(44, _keyUp.ToByteArray());
                     break;
                 case EventOneofCase.CustomRenderCell:
-                    if (_customRenderCell != null) w.WriteMessageBytes(47, _customRenderCell.ToByteArray());
+                    if (_customRenderCell != null) w.WriteMessageBytes(45, _customRenderCell.ToByteArray());
                     break;
                 case EventOneofCase.DragStart:
-                    if (_dragStart != null) w.WriteMessageBytes(48, _dragStart.ToByteArray());
+                    if (_dragStart != null) w.WriteMessageBytes(46, _dragStart.ToByteArray());
                     break;
                 case EventOneofCase.DragOver:
-                    if (_dragOver != null) w.WriteMessageBytes(49, _dragOver.ToByteArray());
+                    if (_dragOver != null) w.WriteMessageBytes(47, _dragOver.ToByteArray());
                     break;
                 case EventOneofCase.DragDrop:
-                    if (_dragDrop != null) w.WriteMessageBytes(50, _dragDrop.ToByteArray());
+                    if (_dragDrop != null) w.WriteMessageBytes(48, _dragDrop.ToByteArray());
                     break;
                 case EventOneofCase.DragComplete:
-                    if (_dragComplete != null) w.WriteMessageBytes(51, _dragComplete.ToByteArray());
+                    if (_dragComplete != null) w.WriteMessageBytes(49, _dragComplete.ToByteArray());
                     break;
                 case EventOneofCase.TypeAheadStarted:
-                    if (_typeAheadStarted != null) w.WriteMessageBytes(52, _typeAheadStarted.ToByteArray());
+                    if (_typeAheadStarted != null) w.WriteMessageBytes(50, _typeAheadStarted.ToByteArray());
                     break;
                 case EventOneofCase.TypeAheadEnded:
-                    if (_typeAheadEnded != null) w.WriteMessageBytes(53, _typeAheadEnded.ToByteArray());
+                    if (_typeAheadEnded != null) w.WriteMessageBytes(51, _typeAheadEnded.ToByteArray());
                     break;
                 case EventOneofCase.DataRefreshing:
-                    if (_dataRefreshing != null) w.WriteMessageBytes(54, _dataRefreshing.ToByteArray());
+                    if (_dataRefreshing != null) w.WriteMessageBytes(52, _dataRefreshing.ToByteArray());
                     break;
                 case EventOneofCase.DataRefreshed:
-                    if (_dataRefreshed != null) w.WriteMessageBytes(55, _dataRefreshed.ToByteArray());
+                    if (_dataRefreshed != null) w.WriteMessageBytes(53, _dataRefreshed.ToByteArray());
                     break;
                 case EventOneofCase.FilterData:
-                    if (_filterData != null) w.WriteMessageBytes(56, _filterData.ToByteArray());
+                    if (_filterData != null) w.WriteMessageBytes(54, _filterData.ToByteArray());
                     break;
                 case EventOneofCase.Error:
-                    if (_error != null) w.WriteMessageBytes(57, _error.ToByteArray());
+                    if (_error != null) w.WriteMessageBytes(55, _error.ToByteArray());
                     break;
                 case EventOneofCase.BeforePageBreak:
-                    if (_beforePageBreak != null) w.WriteMessageBytes(58, _beforePageBreak.ToByteArray());
+                    if (_beforePageBreak != null) w.WriteMessageBytes(56, _beforePageBreak.ToByteArray());
                     break;
                 case EventOneofCase.StartPage:
-                    if (_startPage != null) w.WriteMessageBytes(59, _startPage.ToByteArray());
+                    if (_startPage != null) w.WriteMessageBytes(57, _startPage.ToByteArray());
                     break;
                 case EventOneofCase.GetHeaderRow:
-                    if (_getHeaderRow != null) w.WriteMessageBytes(60, _getHeaderRow.ToByteArray());
+                    if (_getHeaderRow != null) w.WriteMessageBytes(58, _getHeaderRow.ToByteArray());
                     break;
                 case EventOneofCase.PullToRefreshTriggered:
-                    if (_pullToRefreshTriggered != null) w.WriteMessageBytes(61, _pullToRefreshTriggered.ToByteArray());
+                    if (_pullToRefreshTriggered != null) w.WriteMessageBytes(59, _pullToRefreshTriggered.ToByteArray());
                     break;
                 case EventOneofCase.PullToRefreshCanceled:
-                    if (_pullToRefreshCanceled != null) w.WriteMessageBytes(62, _pullToRefreshCanceled.ToByteArray());
-                    break;
-                case EventOneofCase.BeforeDropdownOpen:
-                    if (_beforeDropdownOpen != null) w.WriteMessageBytes(63, _beforeDropdownOpen.ToByteArray());
+                    if (_pullToRefreshCanceled != null) w.WriteMessageBytes(60, _pullToRefreshCanceled.ToByteArray());
                     break;
                 case EventOneofCase.TreeChildrenRequested:
-                    if (_treeChildrenRequested != null) w.WriteMessageBytes(64, _treeChildrenRequested.ToByteArray());
+                    if (_treeChildrenRequested != null) w.WriteMessageBytes(61, _treeChildrenRequested.ToByteArray());
                     break;
                 case EventOneofCase.BeforeTreeNodeToggle:
-                    if (_beforeTreeNodeToggle != null) w.WriteMessageBytes(65, _beforeTreeNodeToggle.ToByteArray());
+                    if (_beforeTreeNodeToggle != null) w.WriteMessageBytes(62, _beforeTreeNodeToggle.ToByteArray());
                     break;
                 case EventOneofCase.AfterTreeNodeToggle:
-                    if (_afterTreeNodeToggle != null) w.WriteMessageBytes(66, _afterTreeNodeToggle.ToByteArray());
+                    if (_afterTreeNodeToggle != null) w.WriteMessageBytes(63, _afterTreeNodeToggle.ToByteArray());
                     break;
                 case EventOneofCase.TreeNodeActivate:
-                    if (_treeNodeActivate != null) w.WriteMessageBytes(67, _treeNodeActivate.ToByteArray());
+                    if (_treeNodeActivate != null) w.WriteMessageBytes(64, _treeNodeActivate.ToByteArray());
                     break;
                 case EventOneofCase.TreeNodeContextMenu:
-                    if (_treeNodeContextMenu != null) w.WriteMessageBytes(68, _treeNodeContextMenu.ToByteArray());
+                    if (_treeNodeContextMenu != null) w.WriteMessageBytes(65, _treeNodeContextMenu.ToByteArray());
                     break;
             }
             return w.ToArray();
@@ -7322,61 +7813,59 @@ namespace Volvoxgrid.V1
                     case 10: msg.AfterEdit = AfterEditEvent.ParseFrom(r.ReadLengthDelimited()); break;
                     case 11: msg.CellEditValidate = CellEditValidateEvent.ParseFrom(r.ReadLengthDelimited()); break;
                     case 12: msg.CellEditChange = CellEditChangeEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 14: msg.KeyDownEdit = KeyDownEditEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 15: msg.KeyPressEdit = KeyPressEditEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 16: msg.KeyUpEdit = KeyUpEditEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 17: msg.CellEditConfigureStyle = CellEditConfigureStyleEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 18: msg.CellEditConfigureWindow = CellEditConfigureWindowEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 19: msg.DropdownClosed = DropdownClosedEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 20: msg.DropdownOpened = DropdownOpenedEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 21: msg.CellChanged = CellChangedEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 22: msg.RowStatusChange = RowStatusChangeEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 23: msg.BeforeSort = BeforeSortEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 24: msg.AfterSort = AfterSortEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 25: msg.Compare = CompareEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 26: msg.BeforeNodeToggle = BeforeNodeToggleEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 27: msg.AfterNodeToggle = AfterNodeToggleEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 28: msg.BeforeScroll = BeforeScrollEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 29: msg.AfterScroll = AfterScrollEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 30: msg.ScrollTooltip = ScrollTooltipEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 31: msg.BeforeUserResize = BeforeUserResizeEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 32: msg.AfterUserResize = AfterUserResizeEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 33: msg.AfterUserFreeze = AfterUserFreezeEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 34: msg.BeforeMoveColumn = BeforeMoveColumnEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 35: msg.AfterMoveColumn = AfterMoveColumnEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 36: msg.BeforeMoveRow = BeforeMoveRowEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 37: msg.AfterMoveRow = AfterMoveRowEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 38: msg.BeforeMouseDown = BeforeMouseDownEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 39: msg.MouseDown = MouseDownEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 40: msg.MouseUp = MouseUpEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 41: msg.MouseMove = MouseMoveEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 42: msg.Click = ClickEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 43: msg.DblClick = DblClickEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 44: msg.KeyDown = KeyDownEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 45: msg.KeyPress = KeyPressEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 46: msg.KeyUp = KeyUpEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 47: msg.CustomRenderCell = CustomRenderCellEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 48: msg.DragStart = DragStartEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 49: msg.DragOver = DragOverEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 50: msg.DragDrop = DragDropEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 51: msg.DragComplete = DragCompleteEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 52: msg.TypeAheadStarted = TypeAheadStartedEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 53: msg.TypeAheadEnded = TypeAheadEndedEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 54: msg.DataRefreshing = DataRefreshingEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 55: msg.DataRefreshed = DataRefreshedEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 56: msg.FilterData = FilterDataEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 57: msg.Error = ErrorEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 58: msg.BeforePageBreak = BeforePageBreakEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 59: msg.StartPage = StartPageEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 60: msg.GetHeaderRow = GetHeaderRowEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 61: msg.PullToRefreshTriggered = PullToRefreshTriggeredEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 62: msg.PullToRefreshCanceled = PullToRefreshCanceledEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 63: msg.BeforeDropdownOpen = BeforeDropdownOpenEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 64: msg.TreeChildrenRequested = TreeChildrenRequestedEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 65: msg.BeforeTreeNodeToggle = BeforeTreeNodeToggleEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 66: msg.AfterTreeNodeToggle = AfterTreeNodeToggleEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 67: msg.TreeNodeActivate = TreeNodeActivateEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 68: msg.TreeNodeContextMenu = TreeNodeContextMenuEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 13: msg.KeyDownEdit = KeyDownEditEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 14: msg.KeyPressEdit = KeyPressEditEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 15: msg.KeyUpEdit = KeyUpEditEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 16: msg.EditValidationRequest = EditValidationRequest.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 17: msg.EditorListItemsRequest = EditorListItemsRequest.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 18: msg.CustomEditorAction = CustomEditorActionEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 19: msg.CellChanged = CellChangedEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 20: msg.RowStatusChange = RowStatusChangeEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 21: msg.BeforeSort = BeforeSortEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 22: msg.AfterSort = AfterSortEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 23: msg.Compare = CompareEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 24: msg.BeforeNodeToggle = BeforeNodeToggleEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 25: msg.AfterNodeToggle = AfterNodeToggleEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 26: msg.BeforeScroll = BeforeScrollEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 27: msg.AfterScroll = AfterScrollEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 28: msg.ScrollTooltip = ScrollTooltipEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 29: msg.BeforeUserResize = BeforeUserResizeEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 30: msg.AfterUserResize = AfterUserResizeEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 31: msg.AfterUserFreeze = AfterUserFreezeEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 32: msg.BeforeMoveColumn = BeforeMoveColumnEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 33: msg.AfterMoveColumn = AfterMoveColumnEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 34: msg.BeforeMoveRow = BeforeMoveRowEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 35: msg.AfterMoveRow = AfterMoveRowEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 36: msg.BeforeMouseDown = BeforeMouseDownEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 37: msg.MouseDown = MouseDownEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 38: msg.MouseUp = MouseUpEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 39: msg.MouseMove = MouseMoveEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 40: msg.Click = ClickEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 41: msg.DblClick = DblClickEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 42: msg.KeyDown = KeyDownEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 43: msg.KeyPress = KeyPressEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 44: msg.KeyUp = KeyUpEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 45: msg.CustomRenderCell = CustomRenderCellEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 46: msg.DragStart = DragStartEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 47: msg.DragOver = DragOverEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 48: msg.DragDrop = DragDropEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 49: msg.DragComplete = DragCompleteEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 50: msg.TypeAheadStarted = TypeAheadStartedEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 51: msg.TypeAheadEnded = TypeAheadEndedEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 52: msg.DataRefreshing = DataRefreshingEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 53: msg.DataRefreshed = DataRefreshedEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 54: msg.FilterData = FilterDataEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 55: msg.Error = ErrorEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 56: msg.BeforePageBreak = BeforePageBreakEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 57: msg.StartPage = StartPageEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 58: msg.GetHeaderRow = GetHeaderRowEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 59: msg.PullToRefreshTriggered = PullToRefreshTriggeredEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 60: msg.PullToRefreshCanceled = PullToRefreshCanceledEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 61: msg.TreeChildrenRequested = TreeChildrenRequestedEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 62: msg.BeforeTreeNodeToggle = BeforeTreeNodeToggleEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 63: msg.AfterTreeNodeToggle = AfterTreeNodeToggleEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 64: msg.TreeNodeActivate = TreeNodeActivateEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 65: msg.TreeNodeContextMenu = TreeNodeContextMenuEvent.ParseFrom(r.ReadLengthDelimited()); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -7390,12 +7879,12 @@ namespace Volvoxgrid.V1
         public IndicatorBand Band { get; set; }
         public int SlotIndex { get; set; }
         public int SlotKind { get; set; }
-        public uint SubModeBits { get; set; }
         public string CustomKey { get; set; } = "";
         public string Text { get; set; } = "";
         public long IntValue { get; set; }
         public uint StatusFlags { get; set; }
         public byte[] Data { get; set; }
+        public int SubMode { get; set; }
 
         // ── Serialization ──
 
@@ -7406,12 +7895,12 @@ namespace Volvoxgrid.V1
             if (Band != 0) w.WriteInt32(2, (int)Band);
             if (SlotIndex != 0) w.WriteInt32(3, SlotIndex);
             if (SlotKind != 0) w.WriteInt32(4, SlotKind);
-            if (SubModeBits != 0u) w.WriteInt32(5, unchecked((int)SubModeBits));
-            if (CustomKey != null && CustomKey.Length > 0) w.WriteString(6, CustomKey);
-            if (Text != null && Text.Length > 0) w.WriteString(7, Text);
-            if (IntValue != 0L) w.WriteInt64(8, IntValue);
-            if (StatusFlags != 0u) w.WriteInt32(9, unchecked((int)StatusFlags));
-            if (Data != null && Data.Length > 0) w.WriteBytes(10, Data);
+            if (CustomKey != null && CustomKey.Length > 0) w.WriteString(5, CustomKey);
+            if (Text != null && Text.Length > 0) w.WriteString(6, Text);
+            if (IntValue != 0L) w.WriteInt64(7, IntValue);
+            if (StatusFlags != 0u) w.WriteInt32(8, unchecked((int)StatusFlags));
+            if (Data != null && Data.Length > 0) w.WriteBytes(9, Data);
+            if (SubMode != 0) w.WriteInt32(10, SubMode);
             return w.ToArray();
         }
 
@@ -7433,12 +7922,12 @@ namespace Volvoxgrid.V1
                     case 2: msg.Band = (IndicatorBand)r.ReadInt32(); break;
                     case 3: msg.SlotIndex = r.ReadInt32(); break;
                     case 4: msg.SlotKind = r.ReadInt32(); break;
-                    case 5: msg.SubModeBits = unchecked((uint)r.ReadInt32()); break;
-                    case 6: msg.CustomKey = r.ReadString(); break;
-                    case 7: msg.Text = r.ReadString(); break;
-                    case 8: msg.IntValue = r.ReadInt64(); break;
-                    case 9: msg.StatusFlags = unchecked((uint)r.ReadInt32()); break;
-                    case 10: msg.Data = r.ReadLengthDelimited(); break;
+                    case 5: msg.CustomKey = r.ReadString(); break;
+                    case 6: msg.Text = r.ReadString(); break;
+                    case 7: msg.IntValue = r.ReadInt64(); break;
+                    case 8: msg.StatusFlags = unchecked((uint)r.ReadInt32()); break;
+                    case 9: msg.Data = r.ReadLengthDelimited(); break;
+                    case 10: msg.SubMode = r.ReadInt32(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -8761,6 +9250,7 @@ namespace Volvoxgrid.V1
 
     public sealed class KeyDownEditEvent
     {
+        public long SessionId { get; set; }
         public int KeyCode { get; set; }
         public int Modifier { get; set; }
 
@@ -8769,8 +9259,9 @@ namespace Volvoxgrid.V1
         public byte[] ToByteArray()
         {
             var w = new ProtoWriter();
-            if (KeyCode != 0) w.WriteInt32(1, KeyCode);
-            if (Modifier != 0) w.WriteInt32(2, Modifier);
+            if (SessionId != 0L) w.WriteInt64(1, SessionId);
+            if (KeyCode != 0) w.WriteInt32(2, KeyCode);
+            if (Modifier != 0) w.WriteInt32(3, Modifier);
             return w.ToArray();
         }
 
@@ -8788,8 +9279,9 @@ namespace Volvoxgrid.V1
             {
                 switch (field)
                 {
-                    case 1: msg.KeyCode = r.ReadInt32(); break;
-                    case 2: msg.Modifier = r.ReadInt32(); break;
+                    case 1: msg.SessionId = r.ReadInt64(); break;
+                    case 2: msg.KeyCode = r.ReadInt32(); break;
+                    case 3: msg.Modifier = r.ReadInt32(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -8881,6 +9373,7 @@ namespace Volvoxgrid.V1
 
     public sealed class KeyPressEditEvent
     {
+        public long SessionId { get; set; }
         public int KeyAscii { get; set; }
 
         // ── Serialization ──
@@ -8888,7 +9381,8 @@ namespace Volvoxgrid.V1
         public byte[] ToByteArray()
         {
             var w = new ProtoWriter();
-            if (KeyAscii != 0) w.WriteInt32(1, KeyAscii);
+            if (SessionId != 0L) w.WriteInt64(1, SessionId);
+            if (KeyAscii != 0) w.WriteInt32(2, KeyAscii);
             return w.ToArray();
         }
 
@@ -8906,7 +9400,8 @@ namespace Volvoxgrid.V1
             {
                 switch (field)
                 {
-                    case 1: msg.KeyAscii = r.ReadInt32(); break;
+                    case 1: msg.SessionId = r.ReadInt64(); break;
+                    case 2: msg.KeyAscii = r.ReadInt32(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -8951,6 +9446,7 @@ namespace Volvoxgrid.V1
 
     public sealed class KeyUpEditEvent
     {
+        public long SessionId { get; set; }
         public int KeyCode { get; set; }
         public int Modifier { get; set; }
 
@@ -8959,8 +9455,9 @@ namespace Volvoxgrid.V1
         public byte[] ToByteArray()
         {
             var w = new ProtoWriter();
-            if (KeyCode != 0) w.WriteInt32(1, KeyCode);
-            if (Modifier != 0) w.WriteInt32(2, Modifier);
+            if (SessionId != 0L) w.WriteInt64(1, SessionId);
+            if (KeyCode != 0) w.WriteInt32(2, KeyCode);
+            if (Modifier != 0) w.WriteInt32(3, Modifier);
             return w.ToArray();
         }
 
@@ -8978,8 +9475,9 @@ namespace Volvoxgrid.V1
             {
                 switch (field)
                 {
-                    case 1: msg.KeyCode = r.ReadInt32(); break;
-                    case 2: msg.Modifier = r.ReadInt32(); break;
+                    case 1: msg.SessionId = r.ReadInt64(); break;
+                    case 2: msg.KeyCode = r.ReadInt32(); break;
+                    case 3: msg.Modifier = r.ReadInt32(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -9151,6 +9649,146 @@ namespace Volvoxgrid.V1
                     case 1: msg.Row = r.ReadInt32(); break;
                     case 2: msg.Col = r.ReadInt32(); break;
                     case 3: msg.Target = GridEventTarget.ParseFrom(r.ReadLengthDelimited()); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class ListDataSource
+    {
+        public string DataSourceId { get; set; } = "";
+        public bool Filterable { get; set; }
+        public bool Pageable { get; set; }
+        public int PageSize { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (DataSourceId != null && DataSourceId.Length > 0) w.WriteString(1, DataSourceId);
+            if (Filterable) w.WriteBool(2, Filterable);
+            if (Pageable) w.WriteBool(3, Pageable);
+            if (PageSize != 0) w.WriteInt32(4, PageSize);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<ListDataSource> Parser = new MessageParser<ListDataSource>(data => ParseFrom(data));
+
+        public static ListDataSource ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new ListDataSource();
+            var r = new ProtoReader(data);
+            var msg = new ListDataSource();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.DataSourceId = r.ReadString(); break;
+                    case 2: msg.Filterable = r.ReadBool(); break;
+                    case 3: msg.Pageable = r.ReadBool(); break;
+                    case 4: msg.PageSize = r.ReadInt32(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class ListEditorParams
+    {
+        public List<ListItem> StaticItems { get; private set; } = new List<ListItem>();
+        public ListDataSource DataSource { get; set; }
+        public bool AllowCustomValue { get; set; }
+        public bool Searchable { get; set; }
+        public bool MultiSelect { get; set; }
+        public DropdownItemLayout ItemLayout { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            foreach (var item in StaticItems)
+                w.WriteMessageBytes(1, item.ToByteArray());
+            if (DataSource != null) w.WriteMessageBytes(2, DataSource.ToByteArray());
+            if (AllowCustomValue) w.WriteBool(3, AllowCustomValue);
+            if (Searchable) w.WriteBool(4, Searchable);
+            if (MultiSelect) w.WriteBool(5, MultiSelect);
+            if (ItemLayout != 0) w.WriteInt32(6, (int)ItemLayout);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<ListEditorParams> Parser = new MessageParser<ListEditorParams>(data => ParseFrom(data));
+
+        public static ListEditorParams ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new ListEditorParams();
+            var r = new ProtoReader(data);
+            var msg = new ListEditorParams();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.StaticItems.Add(ListItem.ParseFrom(r.ReadLengthDelimited())); break;
+                    case 2: msg.DataSource = ListDataSource.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 3: msg.AllowCustomValue = r.ReadBool(); break;
+                    case 4: msg.Searchable = r.ReadBool(); break;
+                    case 5: msg.MultiSelect = r.ReadBool(); break;
+                    case 6: msg.ItemLayout = (DropdownItemLayout)r.ReadInt32(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class ListItem
+    {
+        public CellValue Value { get; set; }
+        public string Label { get; set; } = "";
+        public List<string> Details { get; private set; } = new List<string>();
+        public bool Disabled { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (Value != null) w.WriteMessageBytes(1, Value.ToByteArray());
+            if (Label != null && Label.Length > 0) w.WriteString(2, Label);
+            foreach (var item in Details)
+                w.WriteString(3, item);
+            if (Disabled) w.WriteBool(4, Disabled);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<ListItem> Parser = new MessageParser<ListItem>(data => ParseFrom(data));
+
+        public static ListItem ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new ListItem();
+            var r = new ProtoReader(data);
+            var msg = new ListItem();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.Value = CellValue.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 2: msg.Label = r.ReadString(); break;
+                    case 3: msg.Details.Add(r.ReadString()); break;
+                    case 4: msg.Disabled = r.ReadBool(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -10086,6 +10724,62 @@ namespace Volvoxgrid.V1
         }
     }
 
+    public sealed class NumberEditorParams
+    {
+        private double? _min;
+        public double Min { get { return _min.GetValueOrDefault(); } set { _min = value; } }
+        public bool HasMin { get { return _min.HasValue; } }
+        private double? _max;
+        public double Max { get { return _max.GetValueOrDefault(); } set { _max = value; } }
+        public bool HasMax { get { return _max.HasValue; } }
+        private double? _step;
+        public double Step { get { return _step.GetValueOrDefault(); } set { _step = value; } }
+        public bool HasStep { get { return _step.HasValue; } }
+        public string Format { get; set; } = "";
+        public bool Nullable { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (_min.HasValue)
+                w.WriteDouble(1, _min.Value);
+            if (_max.HasValue)
+                w.WriteDouble(2, _max.Value);
+            if (_step.HasValue)
+                w.WriteDouble(3, _step.Value);
+            if (Format != null && Format.Length > 0) w.WriteString(4, Format);
+            if (Nullable) w.WriteBool(5, Nullable);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<NumberEditorParams> Parser = new MessageParser<NumberEditorParams>(data => ParseFrom(data));
+
+        public static NumberEditorParams ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new NumberEditorParams();
+            var r = new ProtoReader(data);
+            var msg = new NumberEditorParams();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.Min = r.ReadDouble(); break;
+                    case 2: msg.Max = r.ReadDouble(); break;
+                    case 3: msg.Step = r.ReadDouble(); break;
+                    case 4: msg.Format = r.ReadString(); break;
+                    case 5: msg.Nullable = r.ReadBool(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
     public sealed class OutlineConfig
     {
         private TreeIndicatorStyle? _treeIndicator;
@@ -10124,21 +10818,21 @@ namespace Volvoxgrid.V1
             if (_treeIndicator.HasValue)
                 w.WriteInt32(1, (int)_treeIndicator.Value);
             if (_treeColor.HasValue)
-                w.WriteInt32(3, unchecked((int)_treeColor.Value));
+                w.WriteInt32(2, unchecked((int)_treeColor.Value));
             if (_groupTotalPosition.HasValue)
-                w.WriteInt32(4, (int)_groupTotalPosition.Value);
+                w.WriteInt32(3, (int)_groupTotalPosition.Value);
             if (_multiTotals.HasValue)
-                w.WriteBool(5, _multiTotals.Value);
+                w.WriteBool(4, _multiTotals.Value);
             if (_indicatorIndent.HasValue)
-                w.WriteInt32(6, _indicatorIndent.Value);
+                w.WriteInt32(5, _indicatorIndent.Value);
             if (_maxLevels.HasValue)
-                w.WriteInt32(7, _maxLevels.Value);
+                w.WriteInt32(6, _maxLevels.Value);
             if (_showLevelButtons.HasValue)
-                w.WriteBool(8, _showLevelButtons.Value);
+                w.WriteBool(7, _showLevelButtons.Value);
             if (_labelColumn.HasValue)
-                w.WriteInt32(9, _labelColumn.Value);
+                w.WriteInt32(8, _labelColumn.Value);
             if (_iconColumn.HasValue)
-                w.WriteInt32(10, _iconColumn.Value);
+                w.WriteInt32(9, _iconColumn.Value);
             return w.ToArray();
         }
 
@@ -10157,14 +10851,14 @@ namespace Volvoxgrid.V1
                 switch (field)
                 {
                     case 1: msg.TreeIndicator = (TreeIndicatorStyle)r.ReadInt32(); break;
-                    case 3: msg.TreeColor = unchecked((uint)r.ReadInt32()); break;
-                    case 4: msg.GroupTotalPosition = (GroupTotalPosition)r.ReadInt32(); break;
-                    case 5: msg.MultiTotals = r.ReadBool(); break;
-                    case 6: msg.IndicatorIndent = r.ReadInt32(); break;
-                    case 7: msg.MaxLevels = r.ReadInt32(); break;
-                    case 8: msg.ShowLevelButtons = r.ReadBool(); break;
-                    case 9: msg.LabelColumn = r.ReadInt32(); break;
-                    case 10: msg.IconColumn = r.ReadInt32(); break;
+                    case 2: msg.TreeColor = unchecked((uint)r.ReadInt32()); break;
+                    case 3: msg.GroupTotalPosition = (GroupTotalPosition)r.ReadInt32(); break;
+                    case 4: msg.MultiTotals = r.ReadBool(); break;
+                    case 5: msg.IndicatorIndent = r.ReadInt32(); break;
+                    case 6: msg.MaxLevels = r.ReadInt32(); break;
+                    case 7: msg.ShowLevelButtons = r.ReadBool(); break;
+                    case 8: msg.LabelColumn = r.ReadInt32(); break;
+                    case 9: msg.IconColumn = r.ReadInt32(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -10631,6 +11325,50 @@ namespace Volvoxgrid.V1
         }
     }
 
+    public sealed class Rect
+    {
+        public float X { get; set; }
+        public float Y { get; set; }
+        public float Width { get; set; }
+        public float Height { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (X != 0f) w.WriteFloat(1, X);
+            if (Y != 0f) w.WriteFloat(2, Y);
+            if (Width != 0f) w.WriteFloat(3, Width);
+            if (Height != 0f) w.WriteFloat(4, Height);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<Rect> Parser = new MessageParser<Rect>(data => ParseFrom(data));
+
+        public static Rect ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new Rect();
+            var r = new ProtoReader(data);
+            var msg = new Rect();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.X = r.ReadFloat(); break;
+                    case 2: msg.Y = r.ReadFloat(); break;
+                    case 3: msg.Width = r.ReadFloat(); break;
+                    case 4: msg.Height = r.ReadFloat(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
     public sealed class RefreshRequest
     {
         public long GridId { get; set; }
@@ -10909,6 +11647,9 @@ namespace Volvoxgrid.V1
         private bool? _scrollBlit;
         public bool ScrollBlit { get { return _scrollBlit.GetValueOrDefault(); } set { _scrollBlit = value; } }
         public bool HasScrollBlit { get { return _scrollBlit.HasValue; } }
+        private bool? _fontFallbackEnabled;
+        public bool FontFallbackEnabled { get { return _fontFallbackEnabled.GetValueOrDefault(); } set { _fontFallbackEnabled = value; } }
+        public bool HasFontFallbackEnabled { get { return _fontFallbackEnabled.HasValue; } }
 
         // ── Serialization ──
 
@@ -10937,6 +11678,8 @@ namespace Volvoxgrid.V1
                 w.WriteBool(10, _layerProfiling.Value);
             if (_scrollBlit.HasValue)
                 w.WriteBool(11, _scrollBlit.Value);
+            if (_fontFallbackEnabled.HasValue)
+                w.WriteBool(12, _fontFallbackEnabled.Value);
             return w.ToArray();
         }
 
@@ -10965,6 +11708,7 @@ namespace Volvoxgrid.V1
                     case 9: msg.RenderLayerMask = r.ReadInt64(); break;
                     case 10: msg.LayerProfiling = r.ReadBool(); break;
                     case 11: msg.ScrollBlit = r.ReadBool(); break;
+                    case 12: msg.FontFallbackEnabled = r.ReadBool(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -10990,6 +11734,8 @@ namespace Volvoxgrid.V1
             TerminalViewport = 12,
             TerminalCommand = 13,
             CompareResponse = 14,
+            EditValidationResponse = 15,
+            EditorListItemsResponse = 16,
         }
         public InputOneofCase InputCase { get; set; }
 
@@ -11019,6 +11765,10 @@ namespace Volvoxgrid.V1
         public TerminalCommand TerminalCommand { get { return InputCase == InputOneofCase.TerminalCommand ? _terminalCommand : null; } set { _terminalCommand = value; InputCase = InputOneofCase.TerminalCommand; } }
         private CompareResponse _compareResponse;
         public CompareResponse CompareResponse { get { return InputCase == InputOneofCase.CompareResponse ? _compareResponse : null; } set { _compareResponse = value; InputCase = InputOneofCase.CompareResponse; } }
+        private EditValidationResponse _editValidationResponse;
+        public EditValidationResponse EditValidationResponse { get { return InputCase == InputOneofCase.EditValidationResponse ? _editValidationResponse : null; } set { _editValidationResponse = value; InputCase = InputOneofCase.EditValidationResponse; } }
+        private EditorListItemsResponse _editorListItemsResponse;
+        public EditorListItemsResponse EditorListItemsResponse { get { return InputCase == InputOneofCase.EditorListItemsResponse ? _editorListItemsResponse : null; } set { _editorListItemsResponse = value; InputCase = InputOneofCase.EditorListItemsResponse; } }
         public long GridId { get; set; }
 
         // ── Serialization ──
@@ -11068,6 +11818,12 @@ namespace Volvoxgrid.V1
                 case InputOneofCase.CompareResponse:
                     if (_compareResponse != null) w.WriteMessageBytes(14, _compareResponse.ToByteArray());
                     break;
+                case InputOneofCase.EditValidationResponse:
+                    if (_editValidationResponse != null) w.WriteMessageBytes(15, _editValidationResponse.ToByteArray());
+                    break;
+                case InputOneofCase.EditorListItemsResponse:
+                    if (_editorListItemsResponse != null) w.WriteMessageBytes(16, _editorListItemsResponse.ToByteArray());
+                    break;
             }
             return w.ToArray();
         }
@@ -11100,6 +11856,8 @@ namespace Volvoxgrid.V1
                     case 12: msg.TerminalViewport = TerminalViewport.ParseFrom(r.ReadLengthDelimited()); break;
                     case 13: msg.TerminalCommand = TerminalCommand.ParseFrom(r.ReadLengthDelimited()); break;
                     case 14: msg.CompareResponse = CompareResponse.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 15: msg.EditValidationResponse = EditValidationResponse.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 16: msg.EditorListItemsResponse = EditorListItemsResponse.ParseFrom(r.ReadLengthDelimited()); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -11115,10 +11873,11 @@ namespace Volvoxgrid.V1
             FrameDone = 2,
             Selection = 3,
             Cursor = 4,
-            EditRequest = 5,
-            DropdownRequest = 6,
-            TooltipRequest = 7,
-            GpuFrameDone = 8,
+            EditorStarted = 5,
+            EditorUpdated = 6,
+            EditorEnded = 7,
+            TooltipRequest = 8,
+            GpuFrameDone = 9,
         }
         public EventOneofCase EventCase { get; set; }
 
@@ -11128,10 +11887,12 @@ namespace Volvoxgrid.V1
         public SelectionUpdate Selection { get { return EventCase == EventOneofCase.Selection ? _selection : null; } set { _selection = value; EventCase = EventOneofCase.Selection; } }
         private CursorChange _cursor;
         public CursorChange Cursor { get { return EventCase == EventOneofCase.Cursor ? _cursor : null; } set { _cursor = value; EventCase = EventOneofCase.Cursor; } }
-        private EditRequest _editRequest;
-        public EditRequest EditRequest { get { return EventCase == EventOneofCase.EditRequest ? _editRequest : null; } set { _editRequest = value; EventCase = EventOneofCase.EditRequest; } }
-        private DropdownRequest _dropdownRequest;
-        public DropdownRequest DropdownRequest { get { return EventCase == EventOneofCase.DropdownRequest ? _dropdownRequest : null; } set { _dropdownRequest = value; EventCase = EventOneofCase.DropdownRequest; } }
+        private EditorSessionStarted _editorStarted;
+        public EditorSessionStarted EditorStarted { get { return EventCase == EventOneofCase.EditorStarted ? _editorStarted : null; } set { _editorStarted = value; EventCase = EventOneofCase.EditorStarted; } }
+        private EditorSessionUpdated _editorUpdated;
+        public EditorSessionUpdated EditorUpdated { get { return EventCase == EventOneofCase.EditorUpdated ? _editorUpdated : null; } set { _editorUpdated = value; EventCase = EventOneofCase.EditorUpdated; } }
+        private EditorSessionEnded _editorEnded;
+        public EditorSessionEnded EditorEnded { get { return EventCase == EventOneofCase.EditorEnded ? _editorEnded : null; } set { _editorEnded = value; EventCase = EventOneofCase.EditorEnded; } }
         private TooltipRequest _tooltipRequest;
         public TooltipRequest TooltipRequest { get { return EventCase == EventOneofCase.TooltipRequest ? _tooltipRequest : null; } set { _tooltipRequest = value; EventCase = EventOneofCase.TooltipRequest; } }
         private GpuFrameDone _gpuFrameDone;
@@ -11155,17 +11916,20 @@ namespace Volvoxgrid.V1
                 case EventOneofCase.Cursor:
                     if (_cursor != null) w.WriteMessageBytes(4, _cursor.ToByteArray());
                     break;
-                case EventOneofCase.EditRequest:
-                    if (_editRequest != null) w.WriteMessageBytes(5, _editRequest.ToByteArray());
+                case EventOneofCase.EditorStarted:
+                    if (_editorStarted != null) w.WriteMessageBytes(5, _editorStarted.ToByteArray());
                     break;
-                case EventOneofCase.DropdownRequest:
-                    if (_dropdownRequest != null) w.WriteMessageBytes(6, _dropdownRequest.ToByteArray());
+                case EventOneofCase.EditorUpdated:
+                    if (_editorUpdated != null) w.WriteMessageBytes(6, _editorUpdated.ToByteArray());
+                    break;
+                case EventOneofCase.EditorEnded:
+                    if (_editorEnded != null) w.WriteMessageBytes(7, _editorEnded.ToByteArray());
                     break;
                 case EventOneofCase.TooltipRequest:
-                    if (_tooltipRequest != null) w.WriteMessageBytes(7, _tooltipRequest.ToByteArray());
+                    if (_tooltipRequest != null) w.WriteMessageBytes(8, _tooltipRequest.ToByteArray());
                     break;
                 case EventOneofCase.GpuFrameDone:
-                    if (_gpuFrameDone != null) w.WriteMessageBytes(8, _gpuFrameDone.ToByteArray());
+                    if (_gpuFrameDone != null) w.WriteMessageBytes(9, _gpuFrameDone.ToByteArray());
                     break;
             }
             return w.ToArray();
@@ -11189,10 +11953,11 @@ namespace Volvoxgrid.V1
                     case 2: msg.FrameDone = FrameDone.ParseFrom(r.ReadLengthDelimited()); break;
                     case 3: msg.Selection = SelectionUpdate.ParseFrom(r.ReadLengthDelimited()); break;
                     case 4: msg.Cursor = CursorChange.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 5: msg.EditRequest = EditRequest.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 6: msg.DropdownRequest = DropdownRequest.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 7: msg.TooltipRequest = TooltipRequest.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 8: msg.GpuFrameDone = GpuFrameDone.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 5: msg.EditorStarted = EditorSessionStarted.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 6: msg.EditorUpdated = EditorSessionUpdated.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 7: msg.EditorEnded = EditorSessionEnded.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 8: msg.TooltipRequest = TooltipRequest.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 9: msg.GpuFrameDone = GpuFrameDone.ParseFrom(r.ReadLengthDelimited()); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -11501,23 +12266,23 @@ namespace Volvoxgrid.V1
             if (_width.HasValue)
                 w.WriteInt32(2, _width.Value);
             if (_background.HasValue)
-                w.WriteInt32(4, unchecked((int)_background.Value));
+                w.WriteInt32(3, unchecked((int)_background.Value));
             if (_foreground.HasValue)
-                w.WriteInt32(5, unchecked((int)_foreground.Value));
+                w.WriteInt32(4, unchecked((int)_foreground.Value));
             if (_gridLines.HasValue)
-                w.WriteInt32(6, (int)_gridLines.Value);
+                w.WriteInt32(5, (int)_gridLines.Value);
             if (_gridColor.HasValue)
-                w.WriteInt32(7, unchecked((int)_gridColor.Value));
+                w.WriteInt32(6, unchecked((int)_gridColor.Value));
             if (_autoSize.HasValue)
-                w.WriteBool(8, _autoSize.Value);
+                w.WriteBool(7, _autoSize.Value);
             if (_allowResize.HasValue)
-                w.WriteBool(9, _allowResize.Value);
+                w.WriteBool(8, _allowResize.Value);
             if (_allowSelect.HasValue)
-                w.WriteBool(10, _allowSelect.Value);
+                w.WriteBool(9, _allowSelect.Value);
             if (_allowReorder.HasValue)
-                w.WriteBool(11, _allowReorder.Value);
+                w.WriteBool(10, _allowReorder.Value);
             foreach (var item in Slots)
-                w.WriteMessageBytes(12, item.ToByteArray());
+                w.WriteMessageBytes(11, item.ToByteArray());
             return w.ToArray();
         }
 
@@ -11537,15 +12302,15 @@ namespace Volvoxgrid.V1
                 {
                     case 1: msg.Visible = r.ReadBool(); break;
                     case 2: msg.Width = r.ReadInt32(); break;
-                    case 4: msg.Background = unchecked((uint)r.ReadInt32()); break;
-                    case 5: msg.Foreground = unchecked((uint)r.ReadInt32()); break;
-                    case 6: msg.GridLines = (GridLineStyle)r.ReadInt32(); break;
-                    case 7: msg.GridColor = unchecked((uint)r.ReadInt32()); break;
-                    case 8: msg.AutoSize = r.ReadBool(); break;
-                    case 9: msg.AllowResize = r.ReadBool(); break;
-                    case 10: msg.AllowSelect = r.ReadBool(); break;
-                    case 11: msg.AllowReorder = r.ReadBool(); break;
-                    case 12: msg.Slots.Add(RowIndicatorSlot.ParseFrom(r.ReadLengthDelimited())); break;
+                    case 3: msg.Background = unchecked((uint)r.ReadInt32()); break;
+                    case 4: msg.Foreground = unchecked((uint)r.ReadInt32()); break;
+                    case 5: msg.GridLines = (GridLineStyle)r.ReadInt32(); break;
+                    case 6: msg.GridColor = unchecked((uint)r.ReadInt32()); break;
+                    case 7: msg.AutoSize = r.ReadBool(); break;
+                    case 8: msg.AllowResize = r.ReadBool(); break;
+                    case 9: msg.AllowSelect = r.ReadBool(); break;
+                    case 10: msg.AllowReorder = r.ReadBool(); break;
+                    case 11: msg.Slots.Add(RowIndicatorSlot.ParseFrom(r.ReadLengthDelimited())); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -11684,6 +12449,75 @@ namespace Volvoxgrid.V1
                 {
                     case 1: msg.Row = r.ReadInt32(); break;
                     case 2: msg.Status = RowStatus.ParseFrom(r.ReadLengthDelimited()); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class ScalarValue
+    {
+        public enum ValueOneofCase
+        {
+            None = 0,
+            StringValue = 1,
+            NumberValue = 2,
+            BoolValue = 3,
+            BytesValue = 4,
+        }
+        public ValueOneofCase ValueCase { get; set; }
+
+        private string _stringValue;
+        public string StringValue { get { return ValueCase == ValueOneofCase.StringValue ? _stringValue : ""; } set { _stringValue = value; ValueCase = ValueOneofCase.StringValue; } }
+        private double _numberValue;
+        public double NumberValue { get { return ValueCase == ValueOneofCase.NumberValue ? _numberValue : default(double); } set { _numberValue = value; ValueCase = ValueOneofCase.NumberValue; } }
+        private bool _boolValue;
+        public bool BoolValue { get { return ValueCase == ValueOneofCase.BoolValue ? _boolValue : default(bool); } set { _boolValue = value; ValueCase = ValueOneofCase.BoolValue; } }
+        private byte[] _bytesValue;
+        public byte[] BytesValue { get { return ValueCase == ValueOneofCase.BytesValue ? _bytesValue : null; } set { _bytesValue = value; ValueCase = ValueOneofCase.BytesValue; } }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            switch (ValueCase)
+            {
+                case ValueOneofCase.StringValue:
+                    w.WriteString(1, _stringValue ?? "");
+                    break;
+                case ValueOneofCase.NumberValue:
+                    w.WriteDouble(2, _numberValue);
+                    break;
+                case ValueOneofCase.BoolValue:
+                    w.WriteBool(3, _boolValue);
+                    break;
+                case ValueOneofCase.BytesValue:
+                    w.WriteBytes(4, _bytesValue ?? new byte[0]);
+                    break;
+            }
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<ScalarValue> Parser = new MessageParser<ScalarValue>(data => ParseFrom(data));
+
+        public static ScalarValue ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new ScalarValue();
+            var r = new ProtoReader(data);
+            var msg = new ScalarValue();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.StringValue = r.ReadString(); break;
+                    case 2: msg.NumberValue = r.ReadDouble(); break;
+                    case 3: msg.BoolValue = r.ReadBool(); break;
+                    case 4: msg.BytesValue = r.ReadLengthDelimited(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -12992,6 +13826,80 @@ namespace Volvoxgrid.V1
         }
     }
 
+    public sealed class StructField
+    {
+        public string Key { get; set; } = "";
+        public ScalarValue Value { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (Key != null && Key.Length > 0) w.WriteString(1, Key);
+            if (Value != null) w.WriteMessageBytes(2, Value.ToByteArray());
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<StructField> Parser = new MessageParser<StructField>(data => ParseFrom(data));
+
+        public static StructField ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new StructField();
+            var r = new ProtoReader(data);
+            var msg = new StructField();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.Key = r.ReadString(); break;
+                    case 2: msg.Value = ScalarValue.ParseFrom(r.ReadLengthDelimited()); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class StructValue
+    {
+        public List<StructField> Fields { get; private set; } = new List<StructField>();
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            foreach (var item in Fields)
+                w.WriteMessageBytes(1, item.ToByteArray());
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<StructValue> Parser = new MessageParser<StructValue>(data => ParseFrom(data));
+
+        public static StructValue ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new StructValue();
+            var r = new ProtoReader(data);
+            var msg = new StructValue();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.Fields.Add(StructField.ParseFrom(r.ReadLengthDelimited())); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
     public sealed class StyleConfig
     {
         private uint? _background;
@@ -13423,6 +14331,50 @@ namespace Volvoxgrid.V1
         }
     }
 
+    public sealed class TextEditorParams
+    {
+        public int MaxLength { get; set; }
+        public string Mask { get; set; } = "";
+        public bool AllowNewlines { get; set; }
+        public InputType InputType { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (MaxLength != 0) w.WriteInt32(1, MaxLength);
+            if (Mask != null && Mask.Length > 0) w.WriteString(2, Mask);
+            if (AllowNewlines) w.WriteBool(3, AllowNewlines);
+            if (InputType != 0) w.WriteInt32(4, (int)InputType);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<TextEditorParams> Parser = new MessageParser<TextEditorParams>(data => ParseFrom(data));
+
+        public static TextEditorParams ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new TextEditorParams();
+            var r = new ProtoReader(data);
+            var msg = new TextEditorParams();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.MaxLength = r.ReadInt32(); break;
+                    case 2: msg.Mask = r.ReadString(); break;
+                    case 3: msg.AllowNewlines = r.ReadBool(); break;
+                    case 4: msg.InputType = (InputType)r.ReadInt32(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
     public sealed class TextFormatRun
     {
         public uint StartIndex { get; set; }
@@ -13598,6 +14550,79 @@ namespace Volvoxgrid.V1
                     case 2: msg.Font = Font.ParseFrom(r.ReadLengthDelimited()); break;
                     case 3: msg.Baseline = (TextBaseline)r.ReadInt32(); break;
                     case 4: msg.LinkUrl = r.ReadString(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class TextSelection
+    {
+        public int Start { get; set; }
+        public int Length { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (Start != 0) w.WriteInt32(1, Start);
+            if (Length != 0) w.WriteInt32(2, Length);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<TextSelection> Parser = new MessageParser<TextSelection>(data => ParseFrom(data));
+
+        public static TextSelection ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new TextSelection();
+            var r = new ProtoReader(data);
+            var msg = new TextSelection();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.Start = r.ReadInt32(); break;
+                    case 2: msg.Length = r.ReadInt32(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class TextSelectionChanged
+    {
+        public TextSelection Selection { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (Selection != null) w.WriteMessageBytes(1, Selection.ToByteArray());
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<TextSelectionChanged> Parser = new MessageParser<TextSelectionChanged>(data => ParseFrom(data));
+
+        public static TextSelectionChanged ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new TextSelectionChanged();
+            var r = new ProtoReader(data);
+            var msg = new TextSelectionChanged();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.Selection = TextSelection.ParseFrom(r.ReadLengthDelimited()); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -13994,6 +15019,47 @@ namespace Volvoxgrid.V1
                     case 1: msg.GridId = r.ReadInt64(); break;
                     case 2: msg.Cells.Add(CellUpdate.ParseFrom(r.ReadLengthDelimited())); break;
                     case 3: msg.Atomic = r.ReadBool(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class ValidationError
+    {
+        public string Code { get; set; } = "";
+        public string Message { get; set; } = "";
+        public bool Blocking { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (Code != null && Code.Length > 0) w.WriteString(1, Code);
+            if (Message != null && Message.Length > 0) w.WriteString(2, Message);
+            if (Blocking) w.WriteBool(3, Blocking);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<ValidationError> Parser = new MessageParser<ValidationError>(data => ParseFrom(data));
+
+        public static ValidationError ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new ValidationError();
+            var r = new ProtoReader(data);
+            var msg = new ValidationError();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.Code = r.ReadString(); break;
+                    case 2: msg.Message = r.ReadString(); break;
+                    case 3: msg.Blocking = r.ReadBool(); break;
                     default: r.SkipField(wire); break;
                 }
             }

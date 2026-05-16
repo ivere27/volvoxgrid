@@ -25,8 +25,8 @@ Because the module sits in the `/go/` subdirectory, version tags must be
 **prefixed** with the directory name:
 
 ```
-go/v0.8.8
-go/v0.8.8
+go/v0.8.9
+go/v0.8.9
 ```
 
 Plain `vX.Y.Z` tags (used by the rest of the project) are not picked up by the
@@ -36,11 +36,11 @@ when the module path includes a subdirectory.
 ### Cutting a release
 
 ```sh
-git tag go/v0.8.8
-git push origin go/v0.8.8
+git tag go/v0.8.9
+git push origin go/v0.8.9
 ```
 
-The first time `go get github.com/ivere27/volvoxgrid/go@v0.8.8` runs, the
+The first time `go get github.com/ivere27/volvoxgrid/go@v0.8.9` runs, the
 proxy pulls the tag, locates `/go/go.mod`, and caches the module.
 
 ## Adapter: `github.com/ivere27/volvoxgrid/adapters/bubbletea`
@@ -83,7 +83,7 @@ From outside this repo:
 ```sh
 mkdir /tmp/vgcheck && cd /tmp/vgcheck
 go mod init test
-go get github.com/ivere27/volvoxgrid/go@v0.8.8
+go get github.com/ivere27/volvoxgrid/go@v0.8.9
 go get github.com/ivere27/volvoxgrid/adapters/bubbletea@v0.1.0
 go list -m github.com/ivere27/volvoxgrid/go
 go list -m github.com/ivere27/volvoxgrid/adapters/bubbletea

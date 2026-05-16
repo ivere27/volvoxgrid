@@ -41,7 +41,62 @@ const DEMO_BARCODES: &str = "barcodes";
 const SALES_DEMO_COLS: i32 = 10;
 const HIERARCHY_DEMO_COLS: i32 = 7;
 const BARCODE_DEMO_COLS: i32 = 5;
+const SALES_QUARTER_COL: i32 = 0;
+const SALES_REGION_COL: i32 = 1;
+const SALES_CATEGORY_COL: i32 = 2;
+const SALES_PRODUCT_COL: i32 = 3;
+const SALES_AMOUNT_COL: i32 = 4;
+const SALES_COST_COL: i32 = 5;
+const SALES_MARGIN_COL: i32 = 6;
+const SALES_FLAG_COL: i32 = 7;
+const SALES_STATUS_COL: i32 = 8;
+const SALES_NOTES_COL: i32 = 9;
+const SALES_QUARTER_COL_WIDTH: i32 = 40;
+const SALES_REGION_COL_WIDTH: i32 = 80;
+const SALES_CATEGORY_COL_WIDTH: i32 = 100;
+const SALES_PRODUCT_COL_WIDTH: i32 = 120;
+const SALES_MONEY_COL_WIDTH: i32 = 90;
+const SALES_MARGIN_COL_WIDTH: i32 = 70;
+const SALES_FLAG_COL_WIDTH: i32 = 56;
+const SALES_STATUS_COL_WIDTH: i32 = 80;
+const SALES_NOTES_COL_WIDTH: i32 = 140;
+const SALES_CURRENCY_FORMAT: &str = "$#,##0";
+const SALES_MARGIN_MAX: f64 = 100.0;
+const SALES_MARGIN_PROGRESS_COLOR: u32 = 0xFF818CF8;
+const SALES_GRAND_TOTAL_GROUP_COL: i32 = -1;
+const SALES_GRAND_TOTAL_CAPTION: &str = "Grand Total";
+const SALES_GRAND_TOTAL_BACK_COLOR: u32 = 0xFFEEF2FF;
+const SALES_QUARTER_SUBTOTAL_BACK_COLOR: u32 = 0xFFF5F3FF;
+const SALES_REGION_SUBTOTAL_BACK_COLOR: u32 = 0xFFF8F7FF;
+const SALES_SUBTOTAL_FORE_COLOR: u32 = 0xFF111827;
 const HIERARCHY_NAME_COL: i32 = 0;
+const HIERARCHY_TYPE_COL: i32 = 1;
+const HIERARCHY_SIZE_COL: i32 = 2;
+const HIERARCHY_MODIFIED_COL: i32 = 3;
+const HIERARCHY_PERMISSIONS_COL: i32 = 4;
+const HIERARCHY_DETAILS_COL: i32 = 5;
+const HIERARCHY_ACTION_COL: i32 = 6;
+const HIERARCHY_NAME_COL_WIDTH: i32 = 260;
+const HIERARCHY_TYPE_COL_WIDTH: i32 = 80;
+const HIERARCHY_SIZE_COL_WIDTH: i32 = 80;
+const HIERARCHY_MODIFIED_COL_WIDTH: i32 = 120;
+const HIERARCHY_PERMISSIONS_COL_WIDTH: i32 = 100;
+const HIERARCHY_DETAILS_COL_WIDTH: i32 = 180;
+const HIERARCHY_ACTION_COL_WIDTH: i32 = 92;
+const HIERARCHY_SHORT_DATE_FORMAT: &str = "short date";
+const HIERARCHY_TREE_COLOR: u32 = 0xFFA8A29E;
+const HIERARCHY_FOLDER_TEXT_COLOR: u32 = 0xFF92400E;
+const HIERARCHY_ACTION_TEXT_COLOR: u32 = 0xFF2563EB;
+const HIERARCHY_OUTLINE_INDENT: i32 = 20;
+const HIERARCHY_MIN_OUTLINE_INDICATOR_WIDTH: i32 = 56;
+const HIERARCHY_NAME_EXPANDER_WIDTH: i32 = 280;
+const HIERARCHY_HEADER_ROW_HEIGHT: i32 = 28;
+const HIERARCHY_HEADER_BAND_ROWS: i32 = 1;
+const DEFAULT_ROW_INDICATOR_WIDTH: i32 = 40;
+const DEFAULT_COL_INDICATOR_BAND_ROWS: i32 = 1;
+const DEFAULT_FLING_IMPULSE_GAIN: f32 = 220.0;
+const DEFAULT_FLING_FRICTION: f32 = 0.9;
+const SALES_HEADER_ROW_HEIGHT: i32 = 28;
 const SALES_STATUS_ITEMS: &str = "Active|Pending|Shipped|Returned|Cancelled";
 const SELECTION_MODE_LABELS: [&str; 5] = ["Free", "ByRow", "ByCol", "Listbox", "MultiRange"];
 const FRAME_PACING_LABELS: [&str; 4] = ["Auto", "Platform", "Unlimited", "Fixed"];
@@ -116,16 +171,58 @@ button.volvox-demo-active label {
 }
 "#;
 
-fn dropdown_from_labels(items: &str) -> pb::Dropdown {
-    pb::Dropdown {
-        items: items
-            .split('|')
-            .filter(|label| !label.is_empty())
-            .map(|label| pb::DropdownItem {
-                label: Some(label.to_string()),
-                ..Default::default()
-            })
-            .collect(),
+fn editor_value_from_text(text: String) -> pb::EditorValue {
+    pb::EditorValue {
+        value: Some(pb::CellValue {
+            value: Some(pb::cell_value::Value::Text(text.clone())),
+        }),
+        edit_text: Some(text.clone()),
+        display_text: Some(text),
+    }
+}
+
+fn dropdown_from_labels(items: &str) -> pb::EditorSpec {
+    pb::EditorSpec {
+        kind: pb::EditorKind::EditorSelect as i32,
+        owner: pb::EditorOwner::Engine as i32,
+        presentation: pb::EditorPresentation::EditorCanvas as i32,
+        list: Some(pb::ListEditorParams {
+            static_items: items
+                .split('|')
+                .filter(|label| !label.is_empty())
+                .map(|label| pb::ListItem {
+                    label: label.to_string(),
+                    ..Default::default()
+                })
+                .collect(),
+            ..Default::default()
+        }),
+        ..Default::default()
+    }
+}
+
+fn number_editor(min: f64, max: Option<f64>) -> pb::EditorSpec {
+    pb::EditorSpec {
+        kind: pb::EditorKind::EditorNumber as i32,
+        owner: pb::EditorOwner::Engine as i32,
+        presentation: pb::EditorPresentation::EditorCanvas as i32,
+        number: Some(pb::NumberEditorParams {
+            min: Some(min),
+            max,
+            nullable: false,
+            ..Default::default()
+        }),
+        ..Default::default()
+    }
+}
+
+fn edit_config(trigger: i32, tab_behavior: i32) -> pb::EditConfig {
+    pb::EditConfig {
+        activation: Some(pb::EditActivation {
+            trigger: Some(trigger),
+            tab_behavior: Some(tab_behavior),
+            ..Default::default()
+        }),
         ..Default::default()
     }
 }
@@ -184,6 +281,32 @@ struct BarcodeDemoPlan {
     row_height: i32,
     options_text: &'static str,
 }
+
+#[derive(Clone, Copy)]
+struct SalesSubtotalLevel {
+    group_col: i32,
+    caption: &'static str,
+    back_color: u32,
+}
+
+const SALES_SUBTOTAL_AMOUNT_COLS: [i32; 2] = [SALES_AMOUNT_COL, SALES_COST_COL];
+const SALES_SUBTOTAL_LEVELS: [SalesSubtotalLevel; 3] = [
+    SalesSubtotalLevel {
+        group_col: SALES_GRAND_TOTAL_GROUP_COL,
+        caption: SALES_GRAND_TOTAL_CAPTION,
+        back_color: SALES_GRAND_TOTAL_BACK_COLOR,
+    },
+    SalesSubtotalLevel {
+        group_col: SALES_QUARTER_COL,
+        caption: "",
+        back_color: SALES_QUARTER_SUBTOTAL_BACK_COLOR,
+    },
+    SalesSubtotalLevel {
+        group_col: SALES_REGION_COL,
+        caption: "",
+        back_color: SALES_REGION_SUBTOTAL_BACK_COLOR,
+    },
+];
 
 #[derive(Serialize)]
 struct HierarchyLoadRow<'a> {
@@ -520,6 +643,7 @@ struct State {
     followup_schedule_seq: u64,
     debug_overlay: bool,
     scroll_blit_enabled: bool,
+    edit_enabled: bool,
     hover_enabled: bool,
     col_hidden: bool,
     suppress_entry_changed: bool,
@@ -528,6 +652,7 @@ struct State {
     render_layer_mask: u64,
     /// Tracks whether the engine is in edit mode (for IME commit/preedit).
     engine_editing: bool,
+    space_key_down_forwarded_from_capture: bool,
 }
 
 fn main() {
@@ -603,6 +728,7 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
         followup_schedule_seq: 0,
         debug_overlay: false,
         scroll_blit_enabled: false,
+        edit_enabled: true,
         hover_enabled: true,
         col_hidden: false,
         suppress_entry_changed: false,
@@ -610,6 +736,7 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
         edit_overlay_cell: None,
         render_layer_mask: ALL_LAYER_MASK,
         engine_editing: false,
+        space_key_down_forwarded_from_capture: false,
     };
 
     apply_initial_config(&mut state)?;
@@ -667,6 +794,7 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
     selection_mode.set_selected(0);
     let chk_debug = CheckButton::with_label("Debug");
     let chk_scroll_blit = CheckButton::with_label("ScrollBlit");
+    let chk_edit = CheckButton::with_label("Edit");
     let frame_pacing_box = GtkBox::new(Orientation::Horizontal, 4);
     let frame_pacing_label = Label::new(Some("Pacing"));
     let frame_pacing_mode = DropDown::from_strings(&FRAME_PACING_LABELS);
@@ -693,6 +821,7 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
     let btn_sort_desc = Button::with_label("SortDesc");
     let chk_hover = CheckButton::with_label("Hover");
     chk_hover.set_active(true);
+    chk_edit.set_active(state.borrow().edit_enabled);
     chk_scroll_blit.set_active(state.borrow().scroll_blit_enabled);
 
     let btn_save = Button::with_label("SaveCSV");
@@ -714,6 +843,7 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
     toolbar_row1.append(&frame_pacing_box);
     toolbar_row1.append(&btn_sort_asc);
     toolbar_row1.append(&btn_sort_desc);
+    toolbar_row1.append(&chk_edit);
     toolbar_row1.append(&chk_hover);
 
     toolbar_row2.append(&btn_save);
@@ -1140,6 +1270,48 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
     let key = EventControllerKey::new();
     key.set_im_context(Some(&im_context));
 
+    // GTK IM contexts commonly consume Space and emit it as committed text.
+    // Forward the key-down as well so checkbox/select cells still get their
+    // command-style Space handling; the later commit remains useful for normal
+    // text cells.
+    {
+        let state = Rc::clone(&state);
+        let status = status_label.clone();
+        let area = drawing_area.clone();
+        let capture = EventControllerKey::new();
+        capture.set_propagation_phase(gtk4::PropagationPhase::Capture);
+        capture.connect_key_pressed(move |_ctrl, keyval, _keycode, modifier| {
+            if keyval != gdk::Key::space {
+                return glib::Propagation::Proceed;
+            }
+            let flags = gdk_modifier_to_flags(modifier);
+            if flags & (2 | 4 | 8) != 0 {
+                return glib::Propagation::Proceed;
+            }
+
+            let Ok(mut st) = state.try_borrow_mut() else {
+                return glib::Propagation::Proceed;
+            };
+            if let Err(err) = send_key_input(
+                &mut st,
+                pb::key_event::Type::KeyDown,
+                32,
+                flags,
+                String::new(),
+            ) {
+                st.status_note = format!("Key down failed: {err}");
+            } else {
+                st.space_key_down_forwarded_from_capture = true;
+            }
+            update_status_label(&st, &status);
+            let _ = request_frame(&mut st);
+            drop(st);
+            area.queue_draw();
+            glib::Propagation::Proceed
+        });
+        drawing_area.add_controller(capture);
+    }
+
     // IME commit: final text from IME (e.g. "a" for English, "한" for Korean).
     {
         let state = Rc::clone(&state);
@@ -1162,15 +1334,32 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
                         0,
                         first.to_string(),
                     );
-                    // The engine processes KeyPress synchronously on the render
-                    // thread, entering edit mode. Mark it here so subsequent
-                    // commits in the same pump don't re-trigger auto-edit.
-                    st.engine_editing = true;
+                    // ASCII Space may be a command for checkbox/select cells.
+                    // Let EditorStarted update state for that case; other
+                    // printable commits start text editing.
+                    if first != ' ' {
+                        st.engine_editing = true;
+                    }
                 }
                 // Remaining chars: engine is already editing, insert directly.
                 let rest: String = chars.collect();
                 if !rest.is_empty() {
-                    let _ = st.client.edit_commit_preedit(st.grid_id, &rest);
+                    if st.engine_editing {
+                        let _ = st.client.edit_commit_preedit(st.grid_id, &rest);
+                    } else {
+                        let mut saw_non_space = false;
+                        for ch in rest.chars() {
+                            saw_non_space |= ch != ' ';
+                            let _ = send_key_input(
+                                &mut st,
+                                pb::key_event::Type::KeyPress,
+                                0,
+                                0,
+                                ch.to_string(),
+                            );
+                        }
+                        st.engine_editing = saw_non_space;
+                    }
                 }
             } else {
                 // Editing: commit preedit text into edit_text.
@@ -1224,16 +1413,64 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
     {
         let state = Rc::clone(&state);
         let status = status_label.clone();
+        let area = drawing_area.clone();
         key.connect_key_pressed(move |_ctrl, keyval, _keycode, modifier| {
             let key_code = gdk_keyval_to_vk(keyval);
             if key_code == 0 {
                 return glib::Propagation::Proceed;
             }
 
+            let flags = gdk_modifier_to_flags(modifier);
+            if is_clipboard_paste_shortcut(key_code, flags) {
+                let Ok(mut st) = state.try_borrow_mut() else {
+                    return glib::Propagation::Stop;
+                };
+                match active_readonly_select_editor(&mut st) {
+                    Ok(true) => {
+                        st.status_note = "Select dropdown is read-only".to_string();
+                        update_status_label(&st, &status);
+                        let _ = request_frame(&mut st);
+                        drop(st);
+                        area.queue_draw();
+                        return glib::Propagation::Stop;
+                    }
+                    Ok(false) => {}
+                    Err(err) => {
+                        st.status_note = format!("Edit state failed: {err}");
+                        update_status_label(&st, &status);
+                        drop(st);
+                        return glib::Propagation::Stop;
+                    }
+                }
+                drop(st);
+                request_system_clipboard_paste(&state, &area, &status);
+                return glib::Propagation::Stop;
+            }
+
             let Ok(mut st) = state.try_borrow_mut() else {
                 return glib::Propagation::Stop;
             };
-            let flags = gdk_modifier_to_flags(modifier);
+            if key_code == 32 && st.space_key_down_forwarded_from_capture {
+                st.space_key_down_forwarded_from_capture = false;
+                return glib::Propagation::Stop;
+            }
+            match handle_clipboard_key_shortcut(&mut st, key_code, flags) {
+                Ok(Some(note)) => {
+                    st.status_note = note;
+                    update_status_label(&st, &status);
+                    let _ = request_frame(&mut st);
+                    drop(st);
+                    return glib::Propagation::Stop;
+                }
+                Ok(None) => {}
+                Err(err) => {
+                    st.status_note = err;
+                    update_status_label(&st, &status);
+                    let _ = request_frame(&mut st);
+                    drop(st);
+                    return glib::Propagation::Stop;
+                }
+            }
             if let Err(err) = send_key_input(
                 &mut st,
                 pb::key_event::Type::KeyDown,
@@ -1262,6 +1499,9 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
                 return;
             };
             let flags = gdk_modifier_to_flags(modifier);
+            if key_code == 32 {
+                st.space_key_down_forwarded_from_capture = false;
+            }
             if let Err(err) = send_key_input(
                 &mut st,
                 pb::key_event::Type::KeyUp,
@@ -1475,6 +1715,33 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
         let state = Rc::clone(&state);
         let area = drawing_area.clone();
         let status = status_label.clone();
+        let entry = edit_entry.clone();
+        let combo = dropdown_combo.clone();
+        let combo_editable = dropdown_combo_editable.clone();
+        chk_edit.connect_toggled(move |chk| {
+            run_action(&state, &area, &status, |st| {
+                st.edit_enabled = chk.is_active();
+                if !st.edit_enabled {
+                    let _ = st.client.edit_cancel(st.grid_id);
+                    st.engine_editing = false;
+                    st.edit_overlay_cell = None;
+                    hide_host_editors(&entry, &combo, &combo_editable);
+                    area.grab_focus();
+                }
+                apply_host_runtime_config(st, st.grid_id)?;
+                Ok(if st.edit_enabled {
+                    "Editing enabled".to_string()
+                } else {
+                    "Editing disabled".to_string()
+                })
+            });
+        });
+    }
+
+    {
+        let state = Rc::clone(&state);
+        let area = drawing_area.clone();
+        let status = status_label.clone();
         chk_hover.connect_toggled(move |chk| {
             run_action(&state, &area, &status, |st| {
                 st.hover_enabled = chk.is_active();
@@ -1538,14 +1805,7 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
         let area = drawing_area.clone();
         let status = status_label.clone();
         btn_paste.connect_clicked(move |_| {
-            run_action(&state, &area, &status, |st| {
-                if st.clipboard_text.is_empty() {
-                    return Ok("Clipboard cache is empty".to_string());
-                }
-                let text = st.clipboard_text.clone();
-                st.client.clipboard_paste(st.grid_id, text)?;
-                Ok("Pasted cached clipboard text".to_string())
-            });
+            request_system_clipboard_paste(&state, &area, &status);
         });
     }
     {
@@ -1879,10 +2139,9 @@ impl VolvoxServiceClient {
                 command: Some(pb::edit_command::Command::Start(pb::EditStart {
                     row,
                     col,
-                    select_all: Some(true),
-                    caret_end: Some(true),
-                    seed_text: None,
-                    formula_mode: None,
+                    reason: pb::EditStartReason::EditStartProgrammatic as i32,
+                    seed_value: None,
+                    caret_position: None,
                 })),
             },
         )?;
@@ -1890,50 +2149,68 @@ impl VolvoxServiceClient {
     }
 
     fn edit_commit(&self, grid_id: i64, text: String) -> Result<(), String> {
+        let session = self.edit_session_command(
+            grid_id,
+            pb::editor_session_command::Command::Commit(pb::EditCommit {
+                value: Some(editor_value_from_text(text)),
+            }),
+        )?;
         let _: pb::EditState = self.invoke(
             "/volvoxgrid.v1.VolvoxGridService/Edit",
             &pb::EditCommand {
                 grid_id,
-                command: Some(pb::edit_command::Command::Commit(pb::EditCommit {
-                    text: Some(text),
-                })),
+                command: Some(pb::edit_command::Command::Session(session)),
             },
         )?;
         Ok(())
     }
 
     fn edit_cancel(&self, grid_id: i64) -> Result<(), String> {
+        let session = self.edit_session_command(
+            grid_id,
+            pb::editor_session_command::Command::Cancel(pb::EditCancel {}),
+        )?;
         let _: pb::EditState = self.invoke(
             "/volvoxgrid.v1.VolvoxGridService/Edit",
             &pb::EditCommand {
                 grid_id,
-                command: Some(pb::edit_command::Command::Cancel(pb::EditCancel {})),
+                command: Some(pb::edit_command::Command::Session(session)),
             },
         )?;
         Ok(())
     }
 
     fn edit_set_text(&self, grid_id: i64, text: String) -> Result<(), String> {
+        let session = self.edit_session_command(
+            grid_id,
+            pb::editor_session_command::Command::ValueChanged(pb::EditorValueChanged {
+                value: Some(editor_value_from_text(text)),
+            }),
+        )?;
         let _: pb::EditState = self.invoke(
             "/volvoxgrid.v1.VolvoxGridService/Edit",
             &pb::EditCommand {
                 grid_id,
-                command: Some(pb::edit_command::Command::SetText(pb::EditSetText { text })),
+                command: Some(pb::edit_command::Command::Session(session)),
             },
         )?;
         Ok(())
     }
 
     fn edit_set_preedit(&self, grid_id: i64, text: String, cursor: i32) -> Result<(), String> {
+        let session = self.edit_session_command(
+            grid_id,
+            pb::editor_session_command::Command::PreeditChanged(pb::EditorPreeditChanged {
+                text,
+                cursor,
+                commit: false,
+            }),
+        )?;
         let _: pb::EditState = self.invoke(
             "/volvoxgrid.v1.VolvoxGridService/Edit",
             &pb::EditCommand {
                 grid_id,
-                command: Some(pb::edit_command::Command::SetPreedit(pb::EditSetPreedit {
-                    text,
-                    cursor,
-                    commit: false,
-                })),
+                command: Some(pb::edit_command::Command::Session(session)),
             },
         )?;
         Ok(())
@@ -1947,10 +2224,9 @@ impl VolvoxServiceClient {
                 command: Some(pb::edit_command::Command::Start(pb::EditStart {
                     row,
                     col,
-                    select_all: None,
-                    caret_end: None,
-                    seed_text: Some(String::new()),
-                    formula_mode: None,
+                    reason: pb::EditStartReason::EditStartProgrammatic as i32,
+                    seed_value: Some(editor_value_from_text(String::new())),
+                    caret_position: None,
                 })),
             },
         )?;
@@ -1958,18 +2234,51 @@ impl VolvoxServiceClient {
     }
 
     fn edit_commit_preedit(&self, grid_id: i64, committed_text: &str) -> Result<(), String> {
+        let session = self.edit_session_command(
+            grid_id,
+            pb::editor_session_command::Command::PreeditChanged(pb::EditorPreeditChanged {
+                text: committed_text.to_string(),
+                cursor: 0,
+                commit: true,
+            }),
+        )?;
         let _: pb::EditState = self.invoke(
             "/volvoxgrid.v1.VolvoxGridService/Edit",
             &pb::EditCommand {
                 grid_id,
-                command: Some(pb::edit_command::Command::SetPreedit(pb::EditSetPreedit {
-                    text: committed_text.to_string(),
-                    cursor: 0,
-                    commit: true,
-                })),
+                command: Some(pb::edit_command::Command::Session(session)),
             },
         )?;
         Ok(())
+    }
+
+    fn edit_state(&self, grid_id: i64) -> Result<pb::EditState, String> {
+        self.invoke(
+            "/volvoxgrid.v1.VolvoxGridService/Edit",
+            &pb::EditCommand {
+                grid_id,
+                command: Some(pb::edit_command::Command::GetState(pb::EditGetState {})),
+            },
+        )
+    }
+
+    fn edit_session_command(
+        &self,
+        grid_id: i64,
+        command: pb::editor_session_command::Command,
+    ) -> Result<pb::EditorSessionCommand, String> {
+        let state = self.edit_state(grid_id)?;
+        let (session_id, state_version) = state
+            .session
+            .as_ref()
+            .filter(|_| state.active)
+            .map(|s| (s.session_id, s.state_version))
+            .unwrap_or((0, 0));
+        Ok(pb::EditorSessionCommand {
+            session_id,
+            state_version,
+            command: Some(command),
+        })
     }
 
     fn find_text(&self, grid_id: i64, col: i32, start_row: i32, text: &str) -> Result<i32, String> {
@@ -2123,6 +2432,16 @@ impl VolvoxServiceClient {
         )
     }
 
+    fn clipboard_cut(&self, grid_id: i64) -> Result<pb::ClipboardResponse, String> {
+        self.invoke(
+            "/volvoxgrid.v1.VolvoxGridService/Clipboard",
+            &pb::ClipboardCommand {
+                grid_id,
+                command: Some(pb::clipboard_command::Command::Cut(pb::ClipboardCut {})),
+            },
+        )
+    }
+
     fn clipboard_paste(&self, grid_id: i64, text: String) -> Result<(), String> {
         let _: pb::ClipboardResponse = self.invoke(
             "/volvoxgrid.v1.VolvoxGridService/Clipboard",
@@ -2253,11 +2572,7 @@ fn apply_initial_config_for_grid(
                 scroll_blit: Some(scroll_blit_enabled),
                 ..Default::default()
             }),
-            editing: Some(pb::EditConfig {
-                host_key_dispatch: Some(false),
-                host_pointer_dispatch: Some(false),
-                ..Default::default()
-            }),
+            editing: Some(pb::EditConfig::default()),
             interaction: Some(pb::InteractionConfig {
                 header_features: Some(pb::HeaderFeatures {
                     sort: Some(true),
@@ -2273,7 +2588,8 @@ fn apply_initial_config_for_grid(
 }
 
 fn apply_initial_config(state: &mut State) -> Result<(), String> {
-    apply_initial_config_for_grid(&state.client, state.grid_id, state.scroll_blit_enabled)
+    apply_initial_config_for_grid(&state.client, state.grid_id, state.scroll_blit_enabled)?;
+    apply_host_runtime_config(state, state.grid_id)
 }
 
 fn apply_host_runtime_config(state: &State, grid_id: i64) -> Result<(), String> {
@@ -2298,138 +2614,40 @@ fn apply_host_runtime_config(state: &State, grid_id: i64) -> Result<(), String> 
                 }),
                 ..Default::default()
             }),
+            editing: Some(edit_config(
+                if state.edit_enabled {
+                    pb::EditTrigger::KeyClick as i32
+                } else {
+                    pb::EditTrigger::None as i32
+                },
+                pb::TabBehavior::TabCells as i32,
+            )),
             ..Default::default()
         },
     )?;
     Ok(())
 }
 
-fn sales_highlight_style(
-    background: u32,
-    foreground: Option<u32>,
-    border_style: Option<i32>,
-    border_color: Option<u32>,
-) -> pb::HighlightStyle {
-    pb::HighlightStyle {
-        background: Some(background),
-        foreground,
-        borders: match (border_style, border_color) {
-            (Some(style), Some(color)) => Some(pb::Borders {
-                all: Some(pb::Border {
-                    style: Some(style),
-                    color: Some(color),
-                }),
-                ..Default::default()
-            }),
-            _ => None,
-        },
-        ..Default::default()
-    }
-}
-
 fn sales_theme_config() -> pb::GridConfig {
     pb::GridConfig {
-        layout: Some(pb::LayoutConfig {
-            fixed_rows: Some(0),
-            ..Default::default()
-        }),
-        style: Some(pb::StyleConfig {
-            background: Some(0xFFFFFFFF),
-            foreground: Some(0xFF111827),
-            alternate_background: Some(0xFFF9FAFB),
-            progress_color: Some(0xFF818CF8),
-            sheet_background: Some(0xFFFAFAFB),
-            sheet_border: Some(0xFFD1D5DB),
-            grid_lines: Some(pb::GridLines {
-                style: Some(pb::GridLineStyle::GridlineSolid as i32),
-                color: Some(0xFFE5E7EB),
-                ..Default::default()
-            }),
-            fixed: Some(pb::RegionStyle {
-                background: Some(0xFFF3F4F6),
-                foreground: Some(0xFF374151),
-                grid_lines: Some(pb::GridLines {
-                    style: Some(pb::GridLineStyle::GridlineSolid as i32),
-                    color: Some(0xFFD1D5DB),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            }),
-            frozen: Some(pb::RegionStyle {
-                background: Some(0xFFFFFFFF),
-                foreground: Some(0xFF111827),
-                grid_lines: Some(pb::GridLines {
-                    style: Some(pb::GridLineStyle::GridlineSolid as i32),
-                    color: Some(0xFFD1D5DB),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            }),
-            header: Some(pb::HeaderStyle {
-                separator: Some(pb::HeaderSeparator {
-                    enabled: Some(true),
-                    color: Some(0xFFD1D5DB),
-                    width: Some(1),
-                    ..Default::default()
-                }),
-                resize_handle: Some(pb::HeaderResizeHandle {
-                    enabled: Some(true),
-                    color: Some(0xFFD1D5DB),
-                    width: Some(1),
-                    hit_width: Some(6),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            }),
-            ..Default::default()
-        }),
+        theme_preset: Some(pb::ThemePreset::ThemeLight as i32),
         selection: Some(pb::SelectionConfig {
             mode: Some(pb::SelectionMode::SelectionFree as i32),
-            style: Some(pb::HighlightStyle {
-                background: Some(0xFF6366F1),
-                foreground: Some(0xFFFFFFFF),
-                fill_handle: Some(pb::FillHandlePosition::FillHandleNone as i32),
-                fill_handle_color: Some(0xFF818CF8),
-                ..Default::default()
-            }),
-            active_cell_style: Some(sales_highlight_style(
-                0x22000000,
-                Some(0xFFFFFFFF),
-                Some(pb::BorderStyle::BorderThick as i32),
-                Some(0xFF818CF8),
-            )),
-            hover: Some(pb::HoverConfig {
-                row: Some(true),
-                column: Some(true),
-                cell: Some(true),
-                row_style: Some(sales_highlight_style(0x106366F1, None, None, None)),
-                column_style: Some(sales_highlight_style(0x106366F1, None, None, None)),
-                cell_style: Some(sales_highlight_style(
-                    0x1E818CF8,
-                    None,
-                    Some(pb::BorderStyle::BorderThin as i32),
-                    Some(0xFF818CF8),
-                )),
-            }),
             ..Default::default()
         }),
-        editing: Some(pb::EditConfig {
-            trigger: Some(pb::EditTrigger::None as i32),
-            tab_behavior: Some(pb::TabBehavior::TabCells as i32),
-            dropdown_trigger: Some(pb::DropdownTrigger::DropdownAlways as i32),
-            dropdown_search: Some(false),
-            ..Default::default()
-        }),
+        editing: Some(edit_config(
+            pb::EditTrigger::None as i32,
+            pb::TabBehavior::TabCells as i32,
+        )),
         scrolling: Some(pb::ScrollConfig {
             scrollbars: Some(pb::ScrollBarsMode::ScrollbarBoth as i32),
             fling_enabled: Some(true),
-            fling_impulse_gain: Some(220.0),
-            fling_friction: Some(0.9),
+            fling_impulse_gain: Some(DEFAULT_FLING_IMPULSE_GAIN),
+            fling_friction: Some(DEFAULT_FLING_FRICTION),
             ..Default::default()
         }),
         outline: Some(pb::OutlineConfig {
             tree_indicator: Some(pb::TreeIndicatorStyle::TreeIndicatorNone as i32),
-            tree_color: Some(0xFF9CA3AF),
             group_total_position: Some(pb::GroupTotalPosition::GroupTotalBelow as i32),
             multi_totals: Some(true),
             ..Default::default()
@@ -2462,30 +2680,26 @@ fn sales_theme_config() -> pb::GridConfig {
         indicators: Some(pb::IndicatorsConfig {
             row_start: Some(pb::RowIndicatorConfig {
                 visible: Some(true),
-                width: Some(40),
+                width: Some(DEFAULT_ROW_INDICATOR_WIDTH),
                 slots: vec![pb::RowIndicatorSlot {
                     kind: Some(pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers as i32),
-                    width: Some(40),
+                    width: Some(DEFAULT_ROW_INDICATOR_WIDTH),
                     visible: Some(true),
                     ..Default::default()
                 }],
-                background: Some(0xFFF9FAFB),
-                foreground: Some(0xFF6B7280),
-                grid_color: Some(0xFFD1D5DB),
                 allow_resize: Some(true),
                 ..Default::default()
             }),
             col_top: Some(pb::ColIndicatorConfig {
                 visible: Some(true),
-                default_row_height: Some(28),
-                band_rows: Some(1),
-                mode_bits: Some(
-                    (pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as u32)
-                        | (pb::ColIndicatorCellMode::ColIndicatorCellSortGlyph as u32),
-                ),
-                background: Some(0xFFF9FAFB),
-                foreground: Some(0xFF111827),
-                grid_color: Some(0xFFD1D5DB),
+                default_row_height: Some(SALES_HEADER_ROW_HEIGHT),
+                band_rows: Some(DEFAULT_COL_INDICATOR_BAND_ROWS),
+                cell_modes: Some(pb::ColIndicatorCellModes {
+                    modes: vec![
+                        pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as i32,
+                        pb::ColIndicatorCellMode::ColIndicatorCellSortGlyph as i32,
+                    ],
+                }),
                 allow_resize: Some(true),
                 ..Default::default()
             }),
@@ -2496,114 +2710,39 @@ fn sales_theme_config() -> pb::GridConfig {
 }
 
 fn hierarchy_theme_config(max_outline_depth: i32, max_outline_level: i32) -> pb::GridConfig {
-    const OUTLINE_INDENT: i32 = 20;
-    const MIN_OUTLINE_INDICATOR_WIDTH: i32 = 56;
     let max_outline_depth = max_outline_depth.max(0);
-    let outline_width = MIN_OUTLINE_INDICATOR_WIDTH.max((max_outline_depth + 1) * OUTLINE_INDENT);
-    let expander_width = outline_width + 280;
+    let outline_width = HIERARCHY_MIN_OUTLINE_INDICATOR_WIDTH
+        .max((max_outline_depth + 1) * HIERARCHY_OUTLINE_INDENT);
+    let expander_width = outline_width + HIERARCHY_NAME_EXPANDER_WIDTH;
 
     pb::GridConfig {
+        theme_preset: Some(pb::ThemePreset::ThemeAmber as i32),
         layout: Some(pb::LayoutConfig {
             fixed_rows: Some(0),
             ..Default::default()
         }),
-        style: Some(pb::StyleConfig {
-            background: Some(0xFFFFFFFF),
-            foreground: Some(0xFF1C1917),
-            alternate_background: Some(0xFFF5F5F4),
-            progress_color: Some(0xFFF59E0B),
-            sheet_background: Some(0xFFFAFAF9),
-            sheet_border: Some(0xFFD6D3D1),
-            grid_lines: Some(pb::GridLines {
-                style: Some(pb::GridLineStyle::GridlineSolid as i32),
-                color: Some(0xFFE7E5E4),
-                ..Default::default()
-            }),
-            fixed: Some(pb::RegionStyle {
-                background: Some(0xFFF5F5F4),
-                foreground: Some(0xFF44403C),
-                grid_lines: Some(pb::GridLines {
-                    style: Some(pb::GridLineStyle::GridlineSolid as i32),
-                    color: Some(0xFFD6D3D1),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            }),
-            frozen: Some(pb::RegionStyle {
-                background: Some(0xFFFFFFFF),
-                foreground: Some(0xFF1C1917),
-                grid_lines: Some(pb::GridLines {
-                    style: Some(pb::GridLineStyle::GridlineSolid as i32),
-                    color: Some(0xFFD6D3D1),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            }),
-            header: Some(pb::HeaderStyle {
-                separator: Some(pb::HeaderSeparator {
-                    enabled: Some(true),
-                    color: Some(0xFFD6D3D1),
-                    width: Some(1),
-                    ..Default::default()
-                }),
-                resize_handle: Some(pb::HeaderResizeHandle {
-                    enabled: Some(true),
-                    color: Some(0xFFD6D3D1),
-                    width: Some(1),
-                    hit_width: Some(6),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            }),
-            ..Default::default()
-        }),
         selection: Some(pb::SelectionConfig {
             mode: Some(pb::SelectionMode::SelectionFree as i32),
-            style: Some(pb::HighlightStyle {
-                background: Some(0xFFD97706),
-                foreground: Some(0xFFFFFFFF),
-                fill_handle: Some(pb::FillHandlePosition::FillHandleNone as i32),
-                fill_handle_color: Some(0xFFF59E0B),
-                ..Default::default()
-            }),
-            active_cell_style: Some(sales_highlight_style(
-                0x22000000,
-                Some(0xFFFFFFFF),
-                Some(pb::BorderStyle::BorderThick as i32),
-                Some(0xFFF59E0B),
-            )),
-            hover: Some(pb::HoverConfig {
-                cell: Some(true),
-                cell_style: Some(sales_highlight_style(
-                    0x1AD97706,
-                    None,
-                    Some(pb::BorderStyle::BorderThin as i32),
-                    Some(0xFFF59E0B),
-                )),
-                ..Default::default()
-            }),
             ..Default::default()
         }),
-        editing: Some(pb::EditConfig {
-            trigger: Some(pb::EditTrigger::None as i32),
-            tab_behavior: Some(pb::TabBehavior::TabCells as i32),
-            dropdown_trigger: Some(pb::DropdownTrigger::DropdownNever as i32),
-            ..Default::default()
-        }),
+        editing: Some(edit_config(
+            pb::EditTrigger::None as i32,
+            pb::TabBehavior::TabCells as i32,
+        )),
         scrolling: Some(pb::ScrollConfig {
             scrollbars: Some(pb::ScrollBarsMode::ScrollbarBoth as i32),
             fling_enabled: Some(true),
-            fling_impulse_gain: Some(220.0),
-            fling_friction: Some(0.9),
+            fling_impulse_gain: Some(DEFAULT_FLING_IMPULSE_GAIN),
+            fling_friction: Some(DEFAULT_FLING_FRICTION),
             ..Default::default()
         }),
         outline: Some(pb::OutlineConfig {
             tree_indicator: Some(pb::TreeIndicatorStyle::TreeIndicatorArrowsLeaf as i32),
-            indicator_indent: Some(OUTLINE_INDENT),
+            indicator_indent: Some(HIERARCHY_OUTLINE_INDENT),
             max_levels: Some(max_outline_level.max(0)),
             show_level_buttons: Some(true),
             label_column: Some(HIERARCHY_NAME_COL),
-            tree_color: Some(0xFFA8A29E),
+            tree_color: Some(HIERARCHY_TREE_COLOR),
             ..Default::default()
         }),
         interaction: Some(pb::InteractionConfig {
@@ -2629,9 +2768,6 @@ fn hierarchy_theme_config(max_outline_depth: i32, max_outline_level: i32) -> pb:
             row_start: Some(pb::RowIndicatorConfig {
                 visible: Some(true),
                 width: Some(expander_width),
-                background: Some(0xFFFAFAF9),
-                foreground: Some(0xFF44403C),
-                grid_color: Some(0xFFD6D3D1),
                 auto_size: Some(false),
                 allow_resize: Some(true),
                 slots: vec![pb::RowIndicatorSlot {
@@ -2644,8 +2780,6 @@ fn hierarchy_theme_config(max_outline_depth: i32, max_outline_level: i32) -> pb:
             }),
             corner_top_start: Some(pb::CornerIndicatorConfig {
                 visible: Some(true),
-                background: Some(0xFFFAFAF9),
-                foreground: Some(0xFF44403C),
                 slots: vec![pb::CornerIndicatorSlot {
                     kind: Some(pb::CornerIndicatorSlotKind::CornerSlotOutlineLevels as i32),
                     width: Some(outline_width),
@@ -2656,12 +2790,11 @@ fn hierarchy_theme_config(max_outline_depth: i32, max_outline_level: i32) -> pb:
             }),
             col_top: Some(pb::ColIndicatorConfig {
                 visible: Some(true),
-                default_row_height: Some(28),
-                band_rows: Some(1),
-                mode_bits: Some(pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as u32),
-                background: Some(0xFFFAFAF9),
-                foreground: Some(0xFF1C1917),
-                grid_color: Some(0xFFD6D3D1),
+                default_row_height: Some(HIERARCHY_HEADER_ROW_HEIGHT),
+                band_rows: Some(HIERARCHY_HEADER_BAND_ROWS),
+                cell_modes: Some(pb::ColIndicatorCellModes {
+                    modes: vec![pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as i32],
+                }),
                 allow_resize: Some(true),
                 ..Default::default()
             }),
@@ -2687,67 +2820,70 @@ fn load_sales_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Result<()
         grid_id,
         vec![
             pb::ColumnDef {
-                index: 0,
-                width: Some(40),
+                index: SALES_QUARTER_COL,
+                width: Some(SALES_QUARTER_COL_WIDTH),
                 caption: Some("Q".to_string()),
                 key: Some("Q".to_string()),
                 align: Some(pb::Align::CenterCenter as i32),
                 ..Default::default()
             },
             pb::ColumnDef {
-                index: 1,
-                width: Some(80),
+                index: SALES_REGION_COL,
+                width: Some(SALES_REGION_COL_WIDTH),
                 caption: Some("Region".to_string()),
                 key: Some("Region".to_string()),
                 ..Default::default()
             },
             pb::ColumnDef {
-                index: 2,
-                width: Some(100),
+                index: SALES_CATEGORY_COL,
+                width: Some(SALES_CATEGORY_COL_WIDTH),
                 caption: Some("Category".to_string()),
                 key: Some("Category".to_string()),
                 ..Default::default()
             },
             pb::ColumnDef {
-                index: 3,
-                width: Some(120),
+                index: SALES_PRODUCT_COL,
+                width: Some(SALES_PRODUCT_COL_WIDTH),
                 caption: Some("Product".to_string()),
                 key: Some("Product".to_string()),
                 ..Default::default()
             },
             pb::ColumnDef {
-                index: 4,
-                width: Some(90),
+                index: SALES_AMOUNT_COL,
+                width: Some(SALES_MONEY_COL_WIDTH),
                 caption: Some("Sales".to_string()),
                 key: Some("Sales".to_string()),
                 align: Some(pb::Align::RightCenter as i32),
                 data_type: Some(pb::ColumnDataType::ColumnDataCurrency as i32),
-                format: Some("$#,##0".to_string()),
+                format: Some(SALES_CURRENCY_FORMAT.to_string()),
+                editor: Some(number_editor(0.0, None)),
                 ..Default::default()
             },
             pb::ColumnDef {
-                index: 5,
-                width: Some(90),
+                index: SALES_COST_COL,
+                width: Some(SALES_MONEY_COL_WIDTH),
                 caption: Some("Cost".to_string()),
                 key: Some("Cost".to_string()),
                 align: Some(pb::Align::RightCenter as i32),
                 data_type: Some(pb::ColumnDataType::ColumnDataCurrency as i32),
-                format: Some("$#,##0".to_string()),
+                format: Some(SALES_CURRENCY_FORMAT.to_string()),
+                editor: Some(number_editor(0.0, None)),
                 ..Default::default()
             },
             pb::ColumnDef {
-                index: 6,
-                width: Some(70),
+                index: SALES_MARGIN_COL,
+                width: Some(SALES_MARGIN_COL_WIDTH),
                 caption: Some("Margin%".to_string()),
                 key: Some("Margin".to_string()),
                 align: Some(pb::Align::CenterCenter as i32),
                 data_type: Some(pb::ColumnDataType::ColumnDataNumber as i32),
-                progress_color: Some(0xFF818CF8),
+                progress_color: Some(SALES_MARGIN_PROGRESS_COLOR),
+                editor: Some(number_editor(0.0, Some(SALES_MARGIN_MAX))),
                 ..Default::default()
             },
             pb::ColumnDef {
-                index: 7,
-                width: Some(56),
+                index: SALES_FLAG_COL,
+                width: Some(SALES_FLAG_COL_WIDTH),
                 caption: Some("Flag".to_string()),
                 key: Some("Flag".to_string()),
                 align: Some(pb::Align::CenterCenter as i32),
@@ -2755,16 +2891,16 @@ fn load_sales_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Result<()
                 ..Default::default()
             },
             pb::ColumnDef {
-                index: 8,
-                width: Some(80),
+                index: SALES_STATUS_COL,
+                width: Some(SALES_STATUS_COL_WIDTH),
                 caption: Some("Status".to_string()),
                 key: Some("Status".to_string()),
-                dropdown: Some(dropdown_from_labels(SALES_STATUS_ITEMS)),
+                editor: Some(dropdown_from_labels(SALES_STATUS_ITEMS)),
                 ..Default::default()
             },
             pb::ColumnDef {
-                index: 9,
-                width: Some(140),
+                index: SALES_NOTES_COL,
+                width: Some(SALES_NOTES_COL_WIDTH),
                 caption: Some("Notes".to_string()),
                 key: Some("Notes".to_string()),
                 ..Default::default()
@@ -2786,135 +2922,83 @@ fn load_sales_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Result<()
         grid_id,
         vec![
             pb::ColumnDef {
-                index: 7,
+                index: SALES_FLAG_COL,
                 align: Some(pb::Align::CenterCenter as i32),
                 data_type: Some(pb::ColumnDataType::ColumnDataBoolean as i32),
                 ..Default::default()
             },
             pb::ColumnDef {
-                index: 8,
-                dropdown: Some(dropdown_from_labels(SALES_STATUS_ITEMS)),
+                index: SALES_STATUS_COL,
+                editor: Some(dropdown_from_labels(SALES_STATUS_ITEMS)),
                 ..Default::default()
             },
         ],
     )?;
     client.configure(grid_id, sales_theme_config())?;
-
-    client.subtotal(grid_id, pb::AggregateType::AggClear, 0, 0, "", 0, 0, false)?;
-    apply_sales_subtotal_decorations(
-        client,
-        grid_id,
-        &client.subtotal(
-            grid_id,
-            pb::AggregateType::AggSum,
-            -1,
-            4,
-            "Grand Total",
-            0xFFEEF2FF,
-            0xFF111827,
-            true,
-        )?,
-    )?;
-    apply_sales_subtotal_decorations(
-        client,
-        grid_id,
-        &client.subtotal(
-            grid_id,
-            pb::AggregateType::AggSum,
-            0,
-            4,
-            "",
-            0xFFF5F3FF,
-            0xFF111827,
-            true,
-        )?,
-    )?;
-    apply_sales_subtotal_decorations(
-        client,
-        grid_id,
-        &client.subtotal(
-            grid_id,
-            pb::AggregateType::AggSum,
-            1,
-            4,
-            "",
-            0xFFF8F7FF,
-            0xFF111827,
-            true,
-        )?,
-    )?;
-    apply_sales_subtotal_decorations(
-        client,
-        grid_id,
-        &client.subtotal(
-            grid_id,
-            pb::AggregateType::AggSum,
-            -1,
-            5,
-            "Grand Total",
-            0xFFEEF2FF,
-            0xFF111827,
-            true,
-        )?,
-    )?;
-    apply_sales_subtotal_decorations(
-        client,
-        grid_id,
-        &client.subtotal(
-            grid_id,
-            pb::AggregateType::AggSum,
-            0,
-            5,
-            "",
-            0xFFF5F3FF,
-            0xFF111827,
-            true,
-        )?,
-    )?;
-    apply_sales_subtotal_decorations(
-        client,
-        grid_id,
-        &client.subtotal(
-            grid_id,
-            pb::AggregateType::AggSum,
-            1,
-            5,
-            "",
-            0xFFF8F7FF,
-            0xFF111827,
-            true,
-        )?,
-    )?;
+    add_sales_subtotals(client, grid_id)?;
     Ok(())
 }
 
-fn apply_sales_subtotal_decorations(
-    client: &VolvoxServiceClient,
-    grid_id: i64,
-    result: &pb::SubtotalResult,
-) -> Result<(), String> {
+fn add_sales_subtotals(client: &VolvoxServiceClient, grid_id: i64) -> Result<(), String> {
+    client.subtotal(
+        grid_id,
+        pb::AggregateType::AggClear,
+        SALES_QUARTER_COL,
+        SALES_AMOUNT_COL,
+        "",
+        0,
+        0,
+        false,
+    )?;
+    define_sales_merge_columns(client, grid_id)?;
+
+    for amount_col in SALES_SUBTOTAL_AMOUNT_COLS {
+        for level in SALES_SUBTOTAL_LEVELS {
+            let result = client.subtotal(
+                grid_id,
+                pb::AggregateType::AggSum,
+                level.group_col,
+                amount_col,
+                level.caption,
+                level.back_color,
+                SALES_SUBTOTAL_FORE_COLOR,
+                true,
+            )?;
+            merge_sales_subtotal_rows(client, grid_id, &result)?;
+        }
+    }
+    Ok(())
+}
+
+fn define_sales_merge_columns(client: &VolvoxServiceClient, grid_id: i64) -> Result<(), String> {
     client.define_columns(
         grid_id,
         vec![
             pb::ColumnDef {
-                index: 0,
+                index: SALES_QUARTER_COL,
                 span: Some(true),
                 ..Default::default()
             },
             pb::ColumnDef {
-                index: 1,
+                index: SALES_REGION_COL,
                 span: Some(true),
                 ..Default::default()
             },
         ],
-    )?;
+    )
+}
 
+fn merge_sales_subtotal_rows(
+    client: &VolvoxServiceClient,
+    grid_id: i64,
+    result: &pb::SubtotalResult,
+) -> Result<(), String> {
     let mut unique_rows = result.rows.clone();
     unique_rows.sort_unstable();
     unique_rows.dedup();
     for row in unique_rows {
         if client.get_node(grid_id, row)?.level <= 0 {
-            client.merge_cells(grid_id, row, 0, row, 1)?;
+            client.merge_cells(grid_id, row, SALES_QUARTER_COL, row, SALES_REGION_COL)?;
         }
     }
     Ok(())
@@ -2954,54 +3038,54 @@ fn load_hierarchy_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Resul
         vec![
             pb::ColumnDef {
                 index: HIERARCHY_NAME_COL,
-                width: Some(260),
+                width: Some(HIERARCHY_NAME_COL_WIDTH),
                 caption: Some("Name".to_string()),
                 key: Some("Name".to_string()),
                 hidden: Some(true),
                 ..Default::default()
             },
             pb::ColumnDef {
-                index: 1,
-                width: Some(80),
+                index: HIERARCHY_TYPE_COL,
+                width: Some(HIERARCHY_TYPE_COL_WIDTH),
                 caption: Some("Type".to_string()),
                 key: Some("Type".to_string()),
                 ..Default::default()
             },
             pb::ColumnDef {
-                index: 2,
-                width: Some(80),
+                index: HIERARCHY_SIZE_COL,
+                width: Some(HIERARCHY_SIZE_COL_WIDTH),
                 caption: Some("Size".to_string()),
                 key: Some("Size".to_string()),
                 align: Some(pb::Align::RightCenter as i32),
                 ..Default::default()
             },
             pb::ColumnDef {
-                index: 3,
-                width: Some(120),
+                index: HIERARCHY_MODIFIED_COL,
+                width: Some(HIERARCHY_MODIFIED_COL_WIDTH),
                 caption: Some("Modified".to_string()),
                 key: Some("Modified".to_string()),
                 data_type: Some(pb::ColumnDataType::ColumnDataDate as i32),
-                format: Some("short date".to_string()),
+                format: Some(HIERARCHY_SHORT_DATE_FORMAT.to_string()),
                 ..Default::default()
             },
             pb::ColumnDef {
-                index: 4,
-                width: Some(100),
+                index: HIERARCHY_PERMISSIONS_COL,
+                width: Some(HIERARCHY_PERMISSIONS_COL_WIDTH),
                 caption: Some("Permissions".to_string()),
                 key: Some("Permissions".to_string()),
                 align: Some(pb::Align::CenterCenter as i32),
                 ..Default::default()
             },
             pb::ColumnDef {
-                index: 5,
-                width: Some(180),
+                index: HIERARCHY_DETAILS_COL,
+                width: Some(HIERARCHY_DETAILS_COL_WIDTH),
                 caption: Some("Details".to_string()),
                 key: Some("Details".to_string()),
                 ..Default::default()
             },
             pb::ColumnDef {
-                index: 6,
-                width: Some(92),
+                index: HIERARCHY_ACTION_COL,
+                width: Some(HIERARCHY_ACTION_COL_WIDTH),
                 caption: Some("Action".to_string()),
                 key: Some("Action".to_string()),
                 align: Some(pb::Align::CenterCenter as i32),
@@ -3053,11 +3137,11 @@ fn load_hierarchy_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Resul
     )?;
 
     let action_style = pb::CellStyle {
-        foreground: Some(0xFF2563EB),
+        foreground: Some(HIERARCHY_ACTION_TEXT_COLOR),
         ..Default::default()
     };
     let folder_style = pb::CellStyle {
-        foreground: Some(0xFF92400E),
+        foreground: Some(HIERARCHY_FOLDER_TEXT_COLOR),
         font: Some(pb::Font {
             bold: Some(true),
             ..Default::default()
@@ -3068,14 +3152,14 @@ fn load_hierarchy_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Resul
     for (index, row) in rows.iter().enumerate() {
         cells.push(pb::CellUpdate {
             row: index as i32,
-            col: 5,
+            col: HIERARCHY_ACTION_COL,
             style: Some(action_style.clone()),
             ..Default::default()
         });
         if row.kind == "Folder" {
             cells.push(pb::CellUpdate {
                 row: index as i32,
-                col: 0,
+                col: HIERARCHY_NAME_COL,
                 style: Some(folder_style.clone()),
                 ..Default::default()
             });
@@ -3781,7 +3865,8 @@ fn handle_render_output(
                 };
                 area.set_cursor_from_name(name);
             }
-            pb::render_output::Event::EditRequest(_request) => {
+            pb::render_output::Event::EditorStarted(_)
+            | pb::render_output::Event::EditorUpdated(_) => {
                 // Don't show the host GtkEntry overlay. The engine renders the
                 // editor itself in the canvas and the IMContext on the drawing
                 // area handles text input (including CJK composition). Showing
@@ -3789,14 +3874,9 @@ fn handle_render_output(
                 // IME support.
                 state.engine_editing = true;
             }
-            pb::render_output::Event::DropdownRequest(request) => {
-                show_combo_overlay(
-                    state,
-                    edit_entry,
-                    dropdown_combo,
-                    dropdown_combo_editable,
-                    request,
-                )?;
+            pb::render_output::Event::EditorEnded(_) => {
+                state.engine_editing = false;
+                hide_host_editors(edit_entry, dropdown_combo, dropdown_combo_editable);
             }
             pb::render_output::Event::TooltipRequest(request) => {
                 area.set_tooltip_text(Some(&request.text));
@@ -4041,19 +4121,29 @@ fn show_edit_overlay(
     edit_entry: &Entry,
     dropdown_combo: &ComboBoxText,
     dropdown_combo_editable: &ComboBoxText,
-    request: &pb::EditRequest,
+    request: &pb::EditorSessionStarted,
 ) {
+    let session = match request.session.as_ref() {
+        Some(s) => s,
+        None => return,
+    };
+    let rect = session.viewport_rect.as_ref().cloned().unwrap_or_default();
+    let text = session
+        .value
+        .as_ref()
+        .and_then(|value| value.edit_text.clone())
+        .unwrap_or_default();
     hide_combo_overlay(dropdown_combo);
     hide_combo_overlay(dropdown_combo_editable);
     state.suppress_entry_changed = true;
-    state.edit_overlay_cell = Some((request.row, request.col));
-    edit_entry.set_text(&request.current_value);
-    edit_entry.set_position(request.current_value.chars().count() as i32);
-    edit_entry.set_max_length(request.max_length.max(0));
-    edit_entry.set_width_request(request.width.max(1.0).round() as i32);
-    edit_entry.set_height_request(request.height.max(1.0).round() as i32);
-    edit_entry.set_margin_start(request.x.max(0.0).round() as i32);
-    edit_entry.set_margin_top(request.y.max(0.0).round() as i32);
+    state.edit_overlay_cell = Some((session.row, session.col));
+    edit_entry.set_text(&text);
+    edit_entry.set_position(text.chars().count() as i32);
+    edit_entry.set_max_length(0);
+    edit_entry.set_width_request(rect.width.max(1.0).round() as i32);
+    edit_entry.set_height_request(rect.height.max(1.0).round() as i32);
+    edit_entry.set_margin_start(rect.x.max(0.0).round() as i32);
+    edit_entry.set_margin_top(rect.y.max(0.0).round() as i32);
     edit_entry.set_visible(true);
     edit_entry.grab_focus();
     state.suppress_entry_changed = false;
@@ -4087,7 +4177,7 @@ fn show_combo_overlay(
     edit_entry: &Entry,
     dropdown_combo: &ComboBoxText,
     dropdown_combo_editable: &ComboBoxText,
-    _request: &pb::DropdownRequest,
+    _request: &pb::EditorSessionStarted,
 ) -> Result<(), String> {
     // Let the engine render and handle the active dropdown list.
     hide_host_editors(edit_entry, dropdown_combo, dropdown_combo_editable);
@@ -4324,7 +4414,7 @@ fn is_hierarchy_action_text_click(state: &State, event: &pb::GridEvent) -> bool 
     match event.event.as_ref() {
         Some(pb::grid_event::Event::Click(click)) => {
             click.row >= 0
-                && click.col == 5
+                && click.col == HIERARCHY_ACTION_COL
                 && click.hit_area == pb::CellHitArea::HitText as i32
                 && click.interaction == pb::CellInteraction::TextLink as i32
         }
@@ -4383,6 +4473,114 @@ fn set_system_clipboard_text(text: &str) {
     }
 }
 
+fn set_status_note(state: &Rc<RefCell<State>>, status: &Label, note: impl Into<String>) {
+    let Ok(mut st) = state.try_borrow_mut() else {
+        return;
+    };
+    st.status_note = note.into();
+    update_status_label(&st, status);
+}
+
+fn is_clipboard_shortcut(key_code: i32, modifier: i32) -> bool {
+    let shortcut = (modifier & 2 != 0 || modifier & 8 != 0) && modifier & 4 == 0;
+    shortcut && matches!(key_code, 67 | 86 | 88)
+}
+
+fn is_clipboard_paste_shortcut(key_code: i32, modifier: i32) -> bool {
+    is_clipboard_shortcut(key_code, modifier) && key_code == 86
+}
+
+fn is_readonly_select_edit_state(state: &pb::EditState) -> bool {
+    if !state.active {
+        return false;
+    }
+    let Some(editor) = state
+        .session
+        .as_ref()
+        .and_then(|session| session.editor.as_ref())
+    else {
+        return false;
+    };
+    editor.kind == pb::EditorKind::EditorSelect as i32
+        || (editor.list.is_some()
+            && !editor
+                .list
+                .as_ref()
+                .is_some_and(|list| list.allow_custom_value)
+            && editor.kind != pb::EditorKind::EditorCombo as i32)
+}
+
+fn active_readonly_select_editor(state: &mut State) -> Result<bool, String> {
+    if !state.engine_editing {
+        return Ok(false);
+    }
+    Ok(is_readonly_select_edit_state(
+        &state.client.edit_state(state.grid_id)?,
+    ))
+}
+
+fn request_system_clipboard_paste(state: &Rc<RefCell<State>>, area: &DrawingArea, status: &Label) {
+    let Some(display) = gdk::Display::default() else {
+        set_status_note(state, status, "No display clipboard is available");
+        return;
+    };
+
+    let clipboard = display.clipboard();
+    let state = Rc::clone(state);
+    let area = area.clone();
+    let status = status.clone();
+    set_status_note(&state, &status, "Reading system clipboard...");
+
+    glib::MainContext::default().spawn_local(async move {
+        let clipboard_text = clipboard.read_text_future().await;
+        run_action(&state, &area, &status, move |st| {
+            let text = match clipboard_text {
+                Ok(Some(text)) => text.to_string(),
+                Ok(None) => return Ok("System clipboard has no text".to_string()),
+                Err(err) => return Err(format!("Read system clipboard failed: {err}")),
+            };
+            if text.is_empty() {
+                return Ok("System clipboard text is empty".to_string());
+            }
+
+            let char_count = text.chars().count();
+            st.clipboard_text = text.clone();
+            st.client.clipboard_paste(st.grid_id, text)?;
+            Ok(format!("Pasted {char_count} chars from system clipboard"))
+        });
+        area.queue_draw();
+    });
+}
+
+fn handle_clipboard_key_shortcut(
+    state: &mut State,
+    key_code: i32,
+    modifier: i32,
+) -> Result<Option<String>, String> {
+    if !is_clipboard_shortcut(key_code, modifier) {
+        return Ok(None);
+    }
+
+    match key_code {
+        67 => {
+            let resp = state.client.clipboard_copy(state.grid_id)?;
+            state.clipboard_text = resp.text.clone();
+            set_system_clipboard_text(&resp.text);
+            Ok(Some("Copied to clipboard".to_string()))
+        }
+        88 => {
+            if active_readonly_select_editor(state)? {
+                return Ok(Some("Select dropdown is read-only".to_string()));
+            }
+            let resp = state.client.clipboard_cut(state.grid_id)?;
+            state.clipboard_text = resp.text.clone();
+            set_system_clipboard_text(&resp.text);
+            Ok(Some("Cut to clipboard".to_string()))
+        }
+        _ => Ok(None),
+    }
+}
+
 fn truncated_text(text: &str, max_length: i32) -> String {
     if max_length <= 0 {
         return text.to_string();
@@ -4438,6 +4636,12 @@ fn gdk_modifier_to_flags(state: gdk::ModifierType) -> i32 {
     }
     if state.contains(gdk::ModifierType::ALT_MASK) {
         flags |= 4;
+    }
+    if state.contains(gdk::ModifierType::META_MASK)
+        || state.contains(gdk::ModifierType::SUPER_MASK)
+        || state.contains(gdk::ModifierType::HYPER_MASK)
+    {
+        flags |= 8;
     }
     flags
 }

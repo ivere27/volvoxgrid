@@ -1,7 +1,6 @@
 package io.github.ivere27.volvoxgrid.desktop;
 
 import io.github.ivere27.volvoxgrid.EditState;
-import io.github.ivere27.volvoxgrid.EditUiMode;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -518,7 +517,7 @@ public final class VolvoxGridDesktopTuiRunner {
         if (state == null || !state.getActive()) {
             return "Ready";
         }
-        return state.getUiMode() == EditUiMode.EDIT_UI_MODE_EDIT ? "Edit" : "Enter";
+        return "Edit";
     }
 
     private static RunOptions normalizeOptions(RunOptions options) {

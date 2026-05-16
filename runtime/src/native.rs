@@ -171,7 +171,9 @@ fn default_platform_text_renderer() -> Option<Box<dyn volvoxgrid_engine::text::T
 fn install_default_platform_text_renderer(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) {
     if let Some(renderer) = default_platform_text_renderer() {
         let cap = grid.text_layout_cache_cap;
+        let fallback_enabled = grid.font_fallback_enabled;
         let text_engine = grid.ensure_text_engine();
+        text_engine.set_font_fallback_enabled(fallback_enabled);
         text_engine.set_external_renderer(Some(renderer));
         text_engine.set_layout_cache_cap(cap);
     }
@@ -409,7 +411,7 @@ fn should_request_pointer_header_sort(
 fn handle_pointer_render_input(
     runtime: &VolvoxGridRuntime,
     stream: &dyn RuntimeStreamBidi<RenderInput, RenderOutput>,
-    sent_edit_requests: &mut HashMap<i64, SentEditRequest>,
+    sent_editor_session_starts: &mut HashMap<i64, SentEditorSessionStart>,
     grid_id: i64,
     pe: PointerEvent,
     terminal_session: Option<&mut terminal_tui::TerminalTuiSession>,
@@ -457,11 +459,6 @@ fn handle_pointer_render_input(
             let was_editing = grid.edit.is_active();
             let prev_edit_row = grid.edit.edit_row;
             let prev_edit_col = grid.edit.edit_col;
-            let prev_edit_selection = (
-                grid.edit.sel_start,
-                grid.edit.sel_length,
-                grid.edit.sel_caret,
-            );
             let prev_sel = (
                 grid.selection.row,
                 grid.selection.col,
@@ -643,10 +640,15 @@ fn handle_pointer_render_input(
                                         );
                                     }
 
-                                    let is_cell_like = hit.area
-                                        == volvoxgrid_engine::input::HitArea::Cell
-                                        || hit.area == volvoxgrid_engine::input::HitArea::FixedRow
-                                        || hit.area == volvoxgrid_engine::input::HitArea::FixedCol;
+                                    let is_cell_like = matches!(
+                                        hit.area,
+                                        volvoxgrid_engine::input::HitArea::Cell
+                                            | volvoxgrid_engine::input::HitArea::CellText
+                                            | volvoxgrid_engine::input::HitArea::CellPicture
+                                            | volvoxgrid_engine::input::HitArea::CellButtonPicture
+                                            | volvoxgrid_engine::input::HitArea::FixedRow
+                                            | volvoxgrid_engine::input::HitArea::FixedCol
+                                    );
                                     let combo_list = if is_cell_like {
                                         grid.active_dropdown_list(hit.row, hit.col)
                                     } else {
@@ -661,8 +663,15 @@ fn handle_pointer_render_input(
                                             && grid.edit.edit_col == hit.col)
                                         {
                                             let _ = runtime.request_before_edit(
-                                                grid_id, grid, hit.row, hit.col, false, true, None,
-                                                None, None,
+                                                grid_id,
+                                                grid,
+                                                hit.row,
+                                                hit.col,
+                                                false,
+                                                true,
+                                                None,
+                                                None,
+                                                EditStartReason::EditStartDropdownButton,
                                             );
                                         }
                                     } else if is_cell_like
@@ -689,7 +698,11 @@ fn handle_pointer_render_input(
                                             is_combo_cell,
                                             None,
                                             click_caret,
-                                            if pe.dbl_click { Some(true) } else { None },
+                                            if pe.dbl_click {
+                                                EditStartReason::EditStartDoubleClick
+                                            } else {
+                                                EditStartReason::EditStartDropdownButton
+                                            },
                                         );
                                     }
                                 }
@@ -757,15 +770,7 @@ fn handle_pointer_render_input(
                 let started_or_changed = !was_editing
                     || grid.edit.edit_row != prev_edit_row
                     || grid.edit.edit_col != prev_edit_col;
-                let edit_selection_changed = was_editing
-                    && grid.edit.edit_row == prev_edit_row
-                    && grid.edit.edit_col == prev_edit_col
-                    && (
-                        grid.edit.sel_start,
-                        grid.edit.sel_length,
-                        grid.edit.sel_caret,
-                    ) != prev_edit_selection;
-                if started_or_changed || prefer_combo || edit_selection_changed {
+                if started_or_changed || prefer_combo {
                     editor_output = maybe_render_editor_output(grid, prefer_combo);
                 }
             }
@@ -809,8 +814,23 @@ fn handle_pointer_render_input(
                 })),
             });
         }
+        let had_editor_output = editor_output.is_some();
         if let Some(output) = editor_output {
-            send_render_output_tracked(runtime, stream, sent_edit_requests, grid_id, output);
+            send_render_output_tracked(
+                runtime,
+                stream,
+                sent_editor_session_starts,
+                grid_id,
+                output,
+            );
+        }
+        if !had_editor_output {
+            maybe_send_refreshed_editor_session_start(
+                runtime,
+                stream,
+                sent_editor_session_starts,
+                grid_id,
+            );
         }
     }
 }
@@ -818,7 +838,7 @@ fn handle_pointer_render_input(
 fn handle_key_render_input(
     runtime: &VolvoxGridRuntime,
     stream: &dyn RuntimeStreamBidi<RenderInput, RenderOutput>,
-    sent_edit_requests: &mut HashMap<i64, SentEditRequest>,
+    sent_editor_session_starts: &mut HashMap<i64, SentEditorSessionStart>,
     grid_id: i64,
     ke: KeyEvent,
     emit_aux_outputs: bool,
@@ -857,10 +877,7 @@ fn handle_key_render_input(
         match terminal_policy {
             terminal_tui::TerminalKeyPolicyDecision::Consume => {}
             terminal_tui::TerminalKeyPolicyDecision::StartEdit { caret_end: _ } => {
-                // TUI: always start in Edit mode with select-all so the user
-                // can type to replace or press arrows to deselect and edit.
-                if !was_editing && !grid.host_key_dispatch && grid.edit_trigger_mode >= 1 {
-                    let caret_end = Some(true);
+                if !was_editing && grid.edit_trigger_mode >= 1 {
                     let (edit_row, edit_col) =
                         volvoxgrid_engine::input::selected_outline_label_edit_target(grid)
                             .unwrap_or((grid.selection.row, grid.selection.col));
@@ -877,7 +894,7 @@ fn handle_key_render_input(
                             false,
                             None,
                             None,
-                            caret_end,
+                            EditStartReason::EditStartEnterKey,
                         );
                         if grid.is_editing() {
                             grid.edit.select_all();
@@ -893,14 +910,11 @@ fn handle_key_render_input(
                             false,
                             true,
                             true,
+                            EditStartReason::EditStartEnterKey,
                             None,
-                            caret_end,
                             None,
                             None,
                         );
-                        if grid.is_editing() {
-                            grid.edit.select_all();
-                        }
                     }
                 }
             }
@@ -930,7 +944,6 @@ fn handle_key_render_input(
                     if decision_enabled {
                         let uses_outline_expander = (ke.key_code == 13 || ke.key_code == 32)
                             && !was_editing
-                            && !grid.host_key_dispatch
                             && volvoxgrid_engine::input::selected_outline_label_keyboard_target(
                                 grid,
                             )
@@ -957,7 +970,6 @@ fn handle_key_render_input(
                         let sel_col = grid.selection.col;
                         let queued_checkbox_toggle = !uses_outline_expander
                             && (ke.key_code == 13 || ke.key_code == 32)
-                            && !grid.host_key_dispatch
                             && !was_editing
                             && !grid.is_editing()
                             && runtime.request_before_checkbox_toggle(
@@ -966,7 +978,6 @@ fn handle_key_render_input(
                         if !uses_outline_expander
                             && !queued_checkbox_toggle
                             && (ke.key_code == 13 || ke.key_code == 113)
-                            && !grid.host_key_dispatch
                             && grid.edit_trigger_mode >= 1
                             && !was_editing
                         {
@@ -991,7 +1002,11 @@ fn handle_key_render_input(
                                     false,
                                     None,
                                     None,
-                                    if ke.key_code == 113 { Some(true) } else { None },
+                                    if ke.key_code == 113 {
+                                        EditStartReason::EditStartF2
+                                    } else {
+                                        EditStartReason::EditStartEnterKey
+                                    },
                                 );
                             }
                         }
@@ -1026,7 +1041,6 @@ fn handle_key_render_input(
                         }
                         if !outline_space
                             && !was_editing
-                            && !grid.host_key_dispatch
                             && grid.edit_trigger_mode >= 1
                             && grid.type_ahead_mode == 0
                         {
@@ -1050,7 +1064,7 @@ fn handle_key_render_input(
                                             false,
                                             Some(seed),
                                             None,
-                                            None,
+                                            EditStartReason::EditStartPrintableKey,
                                         );
                                     }
                                 }
@@ -1102,8 +1116,23 @@ fn handle_key_render_input(
                 ranges,
             })),
         });
+        let had_editor_output = editor_output.is_some();
         if let Some(output) = editor_output {
-            send_render_output_tracked(runtime, stream, sent_edit_requests, grid_id, output);
+            send_render_output_tracked(
+                runtime,
+                stream,
+                sent_editor_session_starts,
+                grid_id,
+                output,
+            );
+        }
+        if !had_editor_output {
+            maybe_send_refreshed_editor_session_start(
+                runtime,
+                stream,
+                sent_editor_session_starts,
+                grid_id,
+            );
         }
     }
 }
@@ -1111,6 +1140,7 @@ fn handle_key_render_input(
 fn handle_scroll_render_input(
     runtime: &VolvoxGridRuntime,
     stream: &dyn RuntimeStreamBidi<RenderInput, RenderOutput>,
+    sent_editor_session_starts: &mut HashMap<i64, SentEditorSessionStart>,
     grid_id: i64,
     se: ScrollEvent,
     emit_aux_outputs: bool,
@@ -1154,6 +1184,7 @@ fn handle_scroll_render_input(
             .flatten()
             .map(render_output::Event::TooltipRequest),
     });
+    maybe_send_refreshed_editor_session_start(runtime, stream, sent_editor_session_starts, grid_id);
 }
 
 struct VolvoxGridRuntime {
@@ -1302,16 +1333,7 @@ enum PendingAction {
         prefer_combo: bool,
         seed_text: Option<String>,
         click_caret: Option<i32>,
-        caret_end: Option<bool>,
-    },
-    BeforeDropdownOpen {
-        row: i32,
-        col: i32,
-        force: bool,
-        prefer_combo: bool,
-        seed_text: Option<String>,
-        click_caret: Option<i32>,
-        caret_end: Option<bool>,
+        reason: EditStartReason,
     },
     ValidateEdit {
         row: i32,
@@ -1907,10 +1929,9 @@ fn apply_zoom_scale(
 #[cfg(test)]
 mod tests {
     use super::{
-        apply_zoom_scale, capture_zoom_state, cell_screen_rect, ensure_layout,
-        should_request_pointer_header_sort, with_tui_pointer_geometry, RuntimeStream,
-        RuntimeStreamBidi, RuntimeStreamReceiver, RuntimeStreamSender, VolvoxGridRuntime,
-        VolvoxGridServiceRuntime,
+        apply_zoom_scale, capture_zoom_state, ensure_layout, should_request_pointer_header_sort,
+        with_tui_pointer_geometry, RuntimeStream, RuntimeStreamBidi, RuntimeStreamReceiver,
+        RuntimeStreamSender, VolvoxGridRuntime, VolvoxGridServiceRuntime,
     };
     use std::collections::{HashMap, HashSet};
     use std::sync::{
@@ -2134,12 +2155,12 @@ mod tests {
     fn pointer_render_input_emits_resize_cursor_change() {
         let (runtime, grid_id, border_x, _) = runtime_with_resize_grid();
         let stream = TestRenderStream::default();
-        let mut sent_edit_requests = HashMap::new();
+        let mut sent_editor_session_starts = HashMap::new();
 
         super::handle_pointer_render_input(
             &runtime,
             &stream,
-            &mut sent_edit_requests,
+            &mut sent_editor_session_starts,
             grid_id,
             pb::PointerEvent {
                 r#type: pb::pointer_event::Type::Move as i32,
@@ -2168,12 +2189,12 @@ mod tests {
     fn key_render_input_emits_default_cursor_when_escape_cancels_resize() {
         let (runtime, grid_id, border_x, start_width) = runtime_with_resize_grid();
         let stream = TestRenderStream::default();
-        let mut sent_edit_requests = HashMap::new();
+        let mut sent_editor_session_starts = HashMap::new();
 
         super::handle_pointer_render_input(
             &runtime,
             &stream,
-            &mut sent_edit_requests,
+            &mut sent_editor_session_starts,
             grid_id,
             pb::PointerEvent {
                 r#type: pb::pointer_event::Type::Down as i32,
@@ -2189,7 +2210,7 @@ mod tests {
         super::handle_pointer_render_input(
             &runtime,
             &stream,
-            &mut sent_edit_requests,
+            &mut sent_editor_session_starts,
             grid_id,
             pb::PointerEvent {
                 r#type: pb::pointer_event::Type::Move as i32,
@@ -2207,7 +2228,7 @@ mod tests {
         super::handle_key_render_input(
             &runtime,
             &stream,
-            &mut sent_edit_requests,
+            &mut sent_editor_session_starts,
             grid_id,
             pb::KeyEvent {
                 r#type: pb::key_event::Type::KeyDown as i32,
@@ -2233,6 +2254,137 @@ mod tests {
                 assert_eq!(grid.get_col_width(0), start_width);
             })
             .unwrap();
+
+        destroy_test_grid(&runtime, grid_id);
+    }
+
+    #[test]
+    fn refreshed_editor_session_reports_hidden_then_visible_geometry() {
+        let runtime = VolvoxGridRuntime::new();
+        let grid_id = runtime.manager().create_grid(160, 60, 20, 2, 1, 0, 1.0);
+        let stream = TestRenderStream::default();
+        let mut sent_editor_session_starts = HashMap::new();
+
+        runtime
+            .with_grid(grid_id, |grid| {
+                grid.edit_trigger_mode = 1;
+                grid.cells.set_text(1, 0, "edit me".to_string());
+                grid.begin_edit(1, 0, pb::EditStartReason::EditStartProgrammatic);
+                ensure_layout(grid);
+            })
+            .expect("grid exists");
+
+        super::maybe_send_refreshed_editor_session_start(
+            &runtime,
+            &stream,
+            &mut sent_editor_session_starts,
+            grid_id,
+        );
+        assert!(stream.take_outputs().iter().any(|output| matches!(
+            output.event,
+            Some(pb::render_output::Event::EditorStarted(_))
+        )));
+
+        runtime
+            .with_grid(grid_id, |grid| {
+                grid.set_top_row(10);
+                ensure_layout(grid);
+            })
+            .expect("grid exists");
+        super::maybe_send_refreshed_editor_session_start(
+            &runtime,
+            &stream,
+            &mut sent_editor_session_starts,
+            grid_id,
+        );
+        assert!(stream.take_outputs().iter().any(|output| matches!(
+            output.event.as_ref(),
+            Some(pb::render_output::Event::EditorUpdated(update))
+                if update.visible == Some(false)
+        )));
+
+        runtime
+            .with_grid(grid_id, |grid| {
+                grid.set_top_row(1);
+                ensure_layout(grid);
+            })
+            .expect("grid exists");
+        super::maybe_send_refreshed_editor_session_start(
+            &runtime,
+            &stream,
+            &mut sent_editor_session_starts,
+            grid_id,
+        );
+        assert!(stream.take_outputs().iter().any(|output| matches!(
+            output.event.as_ref(),
+            Some(pb::render_output::Event::EditorUpdated(update))
+                if update.visible == Some(true)
+        )));
+
+        destroy_test_grid(&runtime, grid_id);
+    }
+
+    #[test]
+    fn refreshed_editor_session_reports_state_update_without_restarting() {
+        let runtime = VolvoxGridRuntime::new();
+        let grid_id = runtime.manager().create_grid(160, 60, 3, 2, 1, 0, 1.0);
+        let stream = TestRenderStream::default();
+        let mut sent_editor_session_starts = HashMap::new();
+
+        runtime
+            .with_grid(grid_id, |grid| {
+                grid.edit_trigger_mode = 1;
+                grid.cells.set_text(1, 0, "edit me".to_string());
+                grid.begin_edit(1, 0, pb::EditStartReason::EditStartProgrammatic);
+                ensure_layout(grid);
+            })
+            .expect("grid exists");
+
+        super::maybe_send_refreshed_editor_session_start(
+            &runtime,
+            &stream,
+            &mut sent_editor_session_starts,
+            grid_id,
+        );
+        assert!(stream.take_outputs().iter().any(|output| matches!(
+            output.event,
+            Some(pb::render_output::Event::EditorStarted(_))
+        )));
+
+        runtime
+            .with_grid(grid_id, |grid| {
+                grid.edit.update_text("edited".to_string());
+                grid.edit.set_sel_start(6);
+                grid.edit.set_sel_length(0);
+                ensure_layout(grid);
+            })
+            .expect("grid exists");
+
+        super::maybe_send_refreshed_editor_session_start(
+            &runtime,
+            &stream,
+            &mut sent_editor_session_starts,
+            grid_id,
+        );
+        let outputs = stream.take_outputs();
+        assert!(
+            !outputs.iter().any(|output| matches!(
+                output.event,
+                Some(pb::render_output::Event::EditorStarted(_))
+            )),
+            "same-session state changes must not restart the editor"
+        );
+        assert!(outputs.iter().any(|output| matches!(
+            output.event.as_ref(),
+            Some(pb::render_output::Event::EditorUpdated(update))
+                if update
+                    .value
+                    .as_ref()
+                    .map(crate::shared::editor_value_to_text)
+                    .as_deref()
+                    == Some("edited")
+                    && update.selection.as_ref().map(|s| (s.start, s.length)) == Some((6, 0))
+        )));
 
         destroy_test_grid(&runtime, grid_id);
     }
@@ -2842,11 +2994,11 @@ mod tests {
             .unwrap();
 
         let stream = TestRenderStream::default();
-        let mut sent_edit_requests = HashMap::new();
+        let mut sent_editor_session_starts = HashMap::new();
         super::handle_key_render_input(
             &runtime,
             &stream,
-            &mut sent_edit_requests,
+            &mut sent_editor_session_starts,
             grid_id,
             pb::KeyEvent {
                 r#type: pb::key_event::Type::KeyDown as i32,
@@ -2898,8 +3050,17 @@ mod tests {
             &runtime,
             grid_id,
             |runtime, grid_id, grid| {
-                let _ =
-                    runtime.request_before_edit(grid_id, grid, 1, 0, true, false, None, None, None);
+                let _ = runtime.request_before_edit(
+                    grid_id,
+                    grid,
+                    1,
+                    0,
+                    true,
+                    false,
+                    None,
+                    None,
+                    pb::EditStartReason::EditStartUnspecified,
+                );
             },
             |event| matches!(event, GridEventData::BeforeEdit { row: 1, col: 0 }),
         );
@@ -2912,8 +3073,17 @@ mod tests {
             &runtime,
             grid_id,
             |runtime, grid_id, grid| {
-                let _ =
-                    runtime.request_before_edit(grid_id, grid, 1, 0, true, false, None, None, None);
+                let _ = runtime.request_before_edit(
+                    grid_id,
+                    grid,
+                    1,
+                    0,
+                    true,
+                    false,
+                    None,
+                    None,
+                    pb::EditStartReason::EditStartUnspecified,
+                );
             },
             |event| matches!(event, GridEventData::BeforeEdit { row: 1, col: 0 }),
         );
@@ -2927,6 +3097,210 @@ mod tests {
             .unwrap();
 
         destroy_test_grid(&runtime, grid_id);
+    }
+
+    #[test]
+    fn event_decision_allows_dropdown_edit_without_extra_pending_action() {
+        let (runtime, grid_id) = runtime_with_decision_grid(3, 2);
+
+        let event_id = request_pending_event_id(
+            &runtime,
+            grid_id,
+            |runtime, grid_id, grid| {
+                grid.edit_trigger_mode = 1;
+                grid.columns[0].dropdown_items = "Alpha|Beta".to_string();
+                let _ = runtime.request_before_edit(
+                    grid_id,
+                    grid,
+                    1,
+                    0,
+                    true,
+                    false,
+                    None,
+                    None,
+                    pb::EditStartReason::EditStartUnspecified,
+                );
+            },
+            |event| matches!(event, GridEventData::BeforeEdit { row: 1, col: 0 }),
+        );
+
+        let _ = runtime.resolve_event_decision(grid_id, event_id, false);
+        runtime
+            .with_grid(grid_id, |grid| {
+                assert!(grid.edit.is_active());
+                assert_eq!(grid.edit.edit_row, 1);
+                assert_eq!(grid.edit.edit_col, 0);
+                assert_eq!(grid.edit.dropdown_count(), 2);
+                let events = grid.events.drain();
+                assert!(events
+                    .iter()
+                    .any(|event| matches!(event.data, GridEventData::DropdownOpened)));
+            })
+            .unwrap();
+        assert!(
+            runtime.pending_actions.lock().unwrap().is_empty(),
+            "dropdown edit must not wait on a removed BeforeDropdownOpen decision"
+        );
+
+        destroy_test_grid(&runtime, grid_id);
+    }
+
+    #[test]
+    fn service_begin_edit_marks_grid_dirty() {
+        let runtime = VolvoxGridRuntime::new();
+        let grid_id = runtime.manager().create_grid(320, 160, 3, 2, 1, 0, 1.0);
+
+        runtime
+            .with_grid(grid_id, |grid| {
+                grid.edit_trigger_mode = 1;
+                grid.columns[0].dropdown_items = "Alpha|Beta".to_string();
+                grid.clear_dirty();
+
+                let _ = runtime.request_before_edit(
+                    grid_id,
+                    grid,
+                    1,
+                    0,
+                    true,
+                    false,
+                    None,
+                    None,
+                    pb::EditStartReason::EditStartPrintableKey,
+                );
+
+                assert!(grid.edit.is_active());
+                assert!(grid.dirty);
+            })
+            .unwrap();
+
+        destroy_test_grid(&runtime, grid_id);
+    }
+
+    #[test]
+    fn stale_edit_validation_response_is_ignored() {
+        let mut grid = VolvoxGrid::new(1, 320, 160, 3, 2, 1, 0);
+        grid.edit_trigger_mode = 1;
+        grid.default_editor = Some(pb::EditorSpec {
+            kind: pb::EditorKind::EditorText as i32,
+            owner: pb::EditorOwner::Engine as i32,
+            presentation: pb::EditorPresentation::EditorInline as i32,
+            validation_mode: pb::ValidationMode::ValidationBlock as i32,
+            validation_trigger: pb::ValidationTrigger::OnChange as i32,
+            text: Some(pb::TextEditorParams {
+                max_length: 100,
+                ..Default::default()
+            }),
+            ..Default::default()
+        });
+        grid.begin_edit(1, 0, pb::EditStartReason::EditStartProgrammatic);
+        grid.events.drain();
+        assert!(grid.edit.is_active());
+        let session_id = grid.edit.session_serial as i64;
+
+        assert!(crate::shared::queue_active_edit_validation_request(
+            &mut grid, 10
+        ));
+        assert!(crate::shared::queue_active_edit_validation_request(
+            &mut grid, 11
+        ));
+
+        assert!(!crate::shared::apply_edit_validation_response(
+            &mut grid,
+            pb::EditValidationResponse {
+                request_id: 10,
+                session_id,
+                normalized_value: Some(crate::shared::editor_value_from_text("stale".to_string())),
+                ..Default::default()
+            }
+        ));
+        assert_ne!(grid.edit.edit_text, "stale");
+
+        assert!(crate::shared::apply_edit_validation_response(
+            &mut grid,
+            pb::EditValidationResponse {
+                request_id: 11,
+                session_id,
+                normalized_value: Some(crate::shared::editor_value_from_text("fresh".to_string())),
+                ..Default::default()
+            }
+        ));
+        assert_eq!(grid.edit.edit_text, "fresh");
+    }
+
+    #[test]
+    fn stale_editor_list_items_response_is_ignored() {
+        let mut grid = VolvoxGrid::new(1, 320, 160, 3, 2, 1, 0);
+        grid.edit_trigger_mode = 1;
+        grid.columns[0].editor = Some(pb::EditorSpec {
+            kind: pb::EditorKind::EditorSelect as i32,
+            owner: pb::EditorOwner::Engine as i32,
+            presentation: pb::EditorPresentation::EditorInline as i32,
+            list: Some(pb::ListEditorParams {
+                data_source: Some(pb::ListDataSource {
+                    data_source_id: "remote-list".to_string(),
+                    filterable: true,
+                    pageable: true,
+                    page_size: 25,
+                }),
+                searchable: true,
+                item_layout: pb::DropdownItemLayout::DropdownItemAuto as i32,
+                ..Default::default()
+            }),
+            ..Default::default()
+        });
+        grid.begin_edit(1, 0, pb::EditStartReason::EditStartProgrammatic);
+        grid.events.drain();
+        assert!(grid.edit.is_active());
+        let session_id = grid.edit.session_serial as i64;
+
+        assert!(crate::shared::queue_active_editor_list_items_request(
+            &mut grid,
+            20,
+            Some("a".to_string()),
+            0,
+        ));
+        assert!(crate::shared::queue_active_editor_list_items_request(
+            &mut grid,
+            21,
+            Some("b".to_string()),
+            0,
+        ));
+
+        assert!(!crate::shared::apply_editor_list_items_response(
+            &mut grid,
+            pb::EditorListItemsResponse {
+                request_id: 20,
+                session_id,
+                items: vec![pb::ListItem {
+                    value: Some(pb::CellValue {
+                        value: Some(pb::cell_value::Value::Text("old".to_string())),
+                    }),
+                    label: "Old".to_string(),
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }
+        ));
+        assert_eq!(grid.edit.dropdown_count(), 0);
+
+        assert!(crate::shared::apply_editor_list_items_response(
+            &mut grid,
+            pb::EditorListItemsResponse {
+                request_id: 21,
+                session_id,
+                items: vec![pb::ListItem {
+                    value: Some(pb::CellValue {
+                        value: Some(pb::cell_value::Value::Text("new".to_string())),
+                    }),
+                    label: "New".to_string(),
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }
+        ));
+        assert_eq!(grid.edit.dropdown_count(), 1);
+        assert_eq!(grid.edit.get_dropdown_item(0), "New");
+        assert_eq!(grid.edit.get_dropdown_data(0), "new");
     }
 
     #[test]
@@ -3014,7 +3388,7 @@ mod tests {
                 configure_checkbox_cell(grid, 1, 0, false);
                 grid.columns[0].alignment = pb::Align::CenterCenter as i32;
                 ensure_layout(grid);
-                let (x, y, w, h) = cell_screen_rect(grid, 1, 0).expect("cell rect");
+                let (x, y, w, h) = grid.cell_screen_rect(1, 0).expect("cell rect");
                 let click_x = x as f32 + w as f32 * 0.5;
                 let click_y = y as f32 + h as f32 * 0.5;
                 assert_eq!(
@@ -3054,8 +3428,17 @@ mod tests {
             &runtime,
             grid_id,
             |runtime, grid_id, grid| {
-                let _ =
-                    runtime.request_before_edit(grid_id, grid, 1, 0, true, false, None, None, None);
+                let _ = runtime.request_before_edit(
+                    grid_id,
+                    grid,
+                    1,
+                    0,
+                    true,
+                    false,
+                    None,
+                    None,
+                    pb::EditStartReason::EditStartUnspecified,
+                );
             },
             |event| matches!(event, GridEventData::BeforeEdit { row: 1, col: 0 }),
         );
@@ -3096,8 +3479,17 @@ mod tests {
             &runtime,
             grid_id,
             |runtime, grid_id, grid| {
-                let _ =
-                    runtime.request_before_edit(grid_id, grid, 1, 0, true, false, None, None, None);
+                let _ = runtime.request_before_edit(
+                    grid_id,
+                    grid,
+                    1,
+                    0,
+                    true,
+                    false,
+                    None,
+                    None,
+                    pb::EditStartReason::EditStartUnspecified,
+                );
             },
             |event| matches!(event, GridEventData::BeforeEdit { row: 1, col: 0 }),
         );
@@ -3533,50 +3925,83 @@ fn engine_event_to_proto(
                 text,
             }))
         }
-        E::KeyDownEdit { key_code, modifier } => {
-            Some(grid_event::Event::KeyDownEdit(KeyDownEditEvent {
-                key_code,
-                modifier,
-            }))
-        }
-        E::KeyPressEdit { key_ascii } => Some(grid_event::Event::KeyPressEdit(KeyPressEditEvent {
-            key_ascii,
-        })),
-        E::KeyUpEdit { key_code, modifier } => Some(grid_event::Event::KeyUpEdit(KeyUpEditEvent {
+        E::KeyDownEdit {
+            session_id,
+            key_code,
+            modifier,
+        } => Some(grid_event::Event::KeyDownEdit(KeyDownEditEvent {
+            session_id,
             key_code,
             modifier,
         })),
-        E::CellEditConfigureStyle { row, col } => Some(grid_event::Event::CellEditConfigureStyle(
-            CellEditConfigureStyleEvent { row, col },
-        )),
-        E::CellEditConfigureWindow { row, col } => Some(
-            grid_event::Event::CellEditConfigureWindow(CellEditConfigureWindowEvent { row, col }),
-        ),
-        E::BeforeDropdownOpen {
+        E::KeyPressEdit {
+            session_id,
+            key_ascii,
+        } => Some(grid_event::Event::KeyPressEdit(KeyPressEditEvent {
+            session_id,
+            key_ascii,
+        })),
+        E::KeyUpEdit {
+            session_id,
+            key_code,
+            modifier,
+        } => Some(grid_event::Event::KeyUpEdit(KeyUpEditEvent {
+            session_id,
+            key_code,
+            modifier,
+        })),
+        E::EditValidationRequest {
+            request_id,
+            session_id,
             row,
             col,
-            x,
-            y,
-            width,
-            height,
-            dropdown,
-            current_value,
-            selected_index,
-        } => Some(grid_event::Event::BeforeDropdownOpen(
-            BeforeDropdownOpenEvent {
+            value,
+        } => Some(grid_event::Event::EditValidationRequest(
+            EditValidationRequest {
+                request_id,
+                session_id,
                 row,
                 col,
-                x,
-                y,
-                width,
-                height,
-                dropdown: Some(dropdown),
-                current_value,
-                selected_index,
+                value: Some(value),
             },
         )),
-        E::DropdownClosed => Some(grid_event::Event::DropdownClosed(DropdownClosedEvent {})),
-        E::DropdownOpened => Some(grid_event::Event::DropdownOpened(DropdownOpenedEvent {})),
+        E::EditorListItemsRequest {
+            request_id,
+            session_id,
+            data_source_id,
+            filter_text,
+            offset,
+            limit,
+        } => Some(grid_event::Event::EditorListItemsRequest(
+            EditorListItemsRequest {
+                request_id,
+                session_id,
+                data_source_id,
+                filter_text,
+                offset,
+                limit,
+            },
+        )),
+        E::CellEditConfigureStyle { .. }
+        | E::CellEditConfigureWindow { .. }
+        | E::BeforeDropdownOpen { .. }
+        | E::DropdownClosed
+        | E::DropdownOpened => None,
+        E::CustomEditorAction {
+            session_id,
+            row,
+            col,
+            action_id,
+            payload,
+        } => Some(grid_event::Event::CustomEditorAction(
+            CustomEditorActionEvent {
+                session_id,
+                row,
+                col,
+                action_id,
+                payload,
+            },
+        )),
         E::CellChanged {
             row,
             col,
@@ -3873,89 +4298,13 @@ fn engine_event_to_proto(
 // Edit session helpers
 // ---------------------------------------------------------------------------
 
-fn cell_screen_rect(
-    grid: &volvoxgrid_engine::grid::VolvoxGrid,
-    row: i32,
-    col: i32,
-) -> Option<(i32, i32, i32, i32)> {
-    grid.cell_screen_rect(row, col)
-}
-
-fn effective_edit_mask(grid: &volvoxgrid_engine::grid::VolvoxGrid, col: i32) -> String {
-    if col >= 0 && (col as usize) < grid.columns.len() {
-        let mask = &grid.columns[col as usize].edit_mask;
-        if !mask.is_empty() {
-            return mask.clone();
-        }
-    }
-    grid.edit_mask.clone()
-}
-
-fn build_edit_request(
-    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
-    row: i32,
-    col: i32,
-) -> Option<EditRequest> {
-    let (x, y, w, h) = grid.cell_screen_rect(row, col)?;
-    let (current_value, sel_start, sel_length, ui_mode) =
-        if grid.edit.is_active() && grid.edit.edit_row == row && grid.edit.edit_col == col {
-            (
-                grid.edit.edit_text.clone(),
-                grid.edit.sel_start,
-                grid.edit.sel_length,
-                match grid.edit.ui_mode {
-                    volvoxgrid_engine::edit::EditUiMode::EnterMode => EditUiMode::Enter as i32,
-                    volvoxgrid_engine::edit::EditUiMode::EditMode => EditUiMode::Edit as i32,
-                },
-            )
-        } else {
-            let current_value = grid.get_display_text(row, col);
-            let current_len = current_value.chars().count() as i32;
-            (current_value, 0, current_len, EditUiMode::Enter as i32)
-        };
-    Some(EditRequest {
-        row,
-        col,
-        x: x as f32,
-        y: y as f32,
-        width: w as f32,
-        height: h as f32,
-        current_value,
-        edit_mask: effective_edit_mask(grid, col),
-        max_length: grid.edit_max_length,
-        sel_start,
-        sel_length,
-        ui_mode,
-    })
-}
-
-fn build_combo_request(
-    grid: &volvoxgrid_engine::grid::VolvoxGrid,
-    row: i32,
-    col: i32,
-) -> Option<DropdownRequest> {
-    let (x, y, w, h) = cell_screen_rect(grid, row, col)?;
-    let mut items = Vec::new();
-    let count = grid.edit.dropdown_count();
-    for i in 0..count {
-        items.push(grid.edit.get_dropdown_item(i).to_string());
-    }
-    Some(DropdownRequest {
-        row,
-        col,
-        x: x as f32,
-        y: y as f32,
-        width: w as f32,
-        height: h as f32,
-        items,
-        selected: grid.edit.dropdown_index.max(-1),
-        editable: grid.edit.dropdown_editable,
-    })
+fn editor_value_to_text(value: &EditorValue) -> String {
+    shared::editor_value_to_text(value)
 }
 
 fn maybe_render_editor_output(
     grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
-    prefer_combo: bool,
+    _prefer_combo: bool,
 ) -> Option<RenderOutput> {
     if !grid.edit.is_active() {
         return None;
@@ -3965,48 +4314,60 @@ fn maybe_render_editor_output(
     if row < 0 || col < 0 {
         return None;
     }
-    let wants_combo_request =
-        grid.edit.dropdown_count() > 0 && (prefer_combo || !grid.edit.dropdown_editable);
-    if wants_combo_request {
-        if let Some(req) = build_combo_request(grid, row, col) {
-            return Some(RenderOutput {
-                rendered: false,
-                event: Some(render_output::Event::DropdownRequest(req)),
-            });
-        }
-    }
-    build_edit_request(grid, row, col).map(|req| RenderOutput {
+    shared::build_editor_started(grid, row, col).map(|req| RenderOutput {
         rendered: false,
-        event: Some(render_output::Event::EditRequest(req)),
+        event: Some(render_output::Event::EditorStarted(req)),
     })
 }
 
-fn same_edit_request_geometry(lhs: &EditRequest, rhs: &EditRequest) -> bool {
-    lhs.row == rhs.row
-        && lhs.col == rhs.col
-        && lhs.ui_mode == rhs.ui_mode
-        && lhs.x.to_bits() == rhs.x.to_bits()
-        && lhs.y.to_bits() == rhs.y.to_bits()
-        && lhs.width.to_bits() == rhs.width.to_bits()
-        && lhs.height.to_bits() == rhs.height.to_bits()
+fn same_editor_session_start_geometry(
+    lhs: &EditorSessionStarted,
+    rhs: &EditorSessionStarted,
+) -> bool {
+    let (Some(l), Some(r)) = (lhs.session.as_ref(), rhs.session.as_ref()) else {
+        return lhs.session.is_none() && rhs.session.is_none();
+    };
+    let lhs_rect = l.viewport_rect.as_ref();
+    let rhs_rect = r.viewport_rect.as_ref();
+    l.row == r.row
+        && l.col == r.col
+        && l.session_id == r.session_id
+        && lhs_rect.map(|r| {
+            (
+                r.x.to_bits(),
+                r.y.to_bits(),
+                r.width.to_bits(),
+                r.height.to_bits(),
+            )
+        }) == rhs_rect.map(|r| {
+            (
+                r.x.to_bits(),
+                r.y.to_bits(),
+                r.width.to_bits(),
+                r.height.to_bits(),
+            )
+        })
 }
 
 #[derive(Clone)]
-struct SentEditRequest {
-    request: EditRequest,
+struct SentEditorSessionStart {
+    request: EditorSessionStarted,
     session_serial: u64,
+    visible: bool,
 }
 
 fn current_edit_session_serial(
     runtime: &VolvoxGridRuntime,
     grid_id: i64,
-    req: &EditRequest,
+    req: &EditorSessionStarted,
 ) -> Option<u64> {
+    let session = req.session.as_ref()?;
     runtime
         .with_grid(grid_id, |grid| {
             if grid.edit.is_active()
-                && grid.edit.edit_row == req.row
-                && grid.edit.edit_col == req.col
+                && grid.edit.edit_row == session.row
+                && grid.edit.edit_col == session.col
+                && grid.edit.session_serial as i64 == session.session_id
             {
                 Some(grid.edit.session_serial)
             } else {
@@ -4017,73 +4378,183 @@ fn current_edit_session_serial(
         .flatten()
 }
 
-fn track_sent_edit_request(
+fn track_sent_editor_session_start(
     runtime: &VolvoxGridRuntime,
-    sent_edit_requests: &mut HashMap<i64, SentEditRequest>,
+    sent_editor_session_starts: &mut HashMap<i64, SentEditorSessionStart>,
     grid_id: i64,
     output: &RenderOutput,
 ) {
-    if let Some(render_output::Event::EditRequest(req)) = output.event.as_ref() {
+    if let Some(render_output::Event::EditorStarted(req)) = output.event.as_ref() {
         let session_serial = current_edit_session_serial(runtime, grid_id, req).unwrap_or(0);
-        sent_edit_requests.insert(
+        sent_editor_session_starts.insert(
             grid_id,
-            SentEditRequest {
+            SentEditorSessionStart {
                 request: req.clone(),
                 session_serial,
+                visible: true,
             },
         );
+    }
+}
+
+fn track_sent_editor_session_update(
+    sent_editor_session_starts: &mut HashMap<i64, SentEditorSessionStart>,
+    grid_id: i64,
+    output: &RenderOutput,
+) {
+    let Some(render_output::Event::EditorUpdated(update)) = output.event.as_ref() else {
+        return;
+    };
+    let Some(entry) = sent_editor_session_starts.get_mut(&grid_id) else {
+        return;
+    };
+    let Some(session) = entry.request.session.as_mut() else {
+        return;
+    };
+    if session.session_id != update.session_id {
+        return;
+    }
+
+    entry.visible = update.visible.unwrap_or(entry.visible);
+    session.state_version = update.state_version;
+    if let Some(viewport_rect) = update.viewport_rect.clone() {
+        session.viewport_rect = Some(viewport_rect);
+    }
+    if let Some(value) = update.value.clone() {
+        session.value = Some(value);
+    }
+    if let Some(selection) = update.selection.clone() {
+        session.selection = Some(selection);
+    }
+    if update.reason != EditorUpdateReason::EditorUpdateGeometry as i32
+        || !update.validation_errors.is_empty()
+    {
+        session.validation_errors = update.validation_errors.clone();
     }
 }
 
 fn send_render_output_tracked(
     runtime: &VolvoxGridRuntime,
     stream: &dyn RuntimeStreamBidi<RenderInput, RenderOutput>,
-    sent_edit_requests: &mut HashMap<i64, SentEditRequest>,
+    sent_editor_session_starts: &mut HashMap<i64, SentEditorSessionStart>,
     grid_id: i64,
     output: RenderOutput,
 ) {
-    track_sent_edit_request(runtime, sent_edit_requests, grid_id, &output);
+    track_sent_editor_session_start(runtime, sent_editor_session_starts, grid_id, &output);
+    track_sent_editor_session_update(sent_editor_session_starts, grid_id, &output);
     stream.send(output);
 }
 
-fn maybe_send_refreshed_edit_request(
+fn maybe_send_refreshed_editor_session_start(
     runtime: &VolvoxGridRuntime,
     stream: &dyn RuntimeStreamBidi<RenderInput, RenderOutput>,
-    sent_edit_requests: &mut HashMap<i64, SentEditRequest>,
+    sent_editor_session_starts: &mut HashMap<i64, SentEditorSessionStart>,
     grid_id: i64,
 ) {
-    let output = runtime
+    let previous = sent_editor_session_starts.get(&grid_id).cloned();
+    let snapshot = runtime
         .with_grid(grid_id, |grid| {
             if !grid.layout.valid {
                 ensure_layout(grid);
             }
-            maybe_render_editor_output(grid, false)
+            let active_session_id = grid
+                .edit
+                .is_active()
+                .then_some(grid.edit.session_serial as i64);
+            let prev_session_id =
+                |prev: &SentEditorSessionStart| prev.request.session.as_ref().map(|s| s.session_id);
+            let ended = previous
+                .as_ref()
+                .filter(|prev| active_session_id != prev_session_id(prev))
+                .map(|prev| shared::build_editor_ended(grid, &prev.request));
+            let started = maybe_render_editor_output(grid, false);
+            let hidden_update = previous
+                .as_ref()
+                .filter(|prev| active_session_id == prev_session_id(prev))
+                .filter(|_| started.is_none())
+                .map(|prev| {
+                    shared::build_editor_updated_geometry(
+                        &prev.request,
+                        None,
+                        false,
+                        grid.edit.state_version,
+                    )
+                });
+            (active_session_id, ended, started, hidden_update)
         })
-        .ok()
-        .flatten();
+        .ok();
 
-    let Some(output) = output else {
-        sent_edit_requests.remove(&grid_id);
+    let Some((active_session_id, ended, output, hidden_update)) = snapshot else {
+        sent_editor_session_starts.remove(&grid_id);
         return;
     };
-    let Some(render_output::Event::EditRequest(req)) = output.event.as_ref() else {
+
+    if let Some(ended) = ended {
+        stream.send(ended);
+        sent_editor_session_starts.remove(&grid_id);
+    }
+
+    if active_session_id.is_none() {
+        return;
+    }
+
+    let Some(output) = output else {
+        if let Some(hidden_update) = hidden_update {
+            if let Some(prev) = sent_editor_session_starts.get_mut(&grid_id) {
+                if !prev.visible {
+                    return;
+                }
+                prev.visible = false;
+            }
+            stream.send(hidden_update);
+        }
+        return;
+    };
+
+    let Some(render_output::Event::EditorStarted(req)) = output.event.as_ref() else {
         return;
     };
 
     let current_session_serial = current_edit_session_serial(runtime, grid_id, req).unwrap_or(0);
-    let should_send = sent_edit_requests.get(&grid_id).map_or(true, |prev| {
-        prev.session_serial != current_session_serial
-            || !same_edit_request_geometry(&prev.request, req)
-    });
-    if should_send {
-        sent_edit_requests.insert(
+    let previous = sent_editor_session_starts.get(&grid_id).cloned();
+    let should_start = previous
+        .as_ref()
+        .map_or(true, |prev| prev.session_serial != current_session_serial);
+    if should_start {
+        sent_editor_session_starts.insert(
             grid_id,
-            SentEditRequest {
+            SentEditorSessionStart {
                 request: req.clone(),
                 session_serial: current_session_serial,
+                visible: true,
             },
         );
         stream.send(output);
+    } else if let Some(prev) = previous {
+        let prev_ver = prev.request.session.as_ref().map(|s| s.state_version);
+        let cur_ver = req.session.as_ref().map(|s| s.state_version);
+        let geometry_changed = !same_editor_session_start_geometry(&prev.request, req);
+        let state_changed = prev_ver != cur_ver;
+        let changed = !prev.visible || state_changed || geometry_changed;
+        if changed {
+            sent_editor_session_starts.insert(
+                grid_id,
+                SentEditorSessionStart {
+                    request: req.clone(),
+                    session_serial: current_session_serial,
+                    visible: true,
+                },
+            );
+            let reason =
+                shared::editor_update_reason_for_started_delta(&prev.request, req, state_changed);
+            stream.send(shared::build_editor_updated_from_started(
+                req,
+                geometry_changed || !prev.visible,
+                state_changed || !prev.visible,
+                Some(true),
+                reason,
+            ));
+        }
     }
 }
 
@@ -4563,7 +5034,7 @@ impl VolvoxGridRuntime {
         prefer_combo: bool,
         seed_text: Option<String>,
         click_caret: Option<i32>,
-        caret_end: Option<bool>,
+        reason: EditStartReason,
     ) -> Option<RenderOutput> {
         if !grid.can_begin_edit(row, col, force) {
             return None;
@@ -4577,9 +5048,9 @@ impl VolvoxGridRuntime {
                 force,
                 true,
                 true,
-                None,
-                caret_end,
+                reason,
                 seed_text.clone(),
+                click_caret,
                 None,
             );
             if let Some(seed) = seed_text {
@@ -4588,12 +5059,6 @@ impl VolvoxGridRuntime {
                         .push(volvoxgrid_engine::event::GridEventData::CellEditChange {
                             text: seed,
                         });
-                }
-            }
-            if let Some(caret) = click_caret {
-                if grid.edit.is_active() && grid.edit.edit_row == row && grid.edit.edit_col == col {
-                    grid.edit.sel_start = caret;
-                    grid.edit.sel_length = 0;
                 }
             }
             return maybe_render_editor_output(grid, prefer_combo);
@@ -4614,7 +5079,7 @@ impl VolvoxGridRuntime {
                         prefer_combo,
                         seed_text,
                         click_caret,
-                        caret_end,
+                        reason,
                     },
                 },
             );
@@ -4661,44 +5126,6 @@ impl VolvoxGridRuntime {
         true
     }
 
-    fn request_before_dropdown_open(
-        &self,
-        grid_id: i64,
-        grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
-        row: i32,
-        col: i32,
-        force: bool,
-        prefer_combo: bool,
-        seed_text: Option<String>,
-        click_caret: Option<i32>,
-        caret_end: Option<bool>,
-    ) -> bool {
-        let Some(event) = grid.before_dropdown_open_event(row, col) else {
-            return false;
-        };
-        let event_id = self.next_event_id();
-        self.pending_actions
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .insert(
-                (grid_id, event_id),
-                PendingActionEntry {
-                    created_at: Instant::now(),
-                    action: PendingAction::BeforeDropdownOpen {
-                        row,
-                        col,
-                        force,
-                        prefer_combo,
-                        seed_text,
-                        click_caret,
-                        caret_end,
-                    },
-                },
-            );
-        grid.events.push_with_id(event_id, event);
-        true
-    }
-
     fn request_validate_edit(
         &self,
         grid_id: i64,
@@ -4708,7 +5135,28 @@ impl VolvoxGridRuntime {
         old_text: String,
         new_text: String,
     ) {
-        let committed_text = shared::normalize_committed_edit_text(grid, row, col, &new_text);
+        let committed_text =
+            match shared::prepare_committed_edit_text(grid, row, col, &old_text, &new_text) {
+                shared::PreparedEditCommit::Commit(committed) => committed,
+                shared::PreparedEditCommit::AllowInvalid { committed, errors } => {
+                    shared::set_active_edit_validation_errors(grid, row, col, errors);
+                    committed
+                }
+                shared::PreparedEditCommit::Block { attempted, errors } => {
+                    shared::block_active_edit_commit(grid, row, col, attempted, errors);
+                    return;
+                }
+                shared::PreparedEditCommit::Revert(committed) => {
+                    if grid.edit.is_active()
+                        && grid.edit.edit_row == row
+                        && grid.edit.edit_col == col
+                    {
+                        grid.edit.cancel();
+                    }
+                    shared::apply_committed_edit_text(grid, row, col, old_text, committed);
+                    return;
+                }
+            };
 
         if !self.decision_channel_enabled(grid_id) {
             grid.events
@@ -5021,9 +5469,15 @@ impl VolvoxGridRuntime {
                 self.request_before_checkbox_toggle(grid_id, grid, hit.row, hit.col);
             }
 
-            let is_cell_like = hit.area == volvoxgrid_engine::input::HitArea::Cell
-                || hit.area == volvoxgrid_engine::input::HitArea::FixedRow
-                || hit.area == volvoxgrid_engine::input::HitArea::FixedCol;
+            let is_cell_like = matches!(
+                hit.area,
+                volvoxgrid_engine::input::HitArea::Cell
+                    | volvoxgrid_engine::input::HitArea::CellText
+                    | volvoxgrid_engine::input::HitArea::CellPicture
+                    | volvoxgrid_engine::input::HitArea::CellButtonPicture
+                    | volvoxgrid_engine::input::HitArea::FixedRow
+                    | volvoxgrid_engine::input::HitArea::FixedCol
+            );
             let combo_list = if is_cell_like {
                 grid.active_dropdown_list(hit.row, hit.col)
             } else {
@@ -5037,7 +5491,15 @@ impl VolvoxGridRuntime {
                     && grid.edit.edit_col == hit.col)
                 {
                     let _ = self.request_before_edit(
-                        grid_id, grid, hit.row, hit.col, false, true, None, None, None,
+                        grid_id,
+                        grid,
+                        hit.row,
+                        hit.col,
+                        false,
+                        true,
+                        None,
+                        None,
+                        EditStartReason::EditStartDropdownButton,
                     );
                 }
             } else if is_cell_like && ((dbl_click && grid.edit_trigger_mode >= 2) || is_combo_cell)
@@ -5056,7 +5518,11 @@ impl VolvoxGridRuntime {
                     is_combo_cell,
                     None,
                     click_caret,
-                    if dbl_click { Some(true) } else { None },
+                    if dbl_click {
+                        EditStartReason::EditStartDoubleClick
+                    } else {
+                        EditStartReason::EditStartDropdownButton
+                    },
                 );
             }
         }
@@ -5130,28 +5596,13 @@ impl VolvoxGridRuntime {
                 prefer_combo,
                 seed_text,
                 click_caret,
-                caret_end,
+                reason,
             } => {
                 if cancel {
                     return None;
                 }
                 self.manager()
                     .with_grid(grid_id, |grid| {
-                        if grid.active_dropdown(row, col).is_some()
-                            && self.request_before_dropdown_open(
-                                grid_id,
-                                grid,
-                                row,
-                                col,
-                                force,
-                                prefer_combo,
-                                seed_text.clone(),
-                                click_caret,
-                                caret_end,
-                            )
-                        {
-                            return None;
-                        }
                         shared::begin_edit_session_core_opts(
                             grid,
                             row,
@@ -5159,9 +5610,9 @@ impl VolvoxGridRuntime {
                             force,
                             false,
                             true,
-                            None,
-                            caret_end,
+                            reason,
                             seed_text.clone(),
+                            click_caret,
                             None,
                         );
                         if let Some(seed) = seed_text {
@@ -5174,67 +5625,6 @@ impl VolvoxGridRuntime {
                                         text: seed,
                                     },
                                 );
-                            }
-                        }
-                        if let Some(caret) = click_caret {
-                            if grid.edit.is_active()
-                                && grid.edit.edit_row == row
-                                && grid.edit.edit_col == col
-                            {
-                                grid.edit.sel_start = caret;
-                                grid.edit.sel_length = 0;
-                            }
-                        }
-                        maybe_render_editor_output(grid, prefer_combo)
-                    })
-                    .ok()
-                    .flatten()
-            }
-            PendingAction::BeforeDropdownOpen {
-                row,
-                col,
-                force,
-                prefer_combo,
-                seed_text,
-                click_caret,
-                caret_end,
-            } => {
-                if cancel {
-                    return None;
-                }
-                self.manager()
-                    .with_grid(grid_id, |grid| {
-                        shared::begin_edit_session_core_opts(
-                            grid,
-                            row,
-                            col,
-                            force,
-                            false,
-                            false,
-                            None,
-                            caret_end,
-                            seed_text.clone(),
-                            None,
-                        );
-                        if let Some(seed) = seed_text {
-                            if grid.edit.is_active()
-                                && grid.edit.edit_row == row
-                                && grid.edit.edit_col == col
-                            {
-                                grid.events.push(
-                                    volvoxgrid_engine::event::GridEventData::CellEditChange {
-                                        text: seed,
-                                    },
-                                );
-                            }
-                        }
-                        if let Some(caret) = click_caret {
-                            if grid.edit.is_active()
-                                && grid.edit.edit_row == row
-                                && grid.edit.edit_col == col
-                            {
-                                grid.edit.sel_start = caret;
-                                grid.edit.sel_length = 0;
                             }
                         }
                         maybe_render_editor_output(grid, prefer_combo)
@@ -5828,148 +6218,204 @@ impl VolvoxGridServiceRuntime for VolvoxGridRuntime {
         let state = self.with_grid(grid_id, |grid| {
             match request.command {
                 Some(edit_command::Command::Start(start)) => {
-                    shared::begin_edit_session_core_opts(
-                        grid,
-                        start.row,
-                        start.col,
-                        false,
-                        true,
-                        true,
-                        start.select_all,
-                        start.caret_end,
-                        start.seed_text,
-                        start.formula_mode,
-                    );
+                    let seed_text = start.seed_value.as_ref().map(editor_value_to_text);
+                    let reason = EditStartReason::try_from(start.reason)
+                        .unwrap_or(pb::EditStartReason::EditStartUnspecified);
+                    let already_editing = grid.edit.is_active()
+                        && grid.edit.edit_row == start.row
+                        && grid.edit.edit_col == start.col;
+                    if already_editing {
+                        shared::apply_edit_start_options(
+                            grid,
+                            start.row,
+                            start.col,
+                            reason,
+                            start.caret_position,
+                            None,
+                        );
+                    } else {
+                        shared::begin_edit_session_core_opts(
+                            grid,
+                            start.row,
+                            start.col,
+                            false,
+                            true,
+                            true,
+                            reason,
+                            seed_text,
+                            start.caret_position,
+                            None,
+                        );
+                        let request_id = self.next_event_id();
+                        shared::queue_active_editor_list_items_request(grid, request_id, None, 0);
+                    }
                 }
-                Some(edit_command::Command::Commit(commit)) => {
-                    if grid.edit.is_active() {
-                        grid.edit.flush_preedit();
-                        let row = grid.edit.edit_row;
-                        let col = grid.edit.edit_col;
-                        let old_text = grid.cells.get_text(row, col).to_string();
-                        let new_text = commit.text.unwrap_or_else(|| grid.edit.edit_text.clone());
-                        if self.decision_channel_enabled(grid_id) {
-                            let pending_text =
-                                shared::truncate_to_char_count(&new_text, grid.edit_max_length);
-                            grid.edit.update_text(pending_text.clone());
-                            grid.edit.sel_start = pending_text.chars().count() as i32;
-                            grid.edit.sel_length = 0;
-                            self.request_validate_edit(
-                                grid_id,
-                                grid,
-                                row,
-                                col,
-                                old_text,
-                                pending_text,
-                            );
-                        } else {
-                            let committed =
-                                shared::normalize_committed_edit_text(grid, row, col, &new_text);
-                            grid.edit.cancel();
-                            grid.events.push(
-                                volvoxgrid_engine::event::GridEventData::CellEditValidate {
-                                    row,
-                                    col,
-                                    edit_text: committed.clone(),
-                                },
-                            );
-                            shared::apply_committed_edit_text(grid, row, col, old_text, committed);
+                Some(edit_command::Command::Session(session)) => {
+                    if !shared::editor_session_command_is_current(grid, &session) {
+                        return shared::edit_state_proto(grid);
+                    }
+                    match session.command {
+                        Some(editor_session_command::Command::Commit(commit)) => {
+                            if grid.edit.is_active() {
+                                grid.edit.flush_preedit();
+                                let row = grid.edit.edit_row;
+                                let col = grid.edit.edit_col;
+                                let old_text = grid.cells.get_text(row, col).to_string();
+                                let new_text = commit
+                                    .value
+                                    .as_ref()
+                                    .map(editor_value_to_text)
+                                    .unwrap_or_else(|| grid.edit.edit_text.clone());
+                                if self.decision_channel_enabled(grid_id) {
+                                    let pending_text = shared::truncate_to_char_count(
+                                        &new_text,
+                                        grid.edit_max_length,
+                                    );
+                                    grid.edit.update_text(pending_text.clone());
+                                    grid.edit.set_sel_start(pending_text.chars().count() as i32);
+                                    grid.edit.set_sel_length(0);
+                                    self.request_validate_edit(
+                                        grid_id,
+                                        grid,
+                                        row,
+                                        col,
+                                        old_text,
+                                        pending_text,
+                                    );
+                                } else {
+                                    match shared::prepare_committed_edit_text(
+                                        grid, row, col, &old_text, &new_text,
+                                    ) {
+                                        shared::PreparedEditCommit::Commit(committed) => {
+                                            grid.edit.cancel();
+                                            grid.events.push(
+                                                volvoxgrid_engine::event::GridEventData::CellEditValidate {
+                                                    row,
+                                                    col,
+                                                    edit_text: committed.clone(),
+                                                },
+                                            );
+                                            shared::apply_committed_edit_text(
+                                                grid, row, col, old_text, committed,
+                                            );
+                                        }
+                                        shared::PreparedEditCommit::AllowInvalid {
+                                            committed,
+                                            errors,
+                                        } => {
+                                            shared::set_active_edit_validation_errors(
+                                                grid, row, col, errors,
+                                            );
+                                            grid.edit.cancel();
+                                            grid.events.push(
+                                                volvoxgrid_engine::event::GridEventData::CellEditValidate {
+                                                    row,
+                                                    col,
+                                                    edit_text: committed.clone(),
+                                                },
+                                            );
+                                            shared::apply_committed_edit_text(
+                                                grid, row, col, old_text, committed,
+                                            );
+                                        }
+                                        shared::PreparedEditCommit::Block { attempted, errors } => {
+                                            shared::block_active_edit_commit(
+                                                grid, row, col, attempted, errors,
+                                            );
+                                        }
+                                        shared::PreparedEditCommit::Revert(committed) => {
+                                            grid.edit.cancel();
+                                            shared::apply_committed_edit_text(
+                                                grid, row, col, old_text, committed,
+                                            );
+                                        }
+                                    }
+                                }
+                            }
                         }
-                    }
-                }
-                Some(edit_command::Command::Cancel(_)) => {
-                    if grid.edit.is_active() {
-                        let active_combo =
-                            grid.active_dropdown_list(grid.edit.edit_row, grid.edit.edit_col);
-                        grid.edit.cancel();
-                        if !active_combo.is_empty() {
-                            grid.events
-                                .push(volvoxgrid_engine::event::GridEventData::DropdownClosed);
+                        Some(editor_session_command::Command::Cancel(_)) => {
+                            if grid.edit.is_active() {
+                                let active_combo = grid
+                                    .active_dropdown_list(grid.edit.edit_row, grid.edit.edit_col);
+                                grid.edit.cancel();
+                                if !active_combo.is_empty() {
+                                    grid.events.push(
+                                        volvoxgrid_engine::event::GridEventData::DropdownClosed,
+                                    );
+                                }
+                                grid.mark_dirty();
+                            }
                         }
-                        grid.mark_dirty();
-                    }
-                }
-                Some(edit_command::Command::SetText(set_text)) => {
-                    if grid.edit.is_active() {
-                        let t =
-                            shared::truncate_to_char_count(&set_text.text, grid.edit_max_length);
-                        grid.edit.update_text(t.clone());
-                        grid.edit.sel_start = t.chars().count() as i32;
-                        grid.edit.sel_length = 0;
-                        grid.events
-                            .push(volvoxgrid_engine::event::GridEventData::CellEditChange {
-                                text: t,
-                            });
-                        grid.mark_dirty();
-                    }
-                }
-                Some(edit_command::Command::SetSelection(sel)) => {
-                    if grid.edit.is_active() {
-                        grid.edit.set_sel_start(sel.start);
-                        grid.edit.set_sel_length(sel.length);
-                        grid.mark_dirty();
-                    }
-                }
-                Some(edit_command::Command::SetHighlights(set_highlights)) => {
-                    let highlights = set_highlights
-                        .regions
-                        .iter()
-                        .filter_map(|region| {
-                            let range = region.range.as_ref()?;
-                            Some(volvoxgrid_engine::edit::EditHighlightRegion {
-                                row1: range.row1,
-                                col1: range.col1,
-                                row2: range.row2,
-                                col2: range.col2,
-                                style: volvoxgrid_engine::style::HighlightStyle::from_proto(
-                                    region.style.as_ref(),
-                                ),
-                                ref_id: region.ref_id,
-                                text_start: region.text_start,
-                                text_length: region.text_length,
-                            })
-                        })
-                        .collect::<Vec<_>>();
-                    grid.edit.set_highlights(highlights);
-                    grid.mark_dirty();
-                }
-                Some(edit_command::Command::SetPreedit(preedit)) => {
-                    if grid.edit.is_active() {
-                        if preedit.commit {
-                            // IME committed text: insert into edit_text at cursor.
-                            grid.edit.commit_preedit(&preedit.text);
-                        } else if preedit.text.is_empty() {
-                            grid.edit.cancel_preedit();
-                        } else {
-                            grid.edit.set_preedit(&preedit.text, preedit.cursor);
+                        Some(editor_session_command::Command::ValueChanged(value_changed)) => {
+                            if shared::active_edit_accepts_text_input(grid) {
+                                let raw = value_changed
+                                    .value
+                                    .as_ref()
+                                    .map(editor_value_to_text)
+                                    .unwrap_or_default();
+                                let t = shared::truncate_to_char_count(&raw, grid.edit_max_length);
+                                grid.edit.update_text(t.clone());
+                                grid.edit.set_sel_start(t.chars().count() as i32);
+                                grid.edit.set_sel_length(0);
+                                grid.events.push(
+                                    volvoxgrid_engine::event::GridEventData::CellEditChange {
+                                        text: t,
+                                    },
+                                );
+                                let validation_request_id = self.next_event_id();
+                                shared::queue_active_edit_validation_request(
+                                    grid,
+                                    validation_request_id,
+                                );
+                                let list_request_id = self.next_event_id();
+                                shared::queue_active_editor_list_items_request(
+                                    grid,
+                                    list_request_id,
+                                    Some(grid.edit.edit_text.clone()),
+                                    0,
+                                );
+                                grid.mark_dirty();
+                            }
                         }
-                        grid.mark_dirty();
-                    }
-                }
-                Some(edit_command::Command::Finish(_)) => {
-                    if grid.edit.is_active() {
-                        grid.edit.flush_preedit();
-                        let row = grid.edit.edit_row;
-                        let col = grid.edit.edit_col;
-                        let old_text = grid.cells.get_text(row, col).to_string();
-                        let new_text = grid.edit.edit_text.clone();
-                        if self.decision_channel_enabled(grid_id) {
-                            self.request_validate_edit(grid_id, grid, row, col, old_text, new_text);
-                        } else {
-                            let committed =
-                                shared::normalize_committed_edit_text(grid, row, col, &new_text);
-                            grid.edit.cancel();
-                            grid.events.push(
-                                volvoxgrid_engine::event::GridEventData::CellEditValidate {
-                                    row,
-                                    col,
-                                    edit_text: committed.clone(),
-                                },
-                            );
-                            shared::apply_committed_edit_text(grid, row, col, old_text, committed);
+                        Some(editor_session_command::Command::SelectionChanged(sel)) => {
+                            if shared::active_edit_accepts_text_input(grid) {
+                                if let Some(selection) = sel.selection {
+                                    grid.edit.set_sel_start(selection.start);
+                                    grid.edit.set_sel_length(selection.length);
+                                }
+                                grid.mark_dirty();
+                            }
                         }
+                        Some(editor_session_command::Command::PreeditChanged(preedit)) => {
+                            if shared::active_edit_accepts_text_input(grid) {
+                                if preedit.commit {
+                                    // IME committed text: insert into edit_text at cursor.
+                                    grid.edit.commit_preedit(&preedit.text);
+                                } else if preedit.text.is_empty() {
+                                    grid.edit.cancel_preedit();
+                                } else {
+                                    grid.edit.set_preedit(&preedit.text, preedit.cursor);
+                                }
+                                grid.mark_dirty();
+                            }
+                        }
+                        Some(editor_session_command::Command::CustomAction(action)) => {
+                            if grid.edit.is_active() {
+                                grid.events.push(
+                                    volvoxgrid_engine::event::GridEventData::CustomEditorAction {
+                                        session_id: grid.edit.session_serial as i64,
+                                        row: grid.edit.edit_row,
+                                        col: grid.edit.edit_col,
+                                        action_id: action.action_id,
+                                        payload: action.payload,
+                                    },
+                                );
+                            }
+                        }
+                        None => {}
                     }
                 }
+                Some(edit_command::Command::GetState(_)) => {}
                 None => {}
             }
 
@@ -6162,7 +6608,7 @@ impl VolvoxGridServiceRuntime for VolvoxGridRuntime {
         let mut last_present_mode: i32 = -1;
         let mut last_fling_tick: Option<std::time::Instant> = None;
         let mut last_mem_calc: HashMap<i64, Instant> = HashMap::new();
-        let mut sent_edit_requests: HashMap<i64, SentEditRequest> = HashMap::new();
+        let mut sent_editor_session_starts: HashMap<i64, SentEditorSessionStart> = HashMap::new();
         let mut zoom_sessions: HashMap<i64, ZoomGestureState> = HashMap::new();
         let mut session_grid_ids: HashSet<i64> = HashSet::new();
 
@@ -6183,7 +6629,7 @@ impl VolvoxGridServiceRuntime for VolvoxGridRuntime {
                         send_render_output_tracked(
                             self,
                             stream,
-                            &mut sent_edit_requests,
+                            &mut sent_editor_session_starts,
                             grid_id,
                             output,
                         );
@@ -6434,10 +6880,10 @@ impl VolvoxGridServiceRuntime for VolvoxGridRuntime {
                                 })),
                             });
                             if rendered && !terminal_session.suppress_aux_outputs() {
-                                maybe_send_refreshed_edit_request(
+                                maybe_send_refreshed_editor_session_start(
                                     self,
                                     stream,
-                                    &mut sent_edit_requests,
+                                    &mut sent_editor_session_starts,
                                     grid_id,
                                 );
                             }
@@ -6782,10 +7228,10 @@ impl VolvoxGridServiceRuntime for VolvoxGridRuntime {
                                 })),
                             });
                             if rendered {
-                                maybe_send_refreshed_edit_request(
+                                maybe_send_refreshed_editor_session_start(
                                     self,
                                     stream,
-                                    &mut sent_edit_requests,
+                                    &mut sent_editor_session_starts,
                                     grid_id,
                                 );
                             }
@@ -6881,7 +7327,7 @@ impl VolvoxGridServiceRuntime for VolvoxGridRuntime {
                                 handle_key_render_input(
                                     self,
                                     stream,
-                                    &mut sent_edit_requests,
+                                    &mut sent_editor_session_starts,
                                     grid_id,
                                     key,
                                     false,
@@ -6892,7 +7338,7 @@ impl VolvoxGridServiceRuntime for VolvoxGridRuntime {
                                 handle_pointer_render_input(
                                     self,
                                     stream,
-                                    &mut sent_edit_requests,
+                                    &mut sent_editor_session_starts,
                                     grid_id,
                                     pointer,
                                     Some(&mut terminal_session),
@@ -6900,7 +7346,14 @@ impl VolvoxGridServiceRuntime for VolvoxGridRuntime {
                                 );
                             }
                             terminal_tui::TerminalEvent::Scroll(scroll) => {
-                                handle_scroll_render_input(self, stream, grid_id, scroll, false);
+                                handle_scroll_render_input(
+                                    self,
+                                    stream,
+                                    &mut sent_editor_session_starts,
+                                    grid_id,
+                                    scroll,
+                                    false,
+                                );
                             }
                         }
                     }
@@ -6910,7 +7363,7 @@ impl VolvoxGridServiceRuntime for VolvoxGridRuntime {
                     handle_pointer_render_input(
                         self,
                         stream,
-                        &mut sent_edit_requests,
+                        &mut sent_editor_session_starts,
                         grid_id,
                         pe,
                         None,
@@ -6922,7 +7375,7 @@ impl VolvoxGridServiceRuntime for VolvoxGridRuntime {
                     handle_key_render_input(
                         self,
                         stream,
-                        &mut sent_edit_requests,
+                        &mut sent_editor_session_starts,
                         grid_id,
                         ke,
                         !terminal_session.suppress_aux_outputs(),
@@ -6934,6 +7387,7 @@ impl VolvoxGridServiceRuntime for VolvoxGridRuntime {
                     handle_scroll_render_input(
                         self,
                         stream,
+                        &mut sent_editor_session_starts,
                         grid_id,
                         se,
                         !terminal_session.suppress_aux_outputs(),
@@ -7120,7 +7574,7 @@ impl VolvoxGridServiceRuntime for VolvoxGridRuntime {
                         send_render_output_tracked(
                             self,
                             stream,
-                            &mut sent_edit_requests,
+                            &mut sent_editor_session_starts,
                             decision_grid_id,
                             output,
                         );
@@ -7137,6 +7591,66 @@ impl VolvoxGridServiceRuntime for VolvoxGridRuntime {
                         rendered: false,
                         event: None,
                     });
+                }
+
+                Some(render_input::Input::EditValidationResponse(response)) => {
+                    let reason = if response.normalized_value.is_some() {
+                        EditorUpdateReason::EditorUpdateNormalizedValue
+                    } else {
+                        EditorUpdateReason::EditorUpdateValidation
+                    };
+                    let output = self
+                        .with_grid(grid_id, |grid| {
+                            shared::apply_edit_validation_response(grid, response)
+                                .then(|| shared::build_editor_updated_state(grid, reason))
+                                .flatten()
+                        })
+                        .ok()
+                        .flatten();
+                    if let Some(output) = output {
+                        send_render_output_tracked(
+                            self,
+                            stream,
+                            &mut sent_editor_session_starts,
+                            grid_id,
+                            output,
+                        );
+                    } else {
+                        stream.send(RenderOutput {
+                            rendered: false,
+                            event: None,
+                        });
+                    }
+                }
+
+                Some(render_input::Input::EditorListItemsResponse(response)) => {
+                    let output = self
+                        .with_grid(grid_id, |grid| {
+                            shared::apply_editor_list_items_response(grid, response)
+                                .then(|| {
+                                    shared::build_editor_updated_state(
+                                        grid,
+                                        EditorUpdateReason::EditorUpdateProgrammaticValue,
+                                    )
+                                })
+                                .flatten()
+                        })
+                        .ok()
+                        .flatten();
+                    if let Some(output) = output {
+                        send_render_output_tracked(
+                            self,
+                            stream,
+                            &mut sent_editor_session_starts,
+                            grid_id,
+                            output,
+                        );
+                    } else {
+                        stream.send(RenderOutput {
+                            rendered: false,
+                            event: None,
+                        });
+                    }
                 }
 
                 None => {
@@ -7687,13 +8201,18 @@ fn clear_grid_text_cache(grid_id: i64) {
 fn set_grid_external_text_renderer(grid_id: i64, registration: Option<TextRendererRegistration>) {
     let _ = SHARED_GRID_MANAGER.with_grid(grid_id, |grid| match registration {
         Some(reg) => {
-            grid.ensure_text_engine()
+            let fallback_enabled = grid.font_fallback_enabled;
+            let text_engine = grid.ensure_text_engine();
+            text_engine.set_font_fallback_enabled(fallback_enabled);
+            text_engine
                 .set_external_renderer(Some(Box::new(ffi_text_renderer_from_registration(reg))));
         }
         None => {
             if let Some(renderer) = default_platform_text_renderer() {
                 let cap = grid.text_layout_cache_cap;
+                let fallback_enabled = grid.font_fallback_enabled;
                 let text_engine = grid.ensure_text_engine();
+                text_engine.set_font_fallback_enabled(fallback_enabled);
                 text_engine.set_external_renderer(Some(renderer));
                 text_engine.set_layout_cache_cap(cap);
             } else if let Some(text_engine) = &mut grid.text_engine {

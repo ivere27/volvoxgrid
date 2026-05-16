@@ -385,8 +385,9 @@ func buildSalesTuiConfig(rows, cols int) *pb.GridConfig {
 			Mode: ptr(pb.SelectionMode_SELECTION_FREE),
 		},
 		Editing: &pb.EditConfig{
-			Trigger:         ptr(pb.EditTrigger_EDIT_TRIGGER_KEY_CLICK),
-			DropdownTrigger: ptr(pb.DropdownTrigger_DROPDOWN_ALWAYS),
+			Activation: &pb.EditActivation{
+				Trigger: ptr(pb.EditTrigger_EDIT_TRIGGER_KEY_CLICK),
+			},
 		},
 		Outline: &pb.OutlineConfig{
 			TreeIndicator:      ptr(pb.TreeIndicatorStyle_TREE_INDICATOR_NONE),
@@ -419,10 +420,12 @@ func buildSalesTuiConfig(rows, cols int) *pb.GridConfig {
 				Visible:          ptr(true),
 				BandRows:         ptr(int32(1)),
 				DefaultRowHeight: ptr(int32(1)),
-				ModeBits: ptr(
-					uint32(pb.ColIndicatorCellMode_COL_INDICATOR_CELL_HEADER_TEXT) |
-						uint32(pb.ColIndicatorCellMode_COL_INDICATOR_CELL_SORT_GLYPH),
-				),
+				CellModes: &pb.ColIndicatorCellModes{
+					Modes: []pb.ColIndicatorCellMode{
+						pb.ColIndicatorCellMode_COL_INDICATOR_CELL_HEADER_TEXT,
+						pb.ColIndicatorCellMode_COL_INDICATOR_CELL_SORT_GLYPH,
+					},
+				},
 				AllowResize: ptr(false),
 			},
 		},
@@ -531,12 +534,14 @@ func buildHierarchyTuiConfig(rows, cols int, maxOutlineDepth, maxOutlineLevel in
 	outlineWidth := hierarchyTuiOutlineWidth(maxOutlineDepth)
 	expanderWidth := hierarchyTuiExpanderWidth(maxOutlineDepth)
 	return finalizeTuiConfig(&pb.GridConfig{
+		ThemePreset: ptr(pb.ThemePreset_THEME_AMBER),
 		Selection: &pb.SelectionConfig{
 			Mode: ptr(pb.SelectionMode_SELECTION_FREE),
 		},
 		Editing: &pb.EditConfig{
-			Trigger:         ptr(pb.EditTrigger_EDIT_TRIGGER_KEY_CLICK),
-			DropdownTrigger: ptr(pb.DropdownTrigger_DROPDOWN_NEVER),
+			Activation: &pb.EditActivation{
+				Trigger: ptr(pb.EditTrigger_EDIT_TRIGGER_KEY_CLICK),
+			},
 		},
 		Outline: &pb.OutlineConfig{
 			TreeIndicator:    ptr(pb.TreeIndicatorStyle_TREE_INDICATOR_CONNECTORS_LEAF),
@@ -569,8 +574,12 @@ func buildHierarchyTuiConfig(rows, cols int, maxOutlineDepth, maxOutlineLevel in
 				Visible:          ptr(true),
 				BandRows:         ptr(int32(1)),
 				DefaultRowHeight: ptr(int32(1)),
-				ModeBits:         ptr(uint32(pb.ColIndicatorCellMode_COL_INDICATOR_CELL_HEADER_TEXT)),
-				AllowResize:      ptr(false),
+				CellModes: &pb.ColIndicatorCellModes{
+					Modes: []pb.ColIndicatorCellMode{
+						pb.ColIndicatorCellMode_COL_INDICATOR_CELL_HEADER_TEXT,
+					},
+				},
+				AllowResize: ptr(false),
 			},
 			Appearance: ptr(pb.IndicatorAppearance_INDICATOR_APPEARANCE_MODERN),
 		},
@@ -583,7 +592,9 @@ func buildStressTuiConfig(rows, cols int) *pb.GridConfig {
 			Mode: ptr(pb.SelectionMode_SELECTION_FREE),
 		},
 		Editing: &pb.EditConfig{
-			Trigger: ptr(pb.EditTrigger_EDIT_TRIGGER_KEY_CLICK),
+			Activation: &pb.EditActivation{
+				Trigger: ptr(pb.EditTrigger_EDIT_TRIGGER_KEY_CLICK),
+			},
 		},
 		Interaction: &pb.InteractionConfig{
 			HeaderFeatures: &pb.HeaderFeatures{
@@ -606,10 +617,12 @@ func buildStressTuiConfig(rows, cols int) *pb.GridConfig {
 				Visible:          ptr(true),
 				BandRows:         ptr(int32(1)),
 				DefaultRowHeight: ptr(int32(1)),
-				ModeBits: ptr(
-					uint32(pb.ColIndicatorCellMode_COL_INDICATOR_CELL_HEADER_TEXT) |
-						uint32(pb.ColIndicatorCellMode_COL_INDICATOR_CELL_SORT_GLYPH),
-				),
+				CellModes: &pb.ColIndicatorCellModes{
+					Modes: []pb.ColIndicatorCellMode{
+						pb.ColIndicatorCellMode_COL_INDICATOR_CELL_HEADER_TEXT,
+						pb.ColIndicatorCellMode_COL_INDICATOR_CELL_SORT_GLYPH,
+					},
+				},
 				AllowResize: ptr(false),
 			},
 		},
@@ -691,24 +704,42 @@ func buildSalesColumns() []*pb.ColumnDef {
 		{Index: 1, Width: ptr(int32(10)), Caption: ptr("Region"), Key: ptr("Region"), Span: ptr(true)},
 		{Index: 2, Width: ptr(int32(14)), Caption: ptr("Category"), Key: ptr("Category")},
 		{Index: 3, Width: ptr(int32(18)), Caption: ptr("Product"), Key: ptr("Product")},
-		{Index: 4, Width: ptr(int32(12)), Caption: ptr("Sales"), Key: ptr("Sales"), Align: ptr(pb.Align_ALIGN_RIGHT_CENTER), DataType: ptr(pb.ColumnDataType_COLUMN_DATA_CURRENCY), Format: ptr("$#,##0")},
-		{Index: 5, Width: ptr(int32(12)), Caption: ptr("Cost"), Key: ptr("Cost"), Align: ptr(pb.Align_ALIGN_RIGHT_CENTER), DataType: ptr(pb.ColumnDataType_COLUMN_DATA_CURRENCY), Format: ptr("$#,##0")},
-		{Index: 6, Width: ptr(int32(10)), Caption: ptr("Margin%"), Key: ptr("Margin"), Align: ptr(pb.Align_ALIGN_CENTER_CENTER), DataType: ptr(pb.ColumnDataType_COLUMN_DATA_NUMBER), ProgressColor: ptr(uint32(0xFF818CF8))},
+		{Index: 4, Width: ptr(int32(12)), Caption: ptr("Sales"), Key: ptr("Sales"), Align: ptr(pb.Align_ALIGN_RIGHT_CENTER), DataType: ptr(pb.ColumnDataType_COLUMN_DATA_CURRENCY), Format: ptr("$#,##0"), Editor: numberEditor(0, nil)},
+		{Index: 5, Width: ptr(int32(12)), Caption: ptr("Cost"), Key: ptr("Cost"), Align: ptr(pb.Align_ALIGN_RIGHT_CENTER), DataType: ptr(pb.ColumnDataType_COLUMN_DATA_CURRENCY), Format: ptr("$#,##0"), Editor: numberEditor(0, nil)},
+		{Index: 6, Width: ptr(int32(10)), Caption: ptr("Margin%"), Key: ptr("Margin"), Align: ptr(pb.Align_ALIGN_CENTER_CENTER), DataType: ptr(pb.ColumnDataType_COLUMN_DATA_NUMBER), ProgressColor: ptr(uint32(0xFF818CF8)), Editor: numberEditor(0, ptr(100.0))},
 		{Index: 7, Width: ptr(int32(5)), Caption: ptr("Flag"), Key: ptr("Flag"), Align: ptr(pb.Align_ALIGN_CENTER_CENTER), DataType: ptr(pb.ColumnDataType_COLUMN_DATA_BOOLEAN)},
-		{Index: 8, Width: ptr(int32(10)), Caption: ptr("Status"), Key: ptr("Status"), Dropdown: dropdownFromLabels(salesStatusItems)},
+		{Index: 8, Width: ptr(int32(10)), Caption: ptr("Status"), Key: ptr("Status"), Editor: dropdownEditorFromLabels(salesStatusItems)},
 		{Index: 9, Width: ptr(int32(18)), Caption: ptr("Notes"), Key: ptr("Notes")},
 	}
 }
 
-func dropdownFromLabels(items string) *pb.Dropdown {
-	dd := &pb.Dropdown{}
+func dropdownEditorFromLabels(items string) *pb.EditorSpec {
+	list := &pb.ListEditorParams{}
 	for _, label := range strings.Split(items, "|") {
 		if label == "" {
 			continue
 		}
-		dd.Items = append(dd.Items, &pb.DropdownItem{Label: ptr(label)})
+		list.StaticItems = append(list.StaticItems, &pb.ListItem{Label: label})
 	}
-	return dd
+	return &pb.EditorSpec{
+		Kind:         pb.EditorKind_EDITOR_SELECT,
+		Owner:        pb.EditorOwner_EDITOR_OWNER_ENGINE,
+		Presentation: pb.EditorPresentation_EDITOR_INLINE,
+		List:         list,
+	}
+}
+
+func numberEditor(min float64, max *float64) *pb.EditorSpec {
+	return &pb.EditorSpec{
+		Kind:         pb.EditorKind_EDITOR_NUMBER,
+		Owner:        pb.EditorOwner_EDITOR_OWNER_ENGINE,
+		Presentation: pb.EditorPresentation_EDITOR_CANVAS,
+		Number: &pb.NumberEditorParams{
+			Min:      ptr(min),
+			Max:      max,
+			Nullable: false,
+		},
+	}
 }
 
 func buildHierarchyColumns() []*pb.ColumnDef {

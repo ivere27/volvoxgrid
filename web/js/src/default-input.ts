@@ -44,6 +44,40 @@ function isPrintableEditKey(e: KeyboardEvent): boolean {
   return e.key.length === 1;
 }
 
+function engineKeyCode(e: KeyboardEvent): number {
+  switch (e.key) {
+    case "Backspace": return 8;
+    case "Tab": return 9;
+    case "Enter": return 13;
+    case "Escape": return 27;
+    case " ": return 32;
+    case "Spacebar": return 32;
+    case "PageUp": return 33;
+    case "PageDown": return 34;
+    case "End": return 35;
+    case "Home": return 36;
+    case "ArrowLeft": return 37;
+    case "ArrowUp": return 38;
+    case "ArrowRight": return 39;
+    case "ArrowDown": return 40;
+    case "Insert": return 45;
+    case "Delete": return 46;
+    case "Shift": return 16;
+    case "Control": return 17;
+    case "Alt": return 18;
+    case "Meta": return 91;
+  }
+
+  if (/^F([1-9]|1[0-9]|2[0-4])$/.test(e.key)) {
+    return 111 + Number(e.key.slice(1));
+  }
+  if (e.key.length === 1) {
+    const code = e.key.toUpperCase().codePointAt(0);
+    if (code != null && code >= 0x30 && code <= 0x5A) return code;
+  }
+  return e.keyCode;
+}
+
 /**
  * Attach a default keyboard handler that:
  * - Navigates with arrow/tab/page/home/end keys
@@ -71,7 +105,7 @@ export function setupDefaultKeyboard(
     }
 
     const modifier = modifierBits(e);
-    wasm.handle_key_down(gridId, e.keyCode, modifier);
+    wasm.handle_key_down(gridId, engineKeyCode(e), modifier);
     if (printable && typeof wasm.handle_key_press === "function") {
       const charCode = e.key.codePointAt(0);
       if (charCode != null) {

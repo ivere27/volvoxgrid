@@ -96,7 +96,7 @@ pub struct CellExtra {
     pub progress_color: u32,
     pub progress_percent: f32,
     pub custom_format: String,
-    pub dropdown: Option<pb::Dropdown>,
+    pub editor: Option<pb::EditorSpec>,
     pub dropdown_items: String,
     pub user_data: Option<Vec<u8>>,
     /// Picture for cell button (distinct from cell picture).
@@ -122,7 +122,7 @@ impl Default for CellExtra {
             progress_color: 0,
             progress_percent: 0.0,
             custom_format: String::new(),
-            dropdown: None,
+            editor: None,
             dropdown_items: String::new(),
             user_data: None,
             button_picture: None,
@@ -142,8 +142,8 @@ impl CellExtra {
         bytes += self.picture.as_ref().map_or(0, Vec::capacity);
         bytes += self.picture_format.capacity();
         bytes += self.custom_format.capacity();
-        if let Some(dropdown) = &self.dropdown {
-            bytes += dropdown_heap_size_bytes(dropdown);
+        if let Some(editor) = &self.editor {
+            bytes += editor_heap_size_bytes(editor);
         }
         bytes += self.dropdown_items.capacity();
         bytes += self.user_data.as_ref().map_or(0, Vec::capacity);
@@ -243,8 +243,8 @@ impl CellData {
             .map_or("", |e| e.dropdown_items.as_str())
     }
 
-    pub fn dropdown(&self) -> Option<&pb::Dropdown> {
-        self.extra.as_ref().and_then(|e| e.dropdown.as_ref())
+    pub fn editor(&self) -> Option<&pb::EditorSpec> {
+        self.extra.as_ref().and_then(|e| e.editor.as_ref())
     }
 
     pub fn barcode(&self) -> Option<&BarcodeSpec> {
@@ -270,14 +270,35 @@ impl CellData {
     }
 }
 
-fn dropdown_heap_size_bytes(dropdown: &pb::Dropdown) -> usize {
-    let mut bytes = dropdown.items.capacity() * std::mem::size_of::<pb::DropdownItem>();
-    for item in &dropdown.items {
-        bytes += item.value.as_ref().map_or(0, String::capacity);
-        bytes += item.label.as_ref().map_or(0, String::capacity);
-        bytes += item.details.capacity() * std::mem::size_of::<String>();
-        for detail in &item.details {
-            bytes += detail.capacity();
+fn editor_heap_size_bytes(editor: &pb::EditorSpec) -> usize {
+    let mut bytes = editor.custom_editor_id.as_ref().map_or(0, String::capacity);
+    if let Some(text) = &editor.text {
+        bytes += text.mask.capacity();
+    }
+    if let Some(number) = &editor.number {
+        bytes += number.format.capacity();
+    }
+    if let Some(date_time) = &editor.date_time {
+        bytes += date_time.format.capacity();
+    }
+    if let Some(list) = &editor.list {
+        bytes += list.static_items.capacity() * std::mem::size_of::<pb::ListItem>();
+        for item in &list.static_items {
+            bytes += item.label.capacity();
+            bytes += item.details.capacity() * std::mem::size_of::<String>();
+            for detail in &item.details {
+                bytes += detail.capacity();
+            }
+        }
+        if let Some(source) = &list.data_source {
+            bytes += source.data_source_id.capacity();
+        }
+    }
+    for action in &editor.actions {
+        bytes += action.action_id.capacity();
+        bytes += action.label.capacity();
+        if let Some(icon) = &action.icon {
+            bytes += icon.data.capacity() + icon.format.capacity();
         }
     }
     bytes

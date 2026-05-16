@@ -29,17 +29,16 @@ TUI is the exception. A terminal has no OS IME, so the engine can optionally run
 
 ## Shared Engine Contract
 
-The common IME contract is defined once and reused everywhere.
+The common IME contract is defined once and reused everywhere. IME is layered on top of the editor-session lifecycle described in [GUI.md](GUI.md#editor-session-lifecycle).
 
 ### Proto
 
 `proto/volvoxgrid.proto` exposes:
 
-- `EditCommand.set_preedit`
-- `EditSetPreedit { text, cursor, commit }`
-- `EditState.composing`
-- `EditState.preedit_text`
-- `EditConfig.engine_compose`
+- `EditCommand.session` → `EditorSessionCommand.preedit_changed`
+- `EditorPreeditChanged { text, cursor, commit }`
+- `EditState.session.composing`
+- `EditState.session.preedit_text`
 - `EditConfig.compose_method`
 
 Meaning:
@@ -47,7 +46,22 @@ Meaning:
 - `text` + `cursor` updates the current preedit string.
 - `commit = true` commits the supplied text into the active editor.
 - empty preedit clears composition state.
-- `engine_compose` switches composition from host-driven IME to engine-driven compose logic.
+- preedit commands must carry the active editor session's latest `session_id` and `state_version`.
+- `compose_method` selects the engine-side compose algorithm when engine compose is active.
+- GUI hosts normally use host-driven IME through native editor surfaces.
+- TUI mode enables engine compose by default because terminals do not provide an OS IME surface.
+
+### Editor Session Use
+
+GUI hosts should treat composition as active editor-session state:
+
+- If composition starts while no editor is active, start an edit session for the current cell with `EDIT_START_IME_COMPOSITION`.
+- When the engine emits `EditorSessionStarted`, cache `session_id`, `state_version`, `value`, `selection`, `composing`, and `preedit_text`.
+- Send composition updates as `EditCommand.session.preedit_changed` using the latest cached `session_id` and `state_version`.
+- Apply `EditorSessionUpdated` deltas back to the host editor or proxy before sending the next command.
+- Ignore stale composition callbacks after `EditorSessionEnded`.
+
+For visible host-native editors, the host widget owns platform composition events and forwards only the normalized edit state to the engine. For `EDITOR_CANVAS` sessions, the engine renders the preedit underline/caret itself, but the host still owns the platform IME focus surface or idle proxy on GUI platforms.
 
 ### Engine
 
@@ -92,8 +106,9 @@ Current behavior:
 - starts engine edit when composition begins on the idle proxy
 - defers showing the visible editor until composition settles
 - swaps to a real overlay `EditText` during active edit
-- reads composing spans from `BaseInputConnection` and forwards them through `EditSetPreedit`
-- commits plain text through `EditSetText` when no composition is active
+- reads composing spans from `BaseInputConnection` and forwards them through `EditorSessionCommand.preedit_changed`
+- commits plain text through `EditorSessionCommand.value_changed` when no composition is active
+- ignores stale composition callbacks after the active `session_id` changes
 
 Practical result:
 
@@ -116,6 +131,7 @@ Current behavior:
 - composition updates are forwarded with `VolvoxGridController.setEditPreedit(...)`
 - plain edits still use normal edit RPCs such as `beginEdit`, `commitEdit`, and `cancelEdit`
 - overlay key handling ignores commit/cancel shortcuts while Flutter reports an active composing range
+- edit RPCs include the current `session_id` and `state_version` when mutating the active session
 
 Practical result:
 
@@ -187,6 +203,7 @@ Current behavior:
 - transition from proxy to visible editor is delayed so Korean-style immediate follow-up composition does not lose focus
 - the visible editor also handles `compositionstart/update/end`
 - non-IME key redispatch uses `event.isComposing` and `keyCode === 229` guards
+- session updates from the engine remain authoritative for overlay text and selection
 
 Practical result:
 
@@ -211,8 +228,9 @@ TUI behavior is different:
 
 Default behavior:
 
-- TUI mode defaults `engine_compose = true`
-- TUI mode defaults `compose_method = DeadKey`
+- TUI mode enables engine compose by default.
+- TUI mode defaults `compose_method = DeadKey`.
+- GUI mode leaves engine compose disabled unless a host/session explicitly enables it.
 
 Shipped engine compose methods:
 
@@ -237,7 +255,7 @@ These adapters do not all own IME themselves. Most inherit behavior from their h
 | `adapters/sheet` | Web / TypeScript | inherits VolvoxGrid web host IME behavior | adds sheet-state synchronization on composition start |
 | `adapters/sfdatagrid` | Flutter / Dart | inherits `VolvoxGridWidget` IME behavior | no separate adapter IME layer |
 | `adapters/report` | Web / React | not an edit-centric adapter | no adapter-specific IME handling |
-| `adapters/vsflexgrid` | Windows ActiveX / C/C++/Rust | engine-side preedit plumbing exists in Rust | host wrapper IME wiring is incomplete today |
+| `adapters/vsflexgrid` | Windows ActiveX / C/C++/Rust | `ImeComposition` dispatch bridge plus demo host `WM_IME_*` forwarding | external containers must forward IME messages |
 | `adapters/xtragrid` | WinForms compare harness | Volvox side inherits WinForms host IME; reference side uses DevExpress native editors | not a standalone IME implementation |
 
 ### Sheet Adapter
@@ -287,8 +305,8 @@ Relevant files:
 
 Current status:
 
-- the Rust adapter core understands `EditSetPreedit` and `preedit_text`
-- the windowless OCX now exposes `ImeComposition(text, cursor, commit)` and encodes `EditSetPreedit` through the existing native edit protobuf path
+- the Rust adapter core understands `EditorSessionCommand.preedit_changed` and `preedit_text`
+- the windowless OCX exposes `ImeComposition(text, cursor, commit)` and encodes `preedit_changed` through the existing native edit protobuf path
 - the MinGW demo host forwards `WM_IME_STARTCOMPOSITION`, `WM_IME_COMPOSITION`, `WM_IME_ENDCOMPOSITION`, and suppresses `WM_IME_CHAR` duplicates
 - `WM_IME_COMPOSITION` reads `GCS_RESULTSTR` and `GCS_COMPSTR` through IMM32 and forwards them to the OCX DISPID bridge
 
@@ -340,4 +358,4 @@ Today, the repo is strongest on IME in these public hosts:
 - Web/WASM
 - TUI engine compose
 
-The main gap is the Windows ActiveX compatibility adapter, where the lower engine can represent preedit state but the current OCX wrapper does not yet expose a complete host IME bridge.
+The main remaining ActiveX caveat is container integration: the Rust core and demo host expose the preedit bridge, but third-party windowless OCX containers still need to forward `WM_IME_*` messages into `ImeComposition`.

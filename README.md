@@ -101,13 +101,19 @@ npm install volvoxgrid
 
   const grid = new VolvoxGrid(document.getElementById("grid"), {
     wasmUrl: "./wasm/volvoxgrid_wasm.js",
-    rowCount: 100,
-    colCount: 5,
+    columnDefs: [
+      { field: "name", headerName: "Name" },
+      { field: "status", headerName: "Status" },
+    ],
+    rowData: [
+      { id: "1", name: "Hello", status: "Ready" },
+      { id: "2", name: "World", status: "Queued" },
+    ],
+    getRowId: ({ data }) => data.id,
   });
 
   await grid.loaded;
-  grid.setCellText(0, 0, "Hello");
-  grid.setCellText(0, 1, "World");
+  grid.updateRows([{ id: "2", status: "Done" }]);
 </script>
 
 <div id="grid" style="width: 800px; height: 400px;"></div>
@@ -127,7 +133,7 @@ Or use the `<volvox-grid>` custom element:
 
 ```yaml
 dependencies:
-  volvoxgrid: ^0.8.8
+  volvoxgrid: ^0.8.9
 ```
 
 ```dart
@@ -149,7 +155,7 @@ VolvoxGridWidget(controller: controller)
 
 ```kotlin
 dependencies {
-    implementation("io.github.ivere27:volvoxgrid-desktop:0.8.8")
+    implementation("io.github.ivere27:volvoxgrid-desktop:0.8.9")
 }
 ```
 
@@ -165,7 +171,7 @@ ctrl.setCellText(0, 0, "Widget A");
 
 ## Packages
 
-Examples below use `0.8.8`. Replace it with the release you want to consume.
+Examples below use `0.8.9`. Replace it with the release you want to consume.
 
 ### Maven / Gradle
 
@@ -173,10 +179,10 @@ Android:
 
 ```kotlin
 dependencies {
-    implementation("io.github.ivere27:volvoxgrid-android:0.8.8")
-    // or: implementation("io.github.ivere27:volvoxgrid-android-lite:0.8.8")
-    // Compose: implementation("io.github.ivere27:volvoxgrid-android-compose:0.8.8")
-    // Compose lite: implementation("io.github.ivere27:volvoxgrid-android-compose-lite:0.8.8")
+    implementation("io.github.ivere27:volvoxgrid-android:0.8.9")
+    // or: implementation("io.github.ivere27:volvoxgrid-android-lite:0.8.9")
+    // Compose: implementation("io.github.ivere27:volvoxgrid-android-compose:0.8.9")
+    // Compose lite: implementation("io.github.ivere27:volvoxgrid-android-compose-lite:0.8.9")
 }
 ```
 
@@ -188,8 +194,8 @@ repositories {
 }
 
 dependencies {
-    implementation("io.github.ivere27:volvoxgrid-desktop:0.8.8")
-    // or: implementation("io.github.ivere27:volvoxgrid-desktop-lite:0.8.8")
+    implementation("io.github.ivere27:volvoxgrid-desktop:0.8.9")
+    // or: implementation("io.github.ivere27:volvoxgrid-desktop-lite:0.8.9")
 }
 ```
 
@@ -202,7 +208,7 @@ Platform docs:
 
 ```yaml
 dependencies:
-  volvoxgrid: ^0.8.8
+  volvoxgrid: ^0.8.9
 ```
 
 The Flutter package resolves Android and desktop native binaries from Maven Central at build time, and iOS XCFrameworks from GitHub releases. Set `VOLVOXGRID_VARIANT=lite` on supported platforms to use lite artifacts. See [flutter/README.md](flutter/README.md).

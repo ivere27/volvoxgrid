@@ -20,7 +20,6 @@ import {
   SelectionConfigFields as ProtoSelectionConfigFields,
   SpanConfigFields as ProtoSpanConfigFields,
   StyleConfigFields as ProtoStyleConfigFields,
-  EditConfigFields as ProtoEditConfigFields,
 } from "volvoxgrid/generated/volvoxgrid_ffi.js";
 import {
   encodeTag,
@@ -34,6 +33,15 @@ import {
   type HighlightStyleArg,
   type FontArg,
 } from "./proto-utils.js";
+
+const ProtoEditConfigFields = {
+  activation: 1,
+} as const;
+
+const ProtoEditActivationFields = {
+  trigger: 1,
+  tab_behavior: 2,
+} as const;
 
 export interface GridLinesArg {
   style?: number;
@@ -153,7 +161,6 @@ export interface SheetGridConfig {
   indicatorColStyle?: HighlightStyleArg;
   editTrigger?: number;
   tabBehavior?: number;
-  hostKeyDispatch?: boolean;
   resize?: ResizePolicyArg;
   autoResize?: boolean;
   cellSpan?: number;
@@ -188,7 +195,7 @@ export interface SheetGridConfig {
       visible?: boolean;
       defaultRowHeight?: number;
       bandRows?: number;
-      modeBits?: number;
+      cellModes?: ReadonlyArray<number>;
       background?: number;
       foreground?: number;
       gridLines?: number;
@@ -197,7 +204,6 @@ export interface SheetGridConfig {
     };
     cornerTopStart?: {
       visible?: boolean;
-      modeBits?: number;
       background?: number;
       foreground?: number;
       customKey?: string;
@@ -246,8 +252,12 @@ function encodeColIndicatorConfig(config: NonNullable<SheetGridConfig["indicator
   if (config.visible != null) out.push(...encodeTag(ProtoColIndicatorConfigFields.visible, 0), ...encodeBool(config.visible));
   if (config.defaultRowHeight != null) out.push(...encodeTag(ProtoColIndicatorConfigFields.default_row_height, 0), ...encodeInt32(config.defaultRowHeight));
   if (config.bandRows != null) out.push(...encodeTag(ProtoColIndicatorConfigFields.band_rows, 0), ...encodeInt32(config.bandRows));
-  if (config.modeBits != null) {
-    out.push(...encodeTag(ProtoColIndicatorConfigFields.mode_bits, 0), ...encodeVarintUnsigned(BigInt(config.modeBits >>> 0)));
+  if (config.cellModes != null) {
+    const modes: number[] = [];
+    for (const mode of config.cellModes) {
+      modes.push(...encodeTag(1, 0), ...encodeInt32(Math.max(0, Math.trunc(mode))));
+    }
+    out.push(...encodeMessageField(15, modes));
   }
   if (config.background != null) {
     out.push(...encodeTag(ProtoColIndicatorConfigFields.background, 0), ...encodeVarintUnsigned(BigInt(config.background >>> 0)));
@@ -267,9 +277,6 @@ function encodeCornerIndicatorConfig(config: NonNullable<SheetGridConfig["indica
   const out: number[] = [];
   if (!config) return out;
   if (config.visible != null) out.push(...encodeTag(ProtoCornerIndicatorConfigFields.visible, 0), ...encodeBool(config.visible));
-  if (config.modeBits != null) {
-    out.push(...encodeTag(ProtoCornerIndicatorConfigFields.mode_bits, 0), ...encodeVarintUnsigned(BigInt(config.modeBits >>> 0)));
-  }
   if (config.background != null) {
     out.push(...encodeTag(ProtoCornerIndicatorConfigFields.background, 0), ...encodeVarintUnsigned(BigInt(config.background >>> 0)));
   }
@@ -367,9 +374,10 @@ export function encodeGridConfig(config: SheetGridConfig): Uint8Array {
   if (selection.length > 0) gridConfig.push(...encodeMessageField(ProtoGridConfigFields.selection, selection));
 
   const editing: number[] = [];
-  if (config.editTrigger != null) editing.push(...encodeTag(ProtoEditConfigFields.trigger, 0), ...encodeInt32(config.editTrigger));
-  if (config.tabBehavior != null) editing.push(...encodeTag(ProtoEditConfigFields.tab_behavior, 0), ...encodeInt32(config.tabBehavior));
-  if (config.hostKeyDispatch != null) editing.push(...encodeTag(ProtoEditConfigFields.host_key_dispatch, 0), ...encodeBool(config.hostKeyDispatch));
+  const activation: number[] = [];
+  if (config.editTrigger != null) activation.push(...encodeTag(ProtoEditActivationFields.trigger, 0), ...encodeInt32(config.editTrigger));
+  if (config.tabBehavior != null) activation.push(...encodeTag(ProtoEditActivationFields.tab_behavior, 0), ...encodeInt32(config.tabBehavior));
+  if (activation.length > 0) editing.push(...encodeMessageField(ProtoEditConfigFields.activation, activation));
   if (editing.length > 0) gridConfig.push(...encodeMessageField(ProtoGridConfigFields.editing, editing));
 
   const span: number[] = [];

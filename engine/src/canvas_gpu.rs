@@ -8,6 +8,7 @@ use crate::canvas::{adjusted_text_max_width, normalize_font_stretch_scale, Canva
 use std::hash::{Hash, Hasher};
 
 use crate::glyph_atlas::{layout_text_glyphs, GlyphAtlas, GlyphEntry};
+use crate::glyph_rasterizer::{final_fallback_glyph_advance, final_fallback_line_height};
 use crate::gpu_render::{RectInstance, TexturedInstance};
 use crate::text::TextEngine;
 
@@ -97,6 +98,142 @@ impl<'a> GpuCanvas<'a> {
     }
 
     #[allow(clippy::too_many_arguments)]
+    fn push_textured_glyph(
+        &mut self,
+        entry: GlyphEntry,
+        gx: f32,
+        gy: f32,
+        gw: f32,
+        gh: f32,
+        color_f32: [f32; 4],
+        clip_x_min: f32,
+        clip_y_min: f32,
+        clip_x_max: f32,
+        clip_y_max: f32,
+    ) {
+        if entry.width == 0 || entry.height == 0 || gw <= 0.0 || gh <= 0.0 {
+            return;
+        }
+
+        let inst = if gx >= clip_x_min
+            && gy >= clip_y_min
+            && gx + gw <= clip_x_max
+            && gy + gh <= clip_y_max
+        {
+            TexturedInstance {
+                rect: [gx, gy, gw, gh],
+                uv_rect: entry.uv,
+                color: color_f32,
+                flags: [0.0, entry.page as f32],
+            }
+        } else {
+            let left = gx.max(clip_x_min);
+            let top = gy.max(clip_y_min);
+            let right = (gx + gw).min(clip_x_max);
+            let bottom = (gy + gh).min(clip_y_max);
+
+            if left >= right || top >= bottom {
+                return;
+            }
+
+            let u_min = entry.uv[0];
+            let v_min = entry.uv[1];
+            let u_max = entry.uv[2];
+            let v_max = entry.uv[3];
+            let u_range = u_max - u_min;
+            let v_range = v_max - v_min;
+
+            let new_u_min = u_min + u_range * ((left - gx) / gw);
+            let new_v_min = v_min + v_range * ((top - gy) / gh);
+            let new_u_max = u_max - u_range * ((gx + gw - right) / gw);
+            let new_v_max = v_max - v_range * ((gy + gh - bottom) / gh);
+
+            TexturedInstance {
+                rect: [left, top, right - left, bottom - top],
+                uv_rect: [new_u_min, new_v_min, new_u_max, new_v_max],
+                color: color_f32,
+                flags: [0.0, entry.page as f32],
+            }
+        };
+        self.texts().push(inst);
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn draw_final_fallback_text(
+        &mut self,
+        x: i32,
+        y: i32,
+        text: &str,
+        font_size: f32,
+        bold: bool,
+        italic: bool,
+        stretch: f32,
+        color: u32,
+        clip_x: i32,
+        clip_y: i32,
+        clip_w: i32,
+        clip_h: i32,
+        max_width: Option<f32>,
+    ) -> f32 {
+        if text.is_empty() || clip_w <= 0 || clip_h <= 0 {
+            return 0.0;
+        }
+
+        let scale = normalize_font_stretch_scale(stretch);
+        let adjusted_max_width = adjusted_text_max_width(max_width, stretch);
+        let wrap_width = adjusted_max_width.filter(|w| w.is_finite() && *w > 0.0);
+        let color_f32 = color_to_f32(color);
+        let clip_x_max = clip_x as f32 + clip_w as f32;
+        let clip_y_max = y as f32 + clip_h as f32;
+        let clip_x_min = clip_x as f32;
+        let clip_y_min = (clip_y.max(0)) as f32;
+        let xf = x as f32;
+        let yf = y as f32;
+        let line_height = final_fallback_line_height(font_size).ceil().max(1.0);
+
+        let mut line_x: f32 = 0.0;
+        let mut line_y: f32 = 0.0;
+        let mut rendered_width: f32 = 0.0;
+
+        for ch in text.chars() {
+            if ch == '\r' {
+                continue;
+            }
+            if ch == '\n' {
+                rendered_width = rendered_width.max(line_x * scale);
+                line_x = 0.0;
+                line_y += line_height;
+                continue;
+            }
+
+            let advance = final_fallback_glyph_advance(ch, font_size, bold, italic);
+            if let Some(max_w) = wrap_width {
+                if line_x > 0.0 && line_x + advance > max_w {
+                    rendered_width = rendered_width.max(line_x * scale);
+                    line_x = 0.0;
+                    line_y += line_height;
+                }
+            }
+
+            let entry = self
+                .glyph_atlas
+                .final_fallback_glyph(ch, font_size, bold, italic);
+            let gx = xf + (line_x + entry.offset_x as f32) * scale;
+            let gy = yf + line_y + ((line_height - entry.height as f32) * 0.5).max(0.0);
+            let gw = entry.width as f32 * scale;
+            let gh = entry.height as f32;
+            self.push_textured_glyph(
+                entry, gx, gy, gw, gh, color_f32, clip_x_min, clip_y_min, clip_x_max, clip_y_max,
+            );
+
+            line_x += entry.advance_width.unwrap_or(advance);
+            rendered_width = rendered_width.max(line_x * scale);
+        }
+
+        rendered_width
+    }
+
+    #[allow(clippy::too_many_arguments)]
     fn draw_text_internal(
         &mut self,
         x: i32,
@@ -114,12 +251,22 @@ impl<'a> GpuCanvas<'a> {
         clip_h: i32,
         max_width: Option<f32>,
     ) -> f32 {
-        if text.is_empty() || clip_w <= 0 || clip_h <= 0 || !self.text_engine.has_fonts() {
+        if text.is_empty() || clip_w <= 0 || clip_h <= 0 {
             return 0.0;
         }
 
         let scale = normalize_font_stretch_scale(stretch);
         let adjusted_max_width = adjusted_text_max_width(max_width, stretch);
+        if !self.text_engine.has_fonts() {
+            return if self.text_engine.font_fallback_enabled() {
+                self.draw_final_fallback_text(
+                    x, y, text, font_size, bold, italic, stretch, color, clip_x, clip_y, clip_w,
+                    clip_h, max_width,
+                )
+            } else {
+                0.0
+            };
+        }
 
         let cache_key = glyph_cache_hash(text, font_name, font_size, bold, italic);
         if let Some(cached) = self.glyph_pos_cache.get(&cache_key) {
@@ -140,6 +287,11 @@ impl<'a> GpuCanvas<'a> {
             );
             let buffer = if let Some(r) = &layout_res {
                 &r.layout().buffer
+            } else if self.text_engine.font_fallback_enabled() {
+                return self.draw_final_fallback_text(
+                    x, y, text, font_size, bold, italic, stretch, color, clip_x, clip_y, clip_w,
+                    clip_h, max_width,
+                );
             } else {
                 return 0.0;
             };

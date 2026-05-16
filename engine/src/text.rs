@@ -4,7 +4,12 @@ use std::collections::{HashMap, VecDeque};
 #[cfg(feature = "cosmic-text")]
 use std::hash::{BuildHasher, Hash, Hasher};
 
-use crate::glyph_rasterizer::ExternalGlyphRasterizer;
+#[cfg(feature = "cosmic-text")]
+use crate::glyph_rasterizer::GlyphBitmap;
+use crate::glyph_rasterizer::{
+    final_fallback_glyph_advance, final_fallback_line_height, measure_final_fallback_text,
+    rasterize_final_fallback_glyph, ExternalGlyphRasterizer,
+};
 use crate::proto::volvoxgrid::v1 as pb;
 
 /// Pluggable text measurement and rendering interface.
@@ -434,11 +439,34 @@ pub struct TextEngine {
     pub font_generation: u64,
 
     render_options: TextRenderOptions,
+    font_fallback_enabled: bool,
     external_rasterizer: Option<Box<dyn ExternalGlyphRasterizer>>,
     external_renderer: Option<Box<dyn TextRenderer>>,
 }
 
 pub const DEFAULT_LAYOUT_CACHE_CAP: usize = 8192;
+
+#[cfg(feature = "cosmic-text")]
+fn missing_glyph_bitmap(
+    external_rasterizer: &mut Option<Box<dyn ExternalGlyphRasterizer>>,
+    font_fallback_enabled: bool,
+    ch: char,
+    font_name: &str,
+    font_size: f32,
+    bold: bool,
+    italic: bool,
+) -> Option<GlyphBitmap> {
+    if !font_fallback_enabled {
+        return None;
+    }
+    if let Some(bitmap) = external_rasterizer
+        .as_mut()
+        .and_then(|rast| rast.rasterize_glyph(ch, font_name, font_size, bold, italic))
+    {
+        return Some(bitmap);
+    }
+    Some(rasterize_final_fallback_glyph(ch, font_size, bold, italic))
+}
 
 impl TextEngine {
     pub fn new() -> Self {
@@ -464,6 +492,7 @@ impl TextEngine {
                     hinting_mode: pb::TextHintingMode::TextHintAuto as i32,
                     pixel_snap: false,
                 },
+                font_fallback_enabled: true,
                 external_rasterizer: None,
                 external_renderer: None,
             }
@@ -478,6 +507,7 @@ impl TextEngine {
                     hinting_mode: pb::TextHintingMode::TextHintAuto as i32,
                     pixel_snap: false,
                 },
+                font_fallback_enabled: true,
                 external_rasterizer: None,
                 external_renderer: None,
             }
@@ -510,8 +540,10 @@ impl TextEngine {
     }
 
     pub fn layout_cache_len(&self) -> usize {
-        if let Some(ext) = &self.external_renderer {
-            return ext.cache_len();
+        if self.font_fallback_enabled {
+            if let Some(ext) = &self.external_renderer {
+                return ext.cache_len();
+            }
         }
         #[cfg(feature = "cosmic-text")]
         {
@@ -546,11 +578,12 @@ impl TextEngine {
     }
 
     pub fn renderer_name(&self) -> &str {
-        if let Some(ext) = &self.external_renderer {
-            ext.renderer_name()
-        } else {
-            "Engine"
+        if self.font_fallback_enabled {
+            if let Some(ext) = &self.external_renderer {
+                return ext.renderer_name();
+            }
         }
+        "Engine"
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -645,7 +678,7 @@ impl TextEngine {
         }
         #[cfg(not(feature = "cosmic-text"))]
         {
-            self.external_renderer.is_some()
+            self.font_fallback_enabled && self.external_renderer.is_some()
         }
     }
 
@@ -665,6 +698,17 @@ impl TextEngine {
     /// fallback when SwashCache cannot produce a glyph.
     pub fn set_external_rasterizer(&mut self, r: Box<dyn ExternalGlyphRasterizer>) {
         self.external_rasterizer = Some(r);
+    }
+
+    pub fn set_font_fallback_enabled(&mut self, enabled: bool) {
+        if self.font_fallback_enabled != enabled {
+            self.font_fallback_enabled = enabled;
+            self.clear_cache();
+        }
+    }
+
+    pub fn font_fallback_enabled(&self) -> bool {
+        self.font_fallback_enabled
     }
 
     /// Register a complete external text renderer (e.g. Canvas2D on WASM) to
@@ -693,7 +737,6 @@ impl TextEngine {
         max_width_quarter_px.hash(&mut h);
         h.finish()
     }
-
     /// Check whether a `MeasureKey` matches borrowed key components.
     #[cfg(feature = "cosmic-text")]
     fn key_matches(
@@ -867,8 +910,10 @@ impl TextEngine {
         italic: bool,
         max_width: Option<f32>,
     ) -> (f32, f32) {
-        if let Some(ext) = &mut self.external_renderer {
-            return ext.measure_text(text, font_name, font_size, bold, italic, max_width);
+        if self.font_fallback_enabled {
+            if let Some(ext) = &mut self.external_renderer {
+                return ext.measure_text(text, font_name, font_size, bold, italic, max_width);
+            }
         }
 
         #[cfg(feature = "cosmic-text")]
@@ -887,14 +932,118 @@ impl TextEngine {
             ) {
                 let layout = res.layout();
                 (layout.measured_width, layout.measured_height)
+            } else if self.font_fallback_enabled {
+                measure_final_fallback_text(text, font_size, bold, italic, max_width)
             } else {
                 (0.0, font_size * 1.2)
             }
         }
         #[cfg(not(feature = "cosmic-text"))]
         {
-            (0.0, font_size * 1.2)
+            if self.font_fallback_enabled {
+                measure_final_fallback_text(text, font_size, bold, italic, max_width)
+            } else {
+                (0.0, font_size * 1.2)
+            }
         }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn render_final_fallback_text(
+        buffer_pixels: &mut [u8],
+        buf_width: i32,
+        buf_height: i32,
+        stride: i32,
+        x: i32,
+        y: i32,
+        clip_x: i32,
+        clip_y: i32,
+        clip_w: i32,
+        clip_h: i32,
+        text: &str,
+        font_size: f32,
+        bold: bool,
+        italic: bool,
+        color: u32,
+        max_width: Option<f32>,
+        render_mode: i32,
+        hinting_mode: i32,
+    ) -> f32 {
+        if text.is_empty() || clip_w <= 0 || clip_h <= 0 {
+            return 0.0;
+        }
+
+        let r = ((color >> 16) & 0xFF) as u8;
+        let g = ((color >> 8) & 0xFF) as u8;
+        let b = (color & 0xFF) as u8;
+        let line_height = final_fallback_line_height(font_size).ceil().max(1.0) as i32;
+        let wrap_width = max_width.filter(|w| w.is_finite() && *w > 0.0);
+        let clip_x_min = clip_x;
+        let clip_y_min = clip_y.max(0);
+        let clip_x_max = (clip_x + clip_w).min(buf_width);
+        let clip_y_max = (clip_y + clip_h).min(buf_height);
+
+        let mut line_x: f32 = 0.0;
+        let mut line_y: i32 = 0;
+        let mut rendered_width: f32 = 0.0;
+
+        for ch in text.chars() {
+            if ch == '\r' {
+                continue;
+            }
+            if ch == '\n' {
+                rendered_width = rendered_width.max(line_x);
+                line_x = 0.0;
+                line_y += line_height;
+                continue;
+            }
+
+            let advance = final_fallback_glyph_advance(ch, font_size, bold, italic);
+            if let Some(max_w) = wrap_width {
+                if line_x > 0.0 && line_x + advance > max_w {
+                    rendered_width = rendered_width.max(line_x);
+                    line_x = 0.0;
+                    line_y += line_height;
+                }
+            }
+
+            let bitmap = rasterize_final_fallback_glyph(ch, font_size, bold, italic);
+            if bitmap.width > 0 && bitmap.height > 0 {
+                let gw = bitmap.width as i32;
+                let gh = bitmap.height as i32;
+                let gx = x + line_x.round() as i32 + bitmap.offset_x;
+                let gy = y + line_y + ((line_height - gh) / 2).max(0);
+                if gx < clip_x_max
+                    && gy < clip_y_max
+                    && gx + gw > clip_x_min
+                    && gy + gh > clip_y_min
+                {
+                    blit_mask_glyph(
+                        buffer_pixels,
+                        stride,
+                        &bitmap.alpha_data,
+                        gw,
+                        gh,
+                        gx,
+                        gy,
+                        r,
+                        g,
+                        b,
+                        clip_x_min,
+                        clip_y_min,
+                        clip_x_max,
+                        clip_y_max,
+                        render_mode,
+                        hinting_mode,
+                    );
+                }
+            }
+
+            line_x += bitmap.advance_width.unwrap_or(advance);
+            rendered_width = rendered_width.max(line_x);
+        }
+
+        rendered_width
     }
 
     fn render_text_internal<const TRACK_WIDTH: bool>(
@@ -921,9 +1070,30 @@ impl TextEngine {
             return 0.0;
         }
 
-        if let Some(ext) = &mut self.external_renderer {
-            if TRACK_WIDTH {
-                return ext.render_text(
+        if self.font_fallback_enabled {
+            if let Some(ext) = &mut self.external_renderer {
+                if TRACK_WIDTH {
+                    return ext.render_text(
+                        buffer_pixels,
+                        buf_width,
+                        buf_height,
+                        stride,
+                        x,
+                        y,
+                        clip_x,
+                        clip_y,
+                        clip_w,
+                        clip_h,
+                        text,
+                        font_name,
+                        font_size,
+                        bold,
+                        italic,
+                        color,
+                        max_width,
+                    );
+                }
+                ext.render_text_fast(
                     buffer_pixels,
                     buf_width,
                     buf_height,
@@ -942,33 +1112,37 @@ impl TextEngine {
                     color,
                     max_width,
                 );
+                return 0.0;
             }
-            ext.render_text_fast(
-                buffer_pixels,
-                buf_width,
-                buf_height,
-                stride,
-                x,
-                y,
-                clip_x,
-                clip_y,
-                clip_w,
-                clip_h,
-                text,
-                font_name,
-                font_size,
-                bold,
-                italic,
-                color,
-                max_width,
-            );
-            return 0.0;
         }
 
         #[cfg(feature = "cosmic-text")]
         {
             if !self.has_fonts() {
-                return 0.0;
+                return if self.font_fallback_enabled {
+                    Self::render_final_fallback_text(
+                        buffer_pixels,
+                        buf_width,
+                        buf_height,
+                        stride,
+                        x,
+                        y,
+                        clip_x,
+                        clip_y,
+                        clip_w,
+                        clip_h,
+                        text,
+                        font_size,
+                        bold,
+                        italic,
+                        color,
+                        max_width,
+                        self.render_options.render_mode,
+                        self.render_options.hinting_mode,
+                    )
+                } else {
+                    0.0
+                };
             }
 
             let layout_res = Self::get_or_shape_buffer(
@@ -985,6 +1159,27 @@ impl TextEngine {
             );
             let text_buf = if let Some(r) = &layout_res {
                 &r.layout().buffer
+            } else if self.font_fallback_enabled {
+                return Self::render_final_fallback_text(
+                    buffer_pixels,
+                    buf_width,
+                    buf_height,
+                    stride,
+                    x,
+                    y,
+                    clip_x,
+                    clip_y,
+                    clip_w,
+                    clip_h,
+                    text,
+                    font_size,
+                    bold,
+                    italic,
+                    color,
+                    max_width,
+                    self.render_options.render_mode,
+                    self.render_options.hinting_mode,
+                );
             } else {
                 return 0.0;
             };
@@ -1013,8 +1208,6 @@ impl TextEngine {
 
             // Iterate glyphs individually so we can fall back to the external
             // rasterizer for characters that SwashCache cannot produce.
-            let has_external = self.external_rasterizer.is_some();
-
             for run in text_buf.layout_runs() {
                 let run_y = run.line_y;
                 // Track cumulative x-offset adjustment when externally-rasterized
@@ -1028,16 +1221,23 @@ impl TextEngine {
                     // this character. SwashCache would return the tofu rectangle,
                     // so prefer the external rasterizer when available.
                     let is_notdef = physical.cache_key.glyph_id == 0;
+                    if is_notdef && !self.font_fallback_enabled {
+                        continue;
+                    }
 
-                    // Try external rasterizer first for .notdef glyphs.
-                    if is_notdef && has_external {
+                    // Try fallback rasterizers first for .notdef glyphs.
+                    if is_notdef {
                         let character = text.get(glyph.start..).and_then(|s| s.chars().next());
                         if let Some(ch) = character {
-                            if let Some(bitmap) =
-                                self.external_rasterizer.as_mut().and_then(|rast| {
-                                    rast.rasterize_glyph(ch, font_name, font_size, bold, italic)
-                                })
-                            {
+                            if let Some(bitmap) = missing_glyph_bitmap(
+                                &mut self.external_rasterizer,
+                                self.font_fallback_enabled,
+                                ch,
+                                font_name,
+                                font_size,
+                                bold,
+                                italic,
+                            ) {
                                 if bitmap.width > 0 && bitmap.height > 0 {
                                     let gx = physical.x + bitmap.offset_x + x_off;
                                     let gy = physical.y - bitmap.offset_y;
@@ -1075,7 +1275,7 @@ impl TextEngine {
                                 continue;
                             }
                         }
-                        // External rasterizer returned None — fall through to swash.
+                        continue;
                     }
 
                     // Normal path: rasterize via SwashCache.
@@ -1155,15 +1355,19 @@ impl TextEngine {
                                 hinting_mode,
                             ),
                         }
-                    } else if has_external {
-                        // get_image returned None — try external rasterizer.
+                    } else if self.font_fallback_enabled {
+                        // get_image returned None — try fallback rasterizers.
                         let character = text.get(glyph.start..).and_then(|s| s.chars().next());
                         if let Some(ch) = character {
-                            if let Some(bitmap) =
-                                self.external_rasterizer.as_mut().and_then(|rast| {
-                                    rast.rasterize_glyph(ch, font_name, font_size, bold, italic)
-                                })
-                            {
+                            if let Some(bitmap) = missing_glyph_bitmap(
+                                &mut self.external_rasterizer,
+                                self.font_fallback_enabled,
+                                ch,
+                                font_name,
+                                font_size,
+                                bold,
+                                italic,
+                            ) {
                                 if bitmap.width > 0 && bitmap.height > 0 {
                                     let gx = physical.x + bitmap.offset_x + x_off;
                                     let gy = physical.y - bitmap.offset_y;
@@ -1207,7 +1411,30 @@ impl TextEngine {
         }
         #[cfg(not(feature = "cosmic-text"))]
         {
-            0.0
+            if self.font_fallback_enabled {
+                Self::render_final_fallback_text(
+                    buffer_pixels,
+                    buf_width,
+                    buf_height,
+                    stride,
+                    x,
+                    y,
+                    clip_x,
+                    clip_y,
+                    clip_w,
+                    clip_h,
+                    text,
+                    font_size,
+                    bold,
+                    italic,
+                    color,
+                    max_width,
+                    self.render_options.render_mode,
+                    self.render_options.hinting_mode,
+                )
+            } else {
+                0.0
+            }
         }
     }
 

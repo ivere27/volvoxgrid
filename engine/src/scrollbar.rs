@@ -67,6 +67,19 @@ pub(crate) struct ScrollBarGeometry {
     pub corner_h: i32,
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct ScrollViewportGeometry {
+    pub show_h: bool,
+    pub show_v: bool,
+    pub overlays_content: bool,
+    pub uses_arrows: bool,
+    pub bar_size: i32,
+    pub data_w: i32,
+    pub data_h: i32,
+    pub max_x: f32,
+    pub max_y: f32,
+}
+
 impl ScrollBarGeometry {
     pub fn contains_h(&self, px: i32, py: i32) -> bool {
         self.show_h
@@ -138,6 +151,81 @@ pub(crate) fn scrollbar_mode_visible(mode: i32, overflow: bool) -> bool {
         m if m == pb::ScrollBarMode::ScrollbarModeAlways as i32 => true,
         m if m == pb::ScrollBarMode::ScrollbarModeNever as i32 => false,
         _ => overflow,
+    }
+}
+
+pub(crate) fn compute_scroll_viewport(
+    grid: &VolvoxGrid,
+    buf_w: i32,
+    buf_h: i32,
+) -> ScrollViewportGeometry {
+    let appearance = normalize_scrollbar_appearance(grid.scrollbar_appearance);
+    let bar_size = grid.scrollbar_size.max(1);
+    let overlays_content = scrollbar_overlays_content(appearance);
+    let uses_arrows = scrollbar_uses_arrows(appearance);
+    let mode_h = normalize_scrollbar_mode(grid.scrollbar_show_h);
+    let mode_v = normalize_scrollbar_mode(grid.scrollbar_show_v);
+
+    let indicator_start_w = grid.indicator_start_width().max(0);
+    let indicator_end_w = grid.indicator_end_width().max(0);
+    let indicator_top_h = grid.indicator_top_height().max(0);
+    let indicator_bottom_h = grid.indicator_bottom_height().max(0);
+    let fixed_height = grid.layout.row_pos(grid.fixed_rows);
+    let fixed_width = grid.layout.col_pos(grid.fixed_cols);
+    let pinned_height = grid.pinned_top_height() + grid.pinned_bottom_height();
+    let pinned_width = grid.pinned_left_width() + grid.pinned_right_width();
+
+    let data_dims = |show_h: bool, show_v: bool| -> (i32, i32, i32, i32) {
+        let outer_w = (buf_w
+            - if show_v && !overlays_content {
+                bar_size
+            } else {
+                0
+            })
+        .max(1);
+        let outer_h = (buf_h
+            - if show_h && !overlays_content {
+                bar_size
+            } else {
+                0
+            })
+        .max(1);
+        let data_w = (outer_w - indicator_start_w - indicator_end_w).max(1);
+        let data_h = (outer_h - indicator_top_h - indicator_bottom_h).max(1);
+        (outer_w, outer_h, data_w, data_h)
+    };
+    let max_scroll = |data_w: i32, data_h: i32| -> (f32, f32) {
+        let mx = (grid.layout.total_width - data_w + fixed_width + pinned_width).max(0) as f32;
+        let my = (grid.layout.total_height - data_h + fixed_height + pinned_height).max(0) as f32;
+        (mx, my)
+    };
+
+    let mut show_h = mode_h == pb::ScrollBarMode::ScrollbarModeAlways as i32;
+    let mut show_v = mode_v == pb::ScrollBarMode::ScrollbarModeAlways as i32;
+    for _ in 0..3 {
+        let (_, _, data_w, data_h) = data_dims(show_h, show_v);
+        let (mx, my) = max_scroll(data_w, data_h);
+        let next_h = scrollbar_mode_visible(mode_h, mx > 0.0);
+        let next_v = scrollbar_mode_visible(mode_v, my > 0.0);
+        if next_h == show_h && next_v == show_v {
+            break;
+        }
+        show_h = next_h;
+        show_v = next_v;
+    }
+
+    let (_, _, data_w, data_h) = data_dims(show_h, show_v);
+    let (max_x, max_y) = max_scroll(data_w, data_h);
+    ScrollViewportGeometry {
+        show_h,
+        show_v,
+        overlays_content,
+        uses_arrows,
+        bar_size,
+        data_w,
+        data_h,
+        max_x,
+        max_y,
     }
 }
 
@@ -261,72 +349,24 @@ pub(crate) fn compute_scrollbar_geometry(
     buf_w: i32,
     buf_h: i32,
 ) -> ScrollBarGeometry {
-    let appearance = normalize_scrollbar_appearance(grid.scrollbar_appearance);
-    let bar_size = grid.scrollbar_size.max(1);
+    let scroll_view = compute_scroll_viewport(grid, buf_w, buf_h);
+    let show_h = scroll_view.show_h;
+    let show_v = scroll_view.show_v;
+    let overlays_content = scroll_view.overlays_content;
+    let uses_arrows = scroll_view.uses_arrows;
+    let bar_size = scroll_view.bar_size;
+    let data_w = scroll_view.data_w;
+    let data_h = scroll_view.data_h;
+    let view_w = data_w;
+    let view_h = data_h;
+    let max_x = scroll_view.max_x;
+    let max_y = scroll_view.max_y;
     let min_thumb = grid.scrollbar_min_thumb.max(1);
-    let overlays_content = scrollbar_overlays_content(appearance);
-    let uses_arrows = scrollbar_uses_arrows(appearance);
     let margin = if overlays_content {
         grid.scrollbar_margin.max(0)
     } else {
         0
     };
-    let mode_h = normalize_scrollbar_mode(grid.scrollbar_show_h);
-    let mode_v = normalize_scrollbar_mode(grid.scrollbar_show_v);
-
-    let fixed_height = grid.layout.row_pos(grid.fixed_rows);
-    let fixed_width = grid.layout.col_pos(grid.fixed_cols);
-    let pinned_height = grid.pinned_top_height() + grid.pinned_bottom_height();
-    let pinned_width = grid.pinned_left_width() + grid.pinned_right_width();
-
-    let compute_max_scroll = |view_w: i32, view_h: i32| -> (f32, f32) {
-        let mx = (grid.layout.total_width - view_w + fixed_width + pinned_width).max(0) as f32;
-        let my = (grid.layout.total_height - view_h + fixed_height + pinned_height).max(0) as f32;
-        (mx, my)
-    };
-
-    let mut show_h = mode_h == pb::ScrollBarMode::ScrollbarModeAlways as i32;
-    let mut show_v = mode_v == pb::ScrollBarMode::ScrollbarModeAlways as i32;
-    for _ in 0..3 {
-        let view_w = (buf_w
-            - if show_v && !overlays_content {
-                bar_size
-            } else {
-                0
-            })
-        .max(1);
-        let view_h = (buf_h
-            - if show_h && !overlays_content {
-                bar_size
-            } else {
-                0
-            })
-        .max(1);
-        let (mx, my) = compute_max_scroll(view_w, view_h);
-        let next_h = scrollbar_mode_visible(mode_h, mx > 0.0);
-        let next_v = scrollbar_mode_visible(mode_v, my > 0.0);
-        if next_h == show_h && next_v == show_v {
-            break;
-        }
-        show_h = next_h;
-        show_v = next_v;
-    }
-
-    let view_w = (buf_w
-        - if show_v && !overlays_content {
-            bar_size
-        } else {
-            0
-        })
-    .max(1);
-    let view_h = (buf_h
-        - if show_h && !overlays_content {
-            bar_size
-        } else {
-            0
-        })
-    .max(1);
-    let (max_x, max_y) = compute_max_scroll(view_w, view_h);
     let scroll_x = grid.scroll.scroll_x.clamp(0.0, max_x);
     let scroll_y = grid.scroll.scroll_y.clamp(0.0, max_y);
 
@@ -377,7 +417,7 @@ pub(crate) fn compute_scrollbar_geometry(
         }
         if geom.h_track_w > 0 {
             let mut thumb_w = if max_x > 0.0 {
-                ((view_w as f32 / (view_w as f32 + max_x)) * geom.h_track_w as f32).round() as i32
+                ((data_w as f32 / (data_w as f32 + max_x)) * geom.h_track_w as f32).round() as i32
             } else {
                 geom.h_track_w
             };
@@ -438,7 +478,7 @@ pub(crate) fn compute_scrollbar_geometry(
         }
         if geom.v_track_h > 0 {
             let mut thumb_h = if max_y > 0.0 {
-                ((view_h as f32 / (view_h as f32 + max_y)) * geom.v_track_h as f32).round() as i32
+                ((data_h as f32 / (data_h as f32 + max_y)) * geom.v_track_h as f32).round() as i32
             } else {
                 geom.v_track_h
             };

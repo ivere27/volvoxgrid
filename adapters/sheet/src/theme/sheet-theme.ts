@@ -11,7 +11,7 @@ const GRIDLINE_SOLID = 1;
 const FOCUS_BORDER_THICK = 2;
 const SELECTION_MULTI_RANGE = 4;
 const FILL_HANDLE_BOTTOM_RIGHT = 1;
-const EDIT_TRIGGER_KEY_CLICK = 2; // Engine allows editing; host_key_dispatch controls keyboard triggers
+const EDIT_TRIGGER_KEY_CLICK = 2;
 const TAB_CELLS = 1;
 const BORDER_NONE = 0;
 const BORDER_THICK = 2;
@@ -133,10 +133,9 @@ export function buildSheetConfig(opts?: {
       },
     },
 
-    // Editing: host_key_dispatch = true so we control key→edit mapping
+    // Editing
     editTrigger: EDIT_TRIGGER_KEY_CLICK,
     tabBehavior: TAB_CELLS,
-    hostKeyDispatch: true,
 
     // Interaction — ResizePolicy message
     resize: { columns: true, rows: true },

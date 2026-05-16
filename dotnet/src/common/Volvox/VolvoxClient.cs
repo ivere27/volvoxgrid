@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using VolvoxGrid.DotNet.Internal.ProtoLite;
 using Volvoxgrid.V1;
 
 namespace VolvoxGrid.DotNet.Internal
@@ -94,6 +95,12 @@ namespace VolvoxGrid.DotNet.Internal
         {
             byte[] response = InvokeUnary(GetConfigMethod, new GetConfigRequest { GridId = gridId }.ToByteArray());
             return GridConfig.ParseFrom(response);
+        }
+
+        public SchemaResponse GetSchema(long gridId)
+        {
+            byte[] response = InvokeUnary(GetSchemaMethod, new GetSchemaRequest { GridId = gridId }.ToByteArray());
+            return SchemaResponse.ParseFrom(response);
         }
 
         public void DefineColumns(long gridId, IList<ColumnDef> columns)
@@ -318,62 +325,221 @@ namespace VolvoxGrid.DotNet.Internal
             return CopyList(MergedRegionsResponse.ParseFrom(response).Ranges);
         }
 
-        public void EditStart(long gridId, int row, int col, bool? selectAll, bool? caretEnd, string seedText)
+        private static EditorValue EditorValueFromText(string text)
         {
-            var start = new Volvoxgrid.V1.EditStart { Row = row, Col = col };
-            if (selectAll.HasValue) start.SelectAll = selectAll.Value;
-            if (caretEnd.HasValue) start.CaretEnd = caretEnd.Value;
-            if (seedText != null) start.SeedText = seedText;
+            text = text ?? string.Empty;
+            return new EditorValue
+            {
+                Value = new CellValue { Text = text },
+                EditText = text,
+                DisplayText = text,
+            };
+        }
+
+        public void EditStart(long gridId, int row, int col, EditStartReason reason, string seedText, int? caretPosition = null)
+        {
+            var start = new Volvoxgrid.V1.EditStart { Row = row, Col = col, Reason = reason };
+            if (seedText != null) start.SeedValue = EditorValueFromText(seedText);
+            if (caretPosition.HasValue) start.CaretPosition = caretPosition.Value;
             var cmd = new EditCommand { GridId = gridId, Start = start };
             InvokeUnary(EditMethod, cmd.ToByteArray());
         }
 
-        public void EditCommit(long gridId, string text)
+        private EditorSessionCommand PrepareEditorSessionCommand(long gridId, EditorSessionCommand session, long sessionId = 0L, ulong stateVersion = 0UL)
         {
-            var commit = new Volvoxgrid.V1.EditCommit();
-            if (text != null) commit.Text = text;
-            var cmd = new EditCommand { GridId = gridId, Commit = commit };
-            InvokeUnary(EditMethod, cmd.ToByteArray());
-        }
-
-        public void EditCancel(long gridId)
-        {
-            var cmd = new EditCommand { GridId = gridId, Cancel = new Volvoxgrid.V1.EditCancel() };
-            InvokeUnary(EditMethod, cmd.ToByteArray());
-        }
-
-        public void EditSetPreedit(long gridId, string text, int cursor, bool commit)
-        {
-            var preedit = new Volvoxgrid.V1.EditSetPreedit { Text = text ?? string.Empty, Cursor = cursor, Commit = commit };
-            var cmd = new EditCommand { GridId = gridId, SetPreedit = preedit };
-            InvokeUnary(EditMethod, cmd.ToByteArray());
-        }
-
-        public void EditSetText(long gridId, string text)
-        {
-            var cmd = new EditCommand { GridId = gridId, SetText = new Volvoxgrid.V1.EditSetText { Text = text ?? string.Empty } };
-            InvokeUnary(EditMethod, cmd.ToByteArray());
-        }
-
-        public void EditSetSelection(long gridId, int start, int length)
-        {
-            var cmd = new EditCommand
+            if ((sessionId == 0L || stateVersion == 0UL) && gridId != 0L)
             {
-                GridId = gridId,
-                SetSelection = new Volvoxgrid.V1.EditSetSelection
+                try
                 {
-                    Start = start,
-                    Length = length,
-                },
-            };
-            InvokeUnary(EditMethod, cmd.ToByteArray());
+                    EditState state = GetEditState(gridId);
+                    if (state != null && state.Active && state.Session != null)
+                    {
+                        sessionId = state.Session.SessionId;
+                        stateVersion = state.Session.StateVersion;
+                    }
+                }
+                catch
+                {
+                    // Keep legacy best-effort behavior if probing edit state fails.
+                }
+            }
+            if (sessionId != 0L) session.SessionId = sessionId;
+            if (stateVersion != 0UL) session.StateVersion = stateVersion;
+            return session;
+        }
+
+        private byte[] BuildEditSessionCommandBytes(long gridId, EditorSessionCommand session, long sessionId = 0L, ulong stateVersion = 0UL)
+        {
+            session = PrepareEditorSessionCommand(gridId, session, sessionId, stateVersion);
+
+            var w = new ProtoWriter();
+            if (gridId != 0L) w.WriteInt64(1, gridId);
+            w.WriteMessageBytes(3, EncodeEditorSessionCommand(session));
+            return w.ToArray();
+        }
+
+        private static byte[] EncodeEditorSessionCommand(EditorSessionCommand session)
+        {
+            var w = new ProtoWriter();
+            if (session.SessionId != 0L) w.WriteInt64(1, session.SessionId);
+            if (session.StateVersion != 0UL) w.WriteInt64(2, unchecked((long)session.StateVersion));
+
+            switch (session.CommandCase)
+            {
+                case EditorSessionCommand.CommandOneofCase.ValueChanged:
+                    if (session.ValueChanged != null) w.WriteMessageBytes(3, session.ValueChanged.ToByteArray());
+                    break;
+                case EditorSessionCommand.CommandOneofCase.SelectionChanged:
+                    if (session.SelectionChanged != null) w.WriteMessageBytes(4, session.SelectionChanged.ToByteArray());
+                    break;
+                case EditorSessionCommand.CommandOneofCase.PreeditChanged:
+                    if (session.PreeditChanged != null) w.WriteMessageBytes(5, session.PreeditChanged.ToByteArray());
+                    break;
+                case EditorSessionCommand.CommandOneofCase.Commit:
+                    if (session.Commit != null) w.WriteMessageBytes(6, session.Commit.ToByteArray());
+                    break;
+                case EditorSessionCommand.CommandOneofCase.Cancel:
+                    if (session.Cancel != null) w.WriteMessageBytes(7, session.Cancel.ToByteArray());
+                    break;
+                case EditorSessionCommand.CommandOneofCase.CustomAction:
+                    if (session.CustomAction != null) w.WriteMessageBytes(8, session.CustomAction.ToByteArray());
+                    break;
+            }
+
+            return w.ToArray();
+        }
+
+        public void EditCommit(long gridId, string text, long sessionId = 0L, ulong stateVersion = 0UL)
+        {
+            InvokeUnary(
+                EditMethod,
+                BuildEditSessionCommandBytes(
+                    gridId,
+                    new EditorSessionCommand
+                    {
+                        Commit = new Volvoxgrid.V1.EditCommit { Value = EditorValueFromText(text) },
+                    },
+                    sessionId,
+                    stateVersion));
+        }
+
+        public void EditCancel(long gridId, long sessionId = 0L, ulong stateVersion = 0UL)
+        {
+            InvokeUnary(
+                EditMethod,
+                BuildEditSessionCommandBytes(
+                    gridId,
+                    new EditorSessionCommand { Cancel = new Volvoxgrid.V1.EditCancel() },
+                    sessionId,
+                    stateVersion));
+        }
+
+        public void EditSetPreedit(long gridId, string text, int cursor, bool commit, long sessionId = 0L, ulong stateVersion = 0UL)
+        {
+            var preedit = new Volvoxgrid.V1.EditorPreeditChanged { Text = text ?? string.Empty, Cursor = cursor, Commit = commit };
+            InvokeUnary(
+                EditMethod,
+                BuildEditSessionCommandBytes(
+                    gridId,
+                    new EditorSessionCommand { PreeditChanged = preedit },
+                    sessionId,
+                    stateVersion));
+        }
+
+        public void EditSetText(long gridId, string text, long sessionId = 0L, ulong stateVersion = 0UL)
+        {
+            InvokeUnary(
+                EditMethod,
+                BuildEditSessionCommandBytes(
+                    gridId,
+                    new EditorSessionCommand
+                    {
+                        ValueChanged = new EditorValueChanged { Value = EditorValueFromText(text) },
+                    },
+                    sessionId,
+                    stateVersion));
+        }
+
+        public void EditSetSelection(long gridId, int start, int length, long sessionId = 0L, ulong stateVersion = 0UL)
+        {
+            InvokeUnary(
+                EditMethod,
+                BuildEditSessionCommandBytes(
+                    gridId,
+                    new EditorSessionCommand
+                    {
+                        SelectionChanged = new TextSelectionChanged
+                        {
+                            Selection = new TextSelection
+                            {
+                                Start = start,
+                                Length = length,
+                            },
+                        },
+                    },
+                    sessionId,
+                    stateVersion));
         }
 
         public EditState GetEditState(long gridId)
         {
-            var cmd = new EditCommand { GridId = gridId };
+            var cmd = new EditCommand { GridId = gridId, GetState = new EditGetState() };
             byte[] response = InvokeUnary(EditMethod, cmd.ToByteArray());
-            return EditState.ParseFrom(response);
+            EditState state = EditState.ParseFrom(response);
+            HydrateEditStateVersion(response, state);
+            return state;
+        }
+
+        private static void HydrateEditStateVersion(byte[] editStateBytes, EditState state)
+        {
+            if (state == null || state.Session == null)
+            {
+                return;
+            }
+
+            byte[] sessionBytes = ReadLengthDelimitedField(editStateBytes, 2);
+            if (sessionBytes == null)
+            {
+                return;
+            }
+
+            ulong stateVersion = ReadUInt64Field(sessionBytes, 11);
+            if (stateVersion != 0UL)
+            {
+                state.Session.StateVersion = stateVersion;
+            }
+        }
+
+        private static byte[] ReadLengthDelimitedField(byte[] bytes, int targetField)
+        {
+            var r = new ProtoReader(bytes);
+            int field;
+            ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                if (field == targetField && wire == ProtoWireType.LengthDelimited)
+                {
+                    return r.ReadLengthDelimited();
+                }
+                r.SkipField(wire);
+            }
+            return null;
+        }
+
+        private static ulong ReadUInt64Field(byte[] bytes, int targetField)
+        {
+            var r = new ProtoReader(bytes);
+            int field;
+            ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                if (field == targetField && wire == ProtoWireType.Varint)
+                {
+                    return unchecked((ulong)r.ReadInt64());
+                }
+                r.SkipField(wire);
+            }
+            return 0UL;
         }
 
         public ClipboardResponse Clipboard(long gridId, string action, string pasteText)

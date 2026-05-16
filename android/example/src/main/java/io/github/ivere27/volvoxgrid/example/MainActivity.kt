@@ -15,6 +15,7 @@ import android.widget.ScrollView
 import android.widget.Spinner
 import android.widget.Switch
 import android.widget.TextView
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.PopupMenu
@@ -84,6 +85,16 @@ class MainActivity : AppCompatActivity() {
         spRendererMode = findViewById(R.id.spRendererMode)
         swDebug = findViewById(R.id.swDebug)
         spTextCache = findViewById(R.id.spTextCache)
+
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (gridView.cancelActiveEdit()) {
+                    return
+                }
+                isEnabled = false
+                onBackPressedDispatcher.onBackPressed()
+            }
+        })
 
         val modeAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, rendererModeOptions)
         modeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
@@ -322,10 +333,14 @@ class MainActivity : AppCompatActivity() {
                         .setLayout(LayoutConfig.newBuilder()
                             .setRows(rows)
                             .setCols(cols)
+                            .setExtendLastCol(true)
                             .build())
                         .setRendering(RenderConfig.newBuilder()
                             .setFramePacingMode(FramePacingMode.FRAME_PACING_MODE_PLATFORM)
                             .setScrollBlit(scrollBlitEnabled)
+                            .build())
+                        .setSpan(SpanConfig.newBuilder()
+                            .setCellSpan(CellSpanMode.CELL_SPAN_ADJACENT)
                             .build())
                         .setIndicators(IndicatorsConfig.newBuilder()
                             .setRowStart(RowIndicatorConfig.newBuilder()
@@ -345,9 +360,11 @@ class MainActivity : AppCompatActivity() {
                             .setColTop(ColIndicatorConfig.newBuilder()
                                 .setVisible(true)
                                 .setBandRows(1)
-                                .setModeBits(
-                                    ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT.number or
-                                        ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH.number
+                                .setCellModes(
+                                    ColIndicatorCellModes.newBuilder()
+                                        .addModes(ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT)
+                                        .addModes(ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH)
+                                        .build()
                                 )
                                 .build())
                             .build())

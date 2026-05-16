@@ -76,6 +76,10 @@ impl Renderer {
         self.text_engine.set_external_rasterizer(r);
     }
 
+    pub fn set_font_fallback_enabled(&mut self, enabled: bool) {
+        self.text_engine.set_font_fallback_enabled(enabled);
+    }
+
     /// Returns the number of entries currently in the text layout cache.
     pub fn text_cache_len(&self) -> usize {
         if let Some(custom) = self.custom_text_renderer.as_ref() {
@@ -126,6 +130,8 @@ impl Renderer {
         if let Some(custom) = self.custom_text_renderer.as_mut() {
             custom.set_cache_cap(grid.text_layout_cache_cap);
         }
+        self.text_engine
+            .set_font_fallback_enabled(grid.font_fallback_enabled);
 
         // Sync text rasterization options from current grid style.
         self.text_engine.set_render_options(
@@ -135,8 +141,9 @@ impl Renderer {
         );
 
         let text_renderer: &mut dyn TextRenderer = match self.custom_text_renderer.as_mut() {
-            Some(custom) => &mut **custom,
+            Some(custom) if grid.font_fallback_enabled => &mut **custom,
             None => &mut self.text_engine,
+            Some(_) => &mut self.text_engine,
         };
 
         let current_scroll_state = ScrollCacheState::snapshot(grid, width, height);
@@ -329,6 +336,71 @@ mod tests {
     }
 
     #[test]
+    fn render_skips_custom_text_renderer_when_font_fallback_disabled() {
+        use std::sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc,
+        };
+
+        struct CountingTextRenderer {
+            calls: Arc<AtomicUsize>,
+        }
+
+        impl TextRenderer for CountingTextRenderer {
+            fn measure_text(
+                &mut self,
+                text: &str,
+                _font_name: &str,
+                _font_size: f32,
+                _bold: bool,
+                _italic: bool,
+                _max_width: Option<f32>,
+            ) -> (f32, f32) {
+                ((text.len().max(1) as f32) * 6.0, 8.0)
+            }
+
+            fn render_text(
+                &mut self,
+                _buffer_pixels: &mut [u8],
+                _buf_width: i32,
+                _buf_height: i32,
+                _stride: i32,
+                _x: i32,
+                _y: i32,
+                _clip_x: i32,
+                _clip_y: i32,
+                _clip_w: i32,
+                _clip_h: i32,
+                _text: &str,
+                _font_name: &str,
+                _font_size: f32,
+                _bold: bool,
+                _italic: bool,
+                _color: u32,
+                _max_width: Option<f32>,
+            ) -> f32 {
+                self.calls.fetch_add(1, Ordering::SeqCst);
+                0.0
+            }
+        }
+
+        let mut grid = VolvoxGrid::new(1, 120, 80, 1, 1, 0, 0);
+        grid.set_font_fallback_enabled(false);
+        grid.cells.set_text(0, 0, "Hello".to_string());
+        grid.style.grid_lines = pb::GridLineStyle::GridlineNone as i32;
+        grid.ensure_layout();
+
+        let calls = Arc::new(AtomicUsize::new(0));
+        let mut renderer = Renderer::with_custom_text_renderer(Box::new(CountingTextRenderer {
+            calls: calls.clone(),
+        }));
+        let mut buffer = vec![0u8; (120 * 80 * 4) as usize];
+        renderer.render(&grid, &mut buffer, 120, 80, 120 * 4);
+
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
     fn render_draws_data_text_with_top_indicator_without_row_resize() {
         let mut grid = VolvoxGrid::new(1, 120, 80, 1, 1, 0, 0);
         grid.cells.set_text(0, 0, "Hello".to_string());
@@ -338,8 +410,8 @@ mod tests {
         grid.indicator_bands.col_top.visible = true;
         grid.indicator_bands.col_top.band_rows = 1;
         grid.indicator_bands.col_top.default_row_height_px = 24;
-        grid.indicator_bands.col_top.mode_bits =
-            pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as u32;
+        grid.indicator_bands.col_top.cell_modes =
+            vec![pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as i32];
         grid.ensure_layout();
 
         let mut renderer = Renderer::with_custom_text_renderer(Box::new(SolidTextRenderer));
@@ -369,8 +441,8 @@ mod tests {
         grid.indicator_bands.col_top.visible = true;
         grid.indicator_bands.col_top.band_rows = 1;
         grid.indicator_bands.col_top.default_row_height_px = 24;
-        grid.indicator_bands.col_top.mode_bits =
-            pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as u32;
+        grid.indicator_bands.col_top.cell_modes =
+            vec![pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as i32];
         grid.selection.selection_style.back_color = Some(0xFF224466);
         grid.selection.selection_style.fore_color = Some(0xFFFFFFFF);
         grid.selection
@@ -409,8 +481,8 @@ mod tests {
         grid.indicator_bands.col_top.visible = true;
         grid.indicator_bands.col_top.band_rows = 1;
         grid.indicator_bands.col_top.default_row_height_px = 24;
-        grid.indicator_bands.col_top.mode_bits =
-            pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as u32;
+        grid.indicator_bands.col_top.cell_modes =
+            vec![pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as i32];
         grid.selection.hover_mode = HOVER_COLUMN;
         grid.selection.hover_column_style.back_color = Some(0xFF557799);
         grid.mouse_row = -1;
@@ -756,8 +828,8 @@ mod tests {
         grid.indicator_bands.col_top.visible = true;
         grid.indicator_bands.col_top.band_rows = 1;
         grid.indicator_bands.col_top.default_row_height_px = 24;
-        grid.indicator_bands.col_top.mode_bits =
-            pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as u32;
+        grid.indicator_bands.col_top.cell_modes =
+            vec![pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as i32];
 
         for row in 0..grid.rows {
             grid.set_row_height(row, 20 + (row % 3) * 4);

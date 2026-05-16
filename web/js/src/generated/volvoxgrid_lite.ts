@@ -768,6 +768,12 @@ export enum BorderStyle {
   BORDER_DASHED = 4,
   BORDER_DOUBLE = 5,
 }
+export enum ButtonRole {
+  BUTTON_ROLE_DEFAULT = 0,
+  BUTTON_ROLE_ELLIPSIS = 1,
+  BUTTON_ROLE_CLEAR = 2,
+  BUTTON_ROLE_CUSTOM = 3,
+}
 export enum CellHitArea {
   HIT_CELL = 0,
   HIT_TEXT = 1,
@@ -892,10 +898,25 @@ export enum DropdownItemLayout {
   DROPDOWN_ITEM_VALUE_LABEL = 2,
   DROPDOWN_ITEM_LABEL_DETAILS = 3,
 }
-export enum DropdownTrigger {
-  DROPDOWN_NEVER = 0,
-  DROPDOWN_ALWAYS = 1,
-  DROPDOWN_ON_EDIT = 2,
+export enum EditEndReason {
+  EDIT_END_UNSPECIFIED = 0,
+  EDIT_END_COMMITTED = 1,
+  EDIT_END_CANCELED = 2,
+  EDIT_END_REVERTED_INVALID = 3,
+  EDIT_END_FOCUS_LOST = 4,
+  EDIT_END_CELL_REMOVED = 5,
+  EDIT_END_GRID_DESTROYED = 6,
+}
+export enum EditStartReason {
+  EDIT_START_UNSPECIFIED = 0,
+  EDIT_START_F2 = 1,
+  EDIT_START_DOUBLE_CLICK = 2,
+  EDIT_START_CLICK_CARET = 3,
+  EDIT_START_ENTER_KEY = 4,
+  EDIT_START_PRINTABLE_KEY = 5,
+  EDIT_START_IME_COMPOSITION = 6,
+  EDIT_START_DROPDOWN_BUTTON = 7,
+  EDIT_START_PROGRAMMATIC = 8,
 }
 export enum EditTrigger {
   EDIT_TRIGGER_NONE = 0,
@@ -905,6 +926,39 @@ export enum EditTrigger {
 export enum EditUiMode {
   EDIT_UI_MODE_ENTER = 0,
   EDIT_UI_MODE_EDIT = 1,
+}
+export enum EditorKind {
+  EDITOR_KIND_UNSPECIFIED = 0,
+  EDITOR_TEXT = 1,
+  EDITOR_MULTILINE_TEXT = 2,
+  EDITOR_NUMBER = 3,
+  EDITOR_CHECKBOX = 4,
+  EDITOR_SELECT = 5,
+  EDITOR_COMBO = 6,
+  EDITOR_DATE_TIME = 7,
+  EDITOR_BUTTON = 8,
+  EDITOR_CUSTOM = 100,
+}
+export enum EditorOwner {
+  EDITOR_OWNER_ENGINE = 0,
+  EDITOR_OWNER_HOST_NATIVE = 1,
+  EDITOR_OWNER_CUSTOM = 2,
+}
+export enum EditorPresentation {
+  EDITOR_CANVAS = 0,
+  EDITOR_POPUP_OVER = 1,
+  EDITOR_POPUP_UNDER = 2,
+  EDITOR_MODAL = 3,
+  EDITOR_INLINE = 4,
+}
+export enum EditorUpdateReason {
+  EDITOR_UPDATE_UNSPECIFIED = 0,
+  EDITOR_UPDATE_GEOMETRY = 1,
+  EDITOR_UPDATE_VALIDATION = 2,
+  EDITOR_UPDATE_NORMALIZED_VALUE = 3,
+  EDITOR_UPDATE_PROGRAMMATIC_VALUE = 4,
+  EDITOR_UPDATE_REMOTE_VALUE = 5,
+  EDITOR_UPDATE_CUSTOM_PAYLOAD = 6,
 }
 export enum ErrorCode {
   ERROR_UNKNOWN = 0,
@@ -1036,6 +1090,14 @@ export enum IndicatorBand {
   INDICATOR_BAND_CORNER_BOTTOM_START = 7,
   INDICATOR_BAND_CORNER_BOTTOM_END = 8,
 }
+export enum InputType {
+  INPUT_TYPE_TEXT = 0,
+  INPUT_TYPE_NUMBER = 1,
+  INPUT_TYPE_EMAIL = 2,
+  INPUT_TYPE_URL = 3,
+  INPUT_TYPE_PHONE = 4,
+  INPUT_TYPE_PASSWORD = 5,
+}
 export enum KeyEvent_Type {
   KEY_TYPE_UNSPECIFIED = 0,
   KEY_DOWN = 1,
@@ -1137,6 +1199,7 @@ export enum RowIndicatorSlotKind {
   ROW_INDICATOR_SLOT_ACTION = 12,
   ROW_INDICATOR_SLOT_STATUS_ICON = 13,
   ROW_INDICATOR_SLOT_CUSTOM = 14,
+  ROW_INDICATOR_SLOT_NUMBERS_DATA_ONLY = 15,
 }
 export enum ScrollBarAppearance {
   SCROLLBAR_APPEARANCE_CLASSIC = 0,
@@ -1231,6 +1294,15 @@ export enum TextRenderMode {
   TEXT_RENDER_SUBPIXEL = 2,
   TEXT_RENDER_MONO = 3,
 }
+export enum ThemePreset {
+  THEME_NONE = 0,
+  THEME_CLASSIC = 1,
+  THEME_LIGHT = 2,
+  THEME_DARK = 3,
+  THEME_HIGH_CONTRAST = 4,
+  THEME_MONOKAI = 5,
+  THEME_AMBER = 6,
+}
 export enum TreeIndicatorStyle {
   TREE_INDICATOR_NONE = 0,
   TREE_INDICATOR_ARROWS = 1,
@@ -1247,6 +1319,17 @@ export enum TypePolicy {
   TYPE_AUTO_DETECT = 0,
   TYPE_ALL_STRING = 1,
   TYPE_FROM_SCHEMA = 2,
+}
+export enum ValidationMode {
+  VALIDATION_BLOCK = 0,
+  VALIDATION_REVERT = 1,
+  VALIDATION_ALLOW_INVALID = 2,
+}
+export enum ValidationTrigger {
+  VALIDATION_TRIGGER_ON_COMMIT = 0,
+  VALIDATION_TRIGGER_ON_CHANGE = 1,
+  VALIDATION_TRIGGER_ON_PAUSE = 2,
+  VALIDATION_TRIGGER_ON_FOCUS_LOST = 3,
 }
 export enum WriteErrorMode {
   WRITE_ERROR_UNSPECIFIED = 0,
@@ -1365,17 +1448,6 @@ export const BarcodeRenderOptionsFields = {
   "size_warning_color": 13,
   "use_full_rect": 14,
 } as const;
-export const BeforeDropdownOpenEventFields = {
-  "row": 1,
-  "col": 2,
-  "x": 3,
-  "y": 4,
-  "width": 5,
-  "height": 6,
-  "dropdown": 7,
-  "current_value": 8,
-  "selected_index": 9,
-} as const;
 export const BeforeEditEventFields = {
   "row": 1,
   "col": 2,
@@ -1456,14 +1528,6 @@ export const CellDataFields = {
 export const CellEditChangeEventFields = {
   "text": 1,
 } as const;
-export const CellEditConfigureStyleEventFields = {
-  "row": 1,
-  "col": 2,
-} as const;
-export const CellEditConfigureWindowEventFields = {
-  "row": 1,
-  "col": 2,
-} as const;
 export const CellEditValidateEventFields = {
   "row": 1,
   "col": 2,
@@ -1508,7 +1572,7 @@ export const CellUpdateFields = {
   "picture": 6,
   "picture_align": 7,
   "button_picture": 8,
-  "dropdown": 9,
+  "editor": 9,
   "sticky_row": 10,
   "sticky_col": 11,
   "interaction": 12,
@@ -1524,6 +1588,9 @@ export const CellValueFields = {
 } as const;
 export const CellsResponseFields = {
   "cells": 1,
+} as const;
+export const CheckboxEditorParamsFields = {
+  "three_state": 1,
 } as const;
 export const ClearRequestFields = {
   "grid_id": 1,
@@ -1567,25 +1634,28 @@ export const ColIndicatorCellFields = {
   "col1": 3,
   "col2": 4,
   "text": 5,
-  "mode_bits": 6,
-  "custom_key": 7,
-  "data": 8,
+  "custom_key": 6,
+  "data": 7,
+  "modes": 8,
+} as const;
+export const ColIndicatorCellModesFields = {
+  "modes": 1,
 } as const;
 export const ColIndicatorConfigFields = {
   "visible": 1,
   "default_row_height": 2,
   "band_rows": 3,
-  "mode_bits": 4,
-  "background": 5,
-  "foreground": 6,
-  "grid_lines": 7,
-  "grid_color": 8,
-  "auto_size": 9,
-  "allow_resize": 10,
-  "allow_reorder": 11,
-  "allow_menu": 12,
-  "row_defs": 13,
-  "cells": 14,
+  "background": 4,
+  "foreground": 5,
+  "grid_lines": 6,
+  "grid_color": 7,
+  "auto_size": 8,
+  "allow_resize": 9,
+  "allow_reorder": 10,
+  "allow_menu": 11,
+  "row_defs": 12,
+  "cells": 13,
+  "cell_modes": 14,
 } as const;
 export const ColIndicatorRowDefFields = {
   "index": 1,
@@ -1604,21 +1674,20 @@ export const ColumnDefFields = {
   "key": 10,
   "sort_order": 11,
   "sort_type": 12,
-  "dropdown": 13,
-  "edit_mask": 14,
-  "indent": 15,
-  "hidden": 16,
-  "span": 17,
-  "image_list": 18,
-  "data": 19,
-  "sticky": 20,
-  "padding": 21,
-  "fixed_padding": 22,
-  "nullable": 23,
-  "coercion_mode": 24,
-  "error_mode": 25,
-  "interaction": 26,
-  "progress_color": 27,
+  "editor": 13,
+  "indent": 14,
+  "hidden": 15,
+  "span": 16,
+  "image_list": 17,
+  "data": 18,
+  "sticky": 19,
+  "padding": 20,
+  "fixed_padding": 21,
+  "nullable": 22,
+  "coercion_mode": 23,
+  "error_mode": 24,
+  "interaction": 25,
+  "progress_color": 26,
 } as const;
 export const CompareEventFields = {
   "request_id": 1,
@@ -1638,12 +1707,11 @@ export const ConfigureResponseFields = {
 } as const;
 export const CornerIndicatorConfigFields = {
   "visible": 1,
-  "mode_bits": 2,
-  "background": 3,
-  "foreground": 4,
-  "custom_key": 5,
-  "data": 6,
-  "slots": 7,
+  "background": 2,
+  "foreground": 3,
+  "custom_key": 4,
+  "data": 5,
+  "slots": 6,
 } as const;
 export const CornerIndicatorSlotFields = {
   "kind": 1,
@@ -1671,6 +1739,17 @@ export const CsvOptionsFields = {
 export const CursorChangeFields = {
   "cursor": 1,
 } as const;
+export const CustomEditorActionFields = {
+  "action_id": 1,
+  "payload": 2,
+} as const;
+export const CustomEditorActionEventFields = {
+  "session_id": 1,
+  "row": 2,
+  "col": 3,
+  "action_id": 4,
+  "payload": 5,
+} as const;
 export const CustomRenderCellEventFields = {
   "row": 1,
   "col": 2,
@@ -1685,6 +1764,13 @@ export const CustomRenderCellEventFields = {
 export const DataRefreshedEventFields = {
 } as const;
 export const DataRefreshingEventFields = {
+} as const;
+export const DateTimeEditorParamsFields = {
+  "format": 1,
+  "min_timestamp": 2,
+  "max_timestamp": 3,
+  "date_only": 4,
+  "time_only": 5,
 } as const;
 export const DblClickEventFields = {
   "row": 1,
@@ -1725,115 +1811,161 @@ export const DragStartEventFields = {
   "row": 1,
   "col": 2,
 } as const;
-export const DropdownFields = {
-  "items": 1,
-  "allow_custom_value": 2,
-  "item_layout": 3,
-  "searchable": 4,
-} as const;
-export const DropdownClosedEventFields = {
-} as const;
-export const DropdownItemFields = {
-  "value": 1,
-  "label": 2,
-  "details": 3,
-  "disabled": 4,
-} as const;
-export const DropdownOpenedEventFields = {
-} as const;
-export const DropdownRequestFields = {
-  "row": 1,
-  "col": 2,
-  "x": 3,
-  "y": 4,
-  "width": 5,
-  "height": 6,
-  "items": 7,
-  "selected": 8,
-  "editable": 9,
+export const EditActivationFields = {
+  "trigger": 1,
+  "tab_behavior": 2,
+  "single_click_edit": 3,
+  "suppress_click_edit": 4,
+  "commit_on_focus_lost": 5,
+  "preserve_edit_on_navigation": 6,
 } as const;
 export const EditCancelFields = {
 } as const;
 export const EditCommandFields = {
   "grid_id": 1,
   "start": 2,
-  "commit": 3,
-  "cancel": 4,
-  "set_text": 5,
-  "set_selection": 6,
-  "finish": 7,
-  "set_highlights": 8,
-  "set_preedit": 9,
+  "session": 3,
+  "get_state": 4,
 } as const;
 export const EditCommitFields = {
-  "text": 1,
+  "value": 1,
 } as const;
 export const EditConfigFields = {
-  "trigger": 1,
-  "tab_behavior": 2,
-  "dropdown_trigger": 3,
-  "dropdown_search": 4,
-  "max_length": 5,
-  "mask": 6,
-  "host_key_dispatch": 7,
-  "host_pointer_dispatch": 8,
-  "engine_compose": 9,
-  "compose_method": 10,
+  "activation": 1,
+  "default_editor": 2,
+  "compose_method": 3,
 } as const;
-export const EditFinishFields = {
-} as const;
-export const EditRequestFields = {
-  "row": 1,
-  "col": 2,
-  "x": 3,
-  "y": 4,
-  "width": 5,
-  "height": 6,
-  "current_value": 7,
-  "edit_mask": 8,
-  "max_length": 9,
-  "sel_start": 10,
-  "sel_length": 11,
-  "ui_mode": 12,
+export const EditGetStateFields = {
 } as const;
 export const EditSetHighlightsFields = {
   "regions": 1,
 } as const;
-export const EditSetPreeditFields = {
+export const EditStartFields = {
+  "row": 1,
+  "col": 2,
+  "reason": 3,
+  "seed_value": 4,
+  "caret_position": 5,
+} as const;
+export const EditStateFields = {
+  "active": 1,
+  "session": 2,
+} as const;
+export const EditValidationRequestFields = {
+  "request_id": 1,
+  "session_id": 2,
+  "row": 3,
+  "col": 4,
+  "value": 5,
+} as const;
+export const EditValidationResponseFields = {
+  "request_id": 1,
+  "session_id": 2,
+  "errors": 3,
+  "normalized_value": 4,
+} as const;
+export const EditorActionFields = {
+  "action_id": 1,
+  "label": 2,
+  "role": 3,
+  "icon": 4,
+} as const;
+export const EditorCapabilitiesFields = {
+  "accepts_text_input": 1,
+  "supports_selection": 2,
+  "supports_cut": 3,
+  "supports_paste": 4,
+  "supports_undo": 5,
+} as const;
+export const EditorListItemsRequestFields = {
+  "request_id": 1,
+  "session_id": 2,
+  "data_source_id": 3,
+  "filter_text": 4,
+  "offset": 5,
+  "limit": 6,
+} as const;
+export const EditorListItemsResponseFields = {
+  "request_id": 1,
+  "session_id": 2,
+  "items": 3,
+  "has_more": 4,
+} as const;
+export const EditorPreeditChangedFields = {
   "text": 1,
   "cursor": 2,
   "commit": 3,
 } as const;
-export const EditSetSelectionFields = {
-  "start": 1,
-  "length": 2,
-} as const;
-export const EditSetTextFields = {
-  "text": 1,
-} as const;
-export const EditStartFields = {
-  "row": 1,
-  "col": 2,
-  "select_all": 3,
-  "caret_end": 4,
-  "seed_text": 5,
-  "formula_mode": 6,
-} as const;
-export const EditStateFields = {
-  "active": 1,
+export const EditorSessionFields = {
+  "session_id": 1,
   "row": 2,
   "col": 3,
-  "text": 4,
-  "sel_start": 5,
-  "sel_length": 6,
-  "composing": 7,
-  "preedit_text": 8,
-  "ui_mode": 9,
-  "x": 10,
-  "y": 11,
-  "width": 12,
-  "height": 13,
-  "max_length": 14,
+  "viewport_rect": 4,
+  "editor": 5,
+  "value": 6,
+  "selection": 7,
+  "ui_mode": 8,
+  "capabilities": 9,
+  "reason": 10,
+  "state_version": 11,
+  "composing": 12,
+  "preedit_text": 13,
+  "validation_errors": 14,
+} as const;
+export const EditorSessionCommandFields = {
+  "session_id": 1,
+  "state_version": 2,
+  "value_changed": 3,
+  "selection_changed": 4,
+  "preedit_changed": 5,
+  "commit": 6,
+  "cancel": 7,
+  "custom_action": 8,
+} as const;
+export const EditorSessionEndedFields = {
+  "session_id": 1,
+  "reason": 2,
+  "committed_value": 3,
+  "state_version": 4,
+} as const;
+export const EditorSessionStartedFields = {
+  "session": 1,
+} as const;
+export const EditorSessionUpdatedFields = {
+  "session_id": 1,
+  "state_version": 2,
+  "reason": 3,
+  "viewport_rect": 4,
+  "value": 5,
+  "selection": 6,
+  "visible": 7,
+  "force_refocus": 8,
+  "validation_errors": 9,
+  "custom_payload": 10,
+} as const;
+export const EditorSpecFields = {
+  "kind": 1,
+  "owner": 2,
+  "presentation": 3,
+  "validation_mode": 4,
+  "validation_trigger": 5,
+  "validation_debounce_ms": 6,
+  "custom_editor_id": 10,
+  "text": 11,
+  "number": 12,
+  "checkbox": 13,
+  "list": 14,
+  "date_time": 15,
+  "actions": 16,
+  "custom_props": 17,
+} as const;
+export const EditorValueFields = {
+  "value": 1,
+  "edit_text": 2,
+  "display_text": 3,
+} as const;
+export const EditorValueChangedFields = {
+  "value": 1,
 } as const;
 export const EnterCellEventFields = {
   "row": 1,
@@ -1985,6 +2117,7 @@ export const GridConfigFields = {
   "rendering": 9,
   "version": 10,
   "indicators": 11,
+  "theme_preset": 12,
 } as const;
 export const GridEventFields = {
   "grid_id": 1,
@@ -2000,73 +2133,71 @@ export const GridEventFields = {
   "after_edit": 10,
   "cell_edit_validate": 11,
   "cell_edit_change": 12,
-  "key_down_edit": 14,
-  "key_press_edit": 15,
-  "key_up_edit": 16,
-  "cell_edit_configure_style": 17,
-  "cell_edit_configure_window": 18,
-  "dropdown_closed": 19,
-  "dropdown_opened": 20,
-  "cell_changed": 21,
-  "row_status_change": 22,
-  "before_sort": 23,
-  "after_sort": 24,
-  "compare": 25,
-  "before_node_toggle": 26,
-  "after_node_toggle": 27,
-  "before_scroll": 28,
-  "after_scroll": 29,
-  "scroll_tooltip": 30,
-  "before_user_resize": 31,
-  "after_user_resize": 32,
-  "after_user_freeze": 33,
-  "before_move_column": 34,
-  "after_move_column": 35,
-  "before_move_row": 36,
-  "after_move_row": 37,
-  "before_mouse_down": 38,
-  "mouse_down": 39,
-  "mouse_up": 40,
-  "mouse_move": 41,
-  "click": 42,
-  "dbl_click": 43,
-  "key_down": 44,
-  "key_press": 45,
-  "key_up": 46,
-  "custom_render_cell": 47,
-  "drag_start": 48,
-  "drag_over": 49,
-  "drag_drop": 50,
-  "drag_complete": 51,
-  "type_ahead_started": 52,
-  "type_ahead_ended": 53,
-  "data_refreshing": 54,
-  "data_refreshed": 55,
-  "filter_data": 56,
-  "error": 57,
-  "before_page_break": 58,
-  "start_page": 59,
-  "get_header_row": 60,
-  "pull_to_refresh_triggered": 61,
-  "pull_to_refresh_canceled": 62,
-  "before_dropdown_open": 63,
-  "tree_children_requested": 64,
-  "before_tree_node_toggle": 65,
-  "after_tree_node_toggle": 66,
-  "tree_node_activate": 67,
-  "tree_node_context_menu": 68,
+  "key_down_edit": 13,
+  "key_press_edit": 14,
+  "key_up_edit": 15,
+  "edit_validation_request": 16,
+  "editor_list_items_request": 17,
+  "custom_editor_action": 18,
+  "cell_changed": 19,
+  "row_status_change": 20,
+  "before_sort": 21,
+  "after_sort": 22,
+  "compare": 23,
+  "before_node_toggle": 24,
+  "after_node_toggle": 25,
+  "before_scroll": 26,
+  "after_scroll": 27,
+  "scroll_tooltip": 28,
+  "before_user_resize": 29,
+  "after_user_resize": 30,
+  "after_user_freeze": 31,
+  "before_move_column": 32,
+  "after_move_column": 33,
+  "before_move_row": 34,
+  "after_move_row": 35,
+  "before_mouse_down": 36,
+  "mouse_down": 37,
+  "mouse_up": 38,
+  "mouse_move": 39,
+  "click": 40,
+  "dbl_click": 41,
+  "key_down": 42,
+  "key_press": 43,
+  "key_up": 44,
+  "custom_render_cell": 45,
+  "drag_start": 46,
+  "drag_over": 47,
+  "drag_drop": 48,
+  "drag_complete": 49,
+  "type_ahead_started": 50,
+  "type_ahead_ended": 51,
+  "data_refreshing": 52,
+  "data_refreshed": 53,
+  "filter_data": 54,
+  "error": 55,
+  "before_page_break": 56,
+  "start_page": 57,
+  "get_header_row": 58,
+  "pull_to_refresh_triggered": 59,
+  "pull_to_refresh_canceled": 60,
+  "tree_children_requested": 61,
+  "before_tree_node_toggle": 62,
+  "after_tree_node_toggle": 63,
+  "tree_node_activate": 64,
+  "tree_node_context_menu": 65,
 } as const;
 export const GridEventTargetFields = {
   "kind": 1,
   "band": 2,
   "slot_index": 3,
   "slot_kind": 4,
-  "sub_mode_bits": 5,
-  "custom_key": 6,
-  "text": 7,
-  "int_value": 8,
-  "status_flags": 9,
-  "data": 10,
+  "custom_key": 5,
+  "text": 6,
+  "int_value": 7,
+  "status_flags": 8,
+  "data": 9,
+  "sub_mode": 10,
 } as const;
 export const GridLinesFields = {
   "style": 1,
@@ -2241,8 +2372,9 @@ export const JsonOptionsFields = {
   "data_path": 1,
 } as const;
 export const KeyDownEditEventFields = {
-  "key_code": 1,
-  "modifier": 2,
+  "session_id": 1,
+  "key_code": 2,
+  "modifier": 3,
 } as const;
 export const KeyDownEventFields = {
   "key_code": 1,
@@ -2255,14 +2387,16 @@ export const KeyEventFields = {
   "character": 4,
 } as const;
 export const KeyPressEditEventFields = {
-  "key_ascii": 1,
+  "session_id": 1,
+  "key_ascii": 2,
 } as const;
 export const KeyPressEventFields = {
   "key_ascii": 1,
 } as const;
 export const KeyUpEditEventFields = {
-  "key_code": 1,
-  "modifier": 2,
+  "session_id": 1,
+  "key_code": 2,
+  "modifier": 3,
 } as const;
 export const KeyUpEventFields = {
   "key_code": 1,
@@ -2284,6 +2418,26 @@ export const LeaveCellEventFields = {
   "row": 1,
   "col": 2,
   "target": 3,
+} as const;
+export const ListDataSourceFields = {
+  "data_source_id": 1,
+  "filterable": 2,
+  "pageable": 3,
+  "page_size": 4,
+} as const;
+export const ListEditorParamsFields = {
+  "static_items": 1,
+  "data_source": 2,
+  "allow_custom_value": 3,
+  "searchable": 4,
+  "multi_select": 5,
+  "item_layout": 6,
+} as const;
+export const ListItemFields = {
+  "value": 1,
+  "label": 2,
+  "details": 3,
+  "disabled": 4,
 } as const;
 export const LoadDataOptionsFields = {
   "csv": 1,
@@ -2402,16 +2556,23 @@ export const NodeInfoFields = {
   "first_child": 6,
   "last_child": 7,
 } as const;
+export const NumberEditorParamsFields = {
+  "min": 1,
+  "max": 2,
+  "step": 3,
+  "format": 4,
+  "nullable": 5,
+} as const;
 export const OutlineConfigFields = {
   "tree_indicator": 1,
-  "tree_color": 3,
-  "group_total_position": 4,
-  "multi_totals": 5,
-  "indicator_indent": 6,
-  "max_levels": 7,
-  "show_level_buttons": 8,
-  "label_column": 9,
-  "icon_column": 10,
+  "tree_color": 2,
+  "group_total_position": 3,
+  "multi_totals": 4,
+  "indicator_indent": 5,
+  "max_levels": 6,
+  "show_level_buttons": 7,
+  "label_column": 8,
+  "icon_column": 9,
 } as const;
 export const OutlineRequestFields = {
   "grid_id": 1,
@@ -2463,6 +2624,12 @@ export const PullToRefreshConfigFields = {
 } as const;
 export const PullToRefreshTriggeredEventFields = {
 } as const;
+export const RectFields = {
+  "x": 1,
+  "y": 2,
+  "width": 3,
+  "height": 4,
+} as const;
 export const RefreshRequestFields = {
   "grid_id": 1,
 } as const;
@@ -2501,6 +2668,7 @@ export const RenderConfigFields = {
   "render_layer_mask": 9,
   "layer_profiling": 10,
   "scroll_blit": 11,
+  "font_fallback_enabled": 12,
 } as const;
 export const RenderInputFields = {
   "grid_id": 1,
@@ -2517,16 +2685,19 @@ export const RenderInputFields = {
   "terminal_viewport": 12,
   "terminal_command": 13,
   "compare_response": 14,
+  "edit_validation_response": 15,
+  "editor_list_items_response": 16,
 } as const;
 export const RenderOutputFields = {
   "rendered": 1,
   "frame_done": 2,
   "selection": 3,
   "cursor": 4,
-  "edit_request": 5,
-  "dropdown_request": 6,
-  "tooltip_request": 7,
-  "gpu_frame_done": 8,
+  "editor_started": 5,
+  "editor_updated": 6,
+  "editor_ended": 7,
+  "tooltip_request": 8,
+  "gpu_frame_done": 9,
 } as const;
 export const ResizePolicyFields = {
   "columns": 1,
@@ -2561,15 +2732,15 @@ export const RowDefFields = {
 export const RowIndicatorConfigFields = {
   "visible": 1,
   "width": 2,
-  "background": 4,
-  "foreground": 5,
-  "grid_lines": 6,
-  "grid_color": 7,
-  "auto_size": 8,
-  "allow_resize": 9,
-  "allow_select": 10,
-  "allow_reorder": 11,
-  "slots": 12,
+  "background": 3,
+  "foreground": 4,
+  "grid_lines": 5,
+  "grid_color": 6,
+  "auto_size": 7,
+  "allow_resize": 8,
+  "allow_select": 9,
+  "allow_reorder": 10,
+  "slots": 11,
 } as const;
 export const RowIndicatorSlotFields = {
   "kind": 1,
@@ -2585,6 +2756,12 @@ export const RowStatusFields = {
 export const RowStatusChangeEventFields = {
   "row": 1,
   "status": 2,
+} as const;
+export const ScalarValueFields = {
+  "string_value": 1,
+  "number_value": 2,
+  "bool_value": 3,
+  "bytes_value": 4,
 } as const;
 export const SchemaResponseFields = {
   "columns": 1,
@@ -2736,6 +2913,13 @@ export const StartEditEventFields = {
 export const StartPageEventFields = {
   "page": 1,
 } as const;
+export const StructFieldFields = {
+  "key": 1,
+  "value": 2,
+} as const;
+export const StructValueFields = {
+  "fields": 1,
+} as const;
 export const StyleConfigFields = {
   "background": 1,
   "foreground": 2,
@@ -2797,6 +2981,12 @@ export const TerminalViewportFields = {
   "height": 4,
   "fullscreen": 5,
 } as const;
+export const TextEditorParamsFields = {
+  "max_length": 1,
+  "mask": 2,
+  "allow_newlines": 3,
+  "input_type": 4,
+} as const;
 export const TextFormatRunFields = {
   "start_index": 1,
   "style": 2,
@@ -2816,6 +3006,13 @@ export const TextRunStyleFields = {
   "font": 2,
   "baseline": 3,
   "link_url": 4,
+} as const;
+export const TextSelectionFields = {
+  "start": 1,
+  "length": 2,
+} as const;
+export const TextSelectionChangedFields = {
+  "selection": 1,
 } as const;
 export const TooltipRequestFields = {
   "x": 1,
@@ -2861,6 +3058,11 @@ export const UpdateCellsRequestFields = {
   "grid_id": 1,
   "cells": 2,
   "atomic": 3,
+} as const;
+export const ValidationErrorFields = {
+  "code": 1,
+  "message": 2,
+  "blocking": 3,
 } as const;
 export const ViewportStateFields = {
   "scroll_x": 1,
@@ -4023,109 +4225,6 @@ export class BarcodeRenderOptions implements LiteMessage {
   }
 }
 registerMessage(BarcodeRenderOptions);
-export class BeforeDropdownOpenEvent implements LiteMessage {
-  static readonly typeName = "volvoxgrid.v1.BeforeDropdownOpenEvent" as const;
-  static readonly fields: readonly ProtoFieldInfo[] = [
-    {
-      no: 1,
-      name: "row",
-      jsonName: "row",
-      prop: "row",
-      kind: "int32" as ProtoKind,
-    },
-    {
-      no: 2,
-      name: "col",
-      jsonName: "col",
-      prop: "col",
-      kind: "int32" as ProtoKind,
-    },
-    {
-      no: 3,
-      name: "x",
-      jsonName: "x",
-      prop: "x",
-      kind: "float" as ProtoKind,
-    },
-    {
-      no: 4,
-      name: "y",
-      jsonName: "y",
-      prop: "y",
-      kind: "float" as ProtoKind,
-    },
-    {
-      no: 5,
-      name: "width",
-      jsonName: "width",
-      prop: "width",
-      kind: "float" as ProtoKind,
-    },
-    {
-      no: 6,
-      name: "height",
-      jsonName: "height",
-      prop: "height",
-      kind: "float" as ProtoKind,
-    },
-    {
-      no: 7,
-      name: "dropdown",
-      jsonName: "dropdown",
-      prop: "dropdown",
-      kind: "message" as ProtoKind,
-      messageType: "Dropdown",
-    },
-    {
-      no: 8,
-      name: "current_value",
-      jsonName: "currentValue",
-      prop: "currentValue",
-      kind: "string" as ProtoKind,
-    },
-    {
-      no: 9,
-      name: "selected_index",
-      jsonName: "selectedIndex",
-      prop: "selectedIndex",
-      kind: "int32" as ProtoKind,
-    },
-  ];
-  row: number = 0;
-  col: number = 0;
-  x: number = 0;
-  y: number = 0;
-  width: number = 0;
-  height: number = 0;
-  dropdown?: Dropdown;
-  currentValue: string = "";
-  selectedIndex: number = 0;
-
-  constructor(init?: Partial<BeforeDropdownOpenEvent>) {
-    initMessage(this, BeforeDropdownOpenEvent.fields, init as Record<string, unknown> | undefined);
-  }
-
-  static fromBinary(data: Uint8Array): BeforeDropdownOpenEvent {
-    return decodeMessage(BeforeDropdownOpenEvent, data);
-  }
-
-  static parseFrom(data: Uint8Array): BeforeDropdownOpenEvent {
-    return BeforeDropdownOpenEvent.fromBinary(data);
-  }
-
-  toBinary(): Uint8Array {
-    return encodeMessage(this, BeforeDropdownOpenEvent.fields);
-  }
-
-  toByteArray(): Uint8Array {
-    return this.toBinary();
-  }
-
-  toJson(): ProtoJsonObject {
-    return messageToJson(this, BeforeDropdownOpenEvent.fields);
-  }
-}
-registerMessage(BeforeDropdownOpenEvent);
 export class BeforeEditEvent implements LiteMessage {
   static readonly typeName = "volvoxgrid.v1.BeforeEditEvent" as const;
   static readonly fields: readonly ProtoFieldInfo[] = [
@@ -5010,98 +5109,6 @@ export class CellEditChangeEvent implements LiteMessage {
   }
 }
 registerMessage(CellEditChangeEvent);
-export class CellEditConfigureStyleEvent implements LiteMessage {
-  static readonly typeName = "volvoxgrid.v1.CellEditConfigureStyleEvent" as const;
-  static readonly fields: readonly ProtoFieldInfo[] = [
-    {
-      no: 1,
-      name: "row",
-      jsonName: "row",
-      prop: "row",
-      kind: "int32" as ProtoKind,
-    },
-    {
-      no: 2,
-      name: "col",
-      jsonName: "col",
-      prop: "col",
-      kind: "int32" as ProtoKind,
-    },
-  ];
-  row: number = 0;
-  col: number = 0;
-
-  constructor(init?: Partial<CellEditConfigureStyleEvent>) {
-    initMessage(this, CellEditConfigureStyleEvent.fields, init as Record<string, unknown> | undefined);
-  }
-
-  static fromBinary(data: Uint8Array): CellEditConfigureStyleEvent {
-    return decodeMessage(CellEditConfigureStyleEvent, data);
-  }
-
-  static parseFrom(data: Uint8Array): CellEditConfigureStyleEvent {
-    return CellEditConfigureStyleEvent.fromBinary(data);
-  }
-
-  toBinary(): Uint8Array {
-    return encodeMessage(this, CellEditConfigureStyleEvent.fields);
-  }
-
-  toByteArray(): Uint8Array {
-    return this.toBinary();
-  }
-
-  toJson(): ProtoJsonObject {
-    return messageToJson(this, CellEditConfigureStyleEvent.fields);
-  }
-}
-registerMessage(CellEditConfigureStyleEvent);
-export class CellEditConfigureWindowEvent implements LiteMessage {
-  static readonly typeName = "volvoxgrid.v1.CellEditConfigureWindowEvent" as const;
-  static readonly fields: readonly ProtoFieldInfo[] = [
-    {
-      no: 1,
-      name: "row",
-      jsonName: "row",
-      prop: "row",
-      kind: "int32" as ProtoKind,
-    },
-    {
-      no: 2,
-      name: "col",
-      jsonName: "col",
-      prop: "col",
-      kind: "int32" as ProtoKind,
-    },
-  ];
-  row: number = 0;
-  col: number = 0;
-
-  constructor(init?: Partial<CellEditConfigureWindowEvent>) {
-    initMessage(this, CellEditConfigureWindowEvent.fields, init as Record<string, unknown> | undefined);
-  }
-
-  static fromBinary(data: Uint8Array): CellEditConfigureWindowEvent {
-    return decodeMessage(CellEditConfigureWindowEvent, data);
-  }
-
-  static parseFrom(data: Uint8Array): CellEditConfigureWindowEvent {
-    return CellEditConfigureWindowEvent.fromBinary(data);
-  }
-
-  toBinary(): Uint8Array {
-    return encodeMessage(this, CellEditConfigureWindowEvent.fields);
-  }
-
-  toByteArray(): Uint8Array {
-    return this.toBinary();
-  }
-
-  toJson(): ProtoJsonObject {
-    return messageToJson(this, CellEditConfigureWindowEvent.fields);
-  }
-}
-registerMessage(CellEditConfigureWindowEvent);
 export class CellEditValidateEvent implements LiteMessage {
   static readonly typeName = "volvoxgrid.v1.CellEditValidateEvent" as const;
   static readonly fields: readonly ProtoFieldInfo[] = [
@@ -5533,12 +5540,11 @@ export class CellUpdate implements LiteMessage {
     },
     {
       no: 9,
-      name: "dropdown",
-      jsonName: "dropdown",
-      prop: "dropdown",
+      name: "editor",
+      jsonName: "editor",
+      prop: "editor",
       kind: "message" as ProtoKind,
-      optional: true,
-      messageType: "Dropdown",
+      messageType: "EditorSpec",
     },
     {
       no: 10,
@@ -5594,7 +5600,7 @@ export class CellUpdate implements LiteMessage {
   picture?: ImageData;
   pictureAlign: ImageAlignment = 0;
   buttonPicture?: ImageData;
-  dropdown?: Dropdown;
+  editor?: EditorSpec;
   stickyRow: StickyEdge = 0;
   stickyCol: StickyEdge = 0;
   interaction: CellInteraction = 0;
@@ -5755,6 +5761,44 @@ export class CellsResponse implements LiteMessage {
   }
 }
 registerMessage(CellsResponse);
+export class CheckboxEditorParams implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.CheckboxEditorParams" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "three_state",
+      jsonName: "threeState",
+      prop: "threeState",
+      kind: "bool" as ProtoKind,
+    },
+  ];
+  threeState: boolean = false;
+
+  constructor(init?: Partial<CheckboxEditorParams>) {
+    initMessage(this, CheckboxEditorParams.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): CheckboxEditorParams {
+    return decodeMessage(CheckboxEditorParams, data);
+  }
+
+  static parseFrom(data: Uint8Array): CheckboxEditorParams {
+    return CheckboxEditorParams.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, CheckboxEditorParams.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, CheckboxEditorParams.fields);
+  }
+}
+registerMessage(CheckboxEditorParams);
 export class ClearRequest implements LiteMessage {
   static readonly typeName = "volvoxgrid.v1.ClearRequest" as const;
   static readonly fields: readonly ProtoFieldInfo[] = [
@@ -6239,14 +6283,6 @@ export class ColIndicatorCell implements LiteMessage {
     },
     {
       no: 6,
-      name: "mode_bits",
-      jsonName: "modeBits",
-      prop: "modeBits",
-      kind: "uint32" as ProtoKind,
-      optional: true,
-    },
-    {
-      no: 7,
       name: "custom_key",
       jsonName: "customKey",
       prop: "customKey",
@@ -6254,12 +6290,21 @@ export class ColIndicatorCell implements LiteMessage {
       optional: true,
     },
     {
-      no: 8,
+      no: 7,
       name: "data",
       jsonName: "data",
       prop: "data",
       kind: "bytes" as ProtoKind,
       optional: true,
+    },
+    {
+      no: 8,
+      name: "modes",
+      jsonName: "modes",
+      prop: "modes",
+      kind: "message" as ProtoKind,
+      optional: true,
+      messageType: "ColIndicatorCellModes",
     },
   ];
   row1: number = 0;
@@ -6267,9 +6312,9 @@ export class ColIndicatorCell implements LiteMessage {
   col1: number = 0;
   col2: number = 0;
   text: string = "";
-  modeBits: number = 0;
   customKey: string = "";
   data?: Uint8Array;
+  modes?: ColIndicatorCellModes;
 
   constructor(init?: Partial<ColIndicatorCell>) {
     initMessage(this, ColIndicatorCell.fields, init as Record<string, unknown> | undefined);
@@ -6296,6 +6341,46 @@ export class ColIndicatorCell implements LiteMessage {
   }
 }
 registerMessage(ColIndicatorCell);
+export class ColIndicatorCellModes implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.ColIndicatorCellModes" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "modes",
+      jsonName: "modes",
+      prop: "modes",
+      kind: "enum" as ProtoKind,
+      repeated: true,
+      enumType: ColIndicatorCellMode,
+    },
+  ];
+  modes: ColIndicatorCellMode[] = [];
+
+  constructor(init?: Partial<ColIndicatorCellModes>) {
+    initMessage(this, ColIndicatorCellModes.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): ColIndicatorCellModes {
+    return decodeMessage(ColIndicatorCellModes, data);
+  }
+
+  static parseFrom(data: Uint8Array): ColIndicatorCellModes {
+    return ColIndicatorCellModes.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, ColIndicatorCellModes.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, ColIndicatorCellModes.fields);
+  }
+}
+registerMessage(ColIndicatorCellModes);
 export class ColIndicatorConfig implements LiteMessage {
   static readonly typeName = "volvoxgrid.v1.ColIndicatorConfig" as const;
   static readonly fields: readonly ProtoFieldInfo[] = [
@@ -6325,14 +6410,6 @@ export class ColIndicatorConfig implements LiteMessage {
     },
     {
       no: 4,
-      name: "mode_bits",
-      jsonName: "modeBits",
-      prop: "modeBits",
-      kind: "uint32" as ProtoKind,
-      optional: true,
-    },
-    {
-      no: 5,
       name: "background",
       jsonName: "background",
       prop: "background",
@@ -6340,7 +6417,7 @@ export class ColIndicatorConfig implements LiteMessage {
       optional: true,
     },
     {
-      no: 6,
+      no: 5,
       name: "foreground",
       jsonName: "foreground",
       prop: "foreground",
@@ -6348,7 +6425,7 @@ export class ColIndicatorConfig implements LiteMessage {
       optional: true,
     },
     {
-      no: 7,
+      no: 6,
       name: "grid_lines",
       jsonName: "gridLines",
       prop: "gridLines",
@@ -6357,7 +6434,7 @@ export class ColIndicatorConfig implements LiteMessage {
       enumType: GridLineStyle,
     },
     {
-      no: 8,
+      no: 7,
       name: "grid_color",
       jsonName: "gridColor",
       prop: "gridColor",
@@ -6365,7 +6442,7 @@ export class ColIndicatorConfig implements LiteMessage {
       optional: true,
     },
     {
-      no: 9,
+      no: 8,
       name: "auto_size",
       jsonName: "autoSize",
       prop: "autoSize",
@@ -6373,7 +6450,7 @@ export class ColIndicatorConfig implements LiteMessage {
       optional: true,
     },
     {
-      no: 10,
+      no: 9,
       name: "allow_resize",
       jsonName: "allowResize",
       prop: "allowResize",
@@ -6381,7 +6458,7 @@ export class ColIndicatorConfig implements LiteMessage {
       optional: true,
     },
     {
-      no: 11,
+      no: 10,
       name: "allow_reorder",
       jsonName: "allowReorder",
       prop: "allowReorder",
@@ -6389,7 +6466,7 @@ export class ColIndicatorConfig implements LiteMessage {
       optional: true,
     },
     {
-      no: 12,
+      no: 11,
       name: "allow_menu",
       jsonName: "allowMenu",
       prop: "allowMenu",
@@ -6397,7 +6474,7 @@ export class ColIndicatorConfig implements LiteMessage {
       optional: true,
     },
     {
-      no: 13,
+      no: 12,
       name: "row_defs",
       jsonName: "rowDefs",
       prop: "rowDefs",
@@ -6406,7 +6483,7 @@ export class ColIndicatorConfig implements LiteMessage {
       messageType: "ColIndicatorRowDef",
     },
     {
-      no: 14,
+      no: 13,
       name: "cells",
       jsonName: "cells",
       prop: "cells",
@@ -6414,11 +6491,19 @@ export class ColIndicatorConfig implements LiteMessage {
       repeated: true,
       messageType: "ColIndicatorCell",
     },
+    {
+      no: 14,
+      name: "cell_modes",
+      jsonName: "cellModes",
+      prop: "cellModes",
+      kind: "message" as ProtoKind,
+      optional: true,
+      messageType: "ColIndicatorCellModes",
+    },
   ];
   visible: boolean = false;
   defaultRowHeight: number = 0;
   bandRows: number = 0;
-  modeBits: number = 0;
   background: number = 0;
   foreground: number = 0;
   gridLines: GridLineStyle = 0;
@@ -6429,6 +6514,7 @@ export class ColIndicatorConfig implements LiteMessage {
   allowMenu: boolean = false;
   rowDefs: ColIndicatorRowDef[] = [];
   cells: ColIndicatorCell[] = [];
+  cellModes?: ColIndicatorCellModes;
 
   constructor(init?: Partial<ColIndicatorConfig>) {
     initMessage(this, ColIndicatorConfig.fields, init as Record<string, unknown> | undefined);
@@ -6608,23 +6694,14 @@ export class ColumnDef implements LiteMessage {
     },
     {
       no: 13,
-      name: "dropdown",
-      jsonName: "dropdown",
-      prop: "dropdown",
+      name: "editor",
+      jsonName: "editor",
+      prop: "editor",
       kind: "message" as ProtoKind,
-      optional: true,
-      messageType: "Dropdown",
+      messageType: "EditorSpec",
     },
     {
       no: 14,
-      name: "edit_mask",
-      jsonName: "editMask",
-      prop: "editMask",
-      kind: "string" as ProtoKind,
-      optional: true,
-    },
-    {
-      no: 15,
       name: "indent",
       jsonName: "indent",
       prop: "indent",
@@ -6632,7 +6709,7 @@ export class ColumnDef implements LiteMessage {
       optional: true,
     },
     {
-      no: 16,
+      no: 15,
       name: "hidden",
       jsonName: "hidden",
       prop: "hidden",
@@ -6640,7 +6717,7 @@ export class ColumnDef implements LiteMessage {
       optional: true,
     },
     {
-      no: 17,
+      no: 16,
       name: "span",
       jsonName: "span",
       prop: "span",
@@ -6648,7 +6725,7 @@ export class ColumnDef implements LiteMessage {
       optional: true,
     },
     {
-      no: 18,
+      no: 17,
       name: "image_list",
       jsonName: "imageList",
       prop: "imageList",
@@ -6657,7 +6734,7 @@ export class ColumnDef implements LiteMessage {
       messageType: "ImageData",
     },
     {
-      no: 19,
+      no: 18,
       name: "data",
       jsonName: "data",
       prop: "data",
@@ -6665,7 +6742,7 @@ export class ColumnDef implements LiteMessage {
       optional: true,
     },
     {
-      no: 20,
+      no: 19,
       name: "sticky",
       jsonName: "sticky",
       prop: "sticky",
@@ -6674,7 +6751,7 @@ export class ColumnDef implements LiteMessage {
       enumType: StickyEdge,
     },
     {
-      no: 21,
+      no: 20,
       name: "padding",
       jsonName: "padding",
       prop: "padding",
@@ -6682,7 +6759,7 @@ export class ColumnDef implements LiteMessage {
       messageType: "Padding",
     },
     {
-      no: 22,
+      no: 21,
       name: "fixed_padding",
       jsonName: "fixedPadding",
       prop: "fixedPadding",
@@ -6690,7 +6767,7 @@ export class ColumnDef implements LiteMessage {
       messageType: "Padding",
     },
     {
-      no: 23,
+      no: 22,
       name: "nullable",
       jsonName: "nullable",
       prop: "nullable",
@@ -6698,7 +6775,7 @@ export class ColumnDef implements LiteMessage {
       optional: true,
     },
     {
-      no: 24,
+      no: 23,
       name: "coercion_mode",
       jsonName: "coercionMode",
       prop: "coercionMode",
@@ -6707,7 +6784,7 @@ export class ColumnDef implements LiteMessage {
       enumType: CoercionMode,
     },
     {
-      no: 25,
+      no: 24,
       name: "error_mode",
       jsonName: "errorMode",
       prop: "errorMode",
@@ -6716,7 +6793,7 @@ export class ColumnDef implements LiteMessage {
       enumType: WriteErrorMode,
     },
     {
-      no: 26,
+      no: 25,
       name: "interaction",
       jsonName: "interaction",
       prop: "interaction",
@@ -6725,7 +6802,7 @@ export class ColumnDef implements LiteMessage {
       enumType: CellInteraction,
     },
     {
-      no: 27,
+      no: 26,
       name: "progress_color",
       jsonName: "progressColor",
       prop: "progressColor",
@@ -6745,8 +6822,7 @@ export class ColumnDef implements LiteMessage {
   key: string = "";
   sortOrder: SortOrder = 0;
   sortType: SortType = 0;
-  dropdown?: Dropdown;
-  editMask: string = "";
+  editor?: EditorSpec;
   indent: number = 0;
   hidden: boolean = false;
   span: boolean = false;
@@ -6984,14 +7060,6 @@ export class CornerIndicatorConfig implements LiteMessage {
     },
     {
       no: 2,
-      name: "mode_bits",
-      jsonName: "modeBits",
-      prop: "modeBits",
-      kind: "uint32" as ProtoKind,
-      optional: true,
-    },
-    {
-      no: 3,
       name: "background",
       jsonName: "background",
       prop: "background",
@@ -6999,7 +7067,7 @@ export class CornerIndicatorConfig implements LiteMessage {
       optional: true,
     },
     {
-      no: 4,
+      no: 3,
       name: "foreground",
       jsonName: "foreground",
       prop: "foreground",
@@ -7007,7 +7075,7 @@ export class CornerIndicatorConfig implements LiteMessage {
       optional: true,
     },
     {
-      no: 5,
+      no: 4,
       name: "custom_key",
       jsonName: "customKey",
       prop: "customKey",
@@ -7015,7 +7083,7 @@ export class CornerIndicatorConfig implements LiteMessage {
       optional: true,
     },
     {
-      no: 6,
+      no: 5,
       name: "data",
       jsonName: "data",
       prop: "data",
@@ -7023,7 +7091,7 @@ export class CornerIndicatorConfig implements LiteMessage {
       optional: true,
     },
     {
-      no: 7,
+      no: 6,
       name: "slots",
       jsonName: "slots",
       prop: "slots",
@@ -7033,7 +7101,6 @@ export class CornerIndicatorConfig implements LiteMessage {
     },
   ];
   visible: boolean = false;
-  modeBits: number = 0;
   background: number = 0;
   foreground: number = 0;
   customKey: string = "";
@@ -7356,6 +7423,124 @@ export class CursorChange implements LiteMessage {
   }
 }
 registerMessage(CursorChange);
+export class CustomEditorAction implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.CustomEditorAction" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "action_id",
+      jsonName: "actionId",
+      prop: "actionId",
+      kind: "string" as ProtoKind,
+    },
+    {
+      no: 2,
+      name: "payload",
+      jsonName: "payload",
+      prop: "payload",
+      kind: "message" as ProtoKind,
+      messageType: "StructValue",
+    },
+  ];
+  actionId: string = "";
+  payload?: StructValue;
+
+  constructor(init?: Partial<CustomEditorAction>) {
+    initMessage(this, CustomEditorAction.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): CustomEditorAction {
+    return decodeMessage(CustomEditorAction, data);
+  }
+
+  static parseFrom(data: Uint8Array): CustomEditorAction {
+    return CustomEditorAction.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, CustomEditorAction.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, CustomEditorAction.fields);
+  }
+}
+registerMessage(CustomEditorAction);
+export class CustomEditorActionEvent implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.CustomEditorActionEvent" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "session_id",
+      jsonName: "sessionId",
+      prop: "sessionId",
+      kind: "int64" as ProtoKind,
+    },
+    {
+      no: 2,
+      name: "row",
+      jsonName: "row",
+      prop: "row",
+      kind: "int32" as ProtoKind,
+    },
+    {
+      no: 3,
+      name: "col",
+      jsonName: "col",
+      prop: "col",
+      kind: "int32" as ProtoKind,
+    },
+    {
+      no: 4,
+      name: "action_id",
+      jsonName: "actionId",
+      prop: "actionId",
+      kind: "string" as ProtoKind,
+    },
+    {
+      no: 5,
+      name: "payload",
+      jsonName: "payload",
+      prop: "payload",
+      kind: "message" as ProtoKind,
+      messageType: "StructValue",
+    },
+  ];
+  sessionId: bigint = 0n;
+  row: number = 0;
+  col: number = 0;
+  actionId: string = "";
+  payload?: StructValue;
+
+  constructor(init?: Partial<CustomEditorActionEvent>) {
+    initMessage(this, CustomEditorActionEvent.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): CustomEditorActionEvent {
+    return decodeMessage(CustomEditorActionEvent, data);
+  }
+
+  static parseFrom(data: Uint8Array): CustomEditorActionEvent {
+    return CustomEditorActionEvent.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, CustomEditorActionEvent.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, CustomEditorActionEvent.fields);
+  }
+}
+registerMessage(CustomEditorActionEvent);
 export class CustomRenderCellEvent implements LiteMessage {
   static readonly typeName = "volvoxgrid.v1.CustomRenderCellEvent" as const;
   static readonly fields: readonly ProtoFieldInfo[] = [
@@ -7519,6 +7704,78 @@ export class DataRefreshingEvent implements LiteMessage {
   }
 }
 registerMessage(DataRefreshingEvent);
+export class DateTimeEditorParams implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.DateTimeEditorParams" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "format",
+      jsonName: "format",
+      prop: "format",
+      kind: "string" as ProtoKind,
+    },
+    {
+      no: 2,
+      name: "min_timestamp",
+      jsonName: "minTimestamp",
+      prop: "minTimestamp",
+      kind: "int64" as ProtoKind,
+      optional: true,
+    },
+    {
+      no: 3,
+      name: "max_timestamp",
+      jsonName: "maxTimestamp",
+      prop: "maxTimestamp",
+      kind: "int64" as ProtoKind,
+      optional: true,
+    },
+    {
+      no: 4,
+      name: "date_only",
+      jsonName: "dateOnly",
+      prop: "dateOnly",
+      kind: "bool" as ProtoKind,
+    },
+    {
+      no: 5,
+      name: "time_only",
+      jsonName: "timeOnly",
+      prop: "timeOnly",
+      kind: "bool" as ProtoKind,
+    },
+  ];
+  format: string = "";
+  minTimestamp: bigint = 0n;
+  maxTimestamp: bigint = 0n;
+  dateOnly: boolean = false;
+  timeOnly: boolean = false;
+
+  constructor(init?: Partial<DateTimeEditorParams>) {
+    initMessage(this, DateTimeEditorParams.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): DateTimeEditorParams {
+    return decodeMessage(DateTimeEditorParams, data);
+  }
+
+  static parseFrom(data: Uint8Array): DateTimeEditorParams {
+    return DateTimeEditorParams.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, DateTimeEditorParams.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, DateTimeEditorParams.fields);
+  }
+}
+registerMessage(DateTimeEditorParams);
 export class DblClickEvent implements LiteMessage {
   static readonly typeName = "volvoxgrid.v1.DblClickEvent" as const;
   static readonly fields: readonly ProtoFieldInfo[] = [
@@ -7990,289 +8247,81 @@ export class DragStartEvent implements LiteMessage {
   }
 }
 registerMessage(DragStartEvent);
-export class Dropdown implements LiteMessage {
-  static readonly typeName = "volvoxgrid.v1.Dropdown" as const;
+export class EditActivation implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.EditActivation" as const;
   static readonly fields: readonly ProtoFieldInfo[] = [
     {
       no: 1,
-      name: "items",
-      jsonName: "items",
-      prop: "items",
-      kind: "message" as ProtoKind,
-      repeated: true,
-      messageType: "DropdownItem",
-    },
-    {
-      no: 2,
-      name: "allow_custom_value",
-      jsonName: "allowCustomValue",
-      prop: "allowCustomValue",
-      kind: "bool" as ProtoKind,
-    },
-    {
-      no: 3,
-      name: "item_layout",
-      jsonName: "itemLayout",
-      prop: "itemLayout",
+      name: "trigger",
+      jsonName: "trigger",
+      prop: "trigger",
       kind: "enum" as ProtoKind,
-      enumType: DropdownItemLayout,
-    },
-    {
-      no: 4,
-      name: "searchable",
-      jsonName: "searchable",
-      prop: "searchable",
-      kind: "bool" as ProtoKind,
       optional: true,
-    },
-  ];
-  items: DropdownItem[] = [];
-  allowCustomValue: boolean = false;
-  itemLayout: DropdownItemLayout = 0;
-  searchable: boolean = false;
-
-  constructor(init?: Partial<Dropdown>) {
-    initMessage(this, Dropdown.fields, init as Record<string, unknown> | undefined);
-  }
-
-  static fromBinary(data: Uint8Array): Dropdown {
-    return decodeMessage(Dropdown, data);
-  }
-
-  static parseFrom(data: Uint8Array): Dropdown {
-    return Dropdown.fromBinary(data);
-  }
-
-  toBinary(): Uint8Array {
-    return encodeMessage(this, Dropdown.fields);
-  }
-
-  toByteArray(): Uint8Array {
-    return this.toBinary();
-  }
-
-  toJson(): ProtoJsonObject {
-    return messageToJson(this, Dropdown.fields);
-  }
-}
-registerMessage(Dropdown);
-export class DropdownClosedEvent implements LiteMessage {
-  static readonly typeName = "volvoxgrid.v1.DropdownClosedEvent" as const;
-  static readonly fields: readonly ProtoFieldInfo[] = [
-  ];
-
-  constructor(init?: Partial<DropdownClosedEvent>) {
-    initMessage(this, DropdownClosedEvent.fields, init as Record<string, unknown> | undefined);
-  }
-
-  static fromBinary(data: Uint8Array): DropdownClosedEvent {
-    return decodeMessage(DropdownClosedEvent, data);
-  }
-
-  static parseFrom(data: Uint8Array): DropdownClosedEvent {
-    return DropdownClosedEvent.fromBinary(data);
-  }
-
-  toBinary(): Uint8Array {
-    return encodeMessage(this, DropdownClosedEvent.fields);
-  }
-
-  toByteArray(): Uint8Array {
-    return this.toBinary();
-  }
-
-  toJson(): ProtoJsonObject {
-    return messageToJson(this, DropdownClosedEvent.fields);
-  }
-}
-registerMessage(DropdownClosedEvent);
-export class DropdownItem implements LiteMessage {
-  static readonly typeName = "volvoxgrid.v1.DropdownItem" as const;
-  static readonly fields: readonly ProtoFieldInfo[] = [
-    {
-      no: 1,
-      name: "value",
-      jsonName: "value",
-      prop: "value",
-      kind: "string" as ProtoKind,
-      optional: true,
+      enumType: EditTrigger,
     },
     {
       no: 2,
-      name: "label",
-      jsonName: "label",
-      prop: "label",
-      kind: "string" as ProtoKind,
+      name: "tab_behavior",
+      jsonName: "tabBehavior",
+      prop: "tabBehavior",
+      kind: "enum" as ProtoKind,
+      optional: true,
+      enumType: TabBehavior,
+    },
+    {
+      no: 3,
+      name: "single_click_edit",
+      jsonName: "singleClickEdit",
+      prop: "singleClickEdit",
+      kind: "bool" as ProtoKind,
       optional: true,
     },
     {
-      no: 3,
-      name: "details",
-      jsonName: "details",
-      prop: "details",
-      kind: "string" as ProtoKind,
-      repeated: true,
-    },
-    {
       no: 4,
-      name: "disabled",
-      jsonName: "disabled",
-      prop: "disabled",
+      name: "suppress_click_edit",
+      jsonName: "suppressClickEdit",
+      prop: "suppressClickEdit",
       kind: "bool" as ProtoKind,
-    },
-  ];
-  value: string = "";
-  label: string = "";
-  details: string[] = [];
-  disabled: boolean = false;
-
-  constructor(init?: Partial<DropdownItem>) {
-    initMessage(this, DropdownItem.fields, init as Record<string, unknown> | undefined);
-  }
-
-  static fromBinary(data: Uint8Array): DropdownItem {
-    return decodeMessage(DropdownItem, data);
-  }
-
-  static parseFrom(data: Uint8Array): DropdownItem {
-    return DropdownItem.fromBinary(data);
-  }
-
-  toBinary(): Uint8Array {
-    return encodeMessage(this, DropdownItem.fields);
-  }
-
-  toByteArray(): Uint8Array {
-    return this.toBinary();
-  }
-
-  toJson(): ProtoJsonObject {
-    return messageToJson(this, DropdownItem.fields);
-  }
-}
-registerMessage(DropdownItem);
-export class DropdownOpenedEvent implements LiteMessage {
-  static readonly typeName = "volvoxgrid.v1.DropdownOpenedEvent" as const;
-  static readonly fields: readonly ProtoFieldInfo[] = [
-  ];
-
-  constructor(init?: Partial<DropdownOpenedEvent>) {
-    initMessage(this, DropdownOpenedEvent.fields, init as Record<string, unknown> | undefined);
-  }
-
-  static fromBinary(data: Uint8Array): DropdownOpenedEvent {
-    return decodeMessage(DropdownOpenedEvent, data);
-  }
-
-  static parseFrom(data: Uint8Array): DropdownOpenedEvent {
-    return DropdownOpenedEvent.fromBinary(data);
-  }
-
-  toBinary(): Uint8Array {
-    return encodeMessage(this, DropdownOpenedEvent.fields);
-  }
-
-  toByteArray(): Uint8Array {
-    return this.toBinary();
-  }
-
-  toJson(): ProtoJsonObject {
-    return messageToJson(this, DropdownOpenedEvent.fields);
-  }
-}
-registerMessage(DropdownOpenedEvent);
-export class DropdownRequest implements LiteMessage {
-  static readonly typeName = "volvoxgrid.v1.DropdownRequest" as const;
-  static readonly fields: readonly ProtoFieldInfo[] = [
-    {
-      no: 1,
-      name: "row",
-      jsonName: "row",
-      prop: "row",
-      kind: "int32" as ProtoKind,
-    },
-    {
-      no: 2,
-      name: "col",
-      jsonName: "col",
-      prop: "col",
-      kind: "int32" as ProtoKind,
-    },
-    {
-      no: 3,
-      name: "x",
-      jsonName: "x",
-      prop: "x",
-      kind: "float" as ProtoKind,
-    },
-    {
-      no: 4,
-      name: "y",
-      jsonName: "y",
-      prop: "y",
-      kind: "float" as ProtoKind,
+      optional: true,
     },
     {
       no: 5,
-      name: "width",
-      jsonName: "width",
-      prop: "width",
-      kind: "float" as ProtoKind,
+      name: "commit_on_focus_lost",
+      jsonName: "commitOnFocusLost",
+      prop: "commitOnFocusLost",
+      kind: "bool" as ProtoKind,
+      optional: true,
     },
     {
       no: 6,
-      name: "height",
-      jsonName: "height",
-      prop: "height",
-      kind: "float" as ProtoKind,
-    },
-    {
-      no: 7,
-      name: "items",
-      jsonName: "items",
-      prop: "items",
-      kind: "string" as ProtoKind,
-      repeated: true,
-    },
-    {
-      no: 8,
-      name: "selected",
-      jsonName: "selected",
-      prop: "selected",
-      kind: "int32" as ProtoKind,
-    },
-    {
-      no: 9,
-      name: "editable",
-      jsonName: "editable",
-      prop: "editable",
+      name: "preserve_edit_on_navigation",
+      jsonName: "preserveEditOnNavigation",
+      prop: "preserveEditOnNavigation",
       kind: "bool" as ProtoKind,
+      optional: true,
     },
   ];
-  row: number = 0;
-  col: number = 0;
-  x: number = 0;
-  y: number = 0;
-  width: number = 0;
-  height: number = 0;
-  items: string[] = [];
-  selected: number = 0;
-  editable: boolean = false;
+  trigger: EditTrigger = 0;
+  tabBehavior: TabBehavior = 0;
+  singleClickEdit: boolean = false;
+  suppressClickEdit: boolean = false;
+  commitOnFocusLost: boolean = false;
+  preserveEditOnNavigation: boolean = false;
 
-  constructor(init?: Partial<DropdownRequest>) {
-    initMessage(this, DropdownRequest.fields, init as Record<string, unknown> | undefined);
+  constructor(init?: Partial<EditActivation>) {
+    initMessage(this, EditActivation.fields, init as Record<string, unknown> | undefined);
   }
 
-  static fromBinary(data: Uint8Array): DropdownRequest {
-    return decodeMessage(DropdownRequest, data);
+  static fromBinary(data: Uint8Array): EditActivation {
+    return decodeMessage(EditActivation, data);
   }
 
-  static parseFrom(data: Uint8Array): DropdownRequest {
-    return DropdownRequest.fromBinary(data);
+  static parseFrom(data: Uint8Array): EditActivation {
+    return EditActivation.fromBinary(data);
   }
 
   toBinary(): Uint8Array {
-    return encodeMessage(this, DropdownRequest.fields);
+    return encodeMessage(this, EditActivation.fields);
   }
 
   toByteArray(): Uint8Array {
@@ -8280,10 +8329,10 @@ export class DropdownRequest implements LiteMessage {
   }
 
   toJson(): ProtoJsonObject {
-    return messageToJson(this, DropdownRequest.fields);
+    return messageToJson(this, EditActivation.fields);
   }
 }
-registerMessage(DropdownRequest);
+registerMessage(EditActivation);
 export class EditCancel implements LiteMessage {
   static readonly typeName = "volvoxgrid.v1.EditCancel" as const;
   static readonly fields: readonly ProtoFieldInfo[] = [
@@ -8317,13 +8366,8 @@ registerMessage(EditCancel);
 export enum EditCommandCommandOneofCase {
   None = 0,
   Start = 2,
-  Commit = 3,
-  Cancel = 4,
-  SetText = 5,
-  SetSelection = 6,
-  Finish = 7,
-  SetHighlights = 8,
-  SetPreedit = 9,
+  Session = 3,
+  GetState = 4,
 }
 export class EditCommand implements LiteMessage {
   static readonly typeName = "volvoxgrid.v1.EditCommand" as const;
@@ -8347,85 +8391,30 @@ export class EditCommand implements LiteMessage {
     },
     {
       no: 3,
-      name: "commit",
-      jsonName: "commit",
-      prop: "commit",
+      name: "session",
+      jsonName: "session",
+      prop: "session",
       kind: "message" as ProtoKind,
       oneof: "commandCase",
-      oneofCase: EditCommandCommandOneofCase.Commit,
-      messageType: "EditCommit",
+      oneofCase: EditCommandCommandOneofCase.Session,
+      messageType: "EditorSessionCommand",
     },
     {
       no: 4,
-      name: "cancel",
-      jsonName: "cancel",
-      prop: "cancel",
+      name: "get_state",
+      jsonName: "getState",
+      prop: "getState",
       kind: "message" as ProtoKind,
       oneof: "commandCase",
-      oneofCase: EditCommandCommandOneofCase.Cancel,
-      messageType: "EditCancel",
-    },
-    {
-      no: 5,
-      name: "set_text",
-      jsonName: "setText",
-      prop: "setText",
-      kind: "message" as ProtoKind,
-      oneof: "commandCase",
-      oneofCase: EditCommandCommandOneofCase.SetText,
-      messageType: "EditSetText",
-    },
-    {
-      no: 6,
-      name: "set_selection",
-      jsonName: "setSelection",
-      prop: "setSelection",
-      kind: "message" as ProtoKind,
-      oneof: "commandCase",
-      oneofCase: EditCommandCommandOneofCase.SetSelection,
-      messageType: "EditSetSelection",
-    },
-    {
-      no: 7,
-      name: "finish",
-      jsonName: "finish",
-      prop: "finish",
-      kind: "message" as ProtoKind,
-      oneof: "commandCase",
-      oneofCase: EditCommandCommandOneofCase.Finish,
-      messageType: "EditFinish",
-    },
-    {
-      no: 8,
-      name: "set_highlights",
-      jsonName: "setHighlights",
-      prop: "setHighlights",
-      kind: "message" as ProtoKind,
-      oneof: "commandCase",
-      oneofCase: EditCommandCommandOneofCase.SetHighlights,
-      messageType: "EditSetHighlights",
-    },
-    {
-      no: 9,
-      name: "set_preedit",
-      jsonName: "setPreedit",
-      prop: "setPreedit",
-      kind: "message" as ProtoKind,
-      oneof: "commandCase",
-      oneofCase: EditCommandCommandOneofCase.SetPreedit,
-      messageType: "EditSetPreedit",
+      oneofCase: EditCommandCommandOneofCase.GetState,
+      messageType: "EditGetState",
     },
   ];
   commandCase: EditCommandCommandOneofCase = EditCommandCommandOneofCase.None;
   gridId: bigint = 0n;
   start?: EditStart;
-  commit?: EditCommit;
-  cancel?: EditCancel;
-  setText?: EditSetText;
-  setSelection?: EditSetSelection;
-  finish?: EditFinish;
-  setHighlights?: EditSetHighlights;
-  setPreedit?: EditSetPreedit;
+  session?: EditorSessionCommand;
+  getState?: EditGetState;
 
   constructor(init?: Partial<EditCommand>) {
     initMessage(this, EditCommand.fields, init as Record<string, unknown> | undefined);
@@ -8457,14 +8446,15 @@ export class EditCommit implements LiteMessage {
   static readonly fields: readonly ProtoFieldInfo[] = [
     {
       no: 1,
-      name: "text",
-      jsonName: "text",
-      prop: "text",
-      kind: "string" as ProtoKind,
+      name: "value",
+      jsonName: "value",
+      prop: "value",
+      kind: "message" as ProtoKind,
       optional: true,
+      messageType: "EditorValue",
     },
   ];
-  text: string = "";
+  value?: EditorValue;
 
   constructor(init?: Partial<EditCommit>) {
     initMessage(this, EditCommit.fields, init as Record<string, unknown> | undefined);
@@ -8496,81 +8486,22 @@ export class EditConfig implements LiteMessage {
   static readonly fields: readonly ProtoFieldInfo[] = [
     {
       no: 1,
-      name: "trigger",
-      jsonName: "trigger",
-      prop: "trigger",
-      kind: "enum" as ProtoKind,
-      optional: true,
-      enumType: EditTrigger,
+      name: "activation",
+      jsonName: "activation",
+      prop: "activation",
+      kind: "message" as ProtoKind,
+      messageType: "EditActivation",
     },
     {
       no: 2,
-      name: "tab_behavior",
-      jsonName: "tabBehavior",
-      prop: "tabBehavior",
-      kind: "enum" as ProtoKind,
-      optional: true,
-      enumType: TabBehavior,
+      name: "default_editor",
+      jsonName: "defaultEditor",
+      prop: "defaultEditor",
+      kind: "message" as ProtoKind,
+      messageType: "EditorSpec",
     },
     {
       no: 3,
-      name: "dropdown_trigger",
-      jsonName: "dropdownTrigger",
-      prop: "dropdownTrigger",
-      kind: "enum" as ProtoKind,
-      optional: true,
-      enumType: DropdownTrigger,
-    },
-    {
-      no: 4,
-      name: "dropdown_search",
-      jsonName: "dropdownSearch",
-      prop: "dropdownSearch",
-      kind: "bool" as ProtoKind,
-      optional: true,
-    },
-    {
-      no: 5,
-      name: "max_length",
-      jsonName: "maxLength",
-      prop: "maxLength",
-      kind: "int32" as ProtoKind,
-      optional: true,
-    },
-    {
-      no: 6,
-      name: "mask",
-      jsonName: "mask",
-      prop: "mask",
-      kind: "string" as ProtoKind,
-      optional: true,
-    },
-    {
-      no: 7,
-      name: "host_key_dispatch",
-      jsonName: "hostKeyDispatch",
-      prop: "hostKeyDispatch",
-      kind: "bool" as ProtoKind,
-      optional: true,
-    },
-    {
-      no: 8,
-      name: "host_pointer_dispatch",
-      jsonName: "hostPointerDispatch",
-      prop: "hostPointerDispatch",
-      kind: "bool" as ProtoKind,
-      optional: true,
-    },
-    {
-      no: 9,
-      name: "engine_compose",
-      jsonName: "engineCompose",
-      prop: "engineCompose",
-      kind: "bool" as ProtoKind,
-      optional: true,
-    },
-    {
-      no: 10,
       name: "compose_method",
       jsonName: "composeMethod",
       prop: "composeMethod",
@@ -8579,15 +8510,8 @@ export class EditConfig implements LiteMessage {
       enumType: ComposeMethod,
     },
   ];
-  trigger: EditTrigger = 0;
-  tabBehavior: TabBehavior = 0;
-  dropdownTrigger: DropdownTrigger = 0;
-  dropdownSearch: boolean = false;
-  maxLength: number = 0;
-  mask: string = "";
-  hostKeyDispatch: boolean = false;
-  hostPointerDispatch: boolean = false;
-  engineCompose: boolean = false;
+  activation?: EditActivation;
+  defaultEditor?: EditorSpec;
   composeMethod: ComposeMethod = 0;
 
   constructor(init?: Partial<EditConfig>) {
@@ -8615,25 +8539,25 @@ export class EditConfig implements LiteMessage {
   }
 }
 registerMessage(EditConfig);
-export class EditFinish implements LiteMessage {
-  static readonly typeName = "volvoxgrid.v1.EditFinish" as const;
+export class EditGetState implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.EditGetState" as const;
   static readonly fields: readonly ProtoFieldInfo[] = [
   ];
 
-  constructor(init?: Partial<EditFinish>) {
-    initMessage(this, EditFinish.fields, init as Record<string, unknown> | undefined);
+  constructor(init?: Partial<EditGetState>) {
+    initMessage(this, EditGetState.fields, init as Record<string, unknown> | undefined);
   }
 
-  static fromBinary(data: Uint8Array): EditFinish {
-    return decodeMessage(EditFinish, data);
+  static fromBinary(data: Uint8Array): EditGetState {
+    return decodeMessage(EditGetState, data);
   }
 
-  static parseFrom(data: Uint8Array): EditFinish {
-    return EditFinish.fromBinary(data);
+  static parseFrom(data: Uint8Array): EditGetState {
+    return EditGetState.fromBinary(data);
   }
 
   toBinary(): Uint8Array {
-    return encodeMessage(this, EditFinish.fields);
+    return encodeMessage(this, EditGetState.fields);
   }
 
   toByteArray(): Uint8Array {
@@ -8641,137 +8565,10 @@ export class EditFinish implements LiteMessage {
   }
 
   toJson(): ProtoJsonObject {
-    return messageToJson(this, EditFinish.fields);
+    return messageToJson(this, EditGetState.fields);
   }
 }
-registerMessage(EditFinish);
-export class EditRequest implements LiteMessage {
-  static readonly typeName = "volvoxgrid.v1.EditRequest" as const;
-  static readonly fields: readonly ProtoFieldInfo[] = [
-    {
-      no: 1,
-      name: "row",
-      jsonName: "row",
-      prop: "row",
-      kind: "int32" as ProtoKind,
-    },
-    {
-      no: 2,
-      name: "col",
-      jsonName: "col",
-      prop: "col",
-      kind: "int32" as ProtoKind,
-    },
-    {
-      no: 3,
-      name: "x",
-      jsonName: "x",
-      prop: "x",
-      kind: "float" as ProtoKind,
-    },
-    {
-      no: 4,
-      name: "y",
-      jsonName: "y",
-      prop: "y",
-      kind: "float" as ProtoKind,
-    },
-    {
-      no: 5,
-      name: "width",
-      jsonName: "width",
-      prop: "width",
-      kind: "float" as ProtoKind,
-    },
-    {
-      no: 6,
-      name: "height",
-      jsonName: "height",
-      prop: "height",
-      kind: "float" as ProtoKind,
-    },
-    {
-      no: 7,
-      name: "current_value",
-      jsonName: "currentValue",
-      prop: "currentValue",
-      kind: "string" as ProtoKind,
-    },
-    {
-      no: 8,
-      name: "edit_mask",
-      jsonName: "editMask",
-      prop: "editMask",
-      kind: "string" as ProtoKind,
-    },
-    {
-      no: 9,
-      name: "max_length",
-      jsonName: "maxLength",
-      prop: "maxLength",
-      kind: "int32" as ProtoKind,
-    },
-    {
-      no: 10,
-      name: "sel_start",
-      jsonName: "selStart",
-      prop: "selStart",
-      kind: "int32" as ProtoKind,
-    },
-    {
-      no: 11,
-      name: "sel_length",
-      jsonName: "selLength",
-      prop: "selLength",
-      kind: "int32" as ProtoKind,
-    },
-    {
-      no: 12,
-      name: "ui_mode",
-      jsonName: "uiMode",
-      prop: "uiMode",
-      kind: "enum" as ProtoKind,
-      enumType: EditUiMode,
-    },
-  ];
-  row: number = 0;
-  col: number = 0;
-  x: number = 0;
-  y: number = 0;
-  width: number = 0;
-  height: number = 0;
-  currentValue: string = "";
-  editMask: string = "";
-  maxLength: number = 0;
-  selStart: number = 0;
-  selLength: number = 0;
-  uiMode: EditUiMode = 0;
-
-  constructor(init?: Partial<EditRequest>) {
-    initMessage(this, EditRequest.fields, init as Record<string, unknown> | undefined);
-  }
-
-  static fromBinary(data: Uint8Array): EditRequest {
-    return decodeMessage(EditRequest, data);
-  }
-
-  static parseFrom(data: Uint8Array): EditRequest {
-    return EditRequest.fromBinary(data);
-  }
-
-  toBinary(): Uint8Array {
-    return encodeMessage(this, EditRequest.fields);
-  }
-
-  toByteArray(): Uint8Array {
-    return this.toBinary();
-  }
-
-  toJson(): ProtoJsonObject {
-    return messageToJson(this, EditRequest.fields);
-  }
-}
-registerMessage(EditRequest);
+registerMessage(EditGetState);
 export class EditSetHighlights implements LiteMessage {
   static readonly typeName = "volvoxgrid.v1.EditSetHighlights" as const;
   static readonly fields: readonly ProtoFieldInfo[] = [
@@ -8812,144 +8609,6 @@ export class EditSetHighlights implements LiteMessage {
   }
 }
 registerMessage(EditSetHighlights);
-export class EditSetPreedit implements LiteMessage {
-  static readonly typeName = "volvoxgrid.v1.EditSetPreedit" as const;
-  static readonly fields: readonly ProtoFieldInfo[] = [
-    {
-      no: 1,
-      name: "text",
-      jsonName: "text",
-      prop: "text",
-      kind: "string" as ProtoKind,
-    },
-    {
-      no: 2,
-      name: "cursor",
-      jsonName: "cursor",
-      prop: "cursor",
-      kind: "int32" as ProtoKind,
-    },
-    {
-      no: 3,
-      name: "commit",
-      jsonName: "commit",
-      prop: "commit",
-      kind: "bool" as ProtoKind,
-    },
-  ];
-  text: string = "";
-  cursor: number = 0;
-  commit: boolean = false;
-
-  constructor(init?: Partial<EditSetPreedit>) {
-    initMessage(this, EditSetPreedit.fields, init as Record<string, unknown> | undefined);
-  }
-
-  static fromBinary(data: Uint8Array): EditSetPreedit {
-    return decodeMessage(EditSetPreedit, data);
-  }
-
-  static parseFrom(data: Uint8Array): EditSetPreedit {
-    return EditSetPreedit.fromBinary(data);
-  }
-
-  toBinary(): Uint8Array {
-    return encodeMessage(this, EditSetPreedit.fields);
-  }
-
-  toByteArray(): Uint8Array {
-    return this.toBinary();
-  }
-
-  toJson(): ProtoJsonObject {
-    return messageToJson(this, EditSetPreedit.fields);
-  }
-}
-registerMessage(EditSetPreedit);
-export class EditSetSelection implements LiteMessage {
-  static readonly typeName = "volvoxgrid.v1.EditSetSelection" as const;
-  static readonly fields: readonly ProtoFieldInfo[] = [
-    {
-      no: 1,
-      name: "start",
-      jsonName: "start",
-      prop: "start",
-      kind: "int32" as ProtoKind,
-    },
-    {
-      no: 2,
-      name: "length",
-      jsonName: "length",
-      prop: "length",
-      kind: "int32" as ProtoKind,
-    },
-  ];
-  start: number = 0;
-  length: number = 0;
-
-  constructor(init?: Partial<EditSetSelection>) {
-    initMessage(this, EditSetSelection.fields, init as Record<string, unknown> | undefined);
-  }
-
-  static fromBinary(data: Uint8Array): EditSetSelection {
-    return decodeMessage(EditSetSelection, data);
-  }
-
-  static parseFrom(data: Uint8Array): EditSetSelection {
-    return EditSetSelection.fromBinary(data);
-  }
-
-  toBinary(): Uint8Array {
-    return encodeMessage(this, EditSetSelection.fields);
-  }
-
-  toByteArray(): Uint8Array {
-    return this.toBinary();
-  }
-
-  toJson(): ProtoJsonObject {
-    return messageToJson(this, EditSetSelection.fields);
-  }
-}
-registerMessage(EditSetSelection);
-export class EditSetText implements LiteMessage {
-  static readonly typeName = "volvoxgrid.v1.EditSetText" as const;
-  static readonly fields: readonly ProtoFieldInfo[] = [
-    {
-      no: 1,
-      name: "text",
-      jsonName: "text",
-      prop: "text",
-      kind: "string" as ProtoKind,
-    },
-  ];
-  text: string = "";
-
-  constructor(init?: Partial<EditSetText>) {
-    initMessage(this, EditSetText.fields, init as Record<string, unknown> | undefined);
-  }
-
-  static fromBinary(data: Uint8Array): EditSetText {
-    return decodeMessage(EditSetText, data);
-  }
-
-  static parseFrom(data: Uint8Array): EditSetText {
-    return EditSetText.fromBinary(data);
-  }
-
-  toBinary(): Uint8Array {
-    return encodeMessage(this, EditSetText.fields);
-  }
-
-  toByteArray(): Uint8Array {
-    return this.toBinary();
-  }
-
-  toJson(): ProtoJsonObject {
-    return messageToJson(this, EditSetText.fields);
-  }
-}
-registerMessage(EditSetText);
 export class EditStart implements LiteMessage {
   static readonly typeName = "volvoxgrid.v1.EditStart" as const;
   static readonly fields: readonly ProtoFieldInfo[] = [
@@ -8969,43 +8628,34 @@ export class EditStart implements LiteMessage {
     },
     {
       no: 3,
-      name: "select_all",
-      jsonName: "selectAll",
-      prop: "selectAll",
-      kind: "bool" as ProtoKind,
-      optional: true,
+      name: "reason",
+      jsonName: "reason",
+      prop: "reason",
+      kind: "enum" as ProtoKind,
+      enumType: EditStartReason,
     },
     {
       no: 4,
-      name: "caret_end",
-      jsonName: "caretEnd",
-      prop: "caretEnd",
-      kind: "bool" as ProtoKind,
-      optional: true,
+      name: "seed_value",
+      jsonName: "seedValue",
+      prop: "seedValue",
+      kind: "message" as ProtoKind,
+      messageType: "EditorValue",
     },
     {
       no: 5,
-      name: "seed_text",
-      jsonName: "seedText",
-      prop: "seedText",
-      kind: "string" as ProtoKind,
-      optional: true,
-    },
-    {
-      no: 6,
-      name: "formula_mode",
-      jsonName: "formulaMode",
-      prop: "formulaMode",
-      kind: "bool" as ProtoKind,
+      name: "caret_position",
+      jsonName: "caretPosition",
+      prop: "caretPosition",
+      kind: "int32" as ProtoKind,
       optional: true,
     },
   ];
   row: number = 0;
   col: number = 0;
-  selectAll: boolean = false;
-  caretEnd: boolean = false;
-  seedText: string = "";
-  formulaMode: boolean = false;
+  reason: EditStartReason = 0;
+  seedValue?: EditorValue;
+  caretPosition: number = 0;
 
   constructor(init?: Partial<EditStart>) {
     initMessage(this, EditStart.fields, init as Record<string, unknown> | undefined);
@@ -9044,111 +8694,15 @@ export class EditState implements LiteMessage {
     },
     {
       no: 2,
-      name: "row",
-      jsonName: "row",
-      prop: "row",
-      kind: "int32" as ProtoKind,
-    },
-    {
-      no: 3,
-      name: "col",
-      jsonName: "col",
-      prop: "col",
-      kind: "int32" as ProtoKind,
-    },
-    {
-      no: 4,
-      name: "text",
-      jsonName: "text",
-      prop: "text",
-      kind: "string" as ProtoKind,
-    },
-    {
-      no: 5,
-      name: "sel_start",
-      jsonName: "selStart",
-      prop: "selStart",
-      kind: "int32" as ProtoKind,
-    },
-    {
-      no: 6,
-      name: "sel_length",
-      jsonName: "selLength",
-      prop: "selLength",
-      kind: "int32" as ProtoKind,
-    },
-    {
-      no: 7,
-      name: "composing",
-      jsonName: "composing",
-      prop: "composing",
-      kind: "bool" as ProtoKind,
-    },
-    {
-      no: 8,
-      name: "preedit_text",
-      jsonName: "preeditText",
-      prop: "preeditText",
-      kind: "string" as ProtoKind,
-    },
-    {
-      no: 9,
-      name: "ui_mode",
-      jsonName: "uiMode",
-      prop: "uiMode",
-      kind: "enum" as ProtoKind,
-      enumType: EditUiMode,
-    },
-    {
-      no: 10,
-      name: "x",
-      jsonName: "x",
-      prop: "x",
-      kind: "float" as ProtoKind,
-    },
-    {
-      no: 11,
-      name: "y",
-      jsonName: "y",
-      prop: "y",
-      kind: "float" as ProtoKind,
-    },
-    {
-      no: 12,
-      name: "width",
-      jsonName: "width",
-      prop: "width",
-      kind: "float" as ProtoKind,
-    },
-    {
-      no: 13,
-      name: "height",
-      jsonName: "height",
-      prop: "height",
-      kind: "float" as ProtoKind,
-    },
-    {
-      no: 14,
-      name: "max_length",
-      jsonName: "maxLength",
-      prop: "maxLength",
-      kind: "int32" as ProtoKind,
+      name: "session",
+      jsonName: "session",
+      prop: "session",
+      kind: "message" as ProtoKind,
+      messageType: "EditorSession",
     },
   ];
   active: boolean = false;
-  row: number = 0;
-  col: number = 0;
-  text: string = "";
-  selStart: number = 0;
-  selLength: number = 0;
-  composing: boolean = false;
-  preeditText: string = "";
-  uiMode: EditUiMode = 0;
-  x: number = 0;
-  y: number = 0;
-  width: number = 0;
-  height: number = 0;
-  maxLength: number = 0;
+  session?: EditorSession;
 
   constructor(init?: Partial<EditState>) {
     initMessage(this, EditState.fields, init as Record<string, unknown> | undefined);
@@ -9175,6 +8729,1223 @@ export class EditState implements LiteMessage {
   }
 }
 registerMessage(EditState);
+export class EditValidationRequest implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.EditValidationRequest" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "request_id",
+      jsonName: "requestId",
+      prop: "requestId",
+      kind: "int64" as ProtoKind,
+    },
+    {
+      no: 2,
+      name: "session_id",
+      jsonName: "sessionId",
+      prop: "sessionId",
+      kind: "int64" as ProtoKind,
+    },
+    {
+      no: 3,
+      name: "row",
+      jsonName: "row",
+      prop: "row",
+      kind: "int32" as ProtoKind,
+    },
+    {
+      no: 4,
+      name: "col",
+      jsonName: "col",
+      prop: "col",
+      kind: "int32" as ProtoKind,
+    },
+    {
+      no: 5,
+      name: "value",
+      jsonName: "value",
+      prop: "value",
+      kind: "message" as ProtoKind,
+      messageType: "EditorValue",
+    },
+  ];
+  requestId: bigint = 0n;
+  sessionId: bigint = 0n;
+  row: number = 0;
+  col: number = 0;
+  value?: EditorValue;
+
+  constructor(init?: Partial<EditValidationRequest>) {
+    initMessage(this, EditValidationRequest.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): EditValidationRequest {
+    return decodeMessage(EditValidationRequest, data);
+  }
+
+  static parseFrom(data: Uint8Array): EditValidationRequest {
+    return EditValidationRequest.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, EditValidationRequest.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, EditValidationRequest.fields);
+  }
+}
+registerMessage(EditValidationRequest);
+export class EditValidationResponse implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.EditValidationResponse" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "request_id",
+      jsonName: "requestId",
+      prop: "requestId",
+      kind: "int64" as ProtoKind,
+    },
+    {
+      no: 2,
+      name: "session_id",
+      jsonName: "sessionId",
+      prop: "sessionId",
+      kind: "int64" as ProtoKind,
+    },
+    {
+      no: 3,
+      name: "errors",
+      jsonName: "errors",
+      prop: "errors",
+      kind: "message" as ProtoKind,
+      repeated: true,
+      messageType: "ValidationError",
+    },
+    {
+      no: 4,
+      name: "normalized_value",
+      jsonName: "normalizedValue",
+      prop: "normalizedValue",
+      kind: "message" as ProtoKind,
+      optional: true,
+      messageType: "EditorValue",
+    },
+  ];
+  requestId: bigint = 0n;
+  sessionId: bigint = 0n;
+  errors: ValidationError[] = [];
+  normalizedValue?: EditorValue;
+
+  constructor(init?: Partial<EditValidationResponse>) {
+    initMessage(this, EditValidationResponse.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): EditValidationResponse {
+    return decodeMessage(EditValidationResponse, data);
+  }
+
+  static parseFrom(data: Uint8Array): EditValidationResponse {
+    return EditValidationResponse.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, EditValidationResponse.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, EditValidationResponse.fields);
+  }
+}
+registerMessage(EditValidationResponse);
+export class EditorAction implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.EditorAction" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "action_id",
+      jsonName: "actionId",
+      prop: "actionId",
+      kind: "string" as ProtoKind,
+    },
+    {
+      no: 2,
+      name: "label",
+      jsonName: "label",
+      prop: "label",
+      kind: "string" as ProtoKind,
+    },
+    {
+      no: 3,
+      name: "role",
+      jsonName: "role",
+      prop: "role",
+      kind: "enum" as ProtoKind,
+      enumType: ButtonRole,
+    },
+    {
+      no: 4,
+      name: "icon",
+      jsonName: "icon",
+      prop: "icon",
+      kind: "message" as ProtoKind,
+      messageType: "ImageData",
+    },
+  ];
+  actionId: string = "";
+  label: string = "";
+  role: ButtonRole = 0;
+  icon?: ImageData;
+
+  constructor(init?: Partial<EditorAction>) {
+    initMessage(this, EditorAction.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): EditorAction {
+    return decodeMessage(EditorAction, data);
+  }
+
+  static parseFrom(data: Uint8Array): EditorAction {
+    return EditorAction.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, EditorAction.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, EditorAction.fields);
+  }
+}
+registerMessage(EditorAction);
+export class EditorCapabilities implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.EditorCapabilities" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "accepts_text_input",
+      jsonName: "acceptsTextInput",
+      prop: "acceptsTextInput",
+      kind: "bool" as ProtoKind,
+    },
+    {
+      no: 2,
+      name: "supports_selection",
+      jsonName: "supportsSelection",
+      prop: "supportsSelection",
+      kind: "bool" as ProtoKind,
+    },
+    {
+      no: 3,
+      name: "supports_cut",
+      jsonName: "supportsCut",
+      prop: "supportsCut",
+      kind: "bool" as ProtoKind,
+    },
+    {
+      no: 4,
+      name: "supports_paste",
+      jsonName: "supportsPaste",
+      prop: "supportsPaste",
+      kind: "bool" as ProtoKind,
+    },
+    {
+      no: 5,
+      name: "supports_undo",
+      jsonName: "supportsUndo",
+      prop: "supportsUndo",
+      kind: "bool" as ProtoKind,
+    },
+  ];
+  acceptsTextInput: boolean = false;
+  supportsSelection: boolean = false;
+  supportsCut: boolean = false;
+  supportsPaste: boolean = false;
+  supportsUndo: boolean = false;
+
+  constructor(init?: Partial<EditorCapabilities>) {
+    initMessage(this, EditorCapabilities.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): EditorCapabilities {
+    return decodeMessage(EditorCapabilities, data);
+  }
+
+  static parseFrom(data: Uint8Array): EditorCapabilities {
+    return EditorCapabilities.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, EditorCapabilities.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, EditorCapabilities.fields);
+  }
+}
+registerMessage(EditorCapabilities);
+export class EditorListItemsRequest implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.EditorListItemsRequest" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "request_id",
+      jsonName: "requestId",
+      prop: "requestId",
+      kind: "int64" as ProtoKind,
+    },
+    {
+      no: 2,
+      name: "session_id",
+      jsonName: "sessionId",
+      prop: "sessionId",
+      kind: "int64" as ProtoKind,
+    },
+    {
+      no: 3,
+      name: "data_source_id",
+      jsonName: "dataSourceId",
+      prop: "dataSourceId",
+      kind: "string" as ProtoKind,
+    },
+    {
+      no: 4,
+      name: "filter_text",
+      jsonName: "filterText",
+      prop: "filterText",
+      kind: "string" as ProtoKind,
+    },
+    {
+      no: 5,
+      name: "offset",
+      jsonName: "offset",
+      prop: "offset",
+      kind: "int32" as ProtoKind,
+    },
+    {
+      no: 6,
+      name: "limit",
+      jsonName: "limit",
+      prop: "limit",
+      kind: "int32" as ProtoKind,
+    },
+  ];
+  requestId: bigint = 0n;
+  sessionId: bigint = 0n;
+  dataSourceId: string = "";
+  filterText: string = "";
+  offset: number = 0;
+  limit: number = 0;
+
+  constructor(init?: Partial<EditorListItemsRequest>) {
+    initMessage(this, EditorListItemsRequest.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): EditorListItemsRequest {
+    return decodeMessage(EditorListItemsRequest, data);
+  }
+
+  static parseFrom(data: Uint8Array): EditorListItemsRequest {
+    return EditorListItemsRequest.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, EditorListItemsRequest.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, EditorListItemsRequest.fields);
+  }
+}
+registerMessage(EditorListItemsRequest);
+export class EditorListItemsResponse implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.EditorListItemsResponse" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "request_id",
+      jsonName: "requestId",
+      prop: "requestId",
+      kind: "int64" as ProtoKind,
+    },
+    {
+      no: 2,
+      name: "session_id",
+      jsonName: "sessionId",
+      prop: "sessionId",
+      kind: "int64" as ProtoKind,
+    },
+    {
+      no: 3,
+      name: "items",
+      jsonName: "items",
+      prop: "items",
+      kind: "message" as ProtoKind,
+      repeated: true,
+      messageType: "ListItem",
+    },
+    {
+      no: 4,
+      name: "has_more",
+      jsonName: "hasMore",
+      prop: "hasMore",
+      kind: "bool" as ProtoKind,
+    },
+  ];
+  requestId: bigint = 0n;
+  sessionId: bigint = 0n;
+  items: ListItem[] = [];
+  hasMore: boolean = false;
+
+  constructor(init?: Partial<EditorListItemsResponse>) {
+    initMessage(this, EditorListItemsResponse.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): EditorListItemsResponse {
+    return decodeMessage(EditorListItemsResponse, data);
+  }
+
+  static parseFrom(data: Uint8Array): EditorListItemsResponse {
+    return EditorListItemsResponse.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, EditorListItemsResponse.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, EditorListItemsResponse.fields);
+  }
+}
+registerMessage(EditorListItemsResponse);
+export class EditorPreeditChanged implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.EditorPreeditChanged" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "text",
+      jsonName: "text",
+      prop: "text",
+      kind: "string" as ProtoKind,
+    },
+    {
+      no: 2,
+      name: "cursor",
+      jsonName: "cursor",
+      prop: "cursor",
+      kind: "int32" as ProtoKind,
+    },
+    {
+      no: 3,
+      name: "commit",
+      jsonName: "commit",
+      prop: "commit",
+      kind: "bool" as ProtoKind,
+    },
+  ];
+  text: string = "";
+  cursor: number = 0;
+  commit: boolean = false;
+
+  constructor(init?: Partial<EditorPreeditChanged>) {
+    initMessage(this, EditorPreeditChanged.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): EditorPreeditChanged {
+    return decodeMessage(EditorPreeditChanged, data);
+  }
+
+  static parseFrom(data: Uint8Array): EditorPreeditChanged {
+    return EditorPreeditChanged.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, EditorPreeditChanged.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, EditorPreeditChanged.fields);
+  }
+}
+registerMessage(EditorPreeditChanged);
+export class EditorSession implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.EditorSession" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "session_id",
+      jsonName: "sessionId",
+      prop: "sessionId",
+      kind: "int64" as ProtoKind,
+    },
+    {
+      no: 2,
+      name: "row",
+      jsonName: "row",
+      prop: "row",
+      kind: "int32" as ProtoKind,
+    },
+    {
+      no: 3,
+      name: "col",
+      jsonName: "col",
+      prop: "col",
+      kind: "int32" as ProtoKind,
+    },
+    {
+      no: 4,
+      name: "viewport_rect",
+      jsonName: "viewportRect",
+      prop: "viewportRect",
+      kind: "message" as ProtoKind,
+      messageType: "Rect",
+    },
+    {
+      no: 5,
+      name: "editor",
+      jsonName: "editor",
+      prop: "editor",
+      kind: "message" as ProtoKind,
+      messageType: "EditorSpec",
+    },
+    {
+      no: 6,
+      name: "value",
+      jsonName: "value",
+      prop: "value",
+      kind: "message" as ProtoKind,
+      messageType: "EditorValue",
+    },
+    {
+      no: 7,
+      name: "selection",
+      jsonName: "selection",
+      prop: "selection",
+      kind: "message" as ProtoKind,
+      messageType: "TextSelection",
+    },
+    {
+      no: 8,
+      name: "ui_mode",
+      jsonName: "uiMode",
+      prop: "uiMode",
+      kind: "enum" as ProtoKind,
+      enumType: EditUiMode,
+    },
+    {
+      no: 9,
+      name: "capabilities",
+      jsonName: "capabilities",
+      prop: "capabilities",
+      kind: "message" as ProtoKind,
+      messageType: "EditorCapabilities",
+    },
+    {
+      no: 10,
+      name: "reason",
+      jsonName: "reason",
+      prop: "reason",
+      kind: "enum" as ProtoKind,
+      enumType: EditStartReason,
+    },
+    {
+      no: 11,
+      name: "state_version",
+      jsonName: "stateVersion",
+      prop: "stateVersion",
+      kind: "uint64" as ProtoKind,
+    },
+    {
+      no: 12,
+      name: "composing",
+      jsonName: "composing",
+      prop: "composing",
+      kind: "bool" as ProtoKind,
+    },
+    {
+      no: 13,
+      name: "preedit_text",
+      jsonName: "preeditText",
+      prop: "preeditText",
+      kind: "string" as ProtoKind,
+    },
+    {
+      no: 14,
+      name: "validation_errors",
+      jsonName: "validationErrors",
+      prop: "validationErrors",
+      kind: "message" as ProtoKind,
+      repeated: true,
+      messageType: "ValidationError",
+    },
+  ];
+  sessionId: bigint = 0n;
+  row: number = 0;
+  col: number = 0;
+  viewportRect?: Rect;
+  editor?: EditorSpec;
+  value?: EditorValue;
+  selection?: TextSelection;
+  uiMode: EditUiMode = 0;
+  capabilities?: EditorCapabilities;
+  reason: EditStartReason = 0;
+  stateVersion: bigint = 0n;
+  composing: boolean = false;
+  preeditText: string = "";
+  validationErrors: ValidationError[] = [];
+
+  constructor(init?: Partial<EditorSession>) {
+    initMessage(this, EditorSession.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): EditorSession {
+    return decodeMessage(EditorSession, data);
+  }
+
+  static parseFrom(data: Uint8Array): EditorSession {
+    return EditorSession.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, EditorSession.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, EditorSession.fields);
+  }
+}
+registerMessage(EditorSession);
+export enum EditorSessionCommandCommandOneofCase {
+  None = 0,
+  ValueChanged = 3,
+  SelectionChanged = 4,
+  PreeditChanged = 5,
+  Commit = 6,
+  Cancel = 7,
+  CustomAction = 8,
+}
+export class EditorSessionCommand implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.EditorSessionCommand" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "session_id",
+      jsonName: "sessionId",
+      prop: "sessionId",
+      kind: "int64" as ProtoKind,
+    },
+    {
+      no: 2,
+      name: "state_version",
+      jsonName: "stateVersion",
+      prop: "stateVersion",
+      kind: "uint64" as ProtoKind,
+    },
+    {
+      no: 3,
+      name: "value_changed",
+      jsonName: "valueChanged",
+      prop: "valueChanged",
+      kind: "message" as ProtoKind,
+      oneof: "commandCase",
+      oneofCase: EditorSessionCommandCommandOneofCase.ValueChanged,
+      messageType: "EditorValueChanged",
+    },
+    {
+      no: 4,
+      name: "selection_changed",
+      jsonName: "selectionChanged",
+      prop: "selectionChanged",
+      kind: "message" as ProtoKind,
+      oneof: "commandCase",
+      oneofCase: EditorSessionCommandCommandOneofCase.SelectionChanged,
+      messageType: "TextSelectionChanged",
+    },
+    {
+      no: 5,
+      name: "preedit_changed",
+      jsonName: "preeditChanged",
+      prop: "preeditChanged",
+      kind: "message" as ProtoKind,
+      oneof: "commandCase",
+      oneofCase: EditorSessionCommandCommandOneofCase.PreeditChanged,
+      messageType: "EditorPreeditChanged",
+    },
+    {
+      no: 6,
+      name: "commit",
+      jsonName: "commit",
+      prop: "commit",
+      kind: "message" as ProtoKind,
+      oneof: "commandCase",
+      oneofCase: EditorSessionCommandCommandOneofCase.Commit,
+      messageType: "EditCommit",
+    },
+    {
+      no: 7,
+      name: "cancel",
+      jsonName: "cancel",
+      prop: "cancel",
+      kind: "message" as ProtoKind,
+      oneof: "commandCase",
+      oneofCase: EditorSessionCommandCommandOneofCase.Cancel,
+      messageType: "EditCancel",
+    },
+    {
+      no: 8,
+      name: "custom_action",
+      jsonName: "customAction",
+      prop: "customAction",
+      kind: "message" as ProtoKind,
+      oneof: "commandCase",
+      oneofCase: EditorSessionCommandCommandOneofCase.CustomAction,
+      messageType: "CustomEditorAction",
+    },
+  ];
+  commandCase: EditorSessionCommandCommandOneofCase = EditorSessionCommandCommandOneofCase.None;
+  sessionId: bigint = 0n;
+  stateVersion: bigint = 0n;
+  valueChanged?: EditorValueChanged;
+  selectionChanged?: TextSelectionChanged;
+  preeditChanged?: EditorPreeditChanged;
+  commit?: EditCommit;
+  cancel?: EditCancel;
+  customAction?: CustomEditorAction;
+
+  constructor(init?: Partial<EditorSessionCommand>) {
+    initMessage(this, EditorSessionCommand.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): EditorSessionCommand {
+    return decodeMessage(EditorSessionCommand, data);
+  }
+
+  static parseFrom(data: Uint8Array): EditorSessionCommand {
+    return EditorSessionCommand.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, EditorSessionCommand.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, EditorSessionCommand.fields);
+  }
+}
+registerMessage(EditorSessionCommand);
+export class EditorSessionEnded implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.EditorSessionEnded" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "session_id",
+      jsonName: "sessionId",
+      prop: "sessionId",
+      kind: "int64" as ProtoKind,
+    },
+    {
+      no: 2,
+      name: "reason",
+      jsonName: "reason",
+      prop: "reason",
+      kind: "enum" as ProtoKind,
+      enumType: EditEndReason,
+    },
+    {
+      no: 3,
+      name: "committed_value",
+      jsonName: "committedValue",
+      prop: "committedValue",
+      kind: "message" as ProtoKind,
+      messageType: "EditorValue",
+    },
+    {
+      no: 4,
+      name: "state_version",
+      jsonName: "stateVersion",
+      prop: "stateVersion",
+      kind: "uint64" as ProtoKind,
+    },
+  ];
+  sessionId: bigint = 0n;
+  reason: EditEndReason = 0;
+  committedValue?: EditorValue;
+  stateVersion: bigint = 0n;
+
+  constructor(init?: Partial<EditorSessionEnded>) {
+    initMessage(this, EditorSessionEnded.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): EditorSessionEnded {
+    return decodeMessage(EditorSessionEnded, data);
+  }
+
+  static parseFrom(data: Uint8Array): EditorSessionEnded {
+    return EditorSessionEnded.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, EditorSessionEnded.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, EditorSessionEnded.fields);
+  }
+}
+registerMessage(EditorSessionEnded);
+export class EditorSessionStarted implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.EditorSessionStarted" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "session",
+      jsonName: "session",
+      prop: "session",
+      kind: "message" as ProtoKind,
+      messageType: "EditorSession",
+    },
+  ];
+  session?: EditorSession;
+
+  constructor(init?: Partial<EditorSessionStarted>) {
+    initMessage(this, EditorSessionStarted.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): EditorSessionStarted {
+    return decodeMessage(EditorSessionStarted, data);
+  }
+
+  static parseFrom(data: Uint8Array): EditorSessionStarted {
+    return EditorSessionStarted.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, EditorSessionStarted.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, EditorSessionStarted.fields);
+  }
+}
+registerMessage(EditorSessionStarted);
+export class EditorSessionUpdated implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.EditorSessionUpdated" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "session_id",
+      jsonName: "sessionId",
+      prop: "sessionId",
+      kind: "int64" as ProtoKind,
+    },
+    {
+      no: 2,
+      name: "state_version",
+      jsonName: "stateVersion",
+      prop: "stateVersion",
+      kind: "uint64" as ProtoKind,
+    },
+    {
+      no: 3,
+      name: "reason",
+      jsonName: "reason",
+      prop: "reason",
+      kind: "enum" as ProtoKind,
+      enumType: EditorUpdateReason,
+    },
+    {
+      no: 4,
+      name: "viewport_rect",
+      jsonName: "viewportRect",
+      prop: "viewportRect",
+      kind: "message" as ProtoKind,
+      optional: true,
+      messageType: "Rect",
+    },
+    {
+      no: 5,
+      name: "value",
+      jsonName: "value",
+      prop: "value",
+      kind: "message" as ProtoKind,
+      optional: true,
+      messageType: "EditorValue",
+    },
+    {
+      no: 6,
+      name: "selection",
+      jsonName: "selection",
+      prop: "selection",
+      kind: "message" as ProtoKind,
+      optional: true,
+      messageType: "TextSelection",
+    },
+    {
+      no: 7,
+      name: "visible",
+      jsonName: "visible",
+      prop: "visible",
+      kind: "bool" as ProtoKind,
+      optional: true,
+    },
+    {
+      no: 8,
+      name: "force_refocus",
+      jsonName: "forceRefocus",
+      prop: "forceRefocus",
+      kind: "bool" as ProtoKind,
+      optional: true,
+    },
+    {
+      no: 9,
+      name: "validation_errors",
+      jsonName: "validationErrors",
+      prop: "validationErrors",
+      kind: "message" as ProtoKind,
+      repeated: true,
+      messageType: "ValidationError",
+    },
+    {
+      no: 10,
+      name: "custom_payload",
+      jsonName: "customPayload",
+      prop: "customPayload",
+      kind: "message" as ProtoKind,
+      messageType: "StructValue",
+    },
+  ];
+  sessionId: bigint = 0n;
+  stateVersion: bigint = 0n;
+  reason: EditorUpdateReason = 0;
+  viewportRect?: Rect;
+  value?: EditorValue;
+  selection?: TextSelection;
+  visible: boolean = false;
+  forceRefocus: boolean = false;
+  validationErrors: ValidationError[] = [];
+  customPayload?: StructValue;
+
+  constructor(init?: Partial<EditorSessionUpdated>) {
+    initMessage(this, EditorSessionUpdated.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): EditorSessionUpdated {
+    return decodeMessage(EditorSessionUpdated, data);
+  }
+
+  static parseFrom(data: Uint8Array): EditorSessionUpdated {
+    return EditorSessionUpdated.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, EditorSessionUpdated.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, EditorSessionUpdated.fields);
+  }
+}
+registerMessage(EditorSessionUpdated);
+export class EditorSpec implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.EditorSpec" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "kind",
+      jsonName: "kind",
+      prop: "kind",
+      kind: "enum" as ProtoKind,
+      enumType: EditorKind,
+    },
+    {
+      no: 2,
+      name: "owner",
+      jsonName: "owner",
+      prop: "owner",
+      kind: "enum" as ProtoKind,
+      enumType: EditorOwner,
+    },
+    {
+      no: 3,
+      name: "presentation",
+      jsonName: "presentation",
+      prop: "presentation",
+      kind: "enum" as ProtoKind,
+      enumType: EditorPresentation,
+    },
+    {
+      no: 4,
+      name: "validation_mode",
+      jsonName: "validationMode",
+      prop: "validationMode",
+      kind: "enum" as ProtoKind,
+      enumType: ValidationMode,
+    },
+    {
+      no: 5,
+      name: "validation_trigger",
+      jsonName: "validationTrigger",
+      prop: "validationTrigger",
+      kind: "enum" as ProtoKind,
+      enumType: ValidationTrigger,
+    },
+    {
+      no: 6,
+      name: "validation_debounce_ms",
+      jsonName: "validationDebounceMs",
+      prop: "validationDebounceMs",
+      kind: "int32" as ProtoKind,
+    },
+    {
+      no: 10,
+      name: "custom_editor_id",
+      jsonName: "customEditorId",
+      prop: "customEditorId",
+      kind: "string" as ProtoKind,
+      optional: true,
+    },
+    {
+      no: 11,
+      name: "text",
+      jsonName: "text",
+      prop: "text",
+      kind: "message" as ProtoKind,
+      messageType: "TextEditorParams",
+    },
+    {
+      no: 12,
+      name: "number",
+      jsonName: "number",
+      prop: "number",
+      kind: "message" as ProtoKind,
+      messageType: "NumberEditorParams",
+    },
+    {
+      no: 13,
+      name: "checkbox",
+      jsonName: "checkbox",
+      prop: "checkbox",
+      kind: "message" as ProtoKind,
+      messageType: "CheckboxEditorParams",
+    },
+    {
+      no: 14,
+      name: "list",
+      jsonName: "list",
+      prop: "list",
+      kind: "message" as ProtoKind,
+      messageType: "ListEditorParams",
+    },
+    {
+      no: 15,
+      name: "date_time",
+      jsonName: "dateTime",
+      prop: "dateTime",
+      kind: "message" as ProtoKind,
+      messageType: "DateTimeEditorParams",
+    },
+    {
+      no: 16,
+      name: "actions",
+      jsonName: "actions",
+      prop: "actions",
+      kind: "message" as ProtoKind,
+      repeated: true,
+      messageType: "EditorAction",
+    },
+    {
+      no: 17,
+      name: "custom_props",
+      jsonName: "customProps",
+      prop: "customProps",
+      kind: "message" as ProtoKind,
+      messageType: "StructValue",
+    },
+  ];
+  kind: EditorKind = 0;
+  owner: EditorOwner = 0;
+  presentation: EditorPresentation = 0;
+  validationMode: ValidationMode = 0;
+  validationTrigger: ValidationTrigger = 0;
+  validationDebounceMs: number = 0;
+  customEditorId: string = "";
+  text?: TextEditorParams;
+  number?: NumberEditorParams;
+  checkbox?: CheckboxEditorParams;
+  list?: ListEditorParams;
+  dateTime?: DateTimeEditorParams;
+  actions: EditorAction[] = [];
+  customProps?: StructValue;
+
+  constructor(init?: Partial<EditorSpec>) {
+    initMessage(this, EditorSpec.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): EditorSpec {
+    return decodeMessage(EditorSpec, data);
+  }
+
+  static parseFrom(data: Uint8Array): EditorSpec {
+    return EditorSpec.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, EditorSpec.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, EditorSpec.fields);
+  }
+}
+registerMessage(EditorSpec);
+export class EditorValue implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.EditorValue" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "value",
+      jsonName: "value",
+      prop: "value",
+      kind: "message" as ProtoKind,
+      messageType: "CellValue",
+    },
+    {
+      no: 2,
+      name: "edit_text",
+      jsonName: "editText",
+      prop: "editText",
+      kind: "string" as ProtoKind,
+      optional: true,
+    },
+    {
+      no: 3,
+      name: "display_text",
+      jsonName: "displayText",
+      prop: "displayText",
+      kind: "string" as ProtoKind,
+      optional: true,
+    },
+  ];
+  value?: CellValue;
+  editText: string = "";
+  displayText: string = "";
+
+  constructor(init?: Partial<EditorValue>) {
+    initMessage(this, EditorValue.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): EditorValue {
+    return decodeMessage(EditorValue, data);
+  }
+
+  static parseFrom(data: Uint8Array): EditorValue {
+    return EditorValue.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, EditorValue.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, EditorValue.fields);
+  }
+}
+registerMessage(EditorValue);
+export class EditorValueChanged implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.EditorValueChanged" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "value",
+      jsonName: "value",
+      prop: "value",
+      kind: "message" as ProtoKind,
+      messageType: "EditorValue",
+    },
+  ];
+  value?: EditorValue;
+
+  constructor(init?: Partial<EditorValueChanged>) {
+    initMessage(this, EditorValueChanged.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): EditorValueChanged {
+    return decodeMessage(EditorValueChanged, data);
+  }
+
+  static parseFrom(data: Uint8Array): EditorValueChanged {
+    return EditorValueChanged.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, EditorValueChanged.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, EditorValueChanged.fields);
+  }
+}
+registerMessage(EditorValueChanged);
 export class EnterCellEvent implements LiteMessage {
   static readonly typeName = "volvoxgrid.v1.EnterCellEvent" as const;
   static readonly fields: readonly ProtoFieldInfo[] = [
@@ -10791,6 +11562,15 @@ export class GridConfig implements LiteMessage {
       kind: "message" as ProtoKind,
       messageType: "IndicatorsConfig",
     },
+    {
+      no: 12,
+      name: "theme_preset",
+      jsonName: "themePreset",
+      prop: "themePreset",
+      kind: "enum" as ProtoKind,
+      optional: true,
+      enumType: ThemePreset,
+    },
   ];
   layout?: LayoutConfig;
   style?: StyleConfig;
@@ -10803,6 +11583,7 @@ export class GridConfig implements LiteMessage {
   rendering?: RenderConfig;
   version: string = "";
   indicators?: IndicatorsConfig;
+  themePreset: ThemePreset = 0;
 
   constructor(init?: Partial<GridConfig>) {
     initMessage(this, GridConfig.fields, init as Record<string, unknown> | undefined);
@@ -10842,61 +11623,59 @@ export enum GridEventEventOneofCase {
   AfterEdit = 10,
   CellEditValidate = 11,
   CellEditChange = 12,
-  KeyDownEdit = 14,
-  KeyPressEdit = 15,
-  KeyUpEdit = 16,
-  CellEditConfigureStyle = 17,
-  CellEditConfigureWindow = 18,
-  DropdownClosed = 19,
-  DropdownOpened = 20,
-  CellChanged = 21,
-  RowStatusChange = 22,
-  BeforeSort = 23,
-  AfterSort = 24,
-  Compare = 25,
-  BeforeNodeToggle = 26,
-  AfterNodeToggle = 27,
-  BeforeScroll = 28,
-  AfterScroll = 29,
-  ScrollTooltip = 30,
-  BeforeUserResize = 31,
-  AfterUserResize = 32,
-  AfterUserFreeze = 33,
-  BeforeMoveColumn = 34,
-  AfterMoveColumn = 35,
-  BeforeMoveRow = 36,
-  AfterMoveRow = 37,
-  BeforeMouseDown = 38,
-  MouseDown = 39,
-  MouseUp = 40,
-  MouseMove = 41,
-  Click = 42,
-  DblClick = 43,
-  KeyDown = 44,
-  KeyPress = 45,
-  KeyUp = 46,
-  CustomRenderCell = 47,
-  DragStart = 48,
-  DragOver = 49,
-  DragDrop = 50,
-  DragComplete = 51,
-  TypeAheadStarted = 52,
-  TypeAheadEnded = 53,
-  DataRefreshing = 54,
-  DataRefreshed = 55,
-  FilterData = 56,
-  Error = 57,
-  BeforePageBreak = 58,
-  StartPage = 59,
-  GetHeaderRow = 60,
-  PullToRefreshTriggered = 61,
-  PullToRefreshCanceled = 62,
-  BeforeDropdownOpen = 63,
-  TreeChildrenRequested = 64,
-  BeforeTreeNodeToggle = 65,
-  AfterTreeNodeToggle = 66,
-  TreeNodeActivate = 67,
-  TreeNodeContextMenu = 68,
+  KeyDownEdit = 13,
+  KeyPressEdit = 14,
+  KeyUpEdit = 15,
+  EditValidationRequest = 16,
+  EditorListItemsRequest = 17,
+  CustomEditorAction = 18,
+  CellChanged = 19,
+  RowStatusChange = 20,
+  BeforeSort = 21,
+  AfterSort = 22,
+  Compare = 23,
+  BeforeNodeToggle = 24,
+  AfterNodeToggle = 25,
+  BeforeScroll = 26,
+  AfterScroll = 27,
+  ScrollTooltip = 28,
+  BeforeUserResize = 29,
+  AfterUserResize = 30,
+  AfterUserFreeze = 31,
+  BeforeMoveColumn = 32,
+  AfterMoveColumn = 33,
+  BeforeMoveRow = 34,
+  AfterMoveRow = 35,
+  BeforeMouseDown = 36,
+  MouseDown = 37,
+  MouseUp = 38,
+  MouseMove = 39,
+  Click = 40,
+  DblClick = 41,
+  KeyDown = 42,
+  KeyPress = 43,
+  KeyUp = 44,
+  CustomRenderCell = 45,
+  DragStart = 46,
+  DragOver = 47,
+  DragDrop = 48,
+  DragComplete = 49,
+  TypeAheadStarted = 50,
+  TypeAheadEnded = 51,
+  DataRefreshing = 52,
+  DataRefreshed = 53,
+  FilterData = 54,
+  Error = 55,
+  BeforePageBreak = 56,
+  StartPage = 57,
+  GetHeaderRow = 58,
+  PullToRefreshTriggered = 59,
+  PullToRefreshCanceled = 60,
+  TreeChildrenRequested = 61,
+  BeforeTreeNodeToggle = 62,
+  AfterTreeNodeToggle = 63,
+  TreeNodeActivate = 64,
+  TreeNodeContextMenu = 65,
 }
 export class GridEvent implements LiteMessage {
   static readonly typeName = "volvoxgrid.v1.GridEvent" as const;
@@ -11026,7 +11805,7 @@ export class GridEvent implements LiteMessage {
       messageType: "CellEditChangeEvent",
     },
     {
-      no: 14,
+      no: 13,
       name: "key_down_edit",
       jsonName: "keyDownEdit",
       prop: "keyDownEdit",
@@ -11036,7 +11815,7 @@ export class GridEvent implements LiteMessage {
       messageType: "KeyDownEditEvent",
     },
     {
-      no: 15,
+      no: 14,
       name: "key_press_edit",
       jsonName: "keyPressEdit",
       prop: "keyPressEdit",
@@ -11046,7 +11825,7 @@ export class GridEvent implements LiteMessage {
       messageType: "KeyPressEditEvent",
     },
     {
-      no: 16,
+      no: 15,
       name: "key_up_edit",
       jsonName: "keyUpEdit",
       prop: "keyUpEdit",
@@ -11056,47 +11835,37 @@ export class GridEvent implements LiteMessage {
       messageType: "KeyUpEditEvent",
     },
     {
-      no: 17,
-      name: "cell_edit_configure_style",
-      jsonName: "cellEditConfigureStyle",
-      prop: "cellEditConfigureStyle",
+      no: 16,
+      name: "edit_validation_request",
+      jsonName: "editValidationRequest",
+      prop: "editValidationRequest",
       kind: "message" as ProtoKind,
       oneof: "eventCase",
-      oneofCase: GridEventEventOneofCase.CellEditConfigureStyle,
-      messageType: "CellEditConfigureStyleEvent",
+      oneofCase: GridEventEventOneofCase.EditValidationRequest,
+      messageType: "EditValidationRequest",
+    },
+    {
+      no: 17,
+      name: "editor_list_items_request",
+      jsonName: "editorListItemsRequest",
+      prop: "editorListItemsRequest",
+      kind: "message" as ProtoKind,
+      oneof: "eventCase",
+      oneofCase: GridEventEventOneofCase.EditorListItemsRequest,
+      messageType: "EditorListItemsRequest",
     },
     {
       no: 18,
-      name: "cell_edit_configure_window",
-      jsonName: "cellEditConfigureWindow",
-      prop: "cellEditConfigureWindow",
+      name: "custom_editor_action",
+      jsonName: "customEditorAction",
+      prop: "customEditorAction",
       kind: "message" as ProtoKind,
       oneof: "eventCase",
-      oneofCase: GridEventEventOneofCase.CellEditConfigureWindow,
-      messageType: "CellEditConfigureWindowEvent",
+      oneofCase: GridEventEventOneofCase.CustomEditorAction,
+      messageType: "CustomEditorActionEvent",
     },
     {
       no: 19,
-      name: "dropdown_closed",
-      jsonName: "dropdownClosed",
-      prop: "dropdownClosed",
-      kind: "message" as ProtoKind,
-      oneof: "eventCase",
-      oneofCase: GridEventEventOneofCase.DropdownClosed,
-      messageType: "DropdownClosedEvent",
-    },
-    {
-      no: 20,
-      name: "dropdown_opened",
-      jsonName: "dropdownOpened",
-      prop: "dropdownOpened",
-      kind: "message" as ProtoKind,
-      oneof: "eventCase",
-      oneofCase: GridEventEventOneofCase.DropdownOpened,
-      messageType: "DropdownOpenedEvent",
-    },
-    {
-      no: 21,
       name: "cell_changed",
       jsonName: "cellChanged",
       prop: "cellChanged",
@@ -11106,7 +11875,7 @@ export class GridEvent implements LiteMessage {
       messageType: "CellChangedEvent",
     },
     {
-      no: 22,
+      no: 20,
       name: "row_status_change",
       jsonName: "rowStatusChange",
       prop: "rowStatusChange",
@@ -11116,7 +11885,7 @@ export class GridEvent implements LiteMessage {
       messageType: "RowStatusChangeEvent",
     },
     {
-      no: 23,
+      no: 21,
       name: "before_sort",
       jsonName: "beforeSort",
       prop: "beforeSort",
@@ -11126,7 +11895,7 @@ export class GridEvent implements LiteMessage {
       messageType: "BeforeSortEvent",
     },
     {
-      no: 24,
+      no: 22,
       name: "after_sort",
       jsonName: "afterSort",
       prop: "afterSort",
@@ -11136,7 +11905,7 @@ export class GridEvent implements LiteMessage {
       messageType: "AfterSortEvent",
     },
     {
-      no: 25,
+      no: 23,
       name: "compare",
       jsonName: "compare",
       prop: "compare",
@@ -11146,7 +11915,7 @@ export class GridEvent implements LiteMessage {
       messageType: "CompareEvent",
     },
     {
-      no: 26,
+      no: 24,
       name: "before_node_toggle",
       jsonName: "beforeNodeToggle",
       prop: "beforeNodeToggle",
@@ -11156,7 +11925,7 @@ export class GridEvent implements LiteMessage {
       messageType: "BeforeNodeToggleEvent",
     },
     {
-      no: 27,
+      no: 25,
       name: "after_node_toggle",
       jsonName: "afterNodeToggle",
       prop: "afterNodeToggle",
@@ -11166,7 +11935,7 @@ export class GridEvent implements LiteMessage {
       messageType: "AfterNodeToggleEvent",
     },
     {
-      no: 28,
+      no: 26,
       name: "before_scroll",
       jsonName: "beforeScroll",
       prop: "beforeScroll",
@@ -11176,7 +11945,7 @@ export class GridEvent implements LiteMessage {
       messageType: "BeforeScrollEvent",
     },
     {
-      no: 29,
+      no: 27,
       name: "after_scroll",
       jsonName: "afterScroll",
       prop: "afterScroll",
@@ -11186,7 +11955,7 @@ export class GridEvent implements LiteMessage {
       messageType: "AfterScrollEvent",
     },
     {
-      no: 30,
+      no: 28,
       name: "scroll_tooltip",
       jsonName: "scrollTooltip",
       prop: "scrollTooltip",
@@ -11196,7 +11965,7 @@ export class GridEvent implements LiteMessage {
       messageType: "ScrollTooltipEvent",
     },
     {
-      no: 31,
+      no: 29,
       name: "before_user_resize",
       jsonName: "beforeUserResize",
       prop: "beforeUserResize",
@@ -11206,7 +11975,7 @@ export class GridEvent implements LiteMessage {
       messageType: "BeforeUserResizeEvent",
     },
     {
-      no: 32,
+      no: 30,
       name: "after_user_resize",
       jsonName: "afterUserResize",
       prop: "afterUserResize",
@@ -11216,7 +11985,7 @@ export class GridEvent implements LiteMessage {
       messageType: "AfterUserResizeEvent",
     },
     {
-      no: 33,
+      no: 31,
       name: "after_user_freeze",
       jsonName: "afterUserFreeze",
       prop: "afterUserFreeze",
@@ -11226,7 +11995,7 @@ export class GridEvent implements LiteMessage {
       messageType: "AfterUserFreezeEvent",
     },
     {
-      no: 34,
+      no: 32,
       name: "before_move_column",
       jsonName: "beforeMoveColumn",
       prop: "beforeMoveColumn",
@@ -11236,7 +12005,7 @@ export class GridEvent implements LiteMessage {
       messageType: "BeforeMoveColumnEvent",
     },
     {
-      no: 35,
+      no: 33,
       name: "after_move_column",
       jsonName: "afterMoveColumn",
       prop: "afterMoveColumn",
@@ -11246,7 +12015,7 @@ export class GridEvent implements LiteMessage {
       messageType: "AfterMoveColumnEvent",
     },
     {
-      no: 36,
+      no: 34,
       name: "before_move_row",
       jsonName: "beforeMoveRow",
       prop: "beforeMoveRow",
@@ -11256,7 +12025,7 @@ export class GridEvent implements LiteMessage {
       messageType: "BeforeMoveRowEvent",
     },
     {
-      no: 37,
+      no: 35,
       name: "after_move_row",
       jsonName: "afterMoveRow",
       prop: "afterMoveRow",
@@ -11266,7 +12035,7 @@ export class GridEvent implements LiteMessage {
       messageType: "AfterMoveRowEvent",
     },
     {
-      no: 38,
+      no: 36,
       name: "before_mouse_down",
       jsonName: "beforeMouseDown",
       prop: "beforeMouseDown",
@@ -11276,7 +12045,7 @@ export class GridEvent implements LiteMessage {
       messageType: "BeforeMouseDownEvent",
     },
     {
-      no: 39,
+      no: 37,
       name: "mouse_down",
       jsonName: "mouseDown",
       prop: "mouseDown",
@@ -11286,7 +12055,7 @@ export class GridEvent implements LiteMessage {
       messageType: "MouseDownEvent",
     },
     {
-      no: 40,
+      no: 38,
       name: "mouse_up",
       jsonName: "mouseUp",
       prop: "mouseUp",
@@ -11296,7 +12065,7 @@ export class GridEvent implements LiteMessage {
       messageType: "MouseUpEvent",
     },
     {
-      no: 41,
+      no: 39,
       name: "mouse_move",
       jsonName: "mouseMove",
       prop: "mouseMove",
@@ -11306,7 +12075,7 @@ export class GridEvent implements LiteMessage {
       messageType: "MouseMoveEvent",
     },
     {
-      no: 42,
+      no: 40,
       name: "click",
       jsonName: "click",
       prop: "click",
@@ -11316,7 +12085,7 @@ export class GridEvent implements LiteMessage {
       messageType: "ClickEvent",
     },
     {
-      no: 43,
+      no: 41,
       name: "dbl_click",
       jsonName: "dblClick",
       prop: "dblClick",
@@ -11326,7 +12095,7 @@ export class GridEvent implements LiteMessage {
       messageType: "DblClickEvent",
     },
     {
-      no: 44,
+      no: 42,
       name: "key_down",
       jsonName: "keyDown",
       prop: "keyDown",
@@ -11336,7 +12105,7 @@ export class GridEvent implements LiteMessage {
       messageType: "KeyDownEvent",
     },
     {
-      no: 45,
+      no: 43,
       name: "key_press",
       jsonName: "keyPress",
       prop: "keyPress",
@@ -11346,7 +12115,7 @@ export class GridEvent implements LiteMessage {
       messageType: "KeyPressEvent",
     },
     {
-      no: 46,
+      no: 44,
       name: "key_up",
       jsonName: "keyUp",
       prop: "keyUp",
@@ -11356,7 +12125,7 @@ export class GridEvent implements LiteMessage {
       messageType: "KeyUpEvent",
     },
     {
-      no: 47,
+      no: 45,
       name: "custom_render_cell",
       jsonName: "customRenderCell",
       prop: "customRenderCell",
@@ -11366,7 +12135,7 @@ export class GridEvent implements LiteMessage {
       messageType: "CustomRenderCellEvent",
     },
     {
-      no: 48,
+      no: 46,
       name: "drag_start",
       jsonName: "dragStart",
       prop: "dragStart",
@@ -11376,7 +12145,7 @@ export class GridEvent implements LiteMessage {
       messageType: "DragStartEvent",
     },
     {
-      no: 49,
+      no: 47,
       name: "drag_over",
       jsonName: "dragOver",
       prop: "dragOver",
@@ -11386,7 +12155,7 @@ export class GridEvent implements LiteMessage {
       messageType: "DragOverEvent",
     },
     {
-      no: 50,
+      no: 48,
       name: "drag_drop",
       jsonName: "dragDrop",
       prop: "dragDrop",
@@ -11396,7 +12165,7 @@ export class GridEvent implements LiteMessage {
       messageType: "DragDropEvent",
     },
     {
-      no: 51,
+      no: 49,
       name: "drag_complete",
       jsonName: "dragComplete",
       prop: "dragComplete",
@@ -11406,7 +12175,7 @@ export class GridEvent implements LiteMessage {
       messageType: "DragCompleteEvent",
     },
     {
-      no: 52,
+      no: 50,
       name: "type_ahead_started",
       jsonName: "typeAheadStarted",
       prop: "typeAheadStarted",
@@ -11416,7 +12185,7 @@ export class GridEvent implements LiteMessage {
       messageType: "TypeAheadStartedEvent",
     },
     {
-      no: 53,
+      no: 51,
       name: "type_ahead_ended",
       jsonName: "typeAheadEnded",
       prop: "typeAheadEnded",
@@ -11426,7 +12195,7 @@ export class GridEvent implements LiteMessage {
       messageType: "TypeAheadEndedEvent",
     },
     {
-      no: 54,
+      no: 52,
       name: "data_refreshing",
       jsonName: "dataRefreshing",
       prop: "dataRefreshing",
@@ -11436,7 +12205,7 @@ export class GridEvent implements LiteMessage {
       messageType: "DataRefreshingEvent",
     },
     {
-      no: 55,
+      no: 53,
       name: "data_refreshed",
       jsonName: "dataRefreshed",
       prop: "dataRefreshed",
@@ -11446,7 +12215,7 @@ export class GridEvent implements LiteMessage {
       messageType: "DataRefreshedEvent",
     },
     {
-      no: 56,
+      no: 54,
       name: "filter_data",
       jsonName: "filterData",
       prop: "filterData",
@@ -11456,7 +12225,7 @@ export class GridEvent implements LiteMessage {
       messageType: "FilterDataEvent",
     },
     {
-      no: 57,
+      no: 55,
       name: "error",
       jsonName: "error",
       prop: "error",
@@ -11466,7 +12235,7 @@ export class GridEvent implements LiteMessage {
       messageType: "ErrorEvent",
     },
     {
-      no: 58,
+      no: 56,
       name: "before_page_break",
       jsonName: "beforePageBreak",
       prop: "beforePageBreak",
@@ -11476,7 +12245,7 @@ export class GridEvent implements LiteMessage {
       messageType: "BeforePageBreakEvent",
     },
     {
-      no: 59,
+      no: 57,
       name: "start_page",
       jsonName: "startPage",
       prop: "startPage",
@@ -11486,7 +12255,7 @@ export class GridEvent implements LiteMessage {
       messageType: "StartPageEvent",
     },
     {
-      no: 60,
+      no: 58,
       name: "get_header_row",
       jsonName: "getHeaderRow",
       prop: "getHeaderRow",
@@ -11496,7 +12265,7 @@ export class GridEvent implements LiteMessage {
       messageType: "GetHeaderRowEvent",
     },
     {
-      no: 61,
+      no: 59,
       name: "pull_to_refresh_triggered",
       jsonName: "pullToRefreshTriggered",
       prop: "pullToRefreshTriggered",
@@ -11506,7 +12275,7 @@ export class GridEvent implements LiteMessage {
       messageType: "PullToRefreshTriggeredEvent",
     },
     {
-      no: 62,
+      no: 60,
       name: "pull_to_refresh_canceled",
       jsonName: "pullToRefreshCanceled",
       prop: "pullToRefreshCanceled",
@@ -11516,17 +12285,7 @@ export class GridEvent implements LiteMessage {
       messageType: "PullToRefreshCanceledEvent",
     },
     {
-      no: 63,
-      name: "before_dropdown_open",
-      jsonName: "beforeDropdownOpen",
-      prop: "beforeDropdownOpen",
-      kind: "message" as ProtoKind,
-      oneof: "eventCase",
-      oneofCase: GridEventEventOneofCase.BeforeDropdownOpen,
-      messageType: "BeforeDropdownOpenEvent",
-    },
-    {
-      no: 64,
+      no: 61,
       name: "tree_children_requested",
       jsonName: "treeChildrenRequested",
       prop: "treeChildrenRequested",
@@ -11536,7 +12295,7 @@ export class GridEvent implements LiteMessage {
       messageType: "TreeChildrenRequestedEvent",
     },
     {
-      no: 65,
+      no: 62,
       name: "before_tree_node_toggle",
       jsonName: "beforeTreeNodeToggle",
       prop: "beforeTreeNodeToggle",
@@ -11546,7 +12305,7 @@ export class GridEvent implements LiteMessage {
       messageType: "BeforeTreeNodeToggleEvent",
     },
     {
-      no: 66,
+      no: 63,
       name: "after_tree_node_toggle",
       jsonName: "afterTreeNodeToggle",
       prop: "afterTreeNodeToggle",
@@ -11556,7 +12315,7 @@ export class GridEvent implements LiteMessage {
       messageType: "AfterTreeNodeToggleEvent",
     },
     {
-      no: 67,
+      no: 64,
       name: "tree_node_activate",
       jsonName: "treeNodeActivate",
       prop: "treeNodeActivate",
@@ -11566,7 +12325,7 @@ export class GridEvent implements LiteMessage {
       messageType: "TreeNodeActivateEvent",
     },
     {
-      no: 68,
+      no: 65,
       name: "tree_node_context_menu",
       jsonName: "treeNodeContextMenu",
       prop: "treeNodeContextMenu",
@@ -11593,10 +12352,9 @@ export class GridEvent implements LiteMessage {
   keyDownEdit?: KeyDownEditEvent;
   keyPressEdit?: KeyPressEditEvent;
   keyUpEdit?: KeyUpEditEvent;
-  cellEditConfigureStyle?: CellEditConfigureStyleEvent;
-  cellEditConfigureWindow?: CellEditConfigureWindowEvent;
-  dropdownClosed?: DropdownClosedEvent;
-  dropdownOpened?: DropdownOpenedEvent;
+  editValidationRequest?: EditValidationRequest;
+  editorListItemsRequest?: EditorListItemsRequest;
+  customEditorAction?: CustomEditorActionEvent;
   cellChanged?: CellChangedEvent;
   rowStatusChange?: RowStatusChangeEvent;
   beforeSort?: BeforeSortEvent;
@@ -11639,7 +12397,6 @@ export class GridEvent implements LiteMessage {
   getHeaderRow?: GetHeaderRowEvent;
   pullToRefreshTriggered?: PullToRefreshTriggeredEvent;
   pullToRefreshCanceled?: PullToRefreshCanceledEvent;
-  beforeDropdownOpen?: BeforeDropdownOpenEvent;
   treeChildrenRequested?: TreeChildrenRequestedEvent;
   beforeTreeNodeToggle?: BeforeTreeNodeToggleEvent;
   afterTreeNodeToggle?: AfterTreeNodeToggleEvent;
@@ -11706,57 +12463,57 @@ export class GridEventTarget implements LiteMessage {
     },
     {
       no: 5,
-      name: "sub_mode_bits",
-      jsonName: "subModeBits",
-      prop: "subModeBits",
-      kind: "uint32" as ProtoKind,
-    },
-    {
-      no: 6,
       name: "custom_key",
       jsonName: "customKey",
       prop: "customKey",
       kind: "string" as ProtoKind,
     },
     {
-      no: 7,
+      no: 6,
       name: "text",
       jsonName: "text",
       prop: "text",
       kind: "string" as ProtoKind,
     },
     {
-      no: 8,
+      no: 7,
       name: "int_value",
       jsonName: "intValue",
       prop: "intValue",
       kind: "int64" as ProtoKind,
     },
     {
-      no: 9,
+      no: 8,
       name: "status_flags",
       jsonName: "statusFlags",
       prop: "statusFlags",
       kind: "uint32" as ProtoKind,
     },
     {
-      no: 10,
+      no: 9,
       name: "data",
       jsonName: "data",
       prop: "data",
       kind: "bytes" as ProtoKind,
+    },
+    {
+      no: 10,
+      name: "sub_mode",
+      jsonName: "subMode",
+      prop: "subMode",
+      kind: "int32" as ProtoKind,
     },
   ];
   kind: GridTargetKind = 0;
   band: IndicatorBand = 0;
   slotIndex: number = 0;
   slotKind: number = 0;
-  subModeBits: number = 0;
   customKey: string = "";
   text: string = "";
   intValue: bigint = 0n;
   statusFlags: number = 0;
   data?: Uint8Array;
+  subMode: number = 0;
 
   constructor(init?: Partial<GridEventTarget>) {
     initMessage(this, GridEventTarget.fields, init as Record<string, unknown> | undefined);
@@ -13609,19 +14366,27 @@ export class KeyDownEditEvent implements LiteMessage {
   static readonly fields: readonly ProtoFieldInfo[] = [
     {
       no: 1,
+      name: "session_id",
+      jsonName: "sessionId",
+      prop: "sessionId",
+      kind: "int64" as ProtoKind,
+    },
+    {
+      no: 2,
       name: "key_code",
       jsonName: "keyCode",
       prop: "keyCode",
       kind: "int32" as ProtoKind,
     },
     {
-      no: 2,
+      no: 3,
       name: "modifier",
       jsonName: "modifier",
       prop: "modifier",
       kind: "int32" as ProtoKind,
     },
   ];
+  sessionId: bigint = 0n;
   keyCode: number = 0;
   modifier: number = 0;
 
@@ -13764,12 +14529,20 @@ export class KeyPressEditEvent implements LiteMessage {
   static readonly fields: readonly ProtoFieldInfo[] = [
     {
       no: 1,
+      name: "session_id",
+      jsonName: "sessionId",
+      prop: "sessionId",
+      kind: "int64" as ProtoKind,
+    },
+    {
+      no: 2,
       name: "key_ascii",
       jsonName: "keyAscii",
       prop: "keyAscii",
       kind: "int32" as ProtoKind,
     },
   ];
+  sessionId: bigint = 0n;
   keyAscii: number = 0;
 
   constructor(init?: Partial<KeyPressEditEvent>) {
@@ -13840,19 +14613,27 @@ export class KeyUpEditEvent implements LiteMessage {
   static readonly fields: readonly ProtoFieldInfo[] = [
     {
       no: 1,
+      name: "session_id",
+      jsonName: "sessionId",
+      prop: "sessionId",
+      kind: "int64" as ProtoKind,
+    },
+    {
+      no: 2,
       name: "key_code",
       jsonName: "keyCode",
       prop: "keyCode",
       kind: "int32" as ProtoKind,
     },
     {
-      no: 2,
+      no: 3,
       name: "modifier",
       jsonName: "modifier",
       prop: "modifier",
       kind: "int32" as ProtoKind,
     },
   ];
+  sessionId: bigint = 0n;
   keyCode: number = 0;
   modifier: number = 0;
 
@@ -14102,6 +14883,214 @@ export class LeaveCellEvent implements LiteMessage {
   }
 }
 registerMessage(LeaveCellEvent);
+export class ListDataSource implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.ListDataSource" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "data_source_id",
+      jsonName: "dataSourceId",
+      prop: "dataSourceId",
+      kind: "string" as ProtoKind,
+    },
+    {
+      no: 2,
+      name: "filterable",
+      jsonName: "filterable",
+      prop: "filterable",
+      kind: "bool" as ProtoKind,
+    },
+    {
+      no: 3,
+      name: "pageable",
+      jsonName: "pageable",
+      prop: "pageable",
+      kind: "bool" as ProtoKind,
+    },
+    {
+      no: 4,
+      name: "page_size",
+      jsonName: "pageSize",
+      prop: "pageSize",
+      kind: "int32" as ProtoKind,
+    },
+  ];
+  dataSourceId: string = "";
+  filterable: boolean = false;
+  pageable: boolean = false;
+  pageSize: number = 0;
+
+  constructor(init?: Partial<ListDataSource>) {
+    initMessage(this, ListDataSource.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): ListDataSource {
+    return decodeMessage(ListDataSource, data);
+  }
+
+  static parseFrom(data: Uint8Array): ListDataSource {
+    return ListDataSource.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, ListDataSource.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, ListDataSource.fields);
+  }
+}
+registerMessage(ListDataSource);
+export class ListEditorParams implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.ListEditorParams" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "static_items",
+      jsonName: "staticItems",
+      prop: "staticItems",
+      kind: "message" as ProtoKind,
+      repeated: true,
+      messageType: "ListItem",
+    },
+    {
+      no: 2,
+      name: "data_source",
+      jsonName: "dataSource",
+      prop: "dataSource",
+      kind: "message" as ProtoKind,
+      messageType: "ListDataSource",
+    },
+    {
+      no: 3,
+      name: "allow_custom_value",
+      jsonName: "allowCustomValue",
+      prop: "allowCustomValue",
+      kind: "bool" as ProtoKind,
+    },
+    {
+      no: 4,
+      name: "searchable",
+      jsonName: "searchable",
+      prop: "searchable",
+      kind: "bool" as ProtoKind,
+    },
+    {
+      no: 5,
+      name: "multi_select",
+      jsonName: "multiSelect",
+      prop: "multiSelect",
+      kind: "bool" as ProtoKind,
+    },
+    {
+      no: 6,
+      name: "item_layout",
+      jsonName: "itemLayout",
+      prop: "itemLayout",
+      kind: "enum" as ProtoKind,
+      enumType: DropdownItemLayout,
+    },
+  ];
+  staticItems: ListItem[] = [];
+  dataSource?: ListDataSource;
+  allowCustomValue: boolean = false;
+  searchable: boolean = false;
+  multiSelect: boolean = false;
+  itemLayout: DropdownItemLayout = 0;
+
+  constructor(init?: Partial<ListEditorParams>) {
+    initMessage(this, ListEditorParams.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): ListEditorParams {
+    return decodeMessage(ListEditorParams, data);
+  }
+
+  static parseFrom(data: Uint8Array): ListEditorParams {
+    return ListEditorParams.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, ListEditorParams.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, ListEditorParams.fields);
+  }
+}
+registerMessage(ListEditorParams);
+export class ListItem implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.ListItem" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "value",
+      jsonName: "value",
+      prop: "value",
+      kind: "message" as ProtoKind,
+      messageType: "CellValue",
+    },
+    {
+      no: 2,
+      name: "label",
+      jsonName: "label",
+      prop: "label",
+      kind: "string" as ProtoKind,
+    },
+    {
+      no: 3,
+      name: "details",
+      jsonName: "details",
+      prop: "details",
+      kind: "string" as ProtoKind,
+      repeated: true,
+    },
+    {
+      no: 4,
+      name: "disabled",
+      jsonName: "disabled",
+      prop: "disabled",
+      kind: "bool" as ProtoKind,
+    },
+  ];
+  value?: CellValue;
+  label: string = "";
+  details: string[] = [];
+  disabled: boolean = false;
+
+  constructor(init?: Partial<ListItem>) {
+    initMessage(this, ListItem.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): ListItem {
+    return decodeMessage(ListItem, data);
+  }
+
+  static parseFrom(data: Uint8Array): ListItem {
+    return ListItem.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, ListItem.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, ListItem.fields);
+  }
+}
+registerMessage(ListItem);
 export enum LoadDataOptionsFormatOneofCase {
   None = 0,
   Csv = 1,
@@ -15362,6 +16351,79 @@ export class NodeInfo implements LiteMessage {
   }
 }
 registerMessage(NodeInfo);
+export class NumberEditorParams implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.NumberEditorParams" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "min",
+      jsonName: "min",
+      prop: "min",
+      kind: "double" as ProtoKind,
+      optional: true,
+    },
+    {
+      no: 2,
+      name: "max",
+      jsonName: "max",
+      prop: "max",
+      kind: "double" as ProtoKind,
+      optional: true,
+    },
+    {
+      no: 3,
+      name: "step",
+      jsonName: "step",
+      prop: "step",
+      kind: "double" as ProtoKind,
+      optional: true,
+    },
+    {
+      no: 4,
+      name: "format",
+      jsonName: "format",
+      prop: "format",
+      kind: "string" as ProtoKind,
+    },
+    {
+      no: 5,
+      name: "nullable",
+      jsonName: "nullable",
+      prop: "nullable",
+      kind: "bool" as ProtoKind,
+    },
+  ];
+  min: number = 0;
+  max: number = 0;
+  step: number = 0;
+  format: string = "";
+  nullable: boolean = false;
+
+  constructor(init?: Partial<NumberEditorParams>) {
+    initMessage(this, NumberEditorParams.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): NumberEditorParams {
+    return decodeMessage(NumberEditorParams, data);
+  }
+
+  static parseFrom(data: Uint8Array): NumberEditorParams {
+    return NumberEditorParams.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, NumberEditorParams.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, NumberEditorParams.fields);
+  }
+}
+registerMessage(NumberEditorParams);
 export class OutlineConfig implements LiteMessage {
   static readonly typeName = "volvoxgrid.v1.OutlineConfig" as const;
   static readonly fields: readonly ProtoFieldInfo[] = [
@@ -15375,7 +16437,7 @@ export class OutlineConfig implements LiteMessage {
       enumType: TreeIndicatorStyle,
     },
     {
-      no: 3,
+      no: 2,
       name: "tree_color",
       jsonName: "treeColor",
       prop: "treeColor",
@@ -15383,7 +16445,7 @@ export class OutlineConfig implements LiteMessage {
       optional: true,
     },
     {
-      no: 4,
+      no: 3,
       name: "group_total_position",
       jsonName: "groupTotalPosition",
       prop: "groupTotalPosition",
@@ -15392,7 +16454,7 @@ export class OutlineConfig implements LiteMessage {
       enumType: GroupTotalPosition,
     },
     {
-      no: 5,
+      no: 4,
       name: "multi_totals",
       jsonName: "multiTotals",
       prop: "multiTotals",
@@ -15400,7 +16462,7 @@ export class OutlineConfig implements LiteMessage {
       optional: true,
     },
     {
-      no: 6,
+      no: 5,
       name: "indicator_indent",
       jsonName: "indicatorIndent",
       prop: "indicatorIndent",
@@ -15408,7 +16470,7 @@ export class OutlineConfig implements LiteMessage {
       optional: true,
     },
     {
-      no: 7,
+      no: 6,
       name: "max_levels",
       jsonName: "maxLevels",
       prop: "maxLevels",
@@ -15416,7 +16478,7 @@ export class OutlineConfig implements LiteMessage {
       optional: true,
     },
     {
-      no: 8,
+      no: 7,
       name: "show_level_buttons",
       jsonName: "showLevelButtons",
       prop: "showLevelButtons",
@@ -15424,7 +16486,7 @@ export class OutlineConfig implements LiteMessage {
       optional: true,
     },
     {
-      no: 9,
+      no: 8,
       name: "label_column",
       jsonName: "labelColumn",
       prop: "labelColumn",
@@ -15432,7 +16494,7 @@ export class OutlineConfig implements LiteMessage {
       optional: true,
     },
     {
-      no: 10,
+      no: 9,
       name: "icon_column",
       jsonName: "iconColumn",
       prop: "iconColumn",
@@ -16036,6 +17098,68 @@ export class PullToRefreshTriggeredEvent implements LiteMessage {
   }
 }
 registerMessage(PullToRefreshTriggeredEvent);
+export class Rect implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.Rect" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "x",
+      jsonName: "x",
+      prop: "x",
+      kind: "float" as ProtoKind,
+    },
+    {
+      no: 2,
+      name: "y",
+      jsonName: "y",
+      prop: "y",
+      kind: "float" as ProtoKind,
+    },
+    {
+      no: 3,
+      name: "width",
+      jsonName: "width",
+      prop: "width",
+      kind: "float" as ProtoKind,
+    },
+    {
+      no: 4,
+      name: "height",
+      jsonName: "height",
+      prop: "height",
+      kind: "float" as ProtoKind,
+    },
+  ];
+  x: number = 0;
+  y: number = 0;
+  width: number = 0;
+  height: number = 0;
+
+  constructor(init?: Partial<Rect>) {
+    initMessage(this, Rect.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): Rect {
+    return decodeMessage(Rect, data);
+  }
+
+  static parseFrom(data: Uint8Array): Rect {
+    return Rect.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, Rect.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, Rect.fields);
+  }
+}
+registerMessage(Rect);
 export class RefreshRequest implements LiteMessage {
   static readonly typeName = "volvoxgrid.v1.RefreshRequest" as const;
   static readonly fields: readonly ProtoFieldInfo[] = [
@@ -16430,6 +17554,14 @@ export class RenderConfig implements LiteMessage {
       kind: "bool" as ProtoKind,
       optional: true,
     },
+    {
+      no: 12,
+      name: "font_fallback_enabled",
+      jsonName: "fontFallbackEnabled",
+      prop: "fontFallbackEnabled",
+      kind: "bool" as ProtoKind,
+      optional: true,
+    },
   ];
   rendererMode: RendererMode = 0;
   debugOverlay: boolean = false;
@@ -16442,6 +17574,7 @@ export class RenderConfig implements LiteMessage {
   renderLayerMask: bigint = 0n;
   layerProfiling: boolean = false;
   scrollBlit: boolean = false;
+  fontFallbackEnabled: boolean = false;
 
   constructor(init?: Partial<RenderConfig>) {
     initMessage(this, RenderConfig.fields, init as Record<string, unknown> | undefined);
@@ -16483,6 +17616,8 @@ export enum RenderInputInputOneofCase {
   TerminalViewport = 12,
   TerminalCommand = 13,
   CompareResponse = 14,
+  EditValidationResponse = 15,
+  EditorListItemsResponse = 16,
 }
 export class RenderInput implements LiteMessage {
   static readonly typeName = "volvoxgrid.v1.RenderInput" as const;
@@ -16624,6 +17759,26 @@ export class RenderInput implements LiteMessage {
       oneofCase: RenderInputInputOneofCase.CompareResponse,
       messageType: "CompareResponse",
     },
+    {
+      no: 15,
+      name: "edit_validation_response",
+      jsonName: "editValidationResponse",
+      prop: "editValidationResponse",
+      kind: "message" as ProtoKind,
+      oneof: "inputCase",
+      oneofCase: RenderInputInputOneofCase.EditValidationResponse,
+      messageType: "EditValidationResponse",
+    },
+    {
+      no: 16,
+      name: "editor_list_items_response",
+      jsonName: "editorListItemsResponse",
+      prop: "editorListItemsResponse",
+      kind: "message" as ProtoKind,
+      oneof: "inputCase",
+      oneofCase: RenderInputInputOneofCase.EditorListItemsResponse,
+      messageType: "EditorListItemsResponse",
+    },
   ];
   inputCase: RenderInputInputOneofCase = RenderInputInputOneofCase.None;
   gridId: bigint = 0n;
@@ -16640,6 +17795,8 @@ export class RenderInput implements LiteMessage {
   terminalViewport?: TerminalViewport;
   terminalCommand?: TerminalCommand;
   compareResponse?: CompareResponse;
+  editValidationResponse?: EditValidationResponse;
+  editorListItemsResponse?: EditorListItemsResponse;
 
   constructor(init?: Partial<RenderInput>) {
     initMessage(this, RenderInput.fields, init as Record<string, unknown> | undefined);
@@ -16671,10 +17828,11 @@ export enum RenderOutputEventOneofCase {
   FrameDone = 2,
   Selection = 3,
   Cursor = 4,
-  EditRequest = 5,
-  DropdownRequest = 6,
-  TooltipRequest = 7,
-  GpuFrameDone = 8,
+  EditorStarted = 5,
+  EditorUpdated = 6,
+  EditorEnded = 7,
+  TooltipRequest = 8,
+  GpuFrameDone = 9,
 }
 export class RenderOutput implements LiteMessage {
   static readonly typeName = "volvoxgrid.v1.RenderOutput" as const;
@@ -16718,26 +17876,36 @@ export class RenderOutput implements LiteMessage {
     },
     {
       no: 5,
-      name: "edit_request",
-      jsonName: "editRequest",
-      prop: "editRequest",
+      name: "editor_started",
+      jsonName: "editorStarted",
+      prop: "editorStarted",
       kind: "message" as ProtoKind,
       oneof: "eventCase",
-      oneofCase: RenderOutputEventOneofCase.EditRequest,
-      messageType: "EditRequest",
+      oneofCase: RenderOutputEventOneofCase.EditorStarted,
+      messageType: "EditorSessionStarted",
     },
     {
       no: 6,
-      name: "dropdown_request",
-      jsonName: "dropdownRequest",
-      prop: "dropdownRequest",
+      name: "editor_updated",
+      jsonName: "editorUpdated",
+      prop: "editorUpdated",
       kind: "message" as ProtoKind,
       oneof: "eventCase",
-      oneofCase: RenderOutputEventOneofCase.DropdownRequest,
-      messageType: "DropdownRequest",
+      oneofCase: RenderOutputEventOneofCase.EditorUpdated,
+      messageType: "EditorSessionUpdated",
     },
     {
       no: 7,
+      name: "editor_ended",
+      jsonName: "editorEnded",
+      prop: "editorEnded",
+      kind: "message" as ProtoKind,
+      oneof: "eventCase",
+      oneofCase: RenderOutputEventOneofCase.EditorEnded,
+      messageType: "EditorSessionEnded",
+    },
+    {
+      no: 8,
       name: "tooltip_request",
       jsonName: "tooltipRequest",
       prop: "tooltipRequest",
@@ -16747,7 +17915,7 @@ export class RenderOutput implements LiteMessage {
       messageType: "TooltipRequest",
     },
     {
-      no: 8,
+      no: 9,
       name: "gpu_frame_done",
       jsonName: "gpuFrameDone",
       prop: "gpuFrameDone",
@@ -16762,8 +17930,9 @@ export class RenderOutput implements LiteMessage {
   frameDone?: FrameDone;
   selection?: SelectionUpdate;
   cursor?: CursorChange;
-  editRequest?: EditRequest;
-  dropdownRequest?: DropdownRequest;
+  editorStarted?: EditorSessionStarted;
+  editorUpdated?: EditorSessionUpdated;
+  editorEnded?: EditorSessionEnded;
   tooltipRequest?: TooltipRequest;
   gpuFrameDone?: GpuFrameDone;
 
@@ -17139,7 +18308,7 @@ export class RowIndicatorConfig implements LiteMessage {
       optional: true,
     },
     {
-      no: 4,
+      no: 3,
       name: "background",
       jsonName: "background",
       prop: "background",
@@ -17147,7 +18316,7 @@ export class RowIndicatorConfig implements LiteMessage {
       optional: true,
     },
     {
-      no: 5,
+      no: 4,
       name: "foreground",
       jsonName: "foreground",
       prop: "foreground",
@@ -17155,7 +18324,7 @@ export class RowIndicatorConfig implements LiteMessage {
       optional: true,
     },
     {
-      no: 6,
+      no: 5,
       name: "grid_lines",
       jsonName: "gridLines",
       prop: "gridLines",
@@ -17164,7 +18333,7 @@ export class RowIndicatorConfig implements LiteMessage {
       enumType: GridLineStyle,
     },
     {
-      no: 7,
+      no: 6,
       name: "grid_color",
       jsonName: "gridColor",
       prop: "gridColor",
@@ -17172,7 +18341,7 @@ export class RowIndicatorConfig implements LiteMessage {
       optional: true,
     },
     {
-      no: 8,
+      no: 7,
       name: "auto_size",
       jsonName: "autoSize",
       prop: "autoSize",
@@ -17180,7 +18349,7 @@ export class RowIndicatorConfig implements LiteMessage {
       optional: true,
     },
     {
-      no: 9,
+      no: 8,
       name: "allow_resize",
       jsonName: "allowResize",
       prop: "allowResize",
@@ -17188,7 +18357,7 @@ export class RowIndicatorConfig implements LiteMessage {
       optional: true,
     },
     {
-      no: 10,
+      no: 9,
       name: "allow_select",
       jsonName: "allowSelect",
       prop: "allowSelect",
@@ -17196,7 +18365,7 @@ export class RowIndicatorConfig implements LiteMessage {
       optional: true,
     },
     {
-      no: 11,
+      no: 10,
       name: "allow_reorder",
       jsonName: "allowReorder",
       prop: "allowReorder",
@@ -17204,7 +18373,7 @@ export class RowIndicatorConfig implements LiteMessage {
       optional: true,
     },
     {
-      no: 12,
+      no: 11,
       name: "slots",
       jsonName: "slots",
       prop: "slots",
@@ -17419,6 +18588,84 @@ export class RowStatusChangeEvent implements LiteMessage {
   }
 }
 registerMessage(RowStatusChangeEvent);
+export enum ScalarValueValueOneofCase {
+  None = 0,
+  StringValue = 1,
+  NumberValue = 2,
+  BoolValue = 3,
+  BytesValue = 4,
+}
+export class ScalarValue implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.ScalarValue" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "string_value",
+      jsonName: "stringValue",
+      prop: "stringValue",
+      kind: "string" as ProtoKind,
+      oneof: "valueCase",
+      oneofCase: ScalarValueValueOneofCase.StringValue,
+    },
+    {
+      no: 2,
+      name: "number_value",
+      jsonName: "numberValue",
+      prop: "numberValue",
+      kind: "double" as ProtoKind,
+      oneof: "valueCase",
+      oneofCase: ScalarValueValueOneofCase.NumberValue,
+    },
+    {
+      no: 3,
+      name: "bool_value",
+      jsonName: "boolValue",
+      prop: "boolValue",
+      kind: "bool" as ProtoKind,
+      oneof: "valueCase",
+      oneofCase: ScalarValueValueOneofCase.BoolValue,
+    },
+    {
+      no: 4,
+      name: "bytes_value",
+      jsonName: "bytesValue",
+      prop: "bytesValue",
+      kind: "bytes" as ProtoKind,
+      oneof: "valueCase",
+      oneofCase: ScalarValueValueOneofCase.BytesValue,
+    },
+  ];
+  valueCase: ScalarValueValueOneofCase = ScalarValueValueOneofCase.None;
+  stringValue?: string;
+  numberValue?: number;
+  boolValue?: boolean;
+  bytesValue?: Uint8Array;
+
+  constructor(init?: Partial<ScalarValue>) {
+    initMessage(this, ScalarValue.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): ScalarValue {
+    return decodeMessage(ScalarValue, data);
+  }
+
+  static parseFrom(data: Uint8Array): ScalarValue {
+    return ScalarValue.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, ScalarValue.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, ScalarValue.fields);
+  }
+}
+registerMessage(ScalarValue);
 export class SchemaResponse implements LiteMessage {
   static readonly typeName = "volvoxgrid.v1.SchemaResponse" as const;
   static readonly fields: readonly ProtoFieldInfo[] = [
@@ -19089,6 +20336,93 @@ export class StartPageEvent implements LiteMessage {
   }
 }
 registerMessage(StartPageEvent);
+export class StructField implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.StructField" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "key",
+      jsonName: "key",
+      prop: "key",
+      kind: "string" as ProtoKind,
+    },
+    {
+      no: 2,
+      name: "value",
+      jsonName: "value",
+      prop: "value",
+      kind: "message" as ProtoKind,
+      messageType: "ScalarValue",
+    },
+  ];
+  key: string = "";
+  value?: ScalarValue;
+
+  constructor(init?: Partial<StructField>) {
+    initMessage(this, StructField.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): StructField {
+    return decodeMessage(StructField, data);
+  }
+
+  static parseFrom(data: Uint8Array): StructField {
+    return StructField.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, StructField.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, StructField.fields);
+  }
+}
+registerMessage(StructField);
+export class StructValue implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.StructValue" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "fields",
+      jsonName: "fields",
+      prop: "fields",
+      kind: "message" as ProtoKind,
+      repeated: true,
+      messageType: "StructField",
+    },
+  ];
+  fields: StructField[] = [];
+
+  constructor(init?: Partial<StructValue>) {
+    initMessage(this, StructValue.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): StructValue {
+    return decodeMessage(StructValue, data);
+  }
+
+  static parseFrom(data: Uint8Array): StructValue {
+    return StructValue.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, StructValue.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, StructValue.fields);
+  }
+}
+registerMessage(StructValue);
 export class StyleConfig implements LiteMessage {
   static readonly typeName = "volvoxgrid.v1.StyleConfig" as const;
   static readonly fields: readonly ProtoFieldInfo[] = [
@@ -19711,6 +21045,69 @@ export class TerminalViewport implements LiteMessage {
   }
 }
 registerMessage(TerminalViewport);
+export class TextEditorParams implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.TextEditorParams" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "max_length",
+      jsonName: "maxLength",
+      prop: "maxLength",
+      kind: "int32" as ProtoKind,
+    },
+    {
+      no: 2,
+      name: "mask",
+      jsonName: "mask",
+      prop: "mask",
+      kind: "string" as ProtoKind,
+    },
+    {
+      no: 3,
+      name: "allow_newlines",
+      jsonName: "allowNewlines",
+      prop: "allowNewlines",
+      kind: "bool" as ProtoKind,
+    },
+    {
+      no: 4,
+      name: "input_type",
+      jsonName: "inputType",
+      prop: "inputType",
+      kind: "enum" as ProtoKind,
+      enumType: InputType,
+    },
+  ];
+  maxLength: number = 0;
+  mask: string = "";
+  allowNewlines: boolean = false;
+  inputType: InputType = 0;
+
+  constructor(init?: Partial<TextEditorParams>) {
+    initMessage(this, TextEditorParams.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): TextEditorParams {
+    return decodeMessage(TextEditorParams, data);
+  }
+
+  static parseFrom(data: Uint8Array): TextEditorParams {
+    return TextEditorParams.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, TextEditorParams.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, TextEditorParams.fields);
+  }
+}
+registerMessage(TextEditorParams);
 export class TextFormatRun implements LiteMessage {
   static readonly typeName = "volvoxgrid.v1.TextFormatRun" as const;
   static readonly fields: readonly ProtoFieldInfo[] = [
@@ -19938,6 +21335,91 @@ export class TextRunStyle implements LiteMessage {
   }
 }
 registerMessage(TextRunStyle);
+export class TextSelection implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.TextSelection" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "start",
+      jsonName: "start",
+      prop: "start",
+      kind: "int32" as ProtoKind,
+    },
+    {
+      no: 2,
+      name: "length",
+      jsonName: "length",
+      prop: "length",
+      kind: "int32" as ProtoKind,
+    },
+  ];
+  start: number = 0;
+  length: number = 0;
+
+  constructor(init?: Partial<TextSelection>) {
+    initMessage(this, TextSelection.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): TextSelection {
+    return decodeMessage(TextSelection, data);
+  }
+
+  static parseFrom(data: Uint8Array): TextSelection {
+    return TextSelection.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, TextSelection.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, TextSelection.fields);
+  }
+}
+registerMessage(TextSelection);
+export class TextSelectionChanged implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.TextSelectionChanged" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "selection",
+      jsonName: "selection",
+      prop: "selection",
+      kind: "message" as ProtoKind,
+      messageType: "TextSelection",
+    },
+  ];
+  selection?: TextSelection;
+
+  constructor(init?: Partial<TextSelectionChanged>) {
+    initMessage(this, TextSelectionChanged.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): TextSelectionChanged {
+    return decodeMessage(TextSelectionChanged, data);
+  }
+
+  static parseFrom(data: Uint8Array): TextSelectionChanged {
+    return TextSelectionChanged.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, TextSelectionChanged.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, TextSelectionChanged.fields);
+  }
+}
+registerMessage(TextSelectionChanged);
 export class TooltipRequest implements LiteMessage {
   static readonly typeName = "volvoxgrid.v1.TooltipRequest" as const;
   static readonly fields: readonly ProtoFieldInfo[] = [
@@ -20443,6 +21925,60 @@ export class UpdateCellsRequest implements LiteMessage {
   }
 }
 registerMessage(UpdateCellsRequest);
+export class ValidationError implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.ValidationError" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "code",
+      jsonName: "code",
+      prop: "code",
+      kind: "string" as ProtoKind,
+    },
+    {
+      no: 2,
+      name: "message",
+      jsonName: "message",
+      prop: "message",
+      kind: "string" as ProtoKind,
+    },
+    {
+      no: 3,
+      name: "blocking",
+      jsonName: "blocking",
+      prop: "blocking",
+      kind: "bool" as ProtoKind,
+    },
+  ];
+  code: string = "";
+  message: string = "";
+  blocking: boolean = false;
+
+  constructor(init?: Partial<ValidationError>) {
+    initMessage(this, ValidationError.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): ValidationError {
+    return decodeMessage(ValidationError, data);
+  }
+
+  static parseFrom(data: Uint8Array): ValidationError {
+    return ValidationError.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, ValidationError.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, ValidationError.fields);
+  }
+}
+registerMessage(ValidationError);
 export class ViewportState implements LiteMessage {
   static readonly typeName = "volvoxgrid.v1.ViewportState" as const;
   static readonly fields: readonly ProtoFieldInfo[] = [

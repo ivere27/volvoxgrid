@@ -7,22 +7,35 @@ import io.github.ivere27.volvoxgrid.common.GridCellText;
 import io.github.ivere27.volvoxgrid.common.GridCellRange;
 import io.github.ivere27.volvoxgrid.common.GridSelection;
 import io.github.ivere27.volvoxgrid.common.RendererBackend;
+import io.github.ivere27.volvoxgrid.common.VolvoxGridColumnIndicatorCellMode;
+import io.github.ivere27.volvoxgrid.common.VolvoxGridColumnIndicatorConfig;
+import io.github.ivere27.volvoxgrid.common.VolvoxGridRowIndicatorConfig;
+import io.github.ivere27.volvoxgrid.common.VolvoxGridRowIndicatorSlot;
+import io.github.ivere27.volvoxgrid.common.VolvoxGridRowIndicatorSlotKind;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * High-level convenience controller for desktop Java.
  */
 public final class VolvoxGridDesktopController implements VolvoxGridController {
-    private static final int DEFAULT_ROW_INDICATOR_WIDTH_PX = 35;
+    private static final int DEFAULT_ROW_INDICATOR_WIDTH_PX = 40;
     private static final int DEFAULT_COL_INDICATOR_BAND_ROWS = 1;
-    private static final int DEFAULT_COL_INDICATOR_MODE_BITS =
-        ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT.getNumber()
-            | ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH.getNumber();
+    private static final float DEFAULT_FLING_IMPULSE_GAIN = 220.0f;
+    private static final float DEFAULT_FLING_FRICTION = 0.9f;
+    private static final int SUBTOTAL_NO_GROUP_COLUMN = -1;
+    private static final int SUBTOTAL_NO_MERGE_COLUMN = -1;
+    private static final int SUBTOTAL_MIN_VALID_MERGE_COLUMN = 0;
+    private static final int SUBTOTAL_CLEAR_COLUMN = 0;
+    private static final long SUBTOTAL_CLEAR_COLOR = 0L;
 
     private final VolvoxGridDesktopClient client;
     private final long gridId;
+    private final boolean hostEditorDefaults;
+    private ThemePreset themePreset = ThemePreset.THEME_NONE;
 
     private static RowIndicatorSlot rowIndicatorSlot(RowIndicatorSlotKind kind, int width) {
         return RowIndicatorSlot.newBuilder()
@@ -32,60 +45,227 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
             .build();
     }
 
-    private static List<RowIndicatorSlot> defaultRowIndicatorSlots() {
-        ArrayList<RowIndicatorSlot> slots = new ArrayList<>();
-        slots.add(rowIndicatorSlot(RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CURRENT, 18));
-        slots.add(rowIndicatorSlot(RowIndicatorSlotKind.ROW_INDICATOR_SLOT_SELECTION, 17));
-        return slots;
+    private static EditorValue editorValueFromText(String text) {
+        String value = text == null ? "" : text;
+        return EditorValue.newBuilder()
+            .setValue(CellValue.newBuilder().setText(value).build())
+            .setEditText(value)
+            .setDisplayText(value)
+            .build();
     }
 
-    private static List<RowIndicatorSlot> rowIndicatorSlotsFromModeBits(int value) {
-        ArrayList<RowIndicatorSlot> slots = new ArrayList<>();
-        addRowIndicatorSlot(slots, value, 1, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NUMBERS, DEFAULT_ROW_INDICATOR_WIDTH_PX);
-        addRowIndicatorSlot(slots, value, 2, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CURRENT, 18);
-        addRowIndicatorSlot(slots, value, 4, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_SELECTION, 17);
-        addRowIndicatorSlot(slots, value, 8, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CHECKBOX, 18);
-        addRowIndicatorSlot(slots, value, 16, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_HANDLE, 18);
-        addRowIndicatorSlot(slots, value, 32, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_EDITING, 18);
-        addRowIndicatorSlot(slots, value, 64, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_MODIFIED, 18);
-        addRowIndicatorSlot(slots, value, 128, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_ERROR, 18);
-        addRowIndicatorSlot(slots, value, 256, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NEW_ROW, 18);
-        addRowIndicatorSlot(slots, value, 512, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_EXPANDER, 18);
-        addRowIndicatorSlot(slots, value, 1024, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_RESIZE, 18);
-        addRowIndicatorSlot(slots, value, 2048, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_ACTION, 18);
-        addRowIndicatorSlot(slots, value, 4096, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_STATUS_ICON, 18);
-        addRowIndicatorSlot(slots, value, 8192, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CUSTOM, 18);
-        return slots;
+    private static EditorSpec defaultHostTextEditor() {
+        return EditorSpec.newBuilder()
+            .setKind(EditorKind.EDITOR_TEXT)
+            .setOwner(EditorOwner.EDITOR_OWNER_HOST_NATIVE)
+            .setPresentation(EditorPresentation.EDITOR_INLINE)
+            .build();
     }
 
-    private static void addRowIndicatorSlot(List<RowIndicatorSlot> slots, int value, int bit, RowIndicatorSlotKind kind, int width) {
-        if ((value & bit) != 0) {
-            slots.add(rowIndicatorSlot(kind, width));
+    private static EditorSpec defaultHostNumberEditor(boolean nullable) {
+        return EditorSpec.newBuilder()
+            .setKind(EditorKind.EDITOR_NUMBER)
+            .setOwner(EditorOwner.EDITOR_OWNER_HOST_NATIVE)
+            .setPresentation(EditorPresentation.EDITOR_INLINE)
+            .setNumber(NumberEditorParams.newBuilder().setNullable(nullable).build())
+            .build();
+    }
+
+    private static EditorSpec defaultEngineCheckboxEditor() {
+        return EditorSpec.newBuilder()
+            .setKind(EditorKind.EDITOR_CHECKBOX)
+            .setOwner(EditorOwner.EDITOR_OWNER_ENGINE)
+            .setPresentation(EditorPresentation.EDITOR_CANVAS)
+            .setCheckbox(CheckboxEditorParams.newBuilder().setThreeState(false).build())
+            .build();
+    }
+
+    private static ColumnDef applyHostEditorDefault(ColumnDef column) {
+        return applyHostEditorDefault(column, null);
+    }
+
+    private static ColumnDef applyHostEditorDefault(ColumnDef column, Set<Integer> columnsWithEditors) {
+        if (column.hasEditor() || !column.hasDataType()) {
+            return column;
         }
+        if (columnsWithEditors != null && columnsWithEditors.contains(column.getIndex())) {
+            return column;
+        }
+        EditorSpec editor;
+        switch (column.getDataType()) {
+            case COLUMN_DATA_STRING:
+                editor = defaultHostTextEditor();
+                break;
+            case COLUMN_DATA_NUMBER:
+            case COLUMN_DATA_CURRENCY:
+                editor = defaultHostNumberEditor(column.hasNullable() ? column.getNullable() : true);
+                break;
+            case COLUMN_DATA_BOOLEAN:
+                editor = defaultEngineCheckboxEditor();
+                break;
+            default:
+                return column;
+        }
+        return column.toBuilder().setEditor(editor).build();
     }
 
-    private static int rowIndicatorModeBitsFromSlots(RowIndicatorConfig config) {
-        int bits = 0;
-        for (RowIndicatorSlot slot : config.getSlotsList()) {
-            switch (slot.getKind()) {
-                case ROW_INDICATOR_SLOT_NUMBERS: bits |= 1; break;
-                case ROW_INDICATOR_SLOT_CURRENT: bits |= 2; break;
-                case ROW_INDICATOR_SLOT_SELECTION: bits |= 4; break;
-                case ROW_INDICATOR_SLOT_CHECKBOX: bits |= 8; break;
-                case ROW_INDICATOR_SLOT_HANDLE: bits |= 16; break;
-                case ROW_INDICATOR_SLOT_EDITING: bits |= 32; break;
-                case ROW_INDICATOR_SLOT_MODIFIED: bits |= 64; break;
-                case ROW_INDICATOR_SLOT_ERROR: bits |= 128; break;
-                case ROW_INDICATOR_SLOT_NEW_ROW: bits |= 256; break;
-                case ROW_INDICATOR_SLOT_EXPANDER: bits |= 512; break;
-                case ROW_INDICATOR_SLOT_RESIZE: bits |= 1024; break;
-                case ROW_INDICATOR_SLOT_ACTION: bits |= 2048; break;
-                case ROW_INDICATOR_SLOT_STATUS_ICON: bits |= 4096; break;
-                case ROW_INDICATOR_SLOT_CUSTOM: bits |= 8192; break;
-                default: break;
+    private Set<Integer> columnsWithExistingEditors() throws SynurangDesktopBridge.SynurangBridgeException {
+        Set<Integer> columnsWithEditors = new HashSet<>();
+        for (ColumnDef column : getSchema().getColumnsList()) {
+            if (column.hasEditor()) {
+                columnsWithEditors.add(column.getIndex());
             }
         }
-        return bits;
+        return columnsWithEditors;
+    }
+
+    private static DefineColumnsRequest defaultEditorsForInferredColumns(
+        long gridId,
+        Iterable<ColumnDef> inferredColumns,
+        Set<Integer> columnsWithEditors
+    ) {
+        DefineColumnsRequest.Builder builder = DefineColumnsRequest.newBuilder().setGridId(gridId);
+        for (ColumnDef column : inferredColumns) {
+            if (!column.hasDataType() || columnsWithEditors.contains(column.getIndex())) {
+                continue;
+            }
+            ColumnDef.Builder def = ColumnDef.newBuilder()
+                .setIndex(column.getIndex())
+                .setDataType(column.getDataType());
+            if (column.hasNullable()) {
+                def.setNullable(column.getNullable());
+            }
+            ColumnDef prepared = applyHostEditorDefault(def.build());
+            if (prepared.hasEditor()) {
+                builder.addColumns(prepared);
+            }
+        }
+        return builder.build();
+    }
+
+    private static List<RowIndicatorSlot> defaultRowIndicatorSlots() {
+        ArrayList<RowIndicatorSlot> slots = new ArrayList<>();
+        slots.add(rowIndicatorSlot(
+            RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NUMBERS,
+            DEFAULT_ROW_INDICATOR_WIDTH_PX
+        ));
+        return slots;
+    }
+
+    private static ColIndicatorCellModes columnIndicatorCellModes(Iterable<VolvoxGridColumnIndicatorCellMode> modes) {
+        ColIndicatorCellModes.Builder builder = ColIndicatorCellModes.newBuilder();
+        for (VolvoxGridColumnIndicatorCellMode mode : modes) {
+            ColIndicatorCellMode protoMode = ColIndicatorCellMode.forNumber(mode.getNumber());
+            if (protoMode != null) {
+                builder.addModes(protoMode);
+            }
+        }
+        return builder.build();
+    }
+
+    private static List<VolvoxGridColumnIndicatorCellMode> columnIndicatorModesToCommon(
+        Iterable<ColIndicatorCellMode> protoModes
+    ) {
+        ArrayList<VolvoxGridColumnIndicatorCellMode> commonModes = new ArrayList<>();
+        for (ColIndicatorCellMode mode : protoModes) {
+            VolvoxGridColumnIndicatorCellMode commonMode =
+                VolvoxGridColumnIndicatorCellMode.forNumber(mode.getNumber());
+            if (commonMode != VolvoxGridColumnIndicatorCellMode.None) {
+                commonModes.add(commonMode);
+            }
+        }
+        return commonModes;
+    }
+
+    private static VolvoxGridColumnIndicatorConfig toCommonColumnIndicatorConfig(ColIndicatorConfig config) {
+        VolvoxGridColumnIndicatorConfig.Builder builder = VolvoxGridColumnIndicatorConfig.builder();
+        if (config.hasVisible()) builder.visible(config.getVisible());
+        if (config.hasDefaultRowHeight()) builder.defaultRowHeight(config.getDefaultRowHeight());
+        if (config.hasBandRows()) builder.bandRows(config.getBandRows());
+        if (config.hasCellModes()) builder.cellModes(columnIndicatorModesToCommon(config.getCellModes().getModesList()));
+        if (config.hasBackground()) builder.background(Integer.toUnsignedLong(config.getBackground()));
+        if (config.hasForeground()) builder.foreground(Integer.toUnsignedLong(config.getForeground()));
+        if (config.hasGridLines()) builder.gridLines(config.getGridLines().getNumber());
+        if (config.hasGridColor()) builder.gridColor(Integer.toUnsignedLong(config.getGridColor()));
+        if (config.hasAutoSize()) builder.autoSize(config.getAutoSize());
+        if (config.hasAllowResize()) builder.allowResize(config.getAllowResize());
+        if (config.hasAllowReorder()) builder.allowReorder(config.getAllowReorder());
+        if (config.hasAllowMenu()) builder.allowMenu(config.getAllowMenu());
+        return builder.build();
+    }
+
+    private static ColIndicatorConfig toProtoColumnIndicatorConfig(VolvoxGridColumnIndicatorConfig config) {
+        ColIndicatorConfig.Builder builder = ColIndicatorConfig.newBuilder();
+        if (config.getVisible() != null) builder.setVisible(config.getVisible());
+        if (config.getDefaultRowHeight() != null) builder.setDefaultRowHeight(config.getDefaultRowHeight());
+        if (config.getBandRows() != null) builder.setBandRows(config.getBandRows());
+        if (config.hasCellModes()) builder.setCellModes(columnIndicatorCellModes(config.getCellModes()));
+        if (config.getBackground() != null) builder.setBackground(config.getBackground().intValue());
+        if (config.getForeground() != null) builder.setForeground(config.getForeground().intValue());
+        if (config.getGridLines() != null) {
+            GridLineStyle style = GridLineStyle.forNumber(config.getGridLines());
+            if (style != null) builder.setGridLines(style);
+        }
+        if (config.getGridColor() != null) builder.setGridColor(config.getGridColor().intValue());
+        if (config.getAutoSize() != null) builder.setAutoSize(config.getAutoSize());
+        if (config.getAllowResize() != null) builder.setAllowResize(config.getAllowResize());
+        if (config.getAllowReorder() != null) builder.setAllowReorder(config.getAllowReorder());
+        if (config.getAllowMenu() != null) builder.setAllowMenu(config.getAllowMenu());
+        return builder.build();
+    }
+
+    private static VolvoxGridRowIndicatorConfig toCommonRowIndicatorConfig(RowIndicatorConfig config) {
+        VolvoxGridRowIndicatorConfig.Builder builder = VolvoxGridRowIndicatorConfig.builder();
+        if (config.hasVisible()) builder.visible(config.getVisible());
+        if (config.hasWidth()) builder.width(config.getWidth());
+        if (config.hasBackground()) builder.background(Integer.toUnsignedLong(config.getBackground()));
+        if (config.hasForeground()) builder.foreground(Integer.toUnsignedLong(config.getForeground()));
+        if (config.hasGridLines()) builder.gridLines(config.getGridLines().getNumber());
+        if (config.hasGridColor()) builder.gridColor(Integer.toUnsignedLong(config.getGridColor()));
+        if (config.hasAutoSize()) builder.autoSize(config.getAutoSize());
+        if (config.hasAllowResize()) builder.allowResize(config.getAllowResize());
+        if (config.hasAllowSelect()) builder.allowSelect(config.getAllowSelect());
+        if (config.hasAllowReorder()) builder.allowReorder(config.getAllowReorder());
+        for (RowIndicatorSlot slot : config.getSlotsList()) {
+            builder.addSlot(
+                new VolvoxGridRowIndicatorSlot(
+                    VolvoxGridRowIndicatorSlotKind.forNumber(slot.getKind().getNumber()),
+                    slot.hasWidth() ? slot.getWidth() : null,
+                    slot.hasVisible() ? slot.getVisible() : null,
+                    slot.hasCustomKey() ? slot.getCustomKey() : null,
+                    slot.hasData() ? slot.getData().toByteArray() : null
+                )
+            );
+        }
+        return builder.build();
+    }
+
+    private static RowIndicatorConfig toProtoRowIndicatorConfig(VolvoxGridRowIndicatorConfig config) {
+        RowIndicatorConfig.Builder builder = RowIndicatorConfig.newBuilder();
+        if (config.getVisible() != null) builder.setVisible(config.getVisible());
+        if (config.getWidth() != null) builder.setWidth(config.getWidth());
+        if (config.getBackground() != null) builder.setBackground(config.getBackground().intValue());
+        if (config.getForeground() != null) builder.setForeground(config.getForeground().intValue());
+        if (config.getGridLines() != null) {
+            GridLineStyle style = GridLineStyle.forNumber(config.getGridLines());
+            if (style != null) builder.setGridLines(style);
+        }
+        if (config.getGridColor() != null) builder.setGridColor(config.getGridColor().intValue());
+        if (config.getAutoSize() != null) builder.setAutoSize(config.getAutoSize());
+        if (config.getAllowResize() != null) builder.setAllowResize(config.getAllowResize());
+        if (config.getAllowSelect() != null) builder.setAllowSelect(config.getAllowSelect());
+        if (config.getAllowReorder() != null) builder.setAllowReorder(config.getAllowReorder());
+        for (VolvoxGridRowIndicatorSlot slot : config.getSlots()) {
+            RowIndicatorSlotKind kind = RowIndicatorSlotKind.forNumber(slot.getKind().getNumber());
+            RowIndicatorSlot.Builder slotBuilder = RowIndicatorSlot.newBuilder()
+                .setKind(kind == null ? RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NONE : kind);
+            if (slot.getWidth() != null) slotBuilder.setWidth(slot.getWidth());
+            if (slot.getVisible() != null) slotBuilder.setVisible(slot.getVisible());
+            if (slot.getCustomKey() != null) slotBuilder.setCustomKey(slot.getCustomKey());
+            if (slot.getData() != null) slotBuilder.setData(ByteString.copyFrom(slot.getData()));
+            builder.addSlots(slotBuilder);
+        }
+        return builder.build();
     }
 
     private static RowIndicatorConfig defaultRowIndicatorStartConfig() {
@@ -100,7 +280,12 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
         return ColIndicatorConfig.newBuilder()
             .setVisible(true)
             .setBandRows(DEFAULT_COL_INDICATOR_BAND_ROWS)
-            .setModeBits(DEFAULT_COL_INDICATOR_MODE_BITS)
+            .setCellModes(
+                ColIndicatorCellModes.newBuilder()
+                    .addModes(ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT)
+                    .addModes(ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH)
+                    .build()
+            )
             .build();
     }
 
@@ -109,6 +294,49 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
             .setRowStart(defaultRowIndicatorStartConfig())
             .setColTop(defaultColIndicatorTopConfig())
             .build();
+    }
+
+    public static GridConfig.Builder defaultGridConfigBuilder(int rows, int cols) {
+        return GridConfig.newBuilder()
+            .setLayout(
+                LayoutConfig.newBuilder()
+                    .setRows(rows)
+                    .setCols(cols)
+                    .setExtendLastCol(true)
+                    .build()
+            )
+            .setScrolling(
+                ScrollConfig.newBuilder()
+                    .setScrollbars(ScrollBarsMode.SCROLLBAR_BOTH)
+                    .setFastScroll(true)
+                    .setFlingImpulseGain(DEFAULT_FLING_IMPULSE_GAIN)
+                    .setFlingFriction(DEFAULT_FLING_FRICTION)
+                    .build()
+            )
+            .setSpan(
+                SpanConfig.newBuilder()
+                    .setCellSpan(CellSpanMode.CELL_SPAN_ADJACENT)
+                    .build()
+            )
+            .setInteraction(
+                InteractionConfig.newBuilder()
+                    .setResize(
+                        ResizePolicy.newBuilder()
+                            .setColumns(true)
+                            .setRows(true)
+                            .setUniform(false)
+                            .build()
+                    )
+                    .setHeaderFeatures(
+                        HeaderFeatures.newBuilder()
+                            .setSort(true)
+                            .setReorder(true)
+                            .setChooser(false)
+                            .build()
+                    )
+                    .build()
+            )
+            .setIndicators(defaultIndicatorsConfig());
     }
 
     public static VolvoxGridDesktopController create(
@@ -122,8 +350,13 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
     }
 
     public VolvoxGridDesktopController(VolvoxGridDesktopClient client, long gridId) {
+        this(client, gridId, true);
+    }
+
+    public VolvoxGridDesktopController(VolvoxGridDesktopClient client, long gridId, boolean hostEditorDefaults) {
         this.client = Objects.requireNonNull(client, "client");
         this.gridId = gridId;
+        this.hostEditorDefaults = hostEditorDefaults;
     }
 
     public long getGridId() {
@@ -212,25 +445,21 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
     }
 
     @Override
-    public int getColumnIndicatorTopModeBits() throws SynurangDesktopBridge.SynurangBridgeException {
+    public VolvoxGridColumnIndicatorConfig getColumnIndicatorTopConfig() throws SynurangDesktopBridge.SynurangBridgeException {
         GridConfig config = getConfig();
         if (!config.hasIndicators() || !config.getIndicators().hasColTop()) {
-            return 0;
+            return VolvoxGridColumnIndicatorConfig.builder().build();
         }
-        return config.getIndicators().getColTop().getModeBits();
+        return toCommonColumnIndicatorConfig(config.getIndicators().getColTop());
     }
 
     @Override
-    public void setColumnIndicatorTopModeBits(int value) throws SynurangDesktopBridge.SynurangBridgeException {
+    public void setColumnIndicatorTopConfig(VolvoxGridColumnIndicatorConfig value) throws SynurangDesktopBridge.SynurangBridgeException {
         configure(
             GridConfig.newBuilder()
                 .setIndicators(
                     IndicatorsConfig.newBuilder()
-                        .setColTop(
-                            ColIndicatorConfig.newBuilder()
-                                .setModeBits(value)
-                                .build()
-                        )
+                        .setColTop(toProtoColumnIndicatorConfig(Objects.requireNonNull(value, "value")))
                         .build()
                 )
                 .build()
@@ -294,28 +523,21 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
     }
 
     @Override
-    public int getRowIndicatorStartModeBits() throws SynurangDesktopBridge.SynurangBridgeException {
+    public VolvoxGridRowIndicatorConfig getRowIndicatorStartConfig() throws SynurangDesktopBridge.SynurangBridgeException {
         GridConfig config = getConfig();
         if (!config.hasIndicators() || !config.getIndicators().hasRowStart()) {
-            return 0;
+            return VolvoxGridRowIndicatorConfig.builder().build();
         }
-        return rowIndicatorModeBitsFromSlots(config.getIndicators().getRowStart());
+        return toCommonRowIndicatorConfig(config.getIndicators().getRowStart());
     }
 
     @Override
-    public void setRowIndicatorStartModeBits(int value) throws SynurangDesktopBridge.SynurangBridgeException {
-        RowIndicatorConfig.Builder row = RowIndicatorConfig.newBuilder();
-        List<RowIndicatorSlot> slots = rowIndicatorSlotsFromModeBits(value);
-        if (slots.isEmpty()) {
-            row.setVisible(false);
-        } else {
-            row.addAllSlots(slots);
-        }
+    public void setRowIndicatorStartConfig(VolvoxGridRowIndicatorConfig value) throws SynurangDesktopBridge.SynurangBridgeException {
         configure(
             GridConfig.newBuilder()
                 .setIndicators(
                     IndicatorsConfig.newBuilder()
-                        .setRowStart(row.build())
+                        .setRowStart(toProtoRowIndicatorConfig(Objects.requireNonNull(value, "value")))
                         .build()
                 )
                 .build()
@@ -405,36 +627,65 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
         if (!config.hasEditing()) {
             return EditTrigger.EDIT_TRIGGER_NONE;
         }
-        return config.getEditing().getTrigger();
+        return config.getEditing().hasActivation()
+            ? config.getEditing().getActivation().getTrigger()
+            : EditTrigger.EDIT_TRIGGER_NONE;
     }
 
     public void setEditTrigger(EditTrigger value) throws SynurangDesktopBridge.SynurangBridgeException {
         Objects.requireNonNull(value, "value");
         configure(
             GridConfig.newBuilder()
-                .setEditing(EditConfig.newBuilder().setTrigger(value).build())
+                .setEditing(EditConfig.newBuilder()
+                    .setActivation(EditActivation.newBuilder().setTrigger(value).build())
+                    .build())
                 .build()
         );
     }
 
     public void beginEdit(int row, int col) throws SynurangDesktopBridge.SynurangBridgeException {
+        beginEdit(row, col, EditStartReason.EDIT_START_PROGRAMMATIC);
+    }
+
+    public void beginEdit(int row, int col, EditStartReason reason)
+        throws SynurangDesktopBridge.SynurangBridgeException {
         client.edit(
             EditCommand.newBuilder()
                 .setGridId(gridId)
-                .setStart(EditStart.newBuilder().setRow(row).setCol(col).build())
+                .setStart(
+                    EditStart.newBuilder()
+                        .setRow(row)
+                        .setCol(col)
+                        .setReason(reason)
+                        .build()
+                )
                 .build()
         );
     }
 
-    public void commitEdit(String text) throws SynurangDesktopBridge.SynurangBridgeException {
-        EditCommit.Builder commit = EditCommit.newBuilder();
-        if (text != null) {
-            commit.setText(text);
+    private EditorSessionCommand.Builder currentEditSessionCommandBuilder()
+        throws SynurangDesktopBridge.SynurangBridgeException {
+        EditorSessionCommand.Builder builder = EditorSessionCommand.newBuilder();
+        EditState state = client.edit(
+            EditCommand.newBuilder()
+                .setGridId(gridId)
+                .build()
+        );
+        if (state != null && state.getActive() && state.hasSession()) {
+            EditorSession session = state.getSession();
+            builder.setSessionId(session.getSessionId());
+            builder.setStateVersion(session.getStateVersion());
         }
+        return builder;
+    }
+
+    public void commitEdit(String text) throws SynurangDesktopBridge.SynurangBridgeException {
         client.edit(
             EditCommand.newBuilder()
                 .setGridId(gridId)
-                .setCommit(commit.build())
+                .setSession(currentEditSessionCommandBuilder()
+                    .setCommit(EditCommit.newBuilder().setValue(editorValueFromText(text)).build())
+                    .build())
                 .build()
         );
     }
@@ -443,7 +694,9 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
         client.edit(
             EditCommand.newBuilder()
                 .setGridId(gridId)
-                .setCancel(EditCancel.newBuilder().build())
+                .setSession(currentEditSessionCommandBuilder()
+                    .setCancel(EditCancel.newBuilder().build())
+                    .build())
                 .build()
         );
     }
@@ -577,7 +830,16 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
 
     public DefineColumnsResponse defineColumns(DefineColumnsRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
         Objects.requireNonNull(request, "request");
-        return client.defineColumns(request.toBuilder().setGridId(gridId).build());
+        DefineColumnsRequest.Builder builder = request.toBuilder()
+            .setGridId(gridId)
+            .clearColumns();
+        Set<Integer> columnsWithEditors = hostEditorDefaults
+            ? columnsWithExistingEditors()
+            : null;
+        for (ColumnDef column : request.getColumnsList()) {
+            builder.addColumns(hostEditorDefaults ? applyHostEditorDefault(column, columnsWithEditors) : column);
+        }
+        return client.defineColumns(builder.build());
     }
 
     public DefineRowsResponse defineRows(DefineRowsRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
@@ -717,6 +979,98 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
             builder.setFont(font);
         }
         return client.subtotal(builder.build());
+    }
+
+    public void addSubtotals(
+        List<Integer> amountCols,
+        List<VolvoxGridSubtotalLevel> levels
+    ) throws SynurangDesktopBridge.SynurangBridgeException {
+        addSubtotals(
+            amountCols,
+            levels,
+            AggregateType.AGG_SUM,
+            true,
+            SUBTOTAL_NO_MERGE_COLUMN,
+            SUBTOTAL_NO_MERGE_COLUMN
+        );
+    }
+
+    public void addSubtotals(
+        List<Integer> amountCols,
+        List<VolvoxGridSubtotalLevel> levels,
+        AggregateType aggregate,
+        boolean clearExisting,
+        int mergeColFrom,
+        int mergeColTo
+    ) throws SynurangDesktopBridge.SynurangBridgeException {
+        if (amountCols == null || levels == null || amountCols.isEmpty() || levels.isEmpty()) {
+            return;
+        }
+
+        withRedrawSuspended(() -> {
+            if (amountCols.size() > 1) {
+                configure(
+                    GridConfig.newBuilder()
+                        .setOutline(OutlineConfig.newBuilder().setMultiTotals(true).build())
+                        .build()
+                );
+            }
+            if (clearExisting) {
+                subtotal(
+                    AggregateType.AGG_CLEAR,
+                    SUBTOTAL_CLEAR_COLUMN,
+                    SUBTOTAL_CLEAR_COLUMN,
+                    "",
+                    SUBTOTAL_CLEAR_COLOR,
+                    SUBTOTAL_CLEAR_COLOR,
+                    false
+                );
+            }
+            boolean wantMerge = mergeColFrom >= SUBTOTAL_MIN_VALID_MERGE_COLUMN
+                && mergeColTo >= mergeColFrom;
+            for (VolvoxGridSubtotalLevel level : levels) {
+                if (level == null) {
+                    continue;
+                }
+                int groupIndex = level.getGroupCol() == null
+                    ? SUBTOTAL_NO_GROUP_COLUMN
+                    : level.getGroupCol();
+                for (Integer col : amountCols) {
+                    if (col == null) {
+                        continue;
+                    }
+                    SubtotalResult result = subtotal(
+                        aggregate == null ? AggregateType.AGG_SUM : aggregate,
+                        groupIndex,
+                        col,
+                        level.getCaption(),
+                        level.getBackColor(),
+                        level.getForeColor(),
+                        true
+                    );
+                    if (wantMerge) {
+                        mergeSubtotalLevelZero(result, mergeColFrom, mergeColTo);
+                    }
+                }
+            }
+        });
+    }
+
+    private void mergeSubtotalLevelZero(SubtotalResult result, int colFrom, int colTo)
+        throws SynurangDesktopBridge.SynurangBridgeException {
+        if (result == null) {
+            return;
+        }
+        Set<Integer> seen = new HashSet<>();
+        for (int row : result.getRowsList()) {
+            if (!seen.add(row)) {
+                continue;
+            }
+            NodeInfo node = getNode(row, null);
+            if (node.getLevel() <= 0) {
+                mergeCells(row, colFrom, row, colTo);
+            }
+        }
     }
 
     public AutoSizeResponse autoSize(AutoSizeRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
@@ -1173,6 +1527,21 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
     }
 
     @Override
+    public boolean fontFallbackEnabled() throws SynurangDesktopBridge.SynurangBridgeException {
+        RenderConfig rendering = getConfig().getRendering();
+        return !rendering.hasFontFallbackEnabled() || rendering.getFontFallbackEnabled();
+    }
+
+    @Override
+    public void setFontFallbackEnabled(boolean enabled) throws SynurangDesktopBridge.SynurangBridgeException {
+        configure(
+            GridConfig.newBuilder()
+                .setRendering(RenderConfig.newBuilder().setFontFallbackEnabled(enabled).build())
+                .build()
+        );
+    }
+
+    @Override
     public long renderLayerMask() throws SynurangDesktopBridge.SynurangBridgeException {
         RenderConfig rendering = getConfig().getRendering();
         return rendering.hasRenderLayerMask() ? rendering.getRenderLayerMask() : -1L;
@@ -1363,7 +1732,11 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
 
     public LoadDataResult loadData(LoadDataRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
         Objects.requireNonNull(request, "request");
-        return client.loadData(request.toBuilder().setGridId(gridId).build());
+        LoadDataResult result = client.loadData(request.toBuilder().setGridId(gridId).build());
+        if (result.getStatus() != LoadDataStatus.LOAD_FAILED) {
+            applyDefaultEditorsForInferredColumns(result);
+        }
+        return result;
     }
 
     public LoadDataResult loadData(byte[] data) throws SynurangDesktopBridge.SynurangBridgeException {
@@ -1379,12 +1752,20 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
         if (options != null) {
             builder.setOptions(options);
         }
-        return client.loadData(builder.build());
+        LoadDataResult result = client.loadData(builder.build());
+        if (result.getStatus() != LoadDataStatus.LOAD_FAILED) {
+            applyDefaultEditorsForInferredColumns(result);
+        }
+        return result;
     }
 
     public LoadDataResult appendData(AppendDataRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
         Objects.requireNonNull(request, "request");
-        return client.appendData(request.toBuilder().setGridId(gridId).build());
+        LoadDataResult result = client.appendData(request.toBuilder().setGridId(gridId).build());
+        if (result.getStatus() != LoadDataStatus.LOAD_FAILED) {
+            applyDefaultEditorsForInferredColumns(result);
+        }
+        return result;
     }
 
     public LoadDataResult appendData(byte[] data) throws SynurangDesktopBridge.SynurangBridgeException {
@@ -1400,7 +1781,33 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
         if (options != null) {
             builder.setOptions(options);
         }
-        return client.appendData(builder.build());
+        LoadDataResult result = client.appendData(builder.build());
+        if (result.getStatus() != LoadDataStatus.LOAD_FAILED) {
+            applyDefaultEditorsForInferredColumns(result);
+        }
+        return result;
+    }
+
+    private void applyDefaultEditorsForInferredColumns(LoadDataResult result)
+        throws SynurangDesktopBridge.SynurangBridgeException {
+        if (!hostEditorDefaults || result == null || result.getInferredColumnsCount() == 0) {
+            return;
+        }
+        Set<Integer> columnsWithEditors = new HashSet<>();
+        for (ColumnDef column : getSchema().getColumnsList()) {
+            if (column.hasEditor()) {
+                columnsWithEditors.add(column.getIndex());
+            }
+        }
+        DefineColumnsRequest request = defaultEditorsForInferredColumns(
+            gridId,
+            result.getInferredColumnsList(),
+            columnsWithEditors
+        );
+        if (request.getColumnsCount() == 0) {
+            return;
+        }
+        client.defineColumns(request);
     }
 
     public PrintResponse printGrid(PrintRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
@@ -1452,6 +1859,23 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
 
     public GridConfig getConfig() throws SynurangDesktopBridge.SynurangBridgeException {
         return client.getConfig(GetConfigRequest.newBuilder().setGridId(gridId).build());
+    }
+
+    /**
+     * Returns the last theme preset requested through this controller.
+     * Manual style changes do not round-trip back into this cached value.
+     */
+    public ThemePreset getThemePreset() {
+        return themePreset;
+    }
+
+    public void setThemePreset(ThemePreset value) throws SynurangDesktopBridge.SynurangBridgeException {
+        ThemePreset preset = value == null ? ThemePreset.THEME_NONE : value;
+        configure(
+            GridConfig.newBuilder()
+                .setThemePreset(preset)
+                .build()
+        );
     }
 
     private SelectRequest buildSingleRangeSelectRequest(
@@ -1534,7 +1958,11 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
 
     public ConfigureResponse configure(ConfigureRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
         Objects.requireNonNull(request, "request");
-        return client.configure(request.toBuilder().setGridId(gridId).build());
+        ConfigureResponse response = client.configure(request.toBuilder().setGridId(gridId).build());
+        if (request.hasConfig() && request.getConfig().hasThemePreset()) {
+            themePreset = request.getConfig().getThemePreset();
+        }
+        return response;
     }
 
     public void configure(GridConfig config) throws SynurangDesktopBridge.SynurangBridgeException {

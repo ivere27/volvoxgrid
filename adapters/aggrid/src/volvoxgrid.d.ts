@@ -152,6 +152,10 @@ declare module "volvoxgrid" {
     searchable?: boolean;
   }
 
+  /**
+   * @deprecated Dropdown-open cancellation is no longer emitted. Use
+   * onBeforeEdit or editor list data-source APIs instead.
+   */
   export interface VolvoxGridBeforeDropdownOpenDetails {
     eventId: bigint;
     rawEvent: Uint8Array;
@@ -193,6 +197,43 @@ declare module "volvoxgrid" {
     columns?: boolean;
     rows?: boolean;
     uniform?: boolean;
+  }
+
+  export interface VolvoxGridRowIndicatorSlot {
+    kind?: number;
+    width?: number;
+    visible?: boolean;
+    customKey?: string;
+    data?: Uint8Array;
+  }
+
+  export interface VolvoxGridRowIndicatorConfig {
+    visible?: boolean;
+    width?: number;
+    background?: number;
+    foreground?: number;
+    gridLines?: number;
+    gridColor?: number;
+    autoSize?: boolean;
+    allowResize?: boolean;
+    allowSelect?: boolean;
+    allowReorder?: boolean;
+    slots?: ReadonlyArray<VolvoxGridRowIndicatorSlot>;
+  }
+
+  export interface VolvoxGridColumnIndicatorConfig {
+    visible?: boolean;
+    defaultRowHeight?: number;
+    bandRows?: number;
+    cellModes?: ReadonlyArray<number>;
+    background?: number;
+    foreground?: number;
+    gridLines?: number;
+    gridColor?: number;
+    autoSize?: boolean;
+    allowResize?: boolean;
+    allowReorder?: boolean;
+    allowMenu?: boolean;
   }
 
   export interface VolvoxGridPadding {
@@ -273,6 +314,10 @@ declare module "volvoxgrid" {
     get cursorCol(): number;
     set cursorCol(value: number);
     onBeforeEdit: ((details: VolvoxGridBeforeEditDetails) => void) | null;
+    /**
+     * @deprecated Dropdown-open cancellation is no longer emitted. Use
+     * onBeforeEdit or editor list data-source APIs instead.
+     */
     onBeforeDropdownOpen: ((details: VolvoxGridBeforeDropdownOpenDetails) => void) | null;
     onCellEditValidating: ((details: VolvoxGridCellEditValidatingDetails) => void) | null;
     onBeforeSort: ((details: VolvoxGridBeforeSortDetails) => void) | null;
@@ -303,8 +348,6 @@ declare module "volvoxgrid" {
     focusBorder: number;
     editTrigger: number;
     editable: boolean;
-    dropdownTrigger: number;
-    dropdownSearch: boolean;
     editMaxLength: number;
     editText: string;
     rendererMode: number;
@@ -322,6 +365,8 @@ declare module "volvoxgrid" {
     setFontName(name: string): void;
     setFontSize(size: number): void;
     setGridLines(mode: number): void;
+    setColumnIndicatorTopConfig(config: VolvoxGridColumnIndicatorConfig): void;
+    setRowIndicatorStartConfig(config: VolvoxGridRowIndicatorConfig): void;
     setHeaderFeatures(features: VolvoxGridHeaderFeatures): void;
     setResizePolicy(policy: VolvoxGridResizePolicy): void;
     setCellStyle(row: number, col: number, style: VolvoxGridCellStyle): void;

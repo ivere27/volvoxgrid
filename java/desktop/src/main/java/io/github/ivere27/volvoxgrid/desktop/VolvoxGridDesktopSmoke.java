@@ -46,10 +46,7 @@ public final class VolvoxGridDesktopSmoke {
             bridge = SynurangDesktopBridge.load(libraryPath);
             VolvoxGridDesktopClient client = new VolvoxGridDesktopClient(bridge);
 
-            GridConfig config = GridConfig.newBuilder()
-                .setLayout(LayoutConfig.newBuilder().setRows(2).setCols(2).build())
-                .setIndicators(VolvoxGridDesktopController.defaultIndicatorsConfig())
-                .build();
+            GridConfig config = VolvoxGridDesktopController.defaultGridConfigBuilder(2, 2).build();
 
             CreateResponse response = client.create(
                 CreateRequest.newBuilder()

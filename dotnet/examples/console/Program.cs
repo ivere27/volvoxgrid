@@ -79,6 +79,14 @@ namespace VolvoxGrid.DotNet.ConsoleSample
             {
                 Log("INFO", "SMOKE: controller-api checks begin", null);
 
+                grid.Configure(
+                    new GridConfig
+                    {
+                        Editing = new EditConfig
+                        {
+                            Activation = new EditActivation { Trigger = EditTrigger.EDIT_TRIGGER_KEY_CLICK },
+                        },
+                    });
                 grid.DefineColumns(BuildColumns());
                 grid.LoadTable(5, 4, BuildSmokeTable(), true);
 
@@ -98,7 +106,23 @@ namespace VolvoxGrid.DotNet.ConsoleSample
                 SmokeAssert(string.Equals(GetCellText(grid, 2, 1), "Gamma*", StringComparison.Ordinal), "UpdateCells row 2");
                 SmokeAssert(string.Equals(GetCellText(grid, 3, 1), "Delta*", StringComparison.Ordinal), "UpdateCells row 3");
 
-                int foundText = grid.FindByText("Gamma*", 1, 0, false, true);
+                grid.BeginEdit(2, 1, EditStartReason.EDIT_START_PROGRAMMATIC, null);
+                EditState editState = grid.GetEditState();
+                SmokeAssert(
+                    editState != null
+                    && editState.Active
+                    && editState.Session != null
+                    && editState.Session.SessionId != 0
+                    && editState.Session.StateVersion != 0,
+                    "BeginEdit/GetEditState");
+                grid.SetEditText("EditedViaSmoke");
+                grid.CommitEdit("EditedViaSmoke");
+                string committedText = GetCellText(grid, 2, 1);
+                SmokeAssert(
+                    string.Equals(committedText, "EditedViaSmoke", StringComparison.Ordinal),
+                    "SetEditText/CommitEdit actual=" + Quote(committedText));
+
+                int foundText = grid.FindByText("EditedViaSmoke", 1, 0, false, true);
                 int foundRegex = grid.FindByRegex("Delta\\*", 1, 0);
                 SmokeAssert(foundText >= 0 && foundRegex >= 0, "FindByText/FindByRegex");
 
@@ -315,7 +339,7 @@ namespace VolvoxGrid.DotNet.ConsoleSample
 
         private static string GetCellText(VolvoxGridClient grid, int row, int col)
         {
-            IList<CellData> cells = grid.GetCells(row, col, row, col, false, false, true);
+            IList<CellData> cells = grid.GetCells(row, col, row, col, false, false, false);
             if (cells == null || cells.Count == 0 || cells[0] == null)
             {
                 return string.Empty;

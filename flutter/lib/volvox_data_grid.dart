@@ -33,8 +33,7 @@ import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 
-import 'volvoxgrid.dart'
-    show VolvoxGridBeforeEditDetails, VolvoxGridWidget;
+import 'volvoxgrid.dart' show VolvoxGridBeforeEditDetails, VolvoxGridWidget;
 import 'volvoxgrid_controller.dart';
 import 'src/generated/volvoxgrid.pb.dart' as pb;
 

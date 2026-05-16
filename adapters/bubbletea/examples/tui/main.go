@@ -249,14 +249,15 @@ func (m *appModel) debugLines(width int) []string {
 			selectionText = "selerr=" + debugCompactText(err.Error(), 48)
 		}
 		if edit, err := m.grid.EditState(); err == nil && edit != nil {
+			session := edit.GetSession()
 			editText = fmt.Sprintf(
 				"active=%t cell=%s ui=%s sel=%d+%d text=%s",
 				edit.GetActive(),
 				debugEditCellLabel(edit),
 				debugEditMode(edit),
-				edit.GetSelStart(),
-				edit.GetSelLength(),
-				debugCompactText(edit.GetText(), 24),
+				session.GetSelection().GetStart(),
+				session.GetSelection().GetLength(),
+				debugCompactText(editorValueText(session.GetValue()), 24),
 			)
 		} else if err != nil {
 			editText = "editerr=" + debugCompactText(err.Error(), 48)
@@ -295,17 +296,51 @@ func debugEditCellLabel(state *pb.EditState) string {
 	if state == nil || !state.GetActive() {
 		return "--"
 	}
-	return debugCellLabel(state.GetRow(), state.GetCol())
+	session := state.GetSession()
+	if session == nil {
+		return "--"
+	}
+	return debugCellLabel(session.GetRow(), session.GetCol())
 }
 
 func debugEditMode(state *pb.EditState) string {
 	if state == nil || !state.GetActive() {
 		return "--"
 	}
-	if state.GetUiMode() == pb.EditUiMode_EDIT_UI_MODE_EDIT {
-		return "EDIT"
+	return "EDIT"
+}
+
+func editorValueText(value *pb.EditorValue) string {
+	if value == nil {
+		return ""
 	}
-	return "ENTER"
+	if value.EditText != nil {
+		return value.GetEditText()
+	}
+	if value.DisplayText != nil {
+		return value.GetDisplayText()
+	}
+	cellValue := value.GetValue()
+	if cellValue == nil {
+		return ""
+	}
+	switch cellValue.GetValue().(type) {
+	case *pb.CellValue_Text:
+		return cellValue.GetText()
+	case *pb.CellValue_Number:
+		return fmt.Sprintf("%g", cellValue.GetNumber())
+	case *pb.CellValue_Flag:
+		if cellValue.GetFlag() {
+			return "true"
+		}
+		return "false"
+	case *pb.CellValue_Timestamp:
+		return fmt.Sprintf("%d", cellValue.GetTimestamp())
+	case *pb.CellValue_Raw:
+		return string(cellValue.GetRaw())
+	default:
+		return ""
+	}
 }
 
 func debugCompactText(text string, limit int) string {

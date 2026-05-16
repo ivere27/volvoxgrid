@@ -90,6 +90,7 @@ pub fn print_grid(
     if text_engine.layout_cache_cap != grid.text_layout_cache_cap {
         text_engine.set_layout_cache_cap(grid.text_layout_cache_cap);
     }
+    text_engine.set_font_fallback_enabled(grid.font_fallback_enabled);
     text_engine.set_render_options(
         grid.style.text_render_mode,
         grid.style.text_hinting_mode,

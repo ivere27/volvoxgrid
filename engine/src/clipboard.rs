@@ -1,3 +1,4 @@
+use crate::event::GridEventData;
 use crate::grid::VolvoxGrid;
 
 /// Copy selected cells to clipboard format (tab-delimited text).
@@ -5,6 +6,10 @@ use crate::grid::VolvoxGrid;
 /// Returns `(text, rich_data)` where `text` is the tab/newline-delimited
 /// string of cell contents and `rich_data` is reserved for future use.
 pub fn copy(grid: &VolvoxGrid) -> (String, Vec<u8>) {
+    if grid.edit.is_active() {
+        return (grid.edit.get_sel_text().to_string(), Vec::new());
+    }
+
     let ranges: Vec<(i32, i32, i32, i32)> = grid
         .selection
         .all_ranges(grid.rows, grid.cols)
@@ -69,6 +74,20 @@ pub fn copy(grid: &VolvoxGrid) -> (String, Vec<u8>) {
 ///
 /// Returns the same `(text, rich_data)` tuple as `copy`.
 pub fn cut(grid: &mut VolvoxGrid) -> (String, Vec<u8>) {
+    if grid.edit.is_active() {
+        if active_readonly_dropdown_edit(grid) {
+            return (String::new(), Vec::new());
+        }
+        let text = grid.edit.get_sel_text().to_string();
+        if grid.edit.delete_selection() {
+            grid.events.push(GridEventData::CellEditChange {
+                text: grid.edit.edit_text.clone(),
+            });
+            grid.mark_dirty();
+        }
+        return (text, Vec::new());
+    }
+
     let result = copy(grid);
     delete_selection(grid);
     result
@@ -80,6 +99,15 @@ pub fn cut(grid: &mut VolvoxGrid) -> (String, Vec<u8>) {
 /// resulting cell value is written into the grid. Pasting stops at the
 /// grid boundary (does not auto-extend rows/cols).
 pub fn paste(grid: &mut VolvoxGrid, text: &str) {
+    if grid.edit.is_active() {
+        if active_readonly_dropdown_edit(grid) {
+            paste_into_readonly_dropdown(grid, text);
+            return;
+        }
+        paste_into_edit(grid, text);
+        return;
+    }
+
     let col_sep = if grid.clip_col_separator.is_empty() {
         "\t".to_string()
     } else {
@@ -98,6 +126,78 @@ pub fn paste(grid: &mut VolvoxGrid, text: &str) {
         paste_rows(grid, text.split(&row_sep), &col_sep);
     }
     grid.mark_dirty();
+}
+
+fn active_readonly_dropdown_edit(grid: &VolvoxGrid) -> bool {
+    grid.edit.is_active() && !grid.edit.dropdown_items.is_empty() && !grid.edit.dropdown_editable
+}
+
+fn paste_into_readonly_dropdown(grid: &mut VolvoxGrid, text: &str) {
+    let Some(candidate) = single_clipboard_value(text) else {
+        return;
+    };
+    if candidate.is_empty() {
+        return;
+    }
+
+    for idx in 0..grid.edit.dropdown_count() {
+        let item = grid.edit.get_dropdown_item(idx);
+        let data = grid.edit.get_dropdown_data(idx);
+        if item == candidate || (!data.is_empty() && data == candidate) {
+            let selected = item.to_string();
+            grid.edit.set_dropdown_index(idx);
+            grid.edit.clear_dropdown_search();
+            grid.events
+                .push(GridEventData::CellEditChange { text: selected });
+            grid.mark_dirty();
+            return;
+        }
+    }
+}
+
+fn single_clipboard_value(text: &str) -> Option<String> {
+    let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
+    let value = normalized.strip_suffix('\n').unwrap_or(&normalized);
+    if value.contains('\n') || value.contains('\t') {
+        return None;
+    }
+    Some(value.to_string())
+}
+
+fn paste_into_edit(grid: &mut VolvoxGrid, text: &str) {
+    let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
+    let total = grid.edit.edit_text.chars().count() as i32;
+    let sel_start = grid.edit.sel_start.clamp(0, total);
+    let sel_end = (grid.edit.sel_start + grid.edit.sel_length.max(0)).clamp(sel_start, total);
+    let selected_len = sel_end - sel_start;
+    let available = if grid.edit_max_length > 0 {
+        (grid.edit_max_length - (total - selected_len)).max(0) as usize
+    } else {
+        usize::MAX
+    };
+    let insert_text = if available == usize::MAX {
+        normalized
+    } else {
+        normalized.chars().take(available).collect()
+    };
+
+    if insert_text.is_empty() && selected_len <= 0 {
+        return;
+    }
+
+    let before_text = grid.edit.edit_text.clone();
+    let before_start = grid.edit.sel_start;
+    let before_length = grid.edit.sel_length;
+    grid.edit.insert_text(&insert_text);
+    if grid.edit.edit_text != before_text
+        || grid.edit.sel_start != before_start
+        || grid.edit.sel_length != before_length
+    {
+        grid.events.push(GridEventData::CellEditChange {
+            text: grid.edit.edit_text.clone(),
+        });
+        grid.mark_dirty();
+    }
 }
 
 fn paste_rows<'a, I>(grid: &mut VolvoxGrid, rows: I, col_sep: &str)
@@ -138,8 +238,10 @@ pub fn delete_selection(grid: &mut VolvoxGrid) {
 
 #[cfg(test)]
 mod tests {
-    use super::{copy, delete_selection, paste};
+    use super::{copy, cut, delete_selection, paste};
+    use crate::event::GridEventData;
     use crate::grid::VolvoxGrid;
+    use crate::proto::volvoxgrid::v1 as pb;
 
     fn sample_grid() -> VolvoxGrid {
         let mut grid = VolvoxGrid::new(1, 640, 480, 3, 4, 0, 0);
@@ -209,5 +311,123 @@ mod tests {
 
         assert_eq!(grid.cells.get_text(0, 0), "X");
         assert_eq!(grid.cells.get_text(1, 0), "A");
+    }
+
+    #[test]
+    fn copy_cut_paste_operate_on_active_edit_selection() {
+        let mut grid = sample_grid();
+        grid.edit
+            .start_edit(0, 0, pb::EditStartReason::EditStartUnspecified, "abcdef");
+        grid.edit.set_selection_anchor_and_caret(2, 5);
+
+        let (copied, _) = copy(&grid);
+        assert_eq!(copied, "cde");
+
+        let (cut_text, _) = cut(&mut grid);
+        assert_eq!(cut_text, "cde");
+        assert_eq!(grid.edit.edit_text, "abf");
+        assert_eq!(grid.edit.sel_start, 2);
+        assert_eq!(grid.edit.sel_length, 0);
+
+        paste(&mut grid, "XY\r\nZ");
+        assert_eq!(grid.edit.edit_text, "abXY\nZf");
+        assert_eq!(grid.edit.sel_start, 6);
+    }
+
+    #[test]
+    fn paste_selects_matching_readonly_dropdown_item() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 2, 1, 0);
+        grid.edit_trigger_mode = 2;
+        grid.columns[0].dropdown_items = "Active|Pending|Shipped".to_string();
+        grid.cells.set_text(1, 0, "Pending".to_string());
+
+        grid.begin_edit(1, 0, pb::EditStartReason::EditStartProgrammatic);
+        assert!(grid.edit.is_active());
+
+        paste(&mut grid, "Shipped\r\n");
+
+        assert_eq!(grid.edit.edit_text, "Shipped");
+        assert_eq!(grid.edit.dropdown_index, 2);
+        assert!(grid
+            .events
+            .drain()
+            .iter()
+            .any(|event| matches!(event.data, GridEventData::CellEditChange { ref text } if text == "Shipped")));
+    }
+
+    #[test]
+    fn cut_ignores_readonly_dropdown_edit() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 2, 1, 0);
+        grid.edit_trigger_mode = 2;
+        grid.columns[0].dropdown_items = "Active|Pending|Shipped".to_string();
+        grid.cells.set_text(1, 0, "Pending".to_string());
+
+        grid.begin_edit(1, 0, pb::EditStartReason::EditStartProgrammatic);
+        assert!(grid.edit.is_active());
+        grid.edit.select_all();
+        grid.events.drain();
+
+        let (cut_text, _) = cut(&mut grid);
+
+        assert_eq!(cut_text, "");
+        assert_eq!(grid.edit.edit_text, "Pending");
+        assert_eq!(grid.edit.dropdown_index, 1);
+        assert!(!grid
+            .events
+            .drain()
+            .iter()
+            .any(|event| matches!(event.data, GridEventData::CellEditChange { .. })));
+    }
+
+    #[test]
+    fn paste_rejects_invalid_readonly_dropdown_item() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 2, 1, 0);
+        grid.edit_trigger_mode = 2;
+        grid.columns[0].dropdown_items = "Active|Pending|Shipped".to_string();
+        grid.cells.set_text(1, 0, "Pending".to_string());
+
+        grid.begin_edit(1, 0, pb::EditStartReason::EditStartProgrammatic);
+        assert!(grid.edit.is_active());
+        grid.events.drain();
+
+        paste(&mut grid, "Injected");
+
+        assert_eq!(grid.edit.edit_text, "Pending");
+        assert_eq!(grid.edit.dropdown_index, 1);
+        assert!(!grid
+            .events
+            .drain()
+            .iter()
+            .any(|event| matches!(event.data, GridEventData::CellEditChange { .. })));
+    }
+
+    #[test]
+    fn paste_rejects_multi_cell_text_for_readonly_dropdown() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 2, 1, 0);
+        grid.edit_trigger_mode = 2;
+        grid.columns[0].dropdown_items = "Active|Pending|Shipped".to_string();
+        grid.cells.set_text(1, 0, "Pending".to_string());
+
+        grid.begin_edit(1, 0, pb::EditStartReason::EditStartProgrammatic);
+        assert!(grid.edit.is_active());
+
+        paste(&mut grid, "Shipped\tExtra");
+
+        assert_eq!(grid.edit.edit_text, "Pending");
+        assert_eq!(grid.edit.dropdown_index, 1);
+    }
+
+    #[test]
+    fn edit_paste_respects_max_length_after_replacing_selection() {
+        let mut grid = sample_grid();
+        grid.edit_max_length = 5;
+        grid.edit
+            .start_edit(0, 0, pb::EditStartReason::EditStartUnspecified, "abcde");
+        grid.edit.set_selection_anchor_and_caret(2, 4);
+
+        paste(&mut grid, "WXYZ");
+
+        assert_eq!(grid.edit.edit_text, "abWXe");
+        assert_eq!(grid.edit.sel_start, 4);
     }
 }

@@ -2,6 +2,19 @@
 
 All notable changes to VolvoxGrid are documented here. Per-package changelogs may have additional detail (e.g. [flutter/CHANGELOG.md](flutter/CHANGELOG.md)).
 
+## 0.8.9
+
+- Added editor-session lifecycle and validation-on-cell-edit support across the engine, protocol, generated bindings, native hosts, Web/WASM, TUI, Flutter, Go, .NET, and ActiveX adapters.
+- Added wrapper-facing row and column indicator configuration APIs, including row-indicator slot helpers and refreshed hierarchy/sales demos.
+- Added configurable font fallback support across native CPU/GPU rendering, Web Canvas2D, Android, Java desktop, .NET, Flutter, and generated bindings.
+- Added built-in visual theme presets via `GridConfig.theme_preset`, with resolved style, selection, scrollbar, and indicator palettes exposed across generated bindings and wrapper controllers.
+- Expanded the Web/WASM package with protobuf RPC calls, typed data operations, named event listeners, cancelable-event handling, event pumping, and refreshed split demo modules.
+- Added `ROW_INDICATOR_SLOT_NUMBERS_DATA_ONLY` row indicators that number only real data rows while leaving subtotal and outline group rows unnumbered.
+- Fixed Flutter desktop IME editing by keeping the focused IME proxy synchronized with edit sessions, commit/cancel navigation, and validation-blocked edits.
+- Fixed Web IME composition by using the host text editor as the idle IME proxy, starting edit sessions on composition start, and forwarding non-IME keys back to the canvas.
+- Fixed outline toggle hit-box sizing and tree outline interaction handling.
+- Fixed GitHub release publishing so internal prerelease artifacts are excluded from release uploads, and refreshed NuGet/package publishing documentation.
+
 ## 0.8.8
 
 - Added full/lite artifact flows across Android, Android Compose, Java desktop, iOS, Web/WASM, and .NET, with OS/browser text-rendering fallback and engine-owned text-cache documentation.
