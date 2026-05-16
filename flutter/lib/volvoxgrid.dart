@@ -382,13 +382,16 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
   final TextEditingController _imeProxyController = TextEditingController();
   final FocusNode _imeProxyFocusNode = FocusNode();
   pb.EditorSessionStarted? _deferredEditorSessionStart;
-  Timer? _imeProxyRevealTimer;
+  bool _imeProxyOverlayVisible = false;
+  Rect _imeProxyOverlayRect = Rect.zero;
   Future<void> _queuedEditCommand = Future<void>.value();
   bool _deferOverlayWhileImeProxyActive = false;
   bool _imeProxySessionActive = false;
   bool _suppressImeProxyChanges = false;
-  String _imeProxyCommittedText = '';
-  String? _suppressedPlainProxyText;
+  bool _imeProxyPreferComposition = false;
+  int _imeProxyEditEpoch = 0;
+  Int64 _imeProxySessionId = Int64.ZERO;
+  Int64 _imeProxyStateVersion = Int64.ZERO;
 
   /// Focus node for keyboard events on the grid itself.
   final FocusNode _gridFocusNode = FocusNode();
@@ -462,10 +465,16 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
       onResume: _onResume,
     );
     WidgetsBinding.instance.addObserver(this);
-    HardwareKeyboard.instance.addHandler(_handleHardwareKeyEvent);
+    _imeProxyFocusNode.onKeyEvent = _onImeProxyFocusKeyEvent;
     _imeProxyController.addListener(_handleImeProxyChanged);
     widget.controller.addListener(_onControllerChanged);
     _syncEventStreamSubscription();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      _requestIdleInputFocus();
+    });
   }
 
   void _onPause() {
@@ -562,8 +571,6 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
     WidgetsBinding.instance.removeObserver(this);
     _lifecycleListener.dispose();
     _longPressTimer?.cancel();
-    _imeProxyRevealTimer?.cancel();
-    HardwareKeyboard.instance.removeHandler(_handleHardwareKeyEvent);
     _closeRenderSession(controller: widget.controller);
     _closeEventStream();
     _freeRenderBuffer();
@@ -760,14 +767,15 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
     _stagedBufferWidth = 0;
     _stagedBufferHeight = 0;
     _decisionChannelEnabled = false;
-    _imeProxyRevealTimer?.cancel();
-    _imeProxyRevealTimer = null;
     _deferredEditorSessionStart = null;
     _deferOverlayWhileImeProxyActive = false;
     _imeProxySessionActive = false;
+    _imeProxyOverlayVisible = false;
+    _imeProxyOverlayRect = Rect.zero;
+    _imeProxyEditEpoch += 1;
+    _imeProxySessionId = Int64.ZERO;
+    _imeProxyStateVersion = Int64.ZERO;
     _editOverlayPendingReveal = false;
-    _imeProxyCommittedText = '';
-    _suppressedPlainProxyText = null;
     _suppressImeProxyChanges = false;
   }
 
@@ -1500,15 +1508,47 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
       if (_deferOverlayWhileImeProxyActive) {
         _deferredEditorSessionStart = pb.EditorSessionStarted()
           ..mergeFromMessage(output.editorStarted);
+        _rememberImeProxyEditorSession(output.editorStarted.session);
+        setState(() {
+          _imeProxyOverlayVisible = true;
+          _imeProxyOverlayRect =
+              _logicalEditorRect(output.editorStarted.session.viewportRect);
+        });
       } else {
         _showEditOverlay(output.editorStarted);
       }
     }
+    if (output.hasEditorUpdated() &&
+        _deferOverlayWhileImeProxyActive &&
+        output.editorUpdated.hasViewportRect()) {
+      if (output.editorUpdated.hasSessionId()) {
+        if (_imeProxySessionId != output.editorUpdated.sessionId) {
+          _imeProxySessionId = output.editorUpdated.sessionId;
+          _imeProxyStateVersion = Int64.ZERO;
+        }
+      }
+      if (output.editorUpdated.hasStateVersion()) {
+        if (output.editorUpdated.stateVersion > _imeProxyStateVersion) {
+          _imeProxyStateVersion = output.editorUpdated.stateVersion;
+        }
+      }
+      setState(() {
+        _imeProxyOverlayVisible = true;
+        _imeProxyOverlayRect =
+            _logicalEditorRect(output.editorUpdated.viewportRect);
+      });
+    }
     if (output.hasEditorUpdated() && _editing) {
       final update = output.editorUpdated;
       if (_editSessionId == Int64.ZERO || update.sessionId == _editSessionId) {
-        _editSessionId = update.sessionId;
-        _editStateVersion = update.stateVersion;
+        if (_editSessionId != update.sessionId) {
+          _editSessionId = update.sessionId;
+          _editStateVersion = Int64.ZERO;
+        }
+        if (update.hasStateVersion() &&
+            update.stateVersion > _editStateVersion) {
+          _editStateVersion = update.stateVersion;
+        }
       }
       if (update.hasVisible() && !update.visible) {
         setState(() {
@@ -1532,6 +1572,15 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
       }
     }
     if (output.hasEditorEnded()) {
+      _deferredEditorSessionStart = null;
+      _deferOverlayWhileImeProxyActive = false;
+      _imeProxySessionActive = false;
+      _imeProxyOverlayVisible = false;
+      _imeProxyOverlayRect = Rect.zero;
+      _imeProxyEditEpoch += 1;
+      _imeProxySessionId = Int64.ZERO;
+      _imeProxyStateVersion = Int64.ZERO;
+      _clearImeProxyValue();
       _closeLocalEditOverlay();
     }
     if (output.rendered) {
@@ -1903,11 +1952,14 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
     if (_isMobilePlatform) {
       return;
     }
+    _imeProxyFocusNode.requestFocus();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _editing) {
         return;
       }
-      _imeProxyFocusNode.requestFocus();
+      if (!_imeProxyFocusNode.hasFocus) {
+        _imeProxyFocusNode.requestFocus();
+      }
     });
   }
 
@@ -1916,16 +1968,25 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
     if (req.hasSession() &&
         req.session.editor.presentation ==
             pb.EditorPresentation.EDITOR_CANVAS) {
+      if (_editSessionId != req.session.sessionId) {
+        _editSessionId = req.session.sessionId;
+        _editStateVersion = Int64.ZERO;
+      }
+      if (req.session.hasStateVersion() &&
+          req.session.stateVersion > _editStateVersion) {
+        _editStateVersion = req.session.stateVersion;
+      }
       return;
     }
 
-    _imeProxyRevealTimer?.cancel();
-    _imeProxyRevealTimer = null;
     _deferredEditorSessionStart = null;
     _deferOverlayWhileImeProxyActive = false;
     _imeProxySessionActive = false;
-    _imeProxyCommittedText = '';
-    _suppressedPlainProxyText = null;
+    _imeProxyOverlayVisible = false;
+    _imeProxyOverlayRect = Rect.zero;
+    _imeProxyEditEpoch += 1;
+    _imeProxySessionId = Int64.ZERO;
+    _imeProxyStateVersion = Int64.ZERO;
     _clearImeProxyValue();
 
     if (!req.hasSession()) return;
@@ -1951,8 +2012,14 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
       setState(() {
         _editRect = nextRect;
         _editUiMode = nextMode;
-        _editSessionId = session.sessionId;
-        _editStateVersion = session.stateVersion;
+        if (_editSessionId != session.sessionId) {
+          _editSessionId = session.sessionId;
+          _editStateVersion = Int64.ZERO;
+        }
+        if (session.hasStateVersion() &&
+            session.stateVersion > _editStateVersion) {
+          _editStateVersion = session.stateVersion;
+        }
         if (shouldHideDuringMove) {
           _editOverlayVisible = false;
           _editOverlayPendingReveal = true;
@@ -1972,8 +2039,14 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
       _editRect = nextRect;
       _editUiMode = nextMode;
       _editSessionToken += 1;
-      _editSessionId = session.sessionId;
-      _editStateVersion = session.stateVersion;
+      if (_editSessionId != session.sessionId) {
+        _editSessionId = session.sessionId;
+        _editStateVersion = Int64.ZERO;
+      }
+      if (session.hasStateVersion() &&
+          session.stateVersion > _editStateVersion) {
+        _editStateVersion = session.stateVersion;
+      }
       _editFontSize = 13.0;
       _editFontFamily = null;
       _editFontBold = false;
@@ -2033,12 +2106,30 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
       return;
     }
     final session = state.session;
+    if (session.hasEditor() &&
+        session.editor.presentation == pb.EditorPresentation.EDITOR_CANVAS) {
+      if (_editSessionId != session.sessionId) {
+        _editSessionId = session.sessionId;
+        _editStateVersion = Int64.ZERO;
+      }
+      if (session.hasStateVersion() &&
+          session.stateVersion > _editStateVersion) {
+        _editStateVersion = session.stateVersion;
+      }
+      return;
+    }
     setState(() {
       _editing = true;
       _editOverlayVisible = true;
       _editOverlayPendingReveal = false;
-      _editSessionId = session.sessionId;
-      _editStateVersion = session.stateVersion;
+      if (_editSessionId != session.sessionId) {
+        _editSessionId = session.sessionId;
+        _editStateVersion = Int64.ZERO;
+      }
+      if (session.hasStateVersion() &&
+          session.stateVersion > _editStateVersion) {
+        _editStateVersion = session.stateVersion;
+      }
       if (session.hasValue()) {
         final nextText = _editorValueText(session.value);
         if (_editTextController.text != nextText) {
@@ -2051,13 +2142,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
     });
   }
 
-  Future<bool> _refreshActiveEditAfterCommit() async {
-    final pb.EditState state;
-    try {
-      state = await widget.controller.getEditState();
-    } catch (_) {
-      return false;
-    }
+  bool _applyPostCommitEditState(pb.EditState state) {
     if (!mounted) {
       return true;
     }
@@ -2069,22 +2154,109 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
     return false;
   }
 
-  void _scheduleDeferredImeOverlayReveal() {
-    _imeProxyRevealTimer?.cancel();
-    _imeProxyRevealTimer = Timer(const Duration(milliseconds: 40), () {
-      if (!mounted) {
-        return;
+  void _rememberImeProxyEditorSession(pb.EditorSession session) {
+    if (_imeProxySessionId != session.sessionId) {
+      _imeProxySessionId = session.sessionId;
+      _imeProxyStateVersion = Int64.ZERO;
+    }
+    if (session.hasStateVersion() &&
+        session.stateVersion > _imeProxyStateVersion) {
+      _imeProxyStateVersion = session.stateVersion;
+    }
+  }
+
+  void _rememberImeProxyEditState(pb.EditState state) {
+    if (state.active && state.hasSession()) {
+      _rememberImeProxyEditorSession(state.session);
+    }
+  }
+
+  Future<List<int>?> _resolveImeProxyEditCell(int row, int col) async {
+    if (row >= 0 && col >= 0) {
+      return <int>[row, col];
+    }
+    try {
+      final selection = await widget.controller.getSelection();
+      if (selection.activeRow >= 0 && selection.activeCol >= 0) {
+        return <int>[selection.activeRow, selection.activeCol];
       }
-      _deferOverlayWhileImeProxyActive = false;
-      _imeProxySessionActive = false;
-      final pending = _deferredEditorSessionStart;
-      _deferredEditorSessionStart = null;
-      if (pending != null) {
-        _showEditOverlay(pending);
-      } else {
-        _requestRender();
-      }
+    } catch (_) {
+      // Preserve best-effort behavior if the selection probe fails.
+    }
+    return null;
+  }
+
+  bool _showImeProxyOverlayForEditState(pb.EditState state) {
+    if (!mounted || !state.active || !state.hasSession()) {
+      return false;
+    }
+    final session = state.session;
+    if (session.hasEditor() &&
+        session.editor.presentation == pb.EditorPresentation.EDITOR_CANVAS) {
+      return false;
+    }
+    if (!session.hasViewportRect() ||
+        session.viewportRect.width <= 0 ||
+        session.viewportRect.height <= 0) {
+      return false;
+    }
+    _deferredEditorSessionStart = pb.EditorSessionStarted()
+      ..session = (pb.EditorSession()..mergeFromMessage(session));
+    _rememberImeProxyEditorSession(session);
+    setState(() {
+      _imeProxyOverlayVisible = true;
+      _imeProxyOverlayRect = _logicalEditorRect(session.viewportRect);
     });
+    return true;
+  }
+
+  Rect _logicalEditorRect(pb.Rect viewportRect) {
+    final dpr = _devicePixelRatio <= 0 ? 1.0 : _devicePixelRatio;
+    return Rect.fromLTWH(
+      viewportRect.x / dpr,
+      viewportRect.y / dpr,
+      viewportRect.width / dpr,
+      viewportRect.height / dpr,
+    );
+  }
+
+  void _finishImeProxySession({pb.EditState? editState}) {
+    if (!mounted) {
+      return;
+    }
+    _deferOverlayWhileImeProxyActive = false;
+    _imeProxySessionActive = false;
+    _imeProxyOverlayVisible = false;
+    _imeProxyOverlayRect = Rect.zero;
+    _imeProxyEditEpoch += 1;
+    _imeProxySessionId = Int64.ZERO;
+    _imeProxyStateVersion = Int64.ZERO;
+    final pending = _deferredEditorSessionStart;
+    _deferredEditorSessionStart = null;
+    if (pending != null) {
+      _showEditOverlay(pending);
+      if (editState != null && editState.active) {
+        _applyActiveEditState(editState);
+      }
+    } else {
+      if (editState != null && editState.active && _editing) {
+        _applyActiveEditState(editState);
+      }
+      _requestRender();
+    }
+  }
+
+  String _imeProxyCommittedTextOutsideComposing(TextEditingValue value) {
+    if (!value.composing.isValid || value.composing.isCollapsed) {
+      return value.text;
+    }
+    final start = value.composing.start.clamp(0, value.text.length);
+    final end = value.composing.end.clamp(start, value.text.length);
+    final prefix = value.text.substring(0, start);
+    final suffix = value.text.substring(end);
+    if (prefix.isEmpty) return suffix;
+    if (suffix.isEmpty) return prefix;
+    return prefix + suffix;
   }
 
   void _handleImeProxyChanged() {
@@ -2101,49 +2273,39 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
       return;
     }
 
-    if (!composing &&
-        _suppressedPlainProxyText != null &&
-        value.text == _suppressedPlainProxyText &&
-        !_imeProxySessionActive) {
-      _suppressedPlainProxyText = null;
-      _clearImeProxyValue();
-      return;
-    }
-
     if (composing) {
-      if (_selRow < 0 || _selCol < 0) {
-        _clearImeProxyValue();
-        return;
-      }
-      _suppressedPlainProxyText = null;
-      _imeProxyRevealTimer?.cancel();
+      _imeProxyPreferComposition = true;
       _deferOverlayWhileImeProxyActive = true;
       if (!_imeProxySessionActive) {
         _imeProxySessionActive = true;
-        _imeProxyCommittedText = '';
         _deferredEditorSessionStart = null;
-        final row = _selRow;
-        final col = _selCol;
+        final initialRow = _selRow;
+        final initialCol = _selCol;
         _queueEditCommand(() async {
-          await widget.controller.beginEdit(row, col, seedText: '');
-          _requestRender();
+          final cell = await _resolveImeProxyEditCell(initialRow, initialCol);
+          if (cell == null) {
+            if (mounted && _imeProxySessionActive) {
+              _finishImeProxySession();
+              _clearImeProxyValue();
+            }
+            return;
+          }
+          final state = await widget.controller.beginEditState(
+            cell[0],
+            cell[1],
+            reason: pb.EditStartReason.EDIT_START_IME_COMPOSITION,
+            seedText: '',
+          );
+          _rememberImeProxyEditState(state);
+          if (mounted && _imeProxySessionActive) {
+            _showImeProxyOverlayForEditState(state);
+            _requestRender();
+          }
         });
       }
       final start = value.composing.start.clamp(0, value.text.length);
       final end = value.composing.end.clamp(start, value.text.length);
-      final prefix = value.text.substring(0, start);
-      var delta = prefix;
-      if (_imeProxyCommittedText.isNotEmpty &&
-          prefix.startsWith(_imeProxyCommittedText)) {
-        delta = prefix.substring(_imeProxyCommittedText.length);
-      }
-      _imeProxyCommittedText = prefix;
-      if (delta.isNotEmpty) {
-        _queueEditCommand(() async {
-          await widget.controller.setEditPreedit(delta, commit: true);
-          _requestRender();
-        });
-      }
+      final committedText = _imeProxyCommittedTextOutsideComposing(value);
       final preedit = value.text.substring(start, end);
       final extentOffset = value.selection.isValid
           ? value.selection.extentOffset.clamp(start, end)
@@ -2152,61 +2314,119 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
         preedit,
         extentOffset - start,
       );
+      final opEpoch = ++_imeProxyEditEpoch;
       _queueEditCommand(() async {
-        await widget.controller.setEditPreedit(preedit, cursor: cursor);
+        if (opEpoch != _imeProxyEditEpoch) {
+          return;
+        }
+        final textState = await widget.controller.setEditText(
+          committedText,
+          sessionId: _imeProxySessionId,
+          stateVersion: _imeProxyStateVersion,
+        );
+        _rememberImeProxyEditState(textState);
+        if (opEpoch != _imeProxyEditEpoch) {
+          return;
+        }
+        final preeditState = await widget.controller.setEditPreedit(
+          preedit,
+          cursor: cursor,
+          sessionId: _imeProxySessionId,
+          stateVersion: _imeProxyStateVersion,
+        );
+        _rememberImeProxyEditState(preeditState);
         _requestRender();
       });
       return;
     }
 
     if (_imeProxySessionActive) {
-      final committed = value.text;
-      var delta = committed;
-      if (_imeProxyCommittedText.isNotEmpty &&
-          committed.startsWith(_imeProxyCommittedText)) {
-        delta = committed.substring(_imeProxyCommittedText.length);
-      }
-      _imeProxyCommittedText = '';
-      if (delta.isNotEmpty) {
-        _queueEditCommand(() async {
-          await widget.controller.setEditPreedit(delta, commit: true);
-          _requestRender();
-        });
-      } else {
-        _queueEditCommand(() async {
-          await widget.controller.setEditPreedit('', cursor: 0);
-          _requestRender();
-        });
-      }
-      _clearImeProxyValue();
-      _scheduleDeferredImeOverlayReveal();
+      final committedText = value.text;
+      final opEpoch = ++_imeProxyEditEpoch;
+      _queueEditCommand(() async {
+        if (opEpoch != _imeProxyEditEpoch) {
+          return;
+        }
+        final textState = await widget.controller.setEditText(
+          committedText,
+          sessionId: _imeProxySessionId,
+          stateVersion: _imeProxyStateVersion,
+        );
+        _rememberImeProxyEditState(textState);
+        if (opEpoch != _imeProxyEditEpoch) {
+          return;
+        }
+        final preeditState = await widget.controller.setEditPreedit(
+          '',
+          cursor: 0,
+          sessionId: _imeProxySessionId,
+          stateVersion: _imeProxyStateVersion,
+        );
+        _rememberImeProxyEditState(preeditState);
+        _requestRender();
+      });
       return;
     }
 
     if (value.text.isEmpty) {
       return;
     }
-    if (_selRow < 0 || _selCol < 0) {
-      _clearImeProxyValue();
-      return;
-    }
     final row = _selRow;
     final col = _selCol;
     final seedText = value.text;
-    _imeProxyRevealTimer?.cancel();
-    _deferOverlayWhileImeProxyActive = true;
-    _imeProxySessionActive = true;
-    _imeProxyCommittedText = '';
+    final reason = _editStartReasonForImeProxyText(seedText);
+    final compositionLikeText = _imeProxyPreferComposition ||
+        reason == pb.EditStartReason.EDIT_START_IME_COMPOSITION;
+    final startReason = compositionLikeText
+        ? pb.EditStartReason.EDIT_START_IME_COMPOSITION
+        : reason;
+    _deferOverlayWhileImeProxyActive = compositionLikeText;
+    _imeProxySessionActive = compositionLikeText;
     _deferredEditorSessionStart = null;
-    _clearImeProxyValue();
+    if (!compositionLikeText) {
+      _clearImeProxyValue();
+    }
     _queueEditCommand(() async {
-      await widget.controller.beginEdit(row, col, seedText: seedText);
-      _requestRender();
+      final cell = await _resolveImeProxyEditCell(row, col);
+      if (cell == null) {
+        if (mounted && _imeProxySessionActive) {
+          _finishImeProxySession();
+          _clearImeProxyValue();
+        }
+        return;
+      }
+      final state = await widget.controller.beginEditState(
+        cell[0],
+        cell[1],
+        reason: startReason,
+        seedText: seedText,
+      );
+      if (compositionLikeText) {
+        _rememberImeProxyEditState(state);
+        if (mounted && _imeProxySessionActive) {
+          _showImeProxyOverlayForEditState(state);
+          _requestRender();
+        }
+      } else {
+        if (mounted && _imeProxySessionActive) {
+          _finishImeProxySession();
+        }
+      }
     });
-    _scheduleDeferredImeOverlayReveal();
   }
 
-  void _forwardRawKeyEvent(KeyEvent event) {
+  pb.EditStartReason _editStartReasonForImeProxyText(String text) {
+    final runes = text.runes.toList(growable: false);
+    if (runes.length == 1 && runes.first >= 0x20 && runes.first <= 0x7E) {
+      return pb.EditStartReason.EDIT_START_PRINTABLE_KEY;
+    }
+    return pb.EditStartReason.EDIT_START_IME_COMPOSITION;
+  }
+
+  void _forwardRawKeyEvent(
+    KeyEvent event, {
+    bool sendPrintableKeyPress = false,
+  }) {
     final pb.KeyEvent_Type type;
     if (event is KeyDownEvent || event is KeyRepeatEvent) {
       type = pb.KeyEvent_Type.KEY_DOWN;
@@ -2216,13 +2436,48 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
       return;
     }
     final keyCode = _engineKeyCodeFor(event);
+    final modifier = _modifiers();
     _sendInput(
       pb.RenderInput()
         ..key = (pb.KeyEvent()
           ..type = type
           ..keyCode = keyCode
           ..character = event.character ?? ''
-          ..modifier = _modifiers()),
+          ..modifier = modifier),
+    );
+    if (sendPrintableKeyPress &&
+        (event is KeyDownEvent || event is KeyRepeatEvent)) {
+      final character = event.character;
+      if (character != null && character.isNotEmpty) {
+        _sendInput(
+          pb.RenderInput()
+            ..key = (pb.KeyEvent()
+              ..type = pb.KeyEvent_Type.KEY_PRESS
+              ..keyCode = keyCode
+              ..character = character
+              ..modifier = modifier),
+        );
+      }
+    }
+    _requestRender();
+  }
+
+  void _sendSyntheticKey(int keyCode, int modifier) {
+    _sendInput(
+      pb.RenderInput()
+        ..key = (pb.KeyEvent()
+          ..type = pb.KeyEvent_Type.KEY_DOWN
+          ..keyCode = keyCode
+          ..character = ''
+          ..modifier = modifier),
+    );
+    _sendInput(
+      pb.RenderInput()
+        ..key = (pb.KeyEvent()
+          ..type = pb.KeyEvent_Type.KEY_UP
+          ..keyCode = keyCode
+          ..character = ''
+          ..modifier = modifier),
     );
     _requestRender();
   }
@@ -2299,59 +2554,315 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
     return character.runes.any((rune) => rune >= 0x20 && rune != 0x7F);
   }
 
-  bool _shouldLetImeProxyHandleText(KeyEvent event) {
-    final hasTextModifiers = HardwareKeyboard.instance.isControlPressed ||
-        HardwareKeyboard.instance.isAltPressed ||
-        HardwareKeyboard.instance.isMetaPressed;
-    return _isPrintableKey(event) && !hasTextModifiers;
+  bool _isTextEntryLogicalKey(LogicalKeyboardKey key) {
+    final label = key.keyLabel;
+    if (label.runes.length != 1) {
+      return false;
+    }
+    final rune = label.runes.first;
+    return rune >= 0x20 && rune != 0x7F;
   }
 
-  bool _handleHardwareKeyEvent(KeyEvent event) {
-    if (!mounted) {
+  bool _hasTextModifierPressed() =>
+      HardwareKeyboard.instance.isControlPressed ||
+      HardwareKeyboard.instance.isAltPressed ||
+      HardwareKeyboard.instance.isMetaPressed;
+
+  bool _shouldLetImeProxyHandleText(KeyEvent event) {
+    if (_hasTextModifierPressed()) {
       return false;
     }
-    if (_editing ||
-        _imeProxySessionActive ||
-        _deferOverlayWhileImeProxyActive ||
-        !_imeProxyFocusNode.hasFocus) {
-      return false;
+    return _isPrintableKey(event) ||
+        (event is KeyDownEvent && _isTextEntryLogicalKey(event.logicalKey)) ||
+        (event is KeyRepeatEvent && _isTextEntryLogicalKey(event.logicalKey));
+  }
+
+  bool _isImeModeLogicalKey(LogicalKeyboardKey key) {
+    return key == LogicalKeyboardKey.hangulMode ||
+        key == LogicalKeyboardKey.kanaMode ||
+        key == LogicalKeyboardKey.hiraganaKatakana ||
+        key == LogicalKeyboardKey.katakana ||
+        key == LogicalKeyboardKey.eisu ||
+        key == LogicalKeyboardKey.convert ||
+        key == LogicalKeyboardKey.nonConvert ||
+        key == LogicalKeyboardKey.lang1 ||
+        key == LogicalKeyboardKey.lang2 ||
+        key == LogicalKeyboardKey.lang3 ||
+        key == LogicalKeyboardKey.lang4 ||
+        key == LogicalKeyboardKey.lang5;
+  }
+
+  bool _isImeModePhysicalKey(PhysicalKeyboardKey key) {
+    return key == PhysicalKeyboardKey.kanaMode ||
+        key == PhysicalKeyboardKey.convert ||
+        key == PhysicalKeyboardKey.nonConvert ||
+        key == PhysicalKeyboardKey.lang1 ||
+        key == PhysicalKeyboardKey.lang2 ||
+        key == PhysicalKeyboardKey.lang3 ||
+        key == PhysicalKeyboardKey.lang4 ||
+        key == PhysicalKeyboardKey.lang5;
+  }
+
+  bool _isPureModifierKey(LogicalKeyboardKey key) {
+    return key == LogicalKeyboardKey.shiftLeft ||
+        key == LogicalKeyboardKey.shiftRight ||
+        key == LogicalKeyboardKey.controlLeft ||
+        key == LogicalKeyboardKey.controlRight ||
+        key == LogicalKeyboardKey.altLeft ||
+        key == LogicalKeyboardKey.altRight ||
+        key == LogicalKeyboardKey.metaLeft ||
+        key == LogicalKeyboardKey.metaRight;
+  }
+
+  bool _shouldLetPlatformImeHandleKey(KeyEvent event) {
+    final key = event.logicalKey;
+    if (_isImeModeLogicalKey(key) || _isImeModePhysicalKey(event.physicalKey)) {
+      return true;
     }
-    if (!_isRawKeyEventForEngine(event)) {
-      return false;
+    if (_isPureModifierKey(key)) {
+      return true;
     }
-    if (_shouldLetImeProxyHandleText(event)) {
-      return false;
+    if (key == LogicalKeyboardKey.space) {
+      final keyboard = HardwareKeyboard.instance;
+      final hasSwitchModifier = keyboard.isControlPressed ||
+          keyboard.isShiftPressed ||
+          keyboard.isMetaPressed;
+      return hasSwitchModifier && !keyboard.isAltPressed;
     }
-    _forwardRawKeyEvent(event);
     return false;
   }
 
-  KeyEventResult _onGridFocusKeyEvent(FocusNode node, KeyEvent event) {
-    if (_editing ||
-        _imeProxySessionActive ||
-        _deferOverlayWhileImeProxyActive) {
+  void _rememberPlatformImeModeHint(KeyEvent event) {
+    if (event is KeyDownEvent || event is KeyRepeatEvent) {
+      _imeProxyPreferComposition = true;
+    }
+  }
+
+  bool _imeProxyHasComposingText() {
+    final composing = _imeProxyController.value.composing;
+    return composing.isValid && !composing.isCollapsed;
+  }
+
+  int? _editCommitNavigationKeyCodeFor(KeyEvent event) {
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.tab) {
+      return 9;
+    }
+    if (key == LogicalKeyboardKey.enter ||
+        key == LogicalKeyboardKey.numpadEnter) {
+      return HardwareKeyboard.instance.isShiftPressed ? 38 : 40;
+    }
+    if (key == LogicalKeyboardKey.arrowLeft ||
+        key == LogicalKeyboardKey.arrowUp ||
+        key == LogicalKeyboardKey.arrowRight ||
+        key == LogicalKeyboardKey.arrowDown) {
+      return _engineKeyCodeFor(event);
+    }
+    return null;
+  }
+
+  int _editCommitNavigationModifierFor(KeyEvent event) {
+    if (event.logicalKey == LogicalKeyboardKey.tab) {
+      return _modifiers();
+    }
+    return 0;
+  }
+
+  void _clearImeProxySessionRef() {
+    _imeProxySessionId = Int64.ZERO;
+    _imeProxyStateVersion = Int64.ZERO;
+  }
+
+  void _closeImeProxyForKeyCommit({bool clearSessionRef = true}) {
+    if (!mounted) {
+      return;
+    }
+    _imeProxyEditEpoch += 1;
+    setState(() {
+      _deferredEditorSessionStart = null;
+      _deferOverlayWhileImeProxyActive = false;
+      _imeProxySessionActive = false;
+      _imeProxyOverlayVisible = false;
+      _imeProxyOverlayRect = Rect.zero;
+    });
+    if (clearSessionRef) {
+      _clearImeProxySessionRef();
+    }
+    _clearImeProxyValue();
+    _requestIdleInputFocus();
+  }
+
+  void _commitImeProxyEditAndSendKey(int navigateKeyCode, int modifier) {
+    final text = _imeProxyController.value.text;
+    _closeImeProxyForKeyCommit(clearSessionRef: false);
+    _queueEditCommand(() async {
+      final state = await widget.controller.commitEditState(
+        text,
+        sessionId: _imeProxySessionId,
+        stateVersion: _imeProxyStateVersion,
+      );
+      if (state.active && state.hasSession()) {
+        // Commit was blocked (e.g. validation rejected the value). The engine
+        // keeps the edit alive; reattach the IME proxy to the still-active
+        // session so the user can correct the value instead of being stuck
+        // with no visible editor.
+        _rememberImeProxyEditState(state);
+        _reattachImeProxyToActiveEdit(state);
+        return;
+      }
+      _clearImeProxySessionRef();
+      if (_applyPostCommitEditState(state)) {
+        return;
+      }
+      if (!mounted) {
+        return;
+      }
+      _sendSyntheticKey(navigateKeyCode, modifier);
+      _requestIdleInputFocus();
+    });
+  }
+
+  void _reattachImeProxyToActiveEdit(pb.EditState state) {
+    if (!mounted) {
+      return;
+    }
+    final session = state.session;
+    final seedText =
+        session.hasValue() ? _editorValueText(session.value) : '';
+    final isCanvas = session.hasEditor() &&
+        session.editor.presentation == pb.EditorPresentation.EDITOR_CANVAS;
+    setState(() {
+      _imeProxySessionActive = true;
+      _deferOverlayWhileImeProxyActive = isCanvas;
+      _imeProxyPreferComposition = false;
+    });
+    _suppressImeProxyChanges = true;
+    _imeProxyController.value = TextEditingValue(
+      text: seedText,
+      selection: TextSelection.collapsed(offset: seedText.length),
+    );
+    _suppressImeProxyChanges = false;
+    if (!isCanvas) {
+      _showImeProxyOverlayForEditState(state);
+    }
+    _imeProxyFocusNode.requestFocus();
+    _requestRender();
+  }
+
+  void _cancelImeProxyEdit() {
+    _closeImeProxyForKeyCommit(clearSessionRef: false);
+    _queueEditCommand(() async {
+      await widget.controller.cancelEdit(
+        sessionId: _imeProxySessionId,
+        stateVersion: _imeProxyStateVersion,
+      );
+      _clearImeProxySessionRef();
+      if (!mounted) {
+        return;
+      }
+      _requestIdleInputFocus();
+      _requestRender();
+    });
+  }
+
+  KeyEventResult? _handleImeProxyEditControlKeyEvent(KeyEvent event) {
+    if (!_imeProxySessionActive &&
+        !_deferOverlayWhileImeProxyActive &&
+        !_imeProxyHasComposingText()) {
+      return null;
+    }
+    final key = event.logicalKey;
+    final isControlKey = key == LogicalKeyboardKey.escape ||
+        _editCommitNavigationKeyCodeFor(event) != null;
+    if (!isControlKey) {
+      return null;
+    }
+    if (event is KeyUpEvent) {
+      return KeyEventResult.handled;
+    }
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return null;
+    }
+    if (key == LogicalKeyboardKey.escape) {
+      _cancelImeProxyEdit();
+      return KeyEventResult.handled;
+    }
+    final navigateKeyCode = _editCommitNavigationKeyCodeFor(event);
+    if (navigateKeyCode == null) {
+      return null;
+    }
+    _commitImeProxyEditAndSendKey(
+      navigateKeyCode,
+      _editCommitNavigationModifierFor(event),
+    );
+    return KeyEventResult.handled;
+  }
+
+  KeyEventResult _onImeProxyFocusKeyEvent(FocusNode node, KeyEvent event) {
+    if (!mounted) {
+      return KeyEventResult.ignored;
+    }
+    if (_editing || !_imeProxyFocusNode.hasFocus) {
       return KeyEventResult.ignored;
     }
     if (!_isRawKeyEventForEngine(event)) {
       return KeyEventResult.ignored;
     }
+    if (_shouldLetPlatformImeHandleKey(event)) {
+      _rememberPlatformImeModeHint(event);
+      return KeyEventResult.ignored;
+    }
+    final imeControlResult = _handleImeProxyEditControlKeyEvent(event);
+    if (imeControlResult != null) {
+      return imeControlResult;
+    }
+    if (_imeProxyHasComposingText()) {
+      return KeyEventResult.ignored;
+    }
+    if (_shouldLetImeProxyHandleText(event)) {
+      return KeyEventResult.ignored;
+    }
+    _forwardRawKeyEvent(event);
+    return KeyEventResult.handled;
+  }
+
+  KeyEventResult _onGridFocusKeyEvent(FocusNode node, KeyEvent event) {
+    if (_editing) {
+      return KeyEventResult.ignored;
+    }
+    if (!_isRawKeyEventForEngine(event)) {
+      return KeyEventResult.ignored;
+    }
+    if (!_imeProxyFocusNode.hasFocus && _shouldLetPlatformImeHandleKey(event)) {
+      _rememberPlatformImeModeHint(event);
+      _requestIdleInputFocus();
+      return KeyEventResult.ignored;
+    }
     if (_imeProxyFocusNode.hasFocus) {
-      // While the hidden IME proxy owns focus, non-text keys are forwarded by
-      // the global HardwareKeyboard bridge. Only plain text still comes
-      // through this Focus handler so the proxy can suppress its duplicate
-      // TextField insertion after the engine sees the key.
+      if (_shouldLetPlatformImeHandleKey(event)) {
+        _rememberPlatformImeModeHint(event);
+        return KeyEventResult.ignored;
+      }
+      final imeControlResult = _handleImeProxyEditControlKeyEvent(event);
+      if (imeControlResult != null) {
+        return imeControlResult;
+      }
+      if (_imeProxyHasComposingText()) {
+        return KeyEventResult.ignored;
+      }
+      // While the hidden IME proxy owns focus, its FocusNode handles non-text
+      // keys first. Plain text is owned by the proxy's TextField so desktop
+      // IMEs can deliver composing/preedit text through TextEditingValue.
       if (_shouldLetImeProxyHandleText(event)) {
-        if (event is KeyDownEvent) {
-          _suppressedPlainProxyText = event.character;
-          _forwardRawKeyEvent(event);
-        }
+        return KeyEventResult.ignored;
       }
       return KeyEventResult.ignored;
     }
-    if (_shouldLetImeProxyHandleText(event) && event is KeyDownEvent) {
-      _suppressedPlainProxyText = event.character;
-    }
-    _forwardRawKeyEvent(event);
+    final directPrintable = _shouldLetImeProxyHandleText(event);
+    _forwardRawKeyEvent(
+      event,
+      sendPrintableKeyPress: directPrintable,
+    );
     return KeyEventResult.ignored;
   }
 
@@ -2429,12 +2940,12 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
   Future<void> _commitEditAndMove(int rowDelta) async {
     final currentRow = _editRow >= 0 ? _editRow : _selRow;
     final currentCol = _editCol >= 0 ? _editCol : _selCol;
-    await widget.controller.commitEdit(
+    final state = await widget.controller.commitEditState(
       _editTextController.text,
       sessionId: _editSessionId,
       stateVersion: _editStateVersion,
     );
-    if (await _refreshActiveEditAfterCommit()) {
+    if (_applyPostCommitEditState(state)) {
       return;
     }
 
@@ -2465,12 +2976,12 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
   }
 
   Future<void> _commitActiveEdit() async {
-    await widget.controller.commitEdit(
+    final state = await widget.controller.commitEditState(
       _editTextController.text,
       sessionId: _editSessionId,
       stateVersion: _editStateVersion,
     );
-    if (await _refreshActiveEditAfterCommit()) {
+    if (_applyPostCommitEditState(state)) {
       return;
     }
     if (!mounted) {
@@ -2486,6 +2997,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
 
   bool get _hasActiveEditSession =>
       _editing ||
+      _editSessionId != Int64.ZERO ||
       _deferredEditorSessionStart != null ||
       _imeProxySessionActive ||
       _deferOverlayWhileImeProxyActive;
@@ -2493,20 +3005,24 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
   Future<void> _cancelActiveEditInternal({
     bool requestIdleInputFocus = true,
   }) async {
-    _imeProxyRevealTimer?.cancel();
-    _imeProxyRevealTimer = null;
     final pending = _deferredEditorSessionStart;
     final sessionId = pending?.hasSession() == true
         ? pending!.session.sessionId
-        : _editSessionId;
+        : (_imeProxySessionId != Int64.ZERO
+            ? _imeProxySessionId
+            : _editSessionId);
     final stateVersion = pending?.hasSession() == true
         ? pending!.session.stateVersion
-        : _editStateVersion;
+        : (_imeProxyStateVersion != Int64.ZERO
+            ? _imeProxyStateVersion
+            : _editStateVersion);
     _deferredEditorSessionStart = null;
     _deferOverlayWhileImeProxyActive = false;
     _imeProxySessionActive = false;
-    _imeProxyCommittedText = '';
-    _suppressedPlainProxyText = null;
+    _imeProxyOverlayVisible = false;
+    _imeProxyOverlayRect = Rect.zero;
+    _imeProxyEditEpoch += 1;
+    _clearImeProxySessionRef();
     _clearImeProxyValue();
     await widget.controller.cancelEdit(
       sessionId: sessionId,
@@ -2596,12 +3112,11 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
     final col = _editCol;
     final textValue = _editTextController.text;
     try {
-      await widget.controller.commitEdit(
+      final state = await widget.controller.commitEditState(
         textValue,
         sessionId: _editSessionId,
         stateVersion: _editStateVersion,
       );
-      final state = await widget.controller.getEditState();
       if (!mounted) {
         return;
       }
@@ -3324,34 +3839,6 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      Positioned(
-                        left: -1000,
-                        top: -1000,
-                        width: 1,
-                        height: 1,
-                        child: IgnorePointer(
-                          ignoring: true,
-                          child: Opacity(
-                            opacity: 0,
-                            child: TextField(
-                              controller: _imeProxyController,
-                              focusNode: _imeProxyFocusNode,
-                              decoration:
-                                  const InputDecoration.collapsed(hintText: ''),
-                              style: const TextStyle(
-                                fontSize: 1,
-                                color: Colors.transparent,
-                              ),
-                              cursorColor: Colors.transparent,
-                              autocorrect: false,
-                              enableSuggestions: false,
-                              enableInteractiveSelection: false,
-                              maxLines: 1,
-                            ),
-                          ),
-                        ),
-                      ),
-
                       // Current Flutter path: decode native RGBA frames and
                       // show via RawImage.  A platform texture path can be
                       // added separately.
@@ -3386,6 +3873,66 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
                                   child: _buildSurface(constraints),
                                 )
                               : _buildSurface(constraints),
+                        ),
+                      ),
+
+                      Positioned(
+                        left: _imeProxyOverlayVisible
+                            ? _imeProxyOverlayRect.left
+                            : -1000,
+                        top: _imeProxyOverlayVisible
+                            ? _imeProxyOverlayRect.top
+                            : -1000,
+                        width: _imeProxyOverlayVisible
+                            ? math.max(1, _imeProxyOverlayRect.width)
+                            : 1,
+                        height: _imeProxyOverlayVisible
+                            ? math.max(1, _imeProxyOverlayRect.height)
+                            : 1,
+                        child: IgnorePointer(
+                          ignoring: true,
+                          child: Opacity(
+                            opacity: _imeProxyOverlayVisible ? 1 : 0,
+                            child: DecoratedBox(
+                              decoration: _imeProxyOverlayVisible
+                                  ? BoxDecoration(
+                                      color: Colors.white,
+                                      border: Border.all(
+                                        color: Colors.black,
+                                      ),
+                                    )
+                                  : const BoxDecoration(),
+                              child: Padding(
+                                padding: _imeProxyOverlayVisible
+                                    ? const EdgeInsets.symmetric(
+                                        horizontal: 2,
+                                      )
+                                    : EdgeInsets.zero,
+                                child: TextField(
+                                  controller: _imeProxyController,
+                                  focusNode: _imeProxyFocusNode,
+                                  autofocus: !_isMobilePlatform,
+                                  decoration: const InputDecoration.collapsed(
+                                    hintText: '',
+                                  ),
+                                  style: TextStyle(
+                                    fontSize: _imeProxyOverlayVisible ? 13 : 1,
+                                    color: _imeProxyOverlayVisible
+                                        ? Colors.black
+                                        : Colors.transparent,
+                                  ),
+                                  cursorColor: _imeProxyOverlayVisible
+                                      ? Colors.black
+                                      : Colors.transparent,
+                                  autocorrect: false,
+                                  enableSuggestions: false,
+                                  enableInteractiveSelection: false,
+                                  maxLines: 1,
+                                  onTapOutside: (_) {},
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
                       ),
 

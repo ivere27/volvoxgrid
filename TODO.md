@@ -56,6 +56,12 @@
 ## Web/JS
 
 - [ ] **Worker-runtime option for event API** (`web/js/src/volvoxgrid.ts`, `web/js/src/proto-host.ts`, `web/js/src/event-pump.ts`): Add `new VolvoxGrid({ runtime: "worker" })` that hosts the wasm + event pump in a dedicated Worker and posts decoded events to the main thread. Same `grid.on/off/once` surface; useful for true async (sub-ms latency, no main-thread blocking) and high-frequency event streams (>1kHz).
+- [ ] **React adapter package (`@volvoxgrid/react`)** (`web/js/`): New separate package that wraps the existing `VolvoxGrid` core class as a React component + hook. Shape:
+  - `<VolvoxGrid rowCount colCount data columns onBeforeEdit onSelectionChanged ... />` — declarative props for every `GridEvent` variant (auto-generate the `onXxx` prop table from `proto/volvoxgrid.proto:3072` `GridEvent` oneof so it stays in sync).
+  - `useVolvoxGrid({...})` hook returning `{ grid, loaded }` for advanced/imperative use.
+  - `ref={gridRef}` exposes `{ grid, loadData(...), updateCells(...) }` handle; `gridRef.current.grid.ffi` keeps the pb-level escape hatch.
+  - Wraps the core class — no reimplementation. Floor: React 18, ESM build only.
+  - Vue / Svelte / Solid wrappers as separate packages later, same generated event-prop pattern.
 
 ## Adapter/AG Grid
 
@@ -82,6 +88,7 @@
 
 - [ ] **Workaround for Adreno driver Vulkan probing** (`engine/src/gpu_render.rs`): Current Vulkan backend on some Android devices (Adreno) fails during internal capability probing for formats 56/59 (4x4 allocation failure), even when unused. Fixed by pinning to OpenGL ES by default. Investigate if `InstanceFlags` or newer `wgpu` versions allow safe Vulkan initialization. **Needs more testing for stability across different devices.**
 - [ ] **Silenced Exceptions (Kotlin)** (`android/volvoxgrid-android/src/.../VolvoxGridView.kt`, `MainActivity.kt`): Empty `catch (_: Exception) {}` blocks hide critical runtime failures. Fix: Log the exception or handle it appropriately.
+- [ ] **Kotlin idiomatic async layer (`-ktx` artifact)** (`android/volvoxgrid-android/`): Current `VolvoxGridController` is a sync interface (Java-shaped, hides Coroutines). Add a separate `volvoxgrid-android-ktx` artifact that exposes `suspend fun` overloads + `Flow<pb.GridEvent>` event stream over the existing `EventStream` RPC. Additive — keep the sync interface for Java consumers. minSdk 21 + Kotlin 1.6+. Compose wrapper (`@Composable fun VolvoxGrid(state)`) as a third artifact later. **Deferred — schedule after current Android work settles.**
 
 ## Build / Portability
 

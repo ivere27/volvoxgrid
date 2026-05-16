@@ -44,22 +44,8 @@ object HierarchyJsonDemo {
     private const val PERMISSIONS_COLUMN_INDEX = 4
     const val ACTION_COLUMN_INDEX = 5
 
-    private const val NAME_COLUMN_WIDTH = 260
-    private const val TYPE_COLUMN_WIDTH = 80
-    private const val SIZE_COLUMN_WIDTH = 80
-    private const val MODIFIED_COLUMN_WIDTH = 120
-    private const val PERMISSIONS_COLUMN_WIDTH = 100
-    private const val ACTION_COLUMN_WIDTH = 92
     private const val SHORT_DATE_FORMAT = "short date"
 
-    private val widths = intArrayOf(
-        NAME_COLUMN_WIDTH,
-        TYPE_COLUMN_WIDTH,
-        SIZE_COLUMN_WIDTH,
-        MODIFIED_COLUMN_WIDTH,
-        PERMISSIONS_COLUMN_WIDTH,
-        ACTION_COLUMN_WIDTH
-    )
     private val captions = arrayOf("Name", "Type", "Size", "Modified", "Permissions", "Action")
     private val keys = arrayOf("Name", "Type", "Size", "Modified", "Permissions", "Action")
     private const val TREE_COLOR = 0xFFA8A29E.toInt()
@@ -77,7 +63,7 @@ object HierarchyJsonDemo {
         val levels = hierarchyLevels(rows)
         val types = List(rows.length()) { row -> rows.getJSONObject(row).optString("Type") }
         val sanitizedJson = visibleRowsJson(rows).toString()
-        controller.setColCount(widths.size)
+        controller.setColCount(keys.size)
         controller.defineColumns(hierarchyColumnRequest())
         val result = controller.loadData(
             sanitizedJson.toByteArray(Charsets.UTF_8),
@@ -110,16 +96,16 @@ object HierarchyJsonDemo {
                 controller.setCellStyleRange(row, NAME_COLUMN_INDEX, row, NAME_COLUMN_INDEX, folderStyle)
             }
         }
+        controller.autoSize(0, keys.lastIndex)
     }
 
     private fun hierarchyColumnRequest(): DefineColumnsRequest {
         val builder = DefineColumnsRequest.newBuilder()
-        for (col in widths.indices) {
+        for (col in keys.indices) {
             val def = ColumnDef.newBuilder()
                 .setIndex(col)
                 .setCaption(captions[col])
                 .setKey(keys[col])
-                .setWidth(widths[col])
             when (col) {
                 SIZE_COLUMN_INDEX -> def.align = Align.ALIGN_RIGHT_CENTER
                 MODIFIED_COLUMN_INDEX -> {

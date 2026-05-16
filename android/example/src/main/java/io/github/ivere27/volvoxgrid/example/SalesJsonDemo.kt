@@ -1,17 +1,24 @@
 package io.github.ivere27.volvoxgrid.example
 
 import io.github.ivere27.volvoxgrid.Align
+import io.github.ivere27.volvoxgrid.CellSpanMode
 import io.github.ivere27.volvoxgrid.ColumnDataType
 import io.github.ivere27.volvoxgrid.ColumnDef
 import io.github.ivere27.volvoxgrid.DefineColumnsRequest
 import io.github.ivere27.volvoxgrid.DropdownItemLayout
 import io.github.ivere27.volvoxgrid.GridConfig
 import io.github.ivere27.volvoxgrid.GroupTotalPosition
+import io.github.ivere27.volvoxgrid.IndicatorsConfig
+import io.github.ivere27.volvoxgrid.LayoutConfig
 import io.github.ivere27.volvoxgrid.ListEditorParams
 import io.github.ivere27.volvoxgrid.ListItem
 import io.github.ivere27.volvoxgrid.LoadDataOptions
 import io.github.ivere27.volvoxgrid.LoadDataStatus
 import io.github.ivere27.volvoxgrid.OutlineConfig
+import io.github.ivere27.volvoxgrid.RowIndicatorConfig
+import io.github.ivere27.volvoxgrid.RowIndicatorSlot
+import io.github.ivere27.volvoxgrid.RowIndicatorSlotKind
+import io.github.ivere27.volvoxgrid.SpanConfig
 import io.github.ivere27.volvoxgrid.ThemePreset
 import io.github.ivere27.volvoxgrid.TreeIndicatorStyle
 import io.github.ivere27.volvoxgrid.VolvoxGridController
@@ -25,13 +32,14 @@ object SalesJsonDemo {
     private const val MARGIN_COL = 6
     private const val FLAG_COL = 7
     private const val STATUS_COL = 8
+    private const val FROZEN_COLS = REGION_COL + 1
+    private const val ROW_INDICATOR_WIDTH = 40
     private const val GRAND_TOTAL_BACK_COLOR = 0xFFEEF2FFL
     private const val QUARTER_SUBTOTAL_BACK_COLOR = 0xFFF5F3FFL
     private const val REGION_SUBTOTAL_BACK_COLOR = 0xFFF8F7FFL
     private const val MARGIN_PROGRESS_COLOR = 0xFF818CF8.toInt()
 
     private val salesStatusItems = listOf("Active", "Pending", "Shipped", "Returned", "Cancelled")
-    private val widths = intArrayOf(40, 80, 100, 120, 90, 90, 70, 56, 80, 140)
     private val captions = arrayOf(
         "Q", "Region", "Category", "Product", "Sales", "Cost", "Margin%", "Flag", "Status", "Notes"
     )
@@ -41,9 +49,13 @@ object SalesJsonDemo {
 
     fun load(controller: VolvoxGridController) {
         controller.themePreset = ThemePreset.THEME_LIGHT
-        controller.setShowRowIndicator(true)
         controller.configure(
             GridConfig.newBuilder()
+                .setLayout(
+                    LayoutConfig.newBuilder()
+                        .setFrozenCols(FROZEN_COLS)
+                        .build()
+                )
                 .setOutline(
                     OutlineConfig.newBuilder()
                         .setTreeIndicator(TreeIndicatorStyle.TREE_INDICATOR_NONE)
@@ -51,10 +63,33 @@ object SalesJsonDemo {
                         .setMultiTotals(true)
                         .build()
                 )
+                .setSpan(
+                    SpanConfig.newBuilder()
+                        .setCellSpan(CellSpanMode.CELL_SPAN_ADJACENT)
+                        .build()
+                )
+                .setIndicators(
+                    IndicatorsConfig.newBuilder()
+                        .setRowStart(
+                            RowIndicatorConfig.newBuilder()
+                                .setVisible(true)
+                                .setWidth(ROW_INDICATOR_WIDTH)
+                                .setAutoSize(true)
+                                .addSlots(
+                                    RowIndicatorSlot.newBuilder()
+                                        .setKind(RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NUMBERS)
+                                        .setWidth(ROW_INDICATOR_WIDTH)
+                                        .setVisible(true)
+                                        .build()
+                                )
+                                .build()
+                        )
+                        .build()
+                )
                 .build()
         )
 
-        controller.setColCount(widths.size)
+        controller.setColCount(keys.size)
         controller.defineColumns(salesColumnRequest())
         val result = controller.loadData(
             controller.getDemoData("sales"),
@@ -64,8 +99,6 @@ object SalesJsonDemo {
         )
         check(result.status != LoadDataStatus.LOAD_FAILED) { "LoadData failed for embedded sales demo" }
         controller.setColDropdown(STATUS_COL, salesStatusDropdown())
-        controller.setSpanCol(QUARTER_COL, true)
-        controller.setSpanCol(REGION_COL, true)
 
         controller.addSubtotals(
             amountCols = listOf(SALES_COL, COST_COL),
@@ -77,17 +110,16 @@ object SalesJsonDemo {
             mergeColFrom = QUARTER_COL,
             mergeColTo = REGION_COL,
         )
-        controller.autoSize(SALES_COL, COST_COL)
+        controller.autoSize(0, keys.lastIndex)
     }
 
     private fun salesColumnRequest(): DefineColumnsRequest {
         val builder = DefineColumnsRequest.newBuilder()
-        for (col in widths.indices) {
+        for (col in keys.indices) {
             val def = ColumnDef.newBuilder()
                 .setIndex(col)
                 .setCaption(captions[col])
                 .setKey(keys[col])
-                .setWidth(widths[col])
             when (col) {
                 QUARTER_COL -> def.align = Align.ALIGN_CENTER_CENTER
                 SALES_COL, COST_COL -> {

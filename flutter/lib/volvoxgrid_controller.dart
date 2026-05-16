@@ -1230,8 +1230,8 @@ class VolvoxGridController extends ChangeNotifier {
           (EditConfig()..activation = (EditActivation()..trigger = mode)));
   }
 
-  /// Begin editing the given cell.
-  Future<void> beginEdit(
+  /// Begin editing the given cell and return the resulting edit state.
+  Future<EditState> beginEditState(
     int row,
     int col, {
     EditStartReason reason = EditStartReason.EDIT_START_PROGRAMMATIC,
@@ -1249,10 +1249,30 @@ class VolvoxGridController extends ChangeNotifier {
     if (caretPosition != null) {
       start.caretPosition = caretPosition;
     }
-    await VolvoxGridService.Edit(EditCommand()
+    final state = await VolvoxGridService.Edit(EditCommand()
       ..gridId = _gridId
       ..start = start);
     notifyListeners();
+    return state;
+  }
+
+  /// Begin editing the given cell.
+  Future<void> beginEdit(
+    int row,
+    int col, {
+    EditStartReason reason = EditStartReason.EDIT_START_PROGRAMMATIC,
+    String? seedText,
+    int? caretPosition,
+    bool? formulaMode,
+  }) async {
+    await beginEditState(
+      row,
+      col,
+      reason: reason,
+      seedText: seedText,
+      caretPosition: caretPosition,
+      formulaMode: formulaMode,
+    );
   }
 
   Future<EditorSessionCommand> _prepareSessionCommand(
@@ -1282,20 +1302,21 @@ class VolvoxGridController extends ChangeNotifier {
     return command;
   }
 
-  /// Commit or cancel the current cell edit.
-  Future<void> commitEdit(
+  /// Commit or cancel the current cell edit and return the resulting state.
+  Future<EditState> commitEditState(
     String text, {
     bool cancel = false,
     Int64? sessionId,
     Int64? stateVersion,
   }) async {
+    final EditState state;
     if (cancel) {
       final session = await _prepareSessionCommand(
         EditorSessionCommand()..cancel = EditCancel(),
         sessionId: sessionId,
         stateVersion: stateVersion,
       );
-      await VolvoxGridService.Edit(EditCommand()
+      state = await VolvoxGridService.Edit(EditCommand()
         ..gridId = _gridId
         ..session = session);
     } else {
@@ -1305,11 +1326,27 @@ class VolvoxGridController extends ChangeNotifier {
         sessionId: sessionId,
         stateVersion: stateVersion,
       );
-      await VolvoxGridService.Edit(EditCommand()
+      state = await VolvoxGridService.Edit(EditCommand()
         ..gridId = _gridId
         ..session = session);
     }
     notifyListeners();
+    return state;
+  }
+
+  /// Commit or cancel the current cell edit.
+  Future<void> commitEdit(
+    String text, {
+    bool cancel = false,
+    Int64? sessionId,
+    Int64? stateVersion,
+  }) async {
+    await commitEditState(
+      text,
+      cancel: cancel,
+      sessionId: sessionId,
+      stateVersion: stateVersion,
+    );
   }
 
   /// Cancel the current cell edit.
@@ -1333,6 +1370,26 @@ class VolvoxGridController extends ChangeNotifier {
     return VolvoxGridService.Edit(EditCommand()
       ..gridId = _gridId
       ..getState = EditGetState());
+  }
+
+  /// Replace the active edit session text.
+  Future<EditState> setEditText(
+    String text, {
+    Int64? sessionId,
+    Int64? stateVersion,
+  }) async {
+    final session = await _prepareSessionCommand(
+      EditorSessionCommand()
+        ..valueChanged =
+            (EditorValueChanged()..value = _editorValueFromText(text)),
+      sessionId: sessionId,
+      stateVersion: stateVersion,
+    );
+    final state = await VolvoxGridService.Edit(EditCommand()
+      ..gridId = _gridId
+      ..session = session);
+    notifyListeners();
+    return state;
   }
 
   /// Update IME preedit/composition state for the active edit session.
