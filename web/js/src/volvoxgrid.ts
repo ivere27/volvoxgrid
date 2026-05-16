@@ -1615,9 +1615,9 @@ function pbEncodeLoadTreeRequest(
   return new Uint8Array(out);
 }
 
-function pbEncodeDefaultEngineTextEditConfig(): Uint8Array {
+function pbEncodeDefaultHostTextEditConfig(): Uint8Array {
   const editing: number[] = [];
-  editing.push(...pbEncodeMessageField(EditConfigFields.default_editor, pbEncodeEngineTextEditor()));
+  editing.push(...pbEncodeMessageField(EditConfigFields.default_editor, pbEncodeHostTextEditor()));
   const gridConfig: number[] = [];
   gridConfig.push(...pbEncodeMessageField(GridConfigFields.editing, new Uint8Array(editing)));
   return new Uint8Array(gridConfig);
@@ -3959,12 +3959,11 @@ export class VolvoxGrid {
   private editComposing: boolean = false;
   private editComposingBaseText: string = "";
 
-  // IME proxy: hidden textarea that stays focused so OS IME toggle and
-  // composition work on the canvas.  Non-IME keys are re-dispatched to
-  // the canvas so existing keyboard handlers fire normally.
+  // IME proxy: the real text editor textarea also stays focused while idle
+  // so OS IME toggle and composition can start before editing is active.
+  // Non-IME keys are re-dispatched to the canvas so existing keyboard
+  // handlers fire normally.
   private imeProxy: HTMLTextAreaElement | null = null;
-  private imeComposing: boolean = false;
-  private imeTransitionTimer: number = 0;
   private skipNextCanvasImeRedirect: boolean = false;
   private lastPointerWasTouch: boolean = false;
 
@@ -4340,7 +4339,7 @@ export class VolvoxGrid {
     } else {
       this.wasm.set_host_combo_overlay(this.gridId, HOST_DROPDOWN_OVERLAY_DISABLED);
     } // engine renders the combo dropdown instead of a host overlay
-    this.applyProtoConfig(pbEncodeDefaultEngineTextEditConfig(), "DefaultEngineTextEditor");
+    this.applyProtoConfig(pbEncodeDefaultHostTextEditConfig(), "DefaultHostTextEditor");
     this.applyProtoConfig(pbEncodeDefaultPresentationConfig(), "default presentation config");
     this.cellSpanModeValue = CellSpanMode.CELL_SPAN_ADJACENT;
     this.scrollBarsValue = ScrollBarsMode.SCROLLBAR_BOTH;
@@ -8656,10 +8655,30 @@ export class VolvoxGrid {
     if (this.skipNextCanvasImeRedirect) {
       return;
     }
-    if (this.imeProxy && !this.imeComposing && !this.editComposing) {
+    if (this.imeProxy && !this.editComposing) {
       this.imeProxy.focus();
     }
   };
+
+  private dispatchKeyboardEventToCanvas(
+    source: KeyboardEvent,
+    type: "keydown" | "keyup",
+  ): void {
+    const clone = new KeyboardEvent(type, {
+      key: source.key,
+      code: source.code,
+      keyCode: source.keyCode,
+      which: source.which,
+      shiftKey: source.shiftKey,
+      ctrlKey: source.ctrlKey,
+      altKey: source.altKey,
+      metaKey: source.metaKey,
+      repeat: source.repeat,
+      bubbles: true,
+      cancelable: true,
+    });
+    this.canvas.dispatchEvent(clone);
+  }
 
   private focusCanvas(skipImeRedirect: boolean): void {
     if (skipImeRedirect) {
@@ -9135,9 +9154,13 @@ export class VolvoxGrid {
     this.editTextArea.spellcheck = false;
     this.editTextArea.wrap = "soft";
     this.editTextArea.setAttribute("data-volvoxgrid-editor", "textarea");
+    this.editTextArea.setAttribute("data-volvoxgrid-ime-proxy", "1");
+    this.editTextArea.tabIndex = -1;
     commonStyle(this.editTextArea);
     this.editTextArea.style.resize = "none";
     this.editTextArea.style.overflow = "hidden";
+    this.imeProxy = this.editTextArea;
+    this.parkIdleImeProxy();
 
     this.editSelect.setAttribute("data-volvoxgrid-editor", "combo");
     commonStyle(this.editSelect);
@@ -9161,6 +9184,21 @@ export class VolvoxGrid {
 
       addEditorListener("compositionstart", () => {
         this.editComposing = true;
+        if (editor === this.editTextArea && !this.wasm.is_editing(this.gridId)) {
+          if (typeof this.wasm.begin_edit_at_selection === "function") {
+            this.wasm.begin_edit_at_selection(this.gridId);
+            this.flushCancelableEventDecisions();
+          }
+          if (this.wasm.is_editing(this.gridId)) {
+            this.wasm.set_edit_text(this.gridId, "");
+            if (typeof this.wasm.set_edit_selection === "function") {
+              this.wasm.set_edit_selection(this.gridId, 0, 0);
+            }
+            this.onCompositionEditStart?.();
+            this.syncHostEditor();
+            this.dirty = true;
+          }
+        }
         // Snapshot committed text at composition start
         if (typeof this.wasm.set_edit_preedit === "function") {
           this.editComposingBaseText = this.wasm.is_editing(this.gridId) ? String(this.wasm.get_edit_text(this.gridId) || "") : "";
@@ -9168,7 +9206,8 @@ export class VolvoxGrid {
       });
       addEditorListener("compositionupdate", (e: CompositionEvent) => {
         if (typeof this.wasm.set_edit_preedit === "function" && this.wasm.is_editing(this.gridId)) {
-          this.wasm.set_edit_preedit(this.gridId, e.data || "", (e.data || "").length);
+          const text = e.data || "";
+          this.wasm.set_edit_preedit(this.gridId, text, Array.from(text).length);
           this.dirty = true;
         }
       });
@@ -9195,6 +9234,14 @@ export class VolvoxGrid {
       });
       addEditorListener("keydown", (e: KeyboardEvent) => {
         const editor = e.currentTarget as HTMLInputElement | HTMLTextAreaElement;
+        if (editor === this.editTextArea
+          && this.activeEditor === "none"
+          && !e.isComposing
+          && e.keyCode !== 229) {
+          e.preventDefault();
+          this.dispatchKeyboardEventToCanvas(e, "keydown");
+          return;
+        }
         const isTextAreaEditor = editor === this.editTextArea;
         if (e.key === "Escape") {
           e.preventDefault();
@@ -9226,6 +9273,16 @@ export class VolvoxGrid {
           }
           e.preventDefault();
           this.commitEditFromHost(e.shiftKey ? 38 : 40, 0);
+        }
+      });
+      addEditorListener("keyup", (e: KeyboardEvent) => {
+        const editor = e.currentTarget as HTMLInputElement | HTMLTextAreaElement;
+        if (editor === this.editTextArea
+          && this.activeEditor === "none"
+          && !e.isComposing
+          && e.keyCode !== 229) {
+          e.preventDefault();
+          this.dispatchKeyboardEventToCanvas(e, "keyup");
         }
       });
       addEditorListener("blur", () => {
@@ -9269,136 +9326,8 @@ export class VolvoxGrid {
       }
     });
 
-    // ── IME proxy ──────────────────────────────────────────────
-    // A hidden <textarea> that stays focused instead of the canvas so the
-    // OS IME toggle key works and CJK composition fires properly.
-    const imeProxy = document.createElement("textarea");
-    imeProxy.setAttribute("data-volvoxgrid-ime-proxy", "1");
-    imeProxy.setAttribute("autocomplete", "off");
-    imeProxy.setAttribute("autocapitalize", "off");
-    imeProxy.setAttribute("spellcheck", "false");
-    imeProxy.setAttribute("aria-hidden", "true");
-    imeProxy.tabIndex = -1;
-    Object.assign(imeProxy.style, {
-      position: "fixed",
-      left: "0px",
-      top: "0px",
-      width: "1px",
-      height: "1px",
-      opacity: "0",
-      border: "none",
-      outline: "none",
-      padding: "0",
-      margin: "0",
-      overflow: "hidden",
-      resize: "none",
-      zIndex: "-1",
-      pointerEvents: "none",
-      caretColor: "transparent",
-    });
-    document.body.appendChild(imeProxy);
-    this.imeProxy = imeProxy;
-
     // When the canvas receives focus, redirect to imeProxy so OS IME works.
     this.canvas.addEventListener("focus", this.onCanvasFocusForIme);
-
-    // Re-dispatch non-composition keydown events to the canvas.
-    imeProxy.addEventListener("keydown", (e: KeyboardEvent) => {
-      if (e.isComposing || e.keyCode === 229) return;
-      e.preventDefault();
-      const clone = new KeyboardEvent("keydown", {
-        key: e.key,
-        code: e.code,
-        keyCode: e.keyCode,
-        which: e.which,
-        shiftKey: e.shiftKey,
-        ctrlKey: e.ctrlKey,
-        altKey: e.altKey,
-        metaKey: e.metaKey,
-        repeat: e.repeat,
-        bubbles: true,
-        cancelable: true,
-      });
-      this.canvas.dispatchEvent(clone);
-    });
-
-    // Re-dispatch keyup the same way.
-    imeProxy.addEventListener("keyup", (e: KeyboardEvent) => {
-      if (e.isComposing) return;
-      e.preventDefault();
-      const clone = new KeyboardEvent("keyup", {
-        key: e.key,
-        code: e.code,
-        keyCode: e.keyCode,
-        which: e.which,
-        shiftKey: e.shiftKey,
-        ctrlKey: e.ctrlKey,
-        altKey: e.altKey,
-        metaKey: e.metaKey,
-        bubbles: true,
-        cancelable: true,
-      });
-      this.canvas.dispatchEvent(clone);
-    });
-
-    // Composition start: begin editing in the engine.
-    imeProxy.addEventListener("compositionstart", () => {
-      this.imeComposing = true;
-      // Cancel any pending transition to editInput — the IME is starting a
-      // new composition cycle (e.g. Korean syllable boundary).
-      if (this.imeTransitionTimer) {
-        clearTimeout(this.imeTransitionTimer);
-        this.imeTransitionTimer = 0;
-      }
-      if (!this.wasm.is_editing(this.gridId)) {
-        if (typeof this.wasm.begin_edit_at_selection === "function") {
-          this.wasm.begin_edit_at_selection(this.gridId);
-          // Flush pending decision events (e.g. BeforeEdit) so the edit
-          // session actually starts before the composition events fire.
-          this.flushCancelableEventDecisions();
-        }
-        if (this.wasm.is_editing(this.gridId)) {
-          this.wasm.set_edit_text(this.gridId, "");
-          if (typeof this.wasm.set_edit_selection === "function") {
-            this.wasm.set_edit_selection(this.gridId, 0, 0);
-          }
-          this.onCompositionEditStart?.();
-          this.dirty = true;
-        }
-      }
-      this.editComposingBaseText = this.wasm.is_editing(this.gridId)
-        ? String(this.wasm.get_edit_text(this.gridId) || "")
-        : "";
-    });
-
-    // Composition update: forward preedit to the engine.
-    imeProxy.addEventListener("compositionupdate", (e: CompositionEvent) => {
-      if (typeof this.wasm.set_edit_preedit === "function" && this.wasm.is_editing(this.gridId)) {
-        this.wasm.set_edit_preedit(this.gridId, e.data || "", (e.data || "").length);
-        this.dirty = true;
-      }
-    });
-
-    // Composition end: commit preedit, then transition to editInput.
-    // The transition is deferred so that if the IME immediately starts a new
-    // composition cycle (Korean syllable boundary), focus stays on imeProxy.
-    imeProxy.addEventListener("compositionend", (e: CompositionEvent) => {
-      this.imeComposing = false;
-      if (typeof this.wasm.commit_edit_preedit === "function" && this.wasm.is_editing(this.gridId)) {
-        this.wasm.commit_edit_preedit(this.gridId, e.data || "");
-        this.dirty = true;
-      }
-      imeProxy.value = "";
-      this.suppressEditorSelect = true;
-      if (this.imeTransitionTimer) clearTimeout(this.imeTransitionTimer);
-      this.imeTransitionTimer = window.setTimeout(() => {
-        this.imeTransitionTimer = 0;
-        if (!this.imeComposing) {
-          this.syncHostEditor();
-          requestAnimationFrame(() => { this.suppressEditorSelect = false; });
-        }
-      }, 60);
-    });
   }
 
   private removeHostEditors(): void {
@@ -9408,21 +9337,38 @@ export class VolvoxGrid {
     this.editSelect.remove();
     this.editDataList.remove();
     this.canvas.removeEventListener("focus", this.onCanvasFocusForIme);
-    if (this.imeTransitionTimer) {
-      clearTimeout(this.imeTransitionTimer);
-      this.imeTransitionTimer = 0;
-    }
-    if (this.imeProxy) {
-      this.imeProxy.remove();
-      this.imeProxy = null;
-    }
+    this.imeProxy = null;
+  }
+
+  private parkIdleImeProxy(): void {
+    this.editTextArea.style.position = "fixed";
+    this.editTextArea.style.display = "block";
+    this.editTextArea.style.left = "0px";
+    this.editTextArea.style.top = "0px";
+    this.editTextArea.style.width = "1px";
+    this.editTextArea.style.height = "1px";
+    this.editTextArea.style.opacity = "0";
+    this.editTextArea.style.zIndex = "-1";
+    this.editTextArea.style.border = "none";
+    this.editTextArea.style.outline = "none";
+    this.editTextArea.style.padding = "0";
+    this.editTextArea.style.margin = "0";
+    this.editTextArea.style.pointerEvents = "none";
+    this.editTextArea.style.caretColor = "transparent";
+    this.editTextArea.style.background = "#ffffff";
+    this.editTextArea.value = "";
+  }
+
+  private restoreTextAreaEditorStyle(): void {
+    this.editTextArea.style.opacity = "1";
+    this.editTextArea.style.zIndex = "2147483000";
+    this.editTextArea.style.border = "1px solid #2a6fd4";
+    this.editTextArea.style.pointerEvents = "auto";
+    this.editTextArea.style.caretColor = "auto";
   }
 
   private syncHostEditor(): void {
     if (this.destroyed) return;
-    // During imeProxy composition the engine renders preedit on the canvas.
-    // Don't show/focus editInput until compositionend.
-    if (this.imeComposing) return;
     const editing = this.wasm.is_editing(this.gridId) !== 0;
     if (!editing) {
       this.activeEditorSessionPresentation = null;
@@ -9554,6 +9500,9 @@ export class VolvoxGrid {
     }
 
     this.positionEditor(editor, left, top, width, height);
+    if (kind === "text") {
+      this.restoreTextAreaEditorStyle();
+    }
     editor.style.display = "block";
     if (kind === "text") {
       this.editInput.style.display = "none";
@@ -9649,15 +9598,14 @@ export class VolvoxGrid {
   private hideHostEditors(focusCanvas: boolean): void {
     if (this.activeEditor === "none"
       && this.editInput.style.display === "none"
-      && this.editTextArea.style.display === "none"
       && this.editSelect.style.display === "none") {
+      this.parkIdleImeProxy();
       if (focusCanvas) this.focusImeProxyOrCanvas();
       return;
     }
 
     this.suppressBlurCommit = true;
     this.editInput.style.display = "none";
-    this.editTextArea.style.display = "none";
     this.editSelect.style.display = "none";
     if (document.activeElement === this.editInput) {
       this.editInput.blur();
@@ -9671,6 +9619,7 @@ export class VolvoxGrid {
     this.suppressBlurCommit = false;
     this.activeEditor = "none";
     this.editorCellKey = "";
+    this.parkIdleImeProxy();
     if (focusCanvas) {
       this.focusImeProxyOrCanvas();
     }

@@ -8,7 +8,9 @@ import io.github.ivere27.volvoxgrid.DefineColumnsRequest
 import io.github.ivere27.volvoxgrid.DropdownItemLayout
 import io.github.ivere27.volvoxgrid.GridConfig
 import io.github.ivere27.volvoxgrid.GroupTotalPosition
+import io.github.ivere27.volvoxgrid.HeaderFeatures
 import io.github.ivere27.volvoxgrid.IndicatorsConfig
+import io.github.ivere27.volvoxgrid.InteractionConfig
 import io.github.ivere27.volvoxgrid.LayoutConfig
 import io.github.ivere27.volvoxgrid.ListEditorParams
 import io.github.ivere27.volvoxgrid.ListItem
@@ -68,6 +70,15 @@ object SalesJsonDemo {
                         .setCellSpan(CellSpanMode.CELL_SPAN_ADJACENT)
                         .build()
                 )
+                .setInteraction(
+                    InteractionConfig.newBuilder()
+                        .setHeaderFeatures(
+                            HeaderFeatures.newBuilder()
+                                .setSort(true)
+                                .build()
+                        )
+                        .build()
+                )
                 .setIndicators(
                     IndicatorsConfig.newBuilder()
                         .setRowStart(
@@ -76,7 +87,7 @@ object SalesJsonDemo {
                                 .setWidth(ROW_INDICATOR_WIDTH)
                                 .addSlots(
                                     RowIndicatorSlot.newBuilder()
-                                        .setKind(RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NUMBERS_DATA_ONLY)
+                                        .setKind(RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NUMBERS)
                                         .build()
                                 )
                                 .build()

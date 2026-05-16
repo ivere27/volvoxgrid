@@ -61,8 +61,6 @@ Future<void> loadSalesJsonDemo(VolvoxGridController controller) async {
     throw StateError('LoadData failed for embedded sales demo');
   }
   await controller.setColDropdown(_statusCol, _salesStatusDropdown());
-  await controller.setSpanCol(_quarterCol, true);
-  await controller.setSpanCol(_regionCol, true);
 
   await controller.addSubtotals(
     [_salesCol, _costCol],

@@ -5,7 +5,6 @@ import {
   GroupTotalPosition,
   LoadDataStatus,
   RowIndicatorSlotKind,
-  SelectionMode,
   ThemePreset,
   TreeIndicatorStyle,
   dropdownFromLabels,
@@ -82,11 +81,7 @@ export function setupSalesJsonDemo(grid: VolvoxGrid, id: number): void {
     grid.setRowIndicatorStartConfig({
       visible: true,
       width: DEFAULT_ROW_INDICATOR_WIDTH,
-      slots: [{
-        kind: RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NUMBERS,
-        width: DEFAULT_ROW_INDICATOR_WIDTH,
-        visible: true,
-      }],
+      slots: [{ kind: RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NUMBERS }],
     });
     grid.setColumnIndicatorTopConfig({
       visible: true,
@@ -97,7 +92,6 @@ export function setupSalesJsonDemo(grid: VolvoxGrid, id: number): void {
         ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH,
       ],
     });
-    grid.selectionMode = SelectionMode.SELECTION_FREE;
     grid.setColDropdown(SalesColumn.Status, dropdownFromLabels(SALES_STATUS_ITEMS));
     grid.addSubtotals(
       [SalesColumn.Sales, SalesColumn.Cost],

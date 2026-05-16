@@ -39,8 +39,6 @@ namespace VolvoxGrid.DotNet.Sample
             DefineSalesColumns(grid);
             grid.LoadData(grid.GetDemoData("sales"));
             grid.SetColDropdown((int)SalesColumn.Status, DropdownFromLabels(StatusItems));
-            grid.SetSpanCol((int)SalesColumn.Quarter, true);
-            grid.SetSpanCol((int)SalesColumn.Region, true);
 
             grid.AddSubtotals(
                 new[] { (int)SalesColumn.Sales, (int)SalesColumn.Cost },
@@ -58,8 +56,8 @@ namespace VolvoxGrid.DotNet.Sample
 
         private static void DefineSalesColumns(VolvoxGridControl grid)
         {
-            grid.DefineColumns((int)SalesColumn.Quarter,  alignment: VolvoxGridAlign.CenterCenter, key: "Quarter",  caption: "Q",        width: 40);
-            grid.DefineColumns((int)SalesColumn.Region,   key: "Region",                          caption: "Region");
+            grid.DefineColumns((int)SalesColumn.Quarter,  alignment: VolvoxGridAlign.CenterCenter, key: "Quarter",  caption: "Q",        width: 40, span: true);
+            grid.DefineColumns((int)SalesColumn.Region,   key: "Region",                          caption: "Region", span: true);
             grid.DefineColumns((int)SalesColumn.Category, key: "Category",                        caption: "Category");
             grid.DefineColumns((int)SalesColumn.Product,  key: "Product",                         caption: "Product");
             grid.DefineColumns((int)SalesColumn.Sales,    format: CurrencyFormat, key: "Sales",   caption: "Sales");
