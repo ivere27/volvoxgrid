@@ -4,7 +4,7 @@ The Go package provides a client API for the VolvoxGrid native library and a reu
 
 ## Prerequisites
 
-- Go 1.22+
+- Go 1.24+
 - The native `volvoxgrid` shared library (built from the repo root with `make build` or `make release`)
 
 ## Package Structure

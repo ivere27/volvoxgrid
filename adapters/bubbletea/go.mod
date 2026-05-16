@@ -1,6 +1,6 @@
 module github.com/ivere27/volvoxgrid/adapters/bubbletea
 
-go 1.24.0
+go 1.24
 
 require (
 	github.com/charmbracelet/bubbletea v1.3.10

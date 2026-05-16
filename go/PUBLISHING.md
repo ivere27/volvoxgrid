@@ -26,7 +26,6 @@ Because the module sits in the `/go/` subdirectory, version tags must be
 
 ```
 go/v0.8.9
-go/v0.8.9
 ```
 
 Plain `vX.Y.Z` tags (used by the rest of the project) are not picked up by the

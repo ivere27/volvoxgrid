@@ -69,7 +69,7 @@ Examples:
 - **Rust**: Latest stable version (via `rustup`).
 - **Flutter**: Latest stable version (if working on Flutter components).
 - **Protobuf Compiler**: `protoc` (if modifying `.proto` files).
-- **Go**: 1.22+ (for `protoc-gen-synurang-ffi` codegen and the Go TUI host).
+- **Go**: 1.24+ (for `protoc-gen-synurang-ffi` codegen and the Go TUI host).
 - **Android SDK/NDK**: For Android/Flutter builds.
 - **Node.js/npm**: For web and adapter package builds.
 - **.NET SDK**: For `.NET` wrapper builds.

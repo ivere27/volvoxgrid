@@ -71,7 +71,7 @@ The web and sheet release-demo targets generate small demo directories that load
 ## Synurang dependency
 
 Synurang Java/JNI runtime sources are vendored in
-`android/volvoxgrid-android` (Synurang v0.5.0), so no external
+`android/volvoxgrid-android` (Synurang v0.5.6), so no external
 `../synurang` checkout or JAR mount is required for Docker builds.
 
 ## Optional env vars

@@ -125,7 +125,7 @@ You do not need every tool for every change, but the full repo can involve:
 
 - Rust stable via `rustup` (engine, runtime, all native builds)
 - `protoc` (proto contract changes via `make codegen`)
-- Go 1.22+ for `protoc-gen-synurang-ffi` and the Go TUI host (`go/`)
+- Go 1.24+ for `protoc-gen-synurang-ffi` and the Go TUI host (`go/`)
 - Node.js and npm for web demos, the web package, and adapter packages (`web/js/`, `web/example/`, `adapters/`)
 - Rust nightly and `wasm-pack` for WASM builds (`runtime/`)
 - Flutter SDK for Flutter work (`flutter/`)
