@@ -2296,6 +2296,12 @@ class RowIndicatorSlotKind extends $pb.ProtobufEnum {
       RowIndicatorSlotKind._(
           14, _omitEnumNames ? '' : 'ROW_INDICATOR_SLOT_CUSTOM');
 
+  /// Same as NUMBERS, but only counts/numbers real data rows.
+  /// Subtotal and outline (grand-total / group) rows render text = "".
+  static const RowIndicatorSlotKind ROW_INDICATOR_SLOT_NUMBERS_DATA_ONLY =
+      RowIndicatorSlotKind._(
+          15, _omitEnumNames ? '' : 'ROW_INDICATOR_SLOT_NUMBERS_DATA_ONLY');
+
   static const $core.List<RowIndicatorSlotKind> values = <RowIndicatorSlotKind>[
     ROW_INDICATOR_SLOT_NONE,
     ROW_INDICATOR_SLOT_NUMBERS,
@@ -2312,10 +2318,11 @@ class RowIndicatorSlotKind extends $pb.ProtobufEnum {
     ROW_INDICATOR_SLOT_ACTION,
     ROW_INDICATOR_SLOT_STATUS_ICON,
     ROW_INDICATOR_SLOT_CUSTOM,
+    ROW_INDICATOR_SLOT_NUMBERS_DATA_ONLY,
   ];
 
   static final $core.List<RowIndicatorSlotKind?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 14);
+      $pb.ProtobufEnum.$_initByValueList(values, 15);
   static RowIndicatorSlotKind? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

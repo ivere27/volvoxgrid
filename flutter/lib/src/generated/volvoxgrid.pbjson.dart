@@ -1353,6 +1353,7 @@ const RowIndicatorSlotKind$json = {
     {'1': 'ROW_INDICATOR_SLOT_ACTION', '2': 12},
     {'1': 'ROW_INDICATOR_SLOT_STATUS_ICON', '2': 13},
     {'1': 'ROW_INDICATOR_SLOT_CUSTOM', '2': 14},
+    {'1': 'ROW_INDICATOR_SLOT_NUMBERS_DATA_ONLY', '2': 15},
   ],
 };
 
@@ -1367,7 +1368,7 @@ final $typed_data.Uint8List rowIndicatorSlotKindDescriptor = $convert.base64Deco
     'V19ST1cQCRIfChtST1dfSU5ESUNBVE9SX1NMT1RfRVhQQU5ERVIQChIdChlST1dfSU5ESUNBVE'
     '9SX1NMT1RfUkVTSVpFEAsSHQoZUk9XX0lORElDQVRPUl9TTE9UX0FDVElPThAMEiIKHlJPV19J'
     'TkRJQ0FUT1JfU0xPVF9TVEFUVVNfSUNPThANEh0KGVJPV19JTkRJQ0FUT1JfU0xPVF9DVVNUT0'
-    '0QDg==');
+    '0QDhIoCiRST1dfSU5ESUNBVE9SX1NMT1RfTlVNQkVSU19EQVRBX09OTFkQDw==');
 
 @$core.Deprecated('Use colIndicatorCellModeDescriptor instead')
 const ColIndicatorCellMode$json = {

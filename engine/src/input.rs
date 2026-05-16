@@ -1681,6 +1681,17 @@ fn enrich_row_indicator_target(grid: &VolvoxGrid, row: i32, target: &mut EventTa
         if row == grid.selection.row {
             target.status_flags |= Flag::GridTargetFlagSelected as u32;
         }
+    } else if kind == Kind::RowIndicatorSlotNumbersDataOnly as i32 {
+        if let Some(n) = grid.data_row_number(row) {
+            target.text = n.to_string();
+            target.int_value = n as i64;
+        } else {
+            target.text = String::new();
+            target.int_value = -1;
+        }
+        if row == grid.selection.row {
+            target.status_flags |= Flag::GridTargetFlagSelected as u32;
+        }
     } else if kind == Kind::RowIndicatorSlotCurrent as i32 {
         if row == grid.selection.row {
             target.status_flags |= Flag::GridTargetFlagSelected as u32;

@@ -18,7 +18,8 @@ public enum VolvoxGridRowIndicatorSlotKind {
     Resize(11),
     Action(12),
     StatusIcon(13),
-    Custom(14);
+    Custom(14),
+    NumbersDataOnly(15);
 
     private final int number;
 

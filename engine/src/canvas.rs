@@ -4625,6 +4625,13 @@ fn render_row_indicator_slot_clipped<C: Canvas>(
         draw_indicator_text_clipped(canvas, grid, &label, rect, clip_rect, 1, fore_color);
         return;
     }
+    if slot_kind == pb::RowIndicatorSlotKind::RowIndicatorSlotNumbersDataOnly as i32 {
+        if let Some(n) = grid.data_row_number(row) {
+            let label = n.to_string();
+            draw_indicator_text_clipped(canvas, grid, &label, rect, clip_rect, 1, fore_color);
+        }
+        return;
+    }
     if slot_kind == pb::RowIndicatorSlotKind::RowIndicatorSlotCurrent as i32 {
         if row == grid.selection.row {
             draw_indicator_text_clipped(canvas, grid, "▶", rect, clip_rect, 1, fore_color);

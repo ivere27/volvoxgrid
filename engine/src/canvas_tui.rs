@@ -782,7 +782,9 @@ fn resolve_row_indicator_width(grid: &VolvoxGrid) -> i32 {
     let mut has_stylized = false;
     let mut has_expander = false;
     for slot in band.slots.iter().filter(|slot| slot.visible) {
-        if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers as i32 {
+        if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers as i32
+            || slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotNumbersDataOnly as i32
+        {
             has_numbers = true;
         } else if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotExpander as i32 {
             has_expander = true;
@@ -1859,6 +1861,10 @@ fn row_indicator_label_render(grid: &VolvoxGrid, row: i32) -> RowIndicatorLabelR
         let (segment, edit_start_in_segment) =
             if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers as i32 {
                 (Some((row - grid.fixed_rows + 1).max(1).to_string()), None)
+            } else if slot.kind
+                == pb::RowIndicatorSlotKind::RowIndicatorSlotNumbersDataOnly as i32
+            {
+                (grid.data_row_number(row).map(|n| n.to_string()), None)
             } else if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotCurrent as i32
                 && row == grid.selection.row
             {

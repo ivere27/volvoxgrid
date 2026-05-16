@@ -74,12 +74,9 @@ object SalesJsonDemo {
                             RowIndicatorConfig.newBuilder()
                                 .setVisible(true)
                                 .setWidth(ROW_INDICATOR_WIDTH)
-                                .setAutoSize(true)
                                 .addSlots(
                                     RowIndicatorSlot.newBuilder()
-                                        .setKind(RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NUMBERS)
-                                        .setWidth(ROW_INDICATOR_WIDTH)
-                                        .setVisible(true)
+                                        .setKind(RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NUMBERS_DATA_ONLY)
                                         .build()
                                 )
                                 .build()

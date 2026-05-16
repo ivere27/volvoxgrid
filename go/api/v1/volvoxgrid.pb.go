@@ -4299,6 +4299,9 @@ const (
 	RowIndicatorSlotKind_ROW_INDICATOR_SLOT_ACTION      RowIndicatorSlotKind = 12
 	RowIndicatorSlotKind_ROW_INDICATOR_SLOT_STATUS_ICON RowIndicatorSlotKind = 13
 	RowIndicatorSlotKind_ROW_INDICATOR_SLOT_CUSTOM      RowIndicatorSlotKind = 14
+	// Same as NUMBERS, but only counts/numbers real data rows.
+	// Subtotal and outline (grand-total / group) rows render text = "".
+	RowIndicatorSlotKind_ROW_INDICATOR_SLOT_NUMBERS_DATA_ONLY RowIndicatorSlotKind = 15
 )
 
 // Enum value maps for RowIndicatorSlotKind.
@@ -4319,23 +4322,25 @@ var (
 		12: "ROW_INDICATOR_SLOT_ACTION",
 		13: "ROW_INDICATOR_SLOT_STATUS_ICON",
 		14: "ROW_INDICATOR_SLOT_CUSTOM",
+		15: "ROW_INDICATOR_SLOT_NUMBERS_DATA_ONLY",
 	}
 	RowIndicatorSlotKind_value = map[string]int32{
-		"ROW_INDICATOR_SLOT_NONE":        0,
-		"ROW_INDICATOR_SLOT_NUMBERS":     1,
-		"ROW_INDICATOR_SLOT_CURRENT":     2,
-		"ROW_INDICATOR_SLOT_SELECTION":   3,
-		"ROW_INDICATOR_SLOT_CHECKBOX":    4,
-		"ROW_INDICATOR_SLOT_HANDLE":      5,
-		"ROW_INDICATOR_SLOT_EDITING":     6,
-		"ROW_INDICATOR_SLOT_MODIFIED":    7,
-		"ROW_INDICATOR_SLOT_ERROR":       8,
-		"ROW_INDICATOR_SLOT_NEW_ROW":     9,
-		"ROW_INDICATOR_SLOT_EXPANDER":    10,
-		"ROW_INDICATOR_SLOT_RESIZE":      11,
-		"ROW_INDICATOR_SLOT_ACTION":      12,
-		"ROW_INDICATOR_SLOT_STATUS_ICON": 13,
-		"ROW_INDICATOR_SLOT_CUSTOM":      14,
+		"ROW_INDICATOR_SLOT_NONE":              0,
+		"ROW_INDICATOR_SLOT_NUMBERS":           1,
+		"ROW_INDICATOR_SLOT_CURRENT":           2,
+		"ROW_INDICATOR_SLOT_SELECTION":         3,
+		"ROW_INDICATOR_SLOT_CHECKBOX":          4,
+		"ROW_INDICATOR_SLOT_HANDLE":            5,
+		"ROW_INDICATOR_SLOT_EDITING":           6,
+		"ROW_INDICATOR_SLOT_MODIFIED":          7,
+		"ROW_INDICATOR_SLOT_ERROR":             8,
+		"ROW_INDICATOR_SLOT_NEW_ROW":           9,
+		"ROW_INDICATOR_SLOT_EXPANDER":          10,
+		"ROW_INDICATOR_SLOT_RESIZE":            11,
+		"ROW_INDICATOR_SLOT_ACTION":            12,
+		"ROW_INDICATOR_SLOT_STATUS_ICON":       13,
+		"ROW_INDICATOR_SLOT_CUSTOM":            14,
+		"ROW_INDICATOR_SLOT_NUMBERS_DATA_ONLY": 15,
 	}
 )
 
@@ -11725,6 +11730,8 @@ func (x *IndicatorColors) GetButtonHoverBorder() uint32 {
 // the engine fills in based on slot_kind:
 //
 //	ROW_INDICATOR_SLOT_NUMBERS       text = row number, int_value = row, status_flags |= SELECTED
+//	ROW_INDICATOR_SLOT_NUMBERS_DATA_ONLY  same as NUMBERS but counts data rows only;
+//	                                      subtotal/outline rows: text = "", int_value = -1
 //	ROW_INDICATOR_SLOT_CURRENT       status_flags |= SELECTED on cursor row
 //	ROW_INDICATOR_SLOT_SELECTION     status_flags |= SELECTED when row in selection
 //	ROW_INDICATOR_SLOT_CHECKBOX      status_flags |= CHECKED when row in selection
@@ -29122,7 +29129,7 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\x1fINDICATOR_BAND_CORNER_TOP_START\x10\x05\x12!\n" +
 	"\x1dINDICATOR_BAND_CORNER_TOP_END\x10\x06\x12&\n" +
 	"\"INDICATOR_BAND_CORNER_BOTTOM_START\x10\a\x12$\n" +
-	" INDICATOR_BAND_CORNER_BOTTOM_END\x10\b*\xf6\x03\n" +
+	" INDICATOR_BAND_CORNER_BOTTOM_END\x10\b*\xa0\x04\n" +
 	"\x14RowIndicatorSlotKind\x12\x1b\n" +
 	"\x17ROW_INDICATOR_SLOT_NONE\x10\x00\x12\x1e\n" +
 	"\x1aROW_INDICATOR_SLOT_NUMBERS\x10\x01\x12\x1e\n" +
@@ -29139,7 +29146,8 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\x19ROW_INDICATOR_SLOT_RESIZE\x10\v\x12\x1d\n" +
 	"\x19ROW_INDICATOR_SLOT_ACTION\x10\f\x12\"\n" +
 	"\x1eROW_INDICATOR_SLOT_STATUS_ICON\x10\r\x12\x1d\n" +
-	"\x19ROW_INDICATOR_SLOT_CUSTOM\x10\x0e*\x8c\x04\n" +
+	"\x19ROW_INDICATOR_SLOT_CUSTOM\x10\x0e\x12(\n" +
+	"$ROW_INDICATOR_SLOT_NUMBERS_DATA_ONLY\x10\x0f*\x8c\x04\n" +
 	"\x14ColIndicatorCellMode\x12\x1b\n" +
 	"\x17COL_INDICATOR_CELL_NONE\x10\x00\x12\"\n" +
 	"\x1eCOL_INDICATOR_CELL_HEADER_TEXT\x10\x01\x12!\n" +

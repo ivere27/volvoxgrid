@@ -2596,6 +2596,41 @@ impl VolvoxGrid {
         self.row_props.get(&row)
     }
 
+    /// Returns true if `row` is a real data row — i.e. not a subtotal/grand-total
+    /// aggregate row and not a tree/outline group node with children.
+    /// Used by `RowIndicatorSlotNumbersDataOnly` to skip non-data rows in numbering.
+    pub fn is_data_row(&self, row: i32) -> bool {
+        if row < self.fixed_rows || row >= self.rows {
+            return false;
+        }
+        if self
+            .row_props
+            .get(&row)
+            .map_or(false, |rp| rp.is_subtotal)
+        {
+            return false;
+        }
+        if self.tree.row_has_children(self.fixed_rows, row) {
+            return false;
+        }
+        true
+    }
+
+    /// Returns the 1-based count of data rows from `fixed_rows` up to and
+    /// including `row`, or `None` if `row` itself is not a data row.
+    pub fn data_row_number(&self, row: i32) -> Option<i32> {
+        if !self.is_data_row(row) {
+            return None;
+        }
+        let mut count = 0i32;
+        for r in self.fixed_rows..=row {
+            if self.is_data_row(r) {
+                count += 1;
+            }
+        }
+        Some(count)
+    }
+
     /// Returns mutable row properties for a row, creating defaults as needed.
     pub fn row_props_mut(&mut self, row: i32) -> Option<&mut RowProps> {
         if row < 0 || row >= self.rows {
@@ -3584,7 +3619,10 @@ impl VolvoxGrid {
             .filter(|(_, slot)| slot.visible)
         {
             let labels: &[&str] =
-                if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers as i32 {
+                if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers as i32
+                    || slot.kind
+                        == pb::RowIndicatorSlotKind::RowIndicatorSlotNumbersDataOnly as i32
+                {
                     &[]
                 } else if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotCurrent as i32 {
                     &["▶"]
@@ -3602,6 +3640,18 @@ impl VolvoxGrid {
             let mut max_w = 0.0f32;
             if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers as i32 {
                 let label = (self.rows - self.fixed_rows).max(1).to_string();
+                let (w, _) = te.measure_text(&label, &font_name, font_size, false, false, None);
+                max_w = max_w.max(w);
+            } else if slot.kind
+                == pb::RowIndicatorSlotKind::RowIndicatorSlotNumbersDataOnly as i32
+            {
+                let mut last = 0i32;
+                for r in self.fixed_rows..self.rows {
+                    if self.is_data_row(r) {
+                        last += 1;
+                    }
+                }
+                let label = last.max(1).to_string();
                 let (w, _) = te.measure_text(&label, &font_name, font_size, false, false, None);
                 max_w = max_w.max(w);
             } else if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotExpander as i32
@@ -3659,6 +3709,7 @@ impl VolvoxGrid {
                 continue;
             }
             let min_width = if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers as i32
+                || slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotNumbersDataOnly as i32
             {
                 crate::indicator::DEFAULT_ROW_INDICATOR_WIDTH
             } else {
@@ -6315,6 +6366,22 @@ mod tests {
         assert!(grid.rows_hidden.contains(&0));
         assert!(!grid.row_props.contains_key(&1));
         assert!(!grid.rows_hidden.contains(&1));
+    }
+
+    #[test]
+    fn data_row_number_skips_subtotal_rows() {
+        // 6 rows, 1 fixed header. Row 3 and row 5 are subtotal rows.
+        // Data rows (1, 2, 4) should number 1, 2, 3. Subtotal rows return None.
+        let mut grid = VolvoxGrid::new(1, 640, 480, 6, 1, 1, 0);
+        grid.row_props.entry(3).or_default().is_subtotal = true;
+        grid.row_props.entry(5).or_default().is_subtotal = true;
+
+        assert_eq!(grid.data_row_number(0), None); // header (below fixed_rows)
+        assert_eq!(grid.data_row_number(1), Some(1));
+        assert_eq!(grid.data_row_number(2), Some(2));
+        assert_eq!(grid.data_row_number(3), None); // subtotal
+        assert_eq!(grid.data_row_number(4), Some(3));
+        assert_eq!(grid.data_row_number(5), None); // subtotal
     }
 
     #[test]

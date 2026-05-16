@@ -722,6 +722,7 @@ namespace Volvoxgrid.V1
         ROW_INDICATOR_SLOT_ACTION = 12,
         ROW_INDICATOR_SLOT_STATUS_ICON = 13,
         ROW_INDICATOR_SLOT_CUSTOM = 14,
+        ROW_INDICATOR_SLOT_NUMBERS_DATA_ONLY = 15,
     }
 
     public enum ScrollBarAppearance

@@ -8694,6 +8694,8 @@ class IndicatorColors extends $pb.GeneratedMessage {
 /// Identity (kind/band/slot_index/slot_kind) plus a value/status snapshot
 /// the engine fills in based on slot_kind:
 ///   ROW_INDICATOR_SLOT_NUMBERS       text = row number, int_value = row, status_flags |= SELECTED
+///   ROW_INDICATOR_SLOT_NUMBERS_DATA_ONLY  same as NUMBERS but counts data rows only;
+///                                         subtotal/outline rows: text = "", int_value = -1
 ///   ROW_INDICATOR_SLOT_CURRENT       status_flags |= SELECTED on cursor row
 ///   ROW_INDICATOR_SLOT_SELECTION     status_flags |= SELECTED when row in selection
 ///   ROW_INDICATOR_SLOT_CHECKBOX      status_flags |= CHECKED when row in selection
