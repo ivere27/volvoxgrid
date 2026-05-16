@@ -11,12 +11,12 @@ let package = Package(
         .binaryTarget(
             name: "VolvoxGrid",
             url: "https://github.com/ivere27/volvoxgrid/releases/download/v0.8.9/VolvoxGrid.xcframework.zip",
-            checksum: ""
+            checksum: "db5eb70038c04d577cffb53c9055c2a82668c10e695df0a764eff30d3deba754"
         ),
         .binaryTarget(
             name: "VolvoxGridLite",
             url: "https://github.com/ivere27/volvoxgrid/releases/download/v0.8.9/VolvoxGridLite.xcframework.zip",
-            checksum: ""
+            checksum: "680e7600bfb7c7411eb6593fa3842bd0293adfa7dc4ceafa12effdb156fd1130"
         ),
     ]
 )
