@@ -907,6 +907,14 @@ namespace VolvoxGrid.DotNet.Internal
 
             candidates.Add(baseDir);
             candidates.Add(cwd);
+            // NuGet copies native payloads to <baseDir>/runtimes/<rid>/native/. The
+            // built-in p/invoke resolver only finds them when the project produces
+            // a RID-specific publish — so probe the layout explicitly here.
+            foreach (var rid in CandidateRuntimeIdentifiers(windows))
+            {
+                candidates.Add(Path.Combine(baseDir, "runtimes", rid, "native"));
+                candidates.Add(Path.Combine(cwd, "runtimes", rid, "native"));
+            }
             candidates.Add(Path.Combine(cwd, "target", "debug"));
             candidates.Add(Path.Combine(cwd, "target", "release"));
             candidates.Add(Path.Combine(cwd, "target", "x86_64-pc-windows-gnu", "debug"));
@@ -966,6 +974,33 @@ namespace VolvoxGrid.DotNet.Internal
                 || platform == PlatformID.Win32S
                 || platform == PlatformID.Win32Windows
                 || platform == PlatformID.WinCE;
+        }
+
+        private static IEnumerable<string> CandidateRuntimeIdentifiers(bool windows)
+        {
+            bool is64 = IntPtr.Size == 8;
+            string arch;
+#if NET5_0_OR_GREATER
+            arch = System.Runtime.InteropServices.RuntimeInformation.OSArchitecture
+                .ToString().ToLowerInvariant();
+#else
+            arch = is64 ? "x64" : "x86";
+#endif
+            if (windows)
+            {
+                yield return is64 ? "win-x64" : "win-x86";
+                yield return "win-x64";
+                yield return "win-x86";
+                yield break;
+            }
+
+            PlatformID p = Environment.OSVersion.Platform;
+            bool osx = p == PlatformID.MacOSX
+                || (p == PlatformID.Unix && Directory.Exists("/System/Library/Frameworks"));
+            string family = osx ? "osx" : "linux";
+            yield return family + "-" + (arch == "arm64" ? "arm64" : "x64");
+            yield return family + "-x64";
+            yield return family + "-arm64";
         }
     }
 }

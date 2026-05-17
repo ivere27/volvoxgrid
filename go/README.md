@@ -1,37 +1,21 @@
 # VolvoxGrid for Go
 
-The Go package provides a client API for the VolvoxGrid native library and a reusable terminal host for building TUI applications.
+VolvoxGrid for Go is a client to the native Rust engine plus a reusable terminal host. You get TUI-grade rendering, escape parsing, and frame diffing without writing any of it yourself. Point it at the shared library, hand it some rows, and let the engine do the drawing.
+
+This README walks you through the two ways you'll typically use the library: the low-level core wrapper when you're building your own terminal host, and the Bubble Tea adapter when you want a typed, data-first model in the Elm style.
 
 ## Prerequisites
 
-- Go 1.24+
-- The native `volvoxgrid` shared library (built from the repo root with `make build` or `make release`)
+Before you start, you'll need:
 
-## Package Structure
+- Go 1.24 or newer. The core module is pinned at `go 1.24` because transitive dependencies (`golang.org/x/sys v0.36.0` and `bubbletea v1.3.10`) require it.
+- The native `volvoxgrid` shared library. Build it from the repo root with `make build` for a debug build or `make release` for an optimized one.
 
-```
-go/
-├── pkg/volvoxgrid/         # Client API for the native library
-│   ├── client.go           # Library loading and grid lifecycle
-│   └── tui/                # Reusable terminal host
-│       ├── terminal.go     # Terminal mode, input reading, capability detection
-│       └── app.go          # Run loop and render session management
-└── examples/tui/           # Interactive TUI example app
-    ├── main.go
-    ├── demo.go
-    └── terminal.go
-```
+Point your code at the resulting `libvolvoxgrid.{so,dylib,dll}` — pass the path to `volvoxgrid.NewClient(...)` directly, or read it from an environment variable. The Bubble Tea example below reads `VOLVOXGRID_LIB`; pick whichever convention fits your project.
 
-The core module is intentionally minimal — only `synurang`, `grpc`, and
-`protobuf`. Framework-specific adapters live in their own modules so the core
-wrapper does not inherit their dependencies.
+## Quick start
 
-| Module | Purpose |
-|---|---|
-| `github.com/ivere27/volvoxgrid/go` | Core wrapper (this module) |
-| `github.com/ivere27/volvoxgrid/adapters/bubbletea` | Bubble Tea typed-row adapter |
-
-## Quick Start
+The fastest way to confirm the library is wired up is to create a client, spin up a grid, and ask it to load a built-in demo. No terminal, no rendering loop — just the engine handshake:
 
 ```go
 package main
@@ -61,17 +45,28 @@ func main() {
 }
 ```
 
-For an interactive terminal app, create a `tui.Terminal`, implement `tui.Controller`, and call `tui.Run(...)`. See `go/examples/tui` for a complete sample controller and host setup.
+If that runs cleanly, your native library is loadable and the client can talk to it. From here you have two paths.
 
-## Bubble Tea adapter (typed, data-first)
+## Two paths
 
-For an Elm-architecture TUI, use the [Bubble Tea](https://github.com/charmbracelet/bubbletea)
-adapter — it ships in a sibling module so the core wrapper above stays free of
-charm dependencies:
+You can use VolvoxGrid in Go at two levels of abstraction. Pick the one that matches your project.
+
+- **Low-level core** — `github.com/ivere27/volvoxgrid/go/pkg/volvoxgrid`. Direct client/grid handles, raw cell updates, your own terminal host. Use this when you're embedding the engine into a non-standard host or building something other than a Bubble Tea app.
+- **Bubble Tea adapter** — `github.com/ivere27/volvoxgrid/adapters/bubbletea`. A typed, data-first wrapper that plugs into the Elm architecture. Use this when you already have row structs and want a grid that updates as your model changes.
+
+The adapter ships in a sibling module so the core wrapper stays free of charm dependencies. If you only need the core, you won't pull in Bubble Tea.
+
+## Bubble Tea adapter
+
+When your app already has row structs and follows the Elm architecture, the Bubble Tea adapter saves you from writing column descriptors and edit plumbing by hand. You declare typed columns, hand it a slice of rows, and the model takes care of refreshes.
+
+Install it alongside Bubble Tea itself:
 
 ```sh
 go get github.com/ivere27/volvoxgrid/adapters/bubbletea
 ```
+
+Then declare your row type, describe the columns, and start a Bubble Tea program:
 
 ```go
 package main
@@ -93,14 +88,16 @@ type Product struct {
 func main() {
     products := []Product{{"Coffee", 3.50}, {"Tea", 2.75}}
     cols := []bubbletea.Column[Product]{
-        {Field: "name",  Header: "Name",  Value: func(p Product) string { return p.Name }},
+        {Field: "name", Header: "Name", Value: func(p Product) string { return p.Name }},
         {Field: "price", Header: "Price",
-            Value: func(p Product) string { return fmt.Sprintf("%.2f", p.Price) },
+            Value:    func(p Product) string { return fmt.Sprintf("%.2f", p.Price) },
             Editable: true},
     }
 
     m, err := bubbletea.New(os.Getenv("VOLVOXGRID_LIB"), cols, products)
-    if err != nil { log.Fatal(err) }
+    if err != nil {
+        log.Fatal(err)
+    }
     defer m.Close()
 
     if _, err := tea.NewProgram(m, tea.WithAltScreen()).Run(); err != nil {
@@ -109,46 +106,49 @@ func main() {
 }
 ```
 
-See [`adapters/bubbletea/`](../adapters/bubbletea/) for the full API
-(`Column[T]`, `CellEdit[T]`, `Options[T]`, `Model[T].SetRows`, etc.).
+The adapter exposes `Column[T]`, `CellEdit[T]`, `Options[T]`, and `Model[T].SetRows` for the common cases. Reach for `SetRows` whenever your model changes upstream and you want the grid to reflect the new slice.
 
-## Running the Example
+## Module structure
 
-From the repo root:
+The Go side of VolvoxGrid is split into two modules so you only pay for what you import.
 
-```bash
-# Build the native library first
-make build
+| Module | Purpose |
+|---|---|
+| `github.com/ivere27/volvoxgrid/go` | Core wrapper. Deps: `synurang`, `grpc`, `protobuf` only. |
+| `github.com/ivere27/volvoxgrid/adapters/bubbletea` | Bubble Tea typed-row adapter. |
 
-# Interactive TUI example
-make go-tui-run
+If you're embedding the engine into your own runtime, depend only on the core. If you want the typed model, add the adapter — it depends on the core module transitively.
 
-# Non-interactive smoke check
-make go-tui-smoke
-```
+## Building a custom TUI host
 
-The example includes demo data selection (`--demo sales`, `--demo hierarchy`, `--demo stress`), search prompts, and a debug panel.
+When Bubble Tea isn't a fit (you have your own input loop, your own chrome, or you're embedding into an existing TUI), you can drive the engine directly through the `tui` subpackage. The pieces you'll touch:
 
-## Data Operations
+- `tui.Terminal` — switches the terminal into raw mode, detects size and capabilities, and exposes the input byte stream.
+- `tui.Controller` — the interface you implement to react to runtime events and inject app-level chrome (headers, footers, prompts).
+- `tui.Run(...)` — the run loop that wires terminal input into the runtime and writes the runtime's ANSI output back to stdout.
 
-The `Grid` struct provides convenience wrappers for common data operations.
+For a working sample controller, look at `go/examples/tui`. It loads a demo, handles `--demo` flags, and shows the minimum a custom host needs to do.
 
-#### LoadData
+## Data operations
 
-Parse CSV or JSON bytes into the grid:
+Once you have a `Grid`, the wrapper exposes a small set of convenience methods for the operations you'll reach for most often.
+
+### LoadData
+
+Use `LoadData` when you have CSV or JSON bytes from a file, network response, or test fixture and want the engine to parse them for you. Passing `nil` options auto-detects CSV.
 
 ```go
 import pb "github.com/ivere27/volvoxgrid/go/api/v1"
 
-// CSV
+// CSV with auto-detection
 if _, err := grid.LoadData(
     []byte("Name,Price,Qty\nWidget A,29.99,150\nWidget B,49.99,200"),
-    nil, // default options (auto-detect CSV)
+    nil,
 ); err != nil {
     return err
 }
 
-// JSON matrix
+// JSON matrix with explicit header policy
 headerPolicy := pb.HeaderPolicy_HEADER_NONE
 if _, err := grid.LoadData(
     []byte(`[["Name","Price"],["Alpha","10"]]`),
@@ -161,9 +161,9 @@ if _, err := grid.LoadData(
 }
 ```
 
-#### UpdateCells
+### UpdateCells
 
-Batch update cells:
+Use `UpdateCells` when you want to write a batch of cells in one round trip. The `atomic` flag makes the runtime apply the whole batch in a single frame, so you won't see a half-updated grid mid-render.
 
 ```go
 if err := grid.UpdateCells([]*pb.CellUpdate{
@@ -175,9 +175,9 @@ if err := grid.UpdateCells([]*pb.CellUpdate{
 }
 ```
 
-#### GetCells
+### GetCells
 
-Read cell values:
+Use `GetCells` when you need to read a range back out — for tests, exports, or pushing values into another widget. The trailing booleans (`includeStyle`, `includeChecked`, `includeTyped`) let you opt in to the heavier payload only when you need it.
 
 ```go
 resp, err := grid.GetCells(0, 0, 1, 2, false, false, false)
@@ -189,9 +189,9 @@ for _, cell := range resp.Cells {
 }
 ```
 
-#### Clear
+### Clear
 
-Clear grid content:
+Use `Clear` when you want to wipe state without destroying the grid. The scope picks what gets cleared; the region picks where.
 
 ```go
 if err := grid.Clear(
@@ -200,12 +200,13 @@ if err := grid.Clear(
 ); err != nil {
     return err
 }
-// Scopes: CLEAR_EVERYTHING, CLEAR_FORMATTING, CLEAR_DATA, CLEAR_SELECTION
 ```
 
-#### LoadTable
+Scopes you can pass: `CLEAR_EVERYTHING`, `CLEAR_FORMATTING`, `CLEAR_DATA`, `CLEAR_SELECTION`. Region `CLEAR_SCROLLABLE` is the most common — it leaves frozen headers and footers alone.
 
-`LoadTable` bulk-loads a row-major flat array of typed `CellValue` entries:
+### LoadTable
+
+Use `LoadTable` when you have a typed flat array and want to skip parsing entirely. It's the fastest path for bulk loads from in-memory data because each value is already typed.
 
 ```go
 if _, err := grid.LoadTable(
@@ -225,16 +226,52 @@ if _, err := grid.LoadTable(
 
 `CellValue` supports `Text`, `Number`, `Flag` (bool), `Raw` (bytes), and `Timestamp` (epoch-ms). For the full schema, see [`proto/volvoxgrid.proto`](../proto/volvoxgrid.proto).
 
-## How It Works
+## Running the example
 
-The Go TUI host follows the thin-host architecture described in [TUI.md](../TUI.md):
+The repo ships an interactive TUI example under `go/examples/tui`. To try it:
 
-1. The host switches the terminal into raw mode and detects capabilities
-2. Raw stdin bytes are forwarded to the runtime via `TerminalInputBytes`
-3. The runtime parses escape sequences, drives the grid engine, and encodes ANSI output
-4. The host writes the returned bytes to stdout
+```bash
+# Build the native library first
+make build
 
-The Go host is responsible for terminal setup, resize detection, and application chrome (headers, footers, prompts). The runtime owns escape parsing, grid rendering, and frame diffing.
+# Interactive TUI example
+make go-tui-run
+
+# Non-interactive smoke check (useful in CI)
+make go-tui-smoke
+```
+
+The example accepts demo selection flags so you can flip between datasets without recompiling:
+
+```bash
+make go-tui-run ARGS="--demo sales"
+make go-tui-run ARGS="--demo hierarchy"
+make go-tui-run ARGS="--demo stress"
+```
+
+`sales` is a small tabular demo, `hierarchy` exercises tree rendering, and `stress` loads enough rows to make frame diffing earn its keep.
+
+## How it works
+
+VolvoxGrid follows a thin-host architecture (the full write-up is in [TUI.md](../TUI.md)). The split keeps the host code in Go small and the rendering predictable across platforms.
+
+1. The host switches the terminal into raw mode and detects capabilities.
+2. Raw stdin bytes are forwarded to the runtime via `TerminalInputBytes`.
+3. The runtime parses escape sequences, drives the grid engine, and encodes ANSI output.
+4. The host writes the returned bytes to stdout.
+
+That gives you a clean ownership boundary:
+
+- **Host owns** terminal setup, resize detection, and app chrome (headers, footers, prompts).
+- **Runtime owns** escape parsing, grid rendering, and frame diffing.
+
+So whether you're using Bubble Tea or driving `tui.Run` yourself, the runtime's job is the same and the host stays small.
+
+## What's next
+
+- [../TUI.md](../TUI.md) — the full architecture write-up for the terminal host, including how escape parsing and frame diffing fit together.
+- [../ARCHITECTURE.md](../ARCHITECTURE.md) — the cross-platform engine architecture.
+- [./PUBLISHING.md](./PUBLISHING.md) — how to cut releases for the core and adapter modules.
 
 ## License
 

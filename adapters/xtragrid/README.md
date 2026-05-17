@@ -1,84 +1,108 @@
-# XtraGrid Adapter
+# XtraGrid compare adapter
 
-## Purpose
+This adapter lets you run one shared C# scenario set against both `VolvoxGrid.DotNet` and the real `DevExpress.XtraGrid`, then writes a side-by-side HTML report with pixel diffs. Reach for it when you're checking that a VolvoxGrid change still matches XtraGrid behavior, or when you're sizing up VolvoxGrid as a XtraGrid replacement.
 
-`adapters/xtragrid` runs the shared C# case set in `test/cases/` against:
+The adapter exists because XtraGrid is a long-standing, behavior-rich commercial control. Comparing screen-for-screen against a reference like that is the fastest way to find behavior gaps in VolvoxGrid and prioritize them — much faster than guessing from spec.
 
-- `VolvoxGrid.DotNet` from `dotnet/`
-- `DevExpress.XtraGrid` from `legacy/devexpress/...`
+## Quick start
 
-The adapter produces screenshots, optional diffs, and an HTML compare report.
-
-## Entry Points
+From the repo root, with the DevExpress assemblies available under `legacy/devexpress/*/net462/`:
 
 ```bash
 adapters/xtragrid/run_compare_ui.sh
+```
+
+A UX-flavored variant — focused on interaction sequences rather than static renders — lives next to it:
+
+```bash
 adapters/xtragrid/run_compare_ux.sh
 ```
 
+If you only want to render VolvoxGrid (no DevExpress reference), pass `--only-vv`. See [Common commands](#common-commands) below.
+
+## How a comparison case works
+
+Each `.csx` file in `test/cases/` is a shared C# script body that compiles to:
+
+```csharp
+public static void Run(GridControl grid, GridView view) { ... }
+```
+
+These aren't real DevExpress types at compile time. The runner provides a small compatibility shim that maps the shared API onto whichever engine you're targeting:
+
+- the real `DevExpress.XtraGrid` when `--engine ref`
+- `VolvoxGrid.DotNet` when `--engine vv`
+
+The goal is one set of `.csx` files driving both engines. The shim handles the small translations — for example, mapping `OptionsView.ShowIndicator` onto VolvoxGrid's `row_indicator_start` band — so row-indicator scenarios compare directly instead of being normalized away.
+
 ## Inputs
 
-- Cases: `adapters/xtragrid/test/cases/*.csx`
-- Runner: `adapters/xtragrid/test/runner/`
-- Volvox build: `dotnet/build_dotnet.sh`
-- DevExpress reference DLL:
-  - explicit: `--ref-grid-assembly /path/to/DevExpress.XtraGrid.vXX.Y.dll`
-  - autodetect: `legacy/devexpress/*/net462/DevExpress.XtraGrid*.dll`
+When you're wiring up a new case or debugging an existing run, here's where the pieces live:
 
-The DevExpress directory must contain neighboring `DevExpress*.dll` dependencies beside `DevExpress.XtraGrid.v*.dll`.
+- **Cases:** `adapters/xtragrid/test/cases/*.csx`
+- **Runner:** `adapters/xtragrid/test/runner/`
+- **VolvoxGrid build:** produced by `dotnet/build_dotnet.sh`
+- **DevExpress reference DLL:** either explicit (`--ref-grid-assembly /path/to/DevExpress.XtraGrid.vXX.Y.dll`) or auto-detected from `legacy/devexpress/*/net462/DevExpress.XtraGrid*.dll`
 
-## Execution Model
+The DevExpress directory must contain the neighboring `DevExpress*.dll` dependencies beside `DevExpress.XtraGrid.v*.dll` — that's how XtraGrid expects its dependencies to load.
 
-- `run_compare_ui.sh` builds `VolvoxGrid.DotNet` with `DOTNET_TFM=net40`
-- the script runner is built as `net462`
-- each `.csx` case is compiled into `public static void Run(GridControl grid, GridView view)`
-- the runner maps that shared API onto either the DevExpress control or the Volvox control at runtime
-- the compat layer maps `OptionsView.ShowIndicator` onto VolvoxGrid's `row_indicator_start` band so row-indicator scenarios can be compared directly instead of normalized away
-- each case is executed in its own runner process to avoid Wine/.NET cross-case lifetime crashes
-- the script reuses a prepared Wine prefix and prefers a prefix with a native `.NET Framework 4.6.2` install when one is present
-- the default native-prefix candidates are:
-  - `target/xtragrid/wineprefix`
-  - `target/xtragrid/wineprefix_dotnet462`
-  - `target/xtragrid/wineprefix_dotnet462_wine11`
+## Execution model
+
+`run_compare_ui.sh` builds `VolvoxGrid.DotNet` with `DOTNET_TFM=net40` and builds the script runner as `net462`. The two-framework split keeps each side targeting what it was designed for.
+
+Each case is executed in its own runner process. That isolation matters: Wine and `.NET` together don't cleanly share lifetime across cases, and running everything in one process tends to crash partway through a run. One process per case sidesteps it.
+
+The script reuses a prepared Wine prefix and prefers one with a native Microsoft `.NET Framework 4.6.2` install when it can find one. The default native-prefix candidates, checked in order, are:
+
+- `target/xtragrid/wineprefix`
+- `target/xtragrid/wineprefix_dotnet462`
+- `target/xtragrid/wineprefix_dotnet462_wine11`
+
+## Runtime requirement
+
+For public DevExpress `net462` packages running under Linux/Wine, a Wine Mono prefix isn't enough. You need:
+
+- Wine with a native Microsoft `.NET Framework 4.6.2` installed in the prefix
+- DevExpress assemblies from `legacy/devexpress/.../net462/`
+
+The compare script automatically skips its Wine Mono bootstrap when it detects that native framework install, so once your prefix is set up correctly the run flows through without extra flags.
 
 ## Output
 
-All artifacts are written under `target/xtragrid/compare/`:
+Everything lands under `target/xtragrid/compare/`. After a run you'll find:
 
-- `test_*_vv.png`
-- `test_*_ref.png`
-- `test_*_diff.png`
-- `results_vv.tsv`
-- `results_ref.tsv`
-- `compare_output.log`
-- `report.html`
+- `test_*_vv.png` — VolvoxGrid render
+- `test_*_ref.png` — XtraGrid render
+- `test_*_diff.png` — pixel diff
+- `results_vv.tsv`, `results_ref.tsv` — tabular results per case
+- `compare_output.log` — raw log
+- `report.html` — open this for the side-by-side view
 
-## Common Commands
+The HTML report pairs each render with its diff so you can scan a long run quickly.
 
-Volvox only:
+## Common commands
+
+VolvoxGrid only (skip the DevExpress reference, useful when iterating on VolvoxGrid):
 
 ```bash
 adapters/xtragrid/run_compare_ui.sh --only-vv
 ```
 
-Single case:
+A single case by number:
 
 ```bash
 adapters/xtragrid/run_compare_ui.sh --test 1
 ```
 
-Specific DevExpress DLL:
+A specific DevExpress DLL:
 
 ```bash
 adapters/xtragrid/run_compare_ui.sh \
   --ref-grid-assembly legacy/devexpress/25.2.5/net462/DevExpress.XtraGrid.v25.2.dll
 ```
 
-## Runtime Requirement
+## What's next
 
-For public DevExpress `net462` packages under Linux/Wine, a Wine Mono prefix is not sufficient. The working setup is:
-
-- Wine with a native Microsoft `.NET Framework 4.6.2` install in the prefix
-- DevExpress assemblies from `legacy/devexpress/.../net462/`
-
-The compare script automatically skips Wine Mono bootstrap when it detects that native framework install.
+- [../../dotnet/README.md](../../dotnet/README.md) — the VolvoxGrid `.NET` package this adapter is built on
+- [../../ARCHITECTURE.md](../../ARCHITECTURE.md) — how the engine, runtime, and wrappers fit together
+- [./test/cases/README.md](./test/cases/README.md) — case-file conventions and the shared API surface

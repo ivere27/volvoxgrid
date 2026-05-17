@@ -1,89 +1,57 @@
-# VolvoxGrid for Java desktop (Swing)
+# VolvoxGrid for Java desktop (Swing) — in-source samples
 
-Java/Swing bindings for the VolvoxGrid native engine. Renders into a
-`JComponent` through CPU buffers or native-surface GPU rendering via JNA-loaded shared libraries
-(`libvolvoxgrid.{so,dylib}` / `volvoxgrid.dll`).
+Java/Swing bindings for the VolvoxGrid native engine. This page is the short tour next to the runnable demos in this directory. For the full guide — events, sorting, subtotals, lite variant, library resolution order, and everything else — head over to [../README.md](../README.md).
 
-## Install
+The binding renders into a `JComponent` through CPU buffers (or a native GPU surface in the full build) via JNA-loaded shared libraries (`libvolvoxgrid.{so,dylib}` / `volvoxgrid.dll`).
 
-The desktop binding is published as a fat JAR with platform-specific
-native libraries embedded under `native/<platform>/`:
-
-```xml
-<dependency>
-    <groupId>io.github.ivere27</groupId>
-    <artifactId>volvoxgrid-desktop</artifactId>
-    <version>0.8.9</version>
-</dependency>
-```
-
-Gradle (Kotlin):
-
-```kotlin
-implementation("io.github.ivere27:volvoxgrid-desktop:0.8.9")
-// or: implementation("io.github.ivere27:volvoxgrid-desktop-lite:0.8.9")
-```
-
-The JAR resolves the right native library at runtime — no manual
-`LD_LIBRARY_PATH` / `PATH` setup required.
-
-**Requirements:** Java 8+, Swing.
-
-### Lite Variant
-
-`volvoxgrid-desktop-lite` uses a native runtime built without the built-in Rust text engine, GPU renderer, regex search, or rayon parallelism. The Swing wrapper registers a Java2D text renderer automatically when the loaded native library has no built-in text engine.
-
-The engine/runtime still owns the external text mask cache. Java2D only measures and rasterizes on cache misses, with a small Java-side `Font` object cache. See [../../TEXT_RENDERING.md](../../TEXT_RENDERING.md).
-
-Local sample selection:
-
-```bash
-make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.8.9
-make java-desktop-run-release VOLVOXGRID_VARIANT=lite
-```
+**Requirements:** Java 8+, Swing. Maven coordinates: `io.github.ivere27:volvoxgrid-desktop:0.8.9` (or `volvoxgrid-desktop-lite:0.8.9`).
 
 ## Quick start
 
-The fastest path is `VolvoxGridTableModelAdapter<T>` — a typed, data-first
-adapter modeled after Swing's `TableModel` idiom. Pass typed columns and a
-row list; the adapter pushes captions and cell text into the engine and
-delivers commits via `setOnCellEdit(...)`.
+The fastest path is `VolvoxGridTableModelAdapter<T>` — a typed, data-first adapter modeled after Swing's `TableModel` idiom. You describe columns once, hand it a row list, and edits surface through one callback.
 
 ```java
 import io.github.ivere27.volvoxgrid.desktop.*;
-import io.github.ivere27.volvoxgrid.desktop.VolvoxGridTableModelAdapter.*;
 import javax.swing.*;
 import java.util.*;
 
 public class App {
-    record Product(String name, double price, int qty) {}
+    static final class Product {
+        final String name; final double price; final int qty;
+        Product(String name, double price, int qty) {
+            this.name = name; this.price = price; this.qty = qty;
+        }
+        String getName()  { return name; }
+        double getPrice() { return price; }
+        int    getQty()   { return qty; }
+    }
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
-            var frame = new JFrame("VolvoxGrid");
-            var panel = new VolvoxGridDesktopPanel();
-            panel.initialize(NativeLibraryPathResolver.resolve(), 100, 5);
+            JFrame frame = new JFrame("VolvoxGrid");
+            VolvoxGridDesktopPanel panel = new VolvoxGridDesktopPanel();
+            panel.initialize(null, 100, 5); // null = auto-detect native library
 
-            var products = new ArrayList<>(List.of(
+            List<Product> products = new ArrayList<>(Arrays.asList(
                 new Product("Widget A", 29.99, 150),
-                new Product("Widget B", 19.50, 80)
+                new Product("Widget B", 19.50,  80)
             ));
 
-            var adapter = new VolvoxGridTableModelAdapter<>(panel, List.of(
-                VolvoxGridTableModelAdapter.column  ("name",  "Name",  Product::name),
-                VolvoxGridTableModelAdapter.editable("price", "Price",
-                    p -> String.format("%.2f", p.price())),
-                VolvoxGridTableModelAdapter.column  ("qty",   "Qty",
-                    p -> Integer.toString(p.qty()))
-            ));
+            VolvoxGridTableModelAdapter<Product> adapter =
+                new VolvoxGridTableModelAdapter<>(panel, Arrays.asList(
+                    VolvoxGridTableModelAdapter.column  ("name",  "Name",  Product::getName),
+                    VolvoxGridTableModelAdapter.editable("price", "Price",
+                        p -> String.format("%.2f", p.getPrice())),
+                    VolvoxGridTableModelAdapter.column  ("qty",   "Qty",
+                        p -> Integer.toString(p.getQty()))
+                ));
             adapter.setOnCellEdit(edit -> {
-                // edit.getRow() is the typed Product
-                var p = edit.getRow();
+                Product p = edit.getRow();
                 try {
                     products.set(edit.getRowIndex(), new Product(
-                        p.name(),
+                        p.getName(),
                         Double.parseDouble(edit.getNewText()),
-                        p.qty()
+                        p.getQty()
                     ));
                 } catch (NumberFormatException ignore) { }
             });
@@ -98,41 +66,43 @@ public class App {
 }
 ```
 
-`VolvoxColumn` factory helpers:
+Pass a new list to `setRows(...)` to refresh — mutating in place won't trigger a reload.
+
+## Column helpers
+
+`VolvoxColumn` factory methods cover the two common cases.
 
 | Factory | Purpose |
 |---|---|
 | `column(field, header, value)` | Read-only column |
-| `editable(field, header, value)` | Editable column (commit surfaces via `OnCellEdit`) |
+| `editable(field, header, value)` | Editable column (commits surface via `OnCellEdit`) |
 
-`VolvoxCellEdit<T>` exposes `getRowIndex()`, `getRow()`, `getColumnIndex()`,
-`getField()`, `getOldText()`, `getNewText()`.
+## Edit callbacks
 
-Pass a new list to `setRows(...)` to refresh; mutating in place will not
-trigger a reload.
+`VolvoxCellEdit<T>` exposes:
 
-## Low-level: `VolvoxGridDesktopPanel` + `VolvoxGridDesktopController`
+| Method | What it returns |
+|---|---|
+| `getRowIndex()` | The row's index in your list |
+| `getRow()` | The typed row object |
+| `getColumnIndex()` | The column's index |
+| `getField()` | The `field` you passed to `column(...)` or `editable(...)` |
+| `getOldText()` | The text that was in the cell before the edit |
+| `getNewText()` | The text the user just committed |
 
-For full control over the engine — partial cell updates, custom dropdown
-sources, programmatic sort, merged cells — drop down to the controller form.
-This is what `VolvoxGridTableModelAdapter` itself uses internally.
+## When you need the controller
 
-```java
-var panel = new VolvoxGridDesktopPanel();
-panel.initialize(NativeLibraryPathResolver.resolve(), 100, 5);
+For partial cell updates, programmatic sorts, merged regions, custom dropdown sources, subtotals, search, export — drop down to `VolvoxGridDesktopPanel` + `VolvoxGridDesktopController`. The adapter uses the controller internally, so you can mix the two on the same panel.
 
-var ctrl = panel.createController();
-ctrl.setColumnCaption(0, "Name");
-ctrl.setColumnCaption(1, "Price");
-ctrl.setCellText(0, 0, "Widget A");
-ctrl.setCellText(0, 1, "29.99");
-```
+The full controller API, events, and config live in [../README.md](../README.md).
 
-Renderer mode helpers include CPU, auto GPU, and explicit GPU backends:
+## Renderer mode helpers
+
+Pick a renderer on the controller when you want to be explicit. The full build supports native-surface GPU rendering; the lite build is CPU-only and rejects GPU modes via capability checks.
 
 ```java
 ctrl.setRendererModeCpu();
-ctrl.setRendererModeGpu();
+ctrl.setRendererModeGpu();          // auto-pick the best GPU backend
 ctrl.setRendererModeGpuVulkan();
 ctrl.setRendererModeGpuGles();
 ctrl.setRendererModeGpuOpenGl();
@@ -140,11 +110,20 @@ ctrl.setRendererModeGpuDx12();
 ctrl.setRendererModeGpuMetal();
 ```
 
-GPU rendering uses a real native surface. The full native library enables it when the platform and driver support the selected `wgpu` backend. The lite native library is CPU-only, so GPU modes are rejected by capability checks.
+## Runnable demos in this directory
 
-See the runnable demos in this directory for fuller examples:
+| File | What it shows |
+|---|---|
+| `VolvoxGridDesktopExample.java` | Basic panel + controller setup |
+| `VolvoxGridDesktopDemo.java` | Broader feature tour driven by the controller |
+| `SalesJsonDesktopDemo.java` | JSON-loaded sales data via `loadData` |
+| `HierarchyJsonDesktopDemo.java` | JSON-loaded hierarchical data with outline/subtotal |
+| `VolvoxGridDesktopTuiExample.java` | Terminal-host integration via the TUI byte-stream path |
 
-- `VolvoxGridDesktopExample.java` — basic panel + controller
-- `VolvoxGridDesktopDemo.java`, `SalesJsonDesktopDemo.java`,
-  `HierarchyJsonDesktopDemo.java` — JSON-driven demos
-- `VolvoxGridDesktopTuiExample.java` — terminal-host integration
+Run any of them through the Makefile from the repo root — see [../README.md](../README.md#local-development) for the full list of `make java-desktop-run` targets.
+
+## Lite variant
+
+`volvoxgrid-desktop-lite` uses a native runtime built without the built-in Rust text engine, GPU renderer, regex search, or rayon parallelism. The Swing wrapper auto-registers a Java2D text renderer when the loaded native library has no built-in text engine. The Rust runtime still owns the external text mask cache; Java2D only measures and rasterizes on cache misses, with a small Java-side `Font` cache.
+
+See [../../TEXT_RENDERING.md](../../TEXT_RENDERING.md) for the full text rendering and cache-ownership story.

@@ -192,6 +192,70 @@ namespace VolvoxGrid.DotNet
             return _client.GetCells(_gridId, row1, col1, row2, col2, includeStyle, includeChecked, includeTyped);
         }
 
+        public string GetCellText(int row, int col)
+        {
+            EnsureNotDisposed();
+            if (row < 0 || col < 0) return string.Empty;
+            var cells = _client.GetCells(_gridId, row, col, row, col, false, false, false);
+            if (cells.Count == 0 || cells[0].Value == null) return string.Empty;
+            return Convert.ToString(ToPublicCellValue(cells[0].Value)) ?? string.Empty;
+        }
+
+        public void SetCellText(int row, int col, string text)
+        {
+            SetCellValue(row, col, text ?? string.Empty);
+        }
+
+        public object GetCellValue(int row, string fieldName)
+        {
+            EnsureNotDisposed();
+            int col = GetColumnIndex(fieldName);
+            if (row < 0 || col < 0) return null;
+            var cells = _client.GetCells(_gridId, row, col, row, col, false, false, true);
+            return cells.Count > 0 ? ToPublicCellValue(cells[0].Value) : null;
+        }
+
+        public void SetCellValue(int row, string fieldName, object value)
+        {
+            int col = GetColumnIndex(fieldName);
+            if (col < 0) return;
+            SetCellValue(row, col, value);
+        }
+
+        private int GetColumnIndex(string fieldName)
+        {
+            if (string.IsNullOrEmpty(fieldName)) return -1;
+            var schema = GetSchema();
+            for (int i = 0; i < schema.Columns.Count; i++)
+            {
+                var c = schema.Columns[i];
+                if (string.Equals(c.Key, fieldName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return c.Index;
+                }
+            }
+            return -1;
+        }
+
+        private static object ToPublicCellValue(CellValue value)
+        {
+            if (value == null) return null;
+            switch (value.ValueCase)
+            {
+                case CellValue.ValueOneofCase.Number: return value.Number;
+                case CellValue.ValueOneofCase.Flag: return value.Flag;
+                case CellValue.ValueOneofCase.Raw: return value.Raw;
+                case CellValue.ValueOneofCase.Timestamp:
+                    try
+                    {
+                        var epoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+                        return epoch.AddMilliseconds(value.Timestamp);
+                    }
+                    catch { return value.Timestamp; }
+                default: return value.Text ?? string.Empty;
+            }
+        }
+
         public void Clear(ClearScope scope, ClearRegion region)
         {
             EnsureNotDisposed();

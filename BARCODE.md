@@ -1,28 +1,30 @@
 # Barcode Support
 
-VolvoxGrid can render QR codes and common 1D barcodes inside normal grid cells.
-Barcode rendering is a cell extra: the cell still has an ordinary value for
-sorting, editing, copy/paste, and data loading.
+You're trying to render a QR code or 1D barcode inside a grid cell. Here's how VolvoxGrid handles it on your platform.
+
+## Who this is for
+
+You're adding barcode cells to a sheet — for inventory, shipping labels, product catalogs, anything that lives in a grid and needs a scannable mark next to a row.
+
+VolvoxGrid renders QR codes and common 1D barcodes inside normal grid cells. Barcode rendering is a cell extra: the cell still has an ordinary value for sorting, editing, copy/paste, and data loading. You don't lose the spreadsheet feel; you just gain a rendered symbol.
 
 The public contract is in [proto/volvoxgrid.proto](proto/volvoxgrid.proto).
 
-## User Behavior
+Next: what your end users see.
 
-- In `make web`, open the `Barcodes` demo to see QR, Code 128, Code 39, EAN,
-  UPC, 2-of-5, and Codabar examples.
+## What your users see
+
+- In `make web`, open the `Barcodes` demo to see QR, Code 128, Code 39, EAN, UPC, 2-of-5, and Codabar examples.
 - In `make gtk-test`, open the `Barcodes` demo for the GTK/library-host version.
-- The `Barcode` column stores the barcode payload as normal cell text. Editing
-  the cell edits the payload, and sorting sorts by that payload.
-- The visible barcode updates from the cell payload. If the payload is invalid
-  for the selected symbology, the barcode is not drawn.
-- TUI mode does not currently draw barcode graphics. It can still show and edit
-  the payload text.
+- The `Barcode` column stores the barcode payload as normal cell text. Editing the cell edits the payload, and sorting sorts by that payload.
+- The visible barcode updates from the cell payload. If the payload is invalid for the selected symbology, the barcode isn't drawn.
+- TUI mode doesn't currently draw barcode graphics. It can still show and edit the payload text.
 
-The shared fixture is [testdata/barcodes.json](testdata/barcodes.json). It is
-plain data with `Symbology`, `Value`, `Label`, `Notes`, and optional
-`TextEncoding` / `QrEcc`; wrappers map those rows to `BarcodeData`.
+The shared fixture is [testdata/barcodes.json](testdata/barcodes.json). It's plain data with `Symbology`, `Value`, `Label`, `Notes`, and optional `TextEncoding` / `QrEcc`; wrappers map those rows to `BarcodeData`.
 
-## Developer Model
+Next: the developer-side model — value vs. data.
+
+## Developer model
 
 Attach a barcode with `CellUpdate.barcode`:
 
@@ -41,23 +43,21 @@ message BarcodeData {
 }
 ```
 
-Recommended pattern:
+The pattern you want most of the time:
 
 1. Put the payload in `CellUpdate.value`.
 2. Leave `BarcodeData.value` empty.
 3. Set `BarcodeData.symbology` and any render/caption options.
 
-When `BarcodeData.value` is empty, the renderer uses the cell display text as
-the payload. This keeps normal grid behavior working: sort, edit, search,
-copy/paste, and TUI fallback all see the same payload.
+When `BarcodeData.value` is empty, the renderer uses the cell display text as the payload. That's what keeps normal grid behavior working: sort, edit, search, copy/paste, and TUI fallback all see the same payload.
 
-Use `BarcodeData.value` only when you intentionally want the rendered payload to
-be different from the cell value.
+Use `BarcodeData.value` only when you intentionally want the rendered payload to differ from the cell value.
 
-`CellUpdate.barcode` is a full replacement, not a sparse patch. Send the full
-barcode spec each time. Send `BARCODE_NONE` to clear an existing barcode extra.
+One thing to watch: `CellUpdate.barcode` is a full replacement, not a sparse patch. Send the full barcode spec each time. Send `BARCODE_NONE` to clear an existing barcode extra.
 
-## Supported Symbologies
+Next: the symbologies you can pick.
+
+## Supported symbologies
 
 | Enum | Notes |
 |---|---|
@@ -75,7 +75,9 @@ barcode spec each time. Send `BARCODE_NONE` to clear an existing barcode extra.
 | `BARCODE_STF` | Numeric Standard 2 of 5. With `CHECK_DIGIT_NONE`, odd-length payloads are rejected. |
 | `BARCODE_CODABAR` | Codabar with valid start/stop characters such as `A...B`, `C...D`. |
 
-Payloads are text strings. Raw binary QR or Code 128 byte mode is not exposed.
+Payloads are text strings. Raw binary QR or Code 128 byte mode isn't exposed.
+
+Next: encoding, rendering, and caption knobs.
 
 ## Options
 
@@ -89,10 +91,8 @@ message BarcodeEncodingOptions {
 }
 ```
 
-- `check_digit`: common policy for optional check digits. Mandatory checksums
-  required by a symbology are still handled by the encoder.
-- `text_encoding`: `AUTO`, `UTF8`, or `GS1`. For Code 128, `AUTO` is normal
-  plain text and `GS1` inserts FNC1 for GS1-128.
+- `check_digit`: common policy for optional check digits. Mandatory checksums required by a symbology are still handled by the encoder.
+- `text_encoding`: `AUTO`, `UTF8`, or `GS1`. For Code 128, `AUTO` is normal plain text and `GS1` inserts FNC1 for GS1-128.
 - `qr_ecc`: QR-only error correction. `DEFAULT` maps to medium ECC.
 
 ### Rendering
@@ -114,17 +114,12 @@ message BarcodeRenderOptions {
 
 - `foreground` defaults to the cell foreground.
 - `background` is transparent when unset.
-- `alignment` defaults to stretch in the engine. Demos often use center for QR
-  and stretch for linear barcodes.
-- `module_size` uses `0` for automatic sizing; explicit values are clamped to
-  `[1, 16]`.
-- `quiet_zone` uses `0` for the symbology default; explicit values are clamped
-  to `[0, 64]` for QR and `[0, 128]` for 1D symbologies.
+- `alignment` defaults to stretch in the engine. Demos often use center for QR and stretch for linear barcodes.
+- `module_size` uses `0` for automatic sizing; explicit values are clamped to `[1, 16]`.
+- `quiet_zone` uses `0` for the symbology default; explicit values are clamped to `[0, 64]` for QR and `[0, 128]` for 1D symbologies.
 - `bar_height` uses `0` for automatic 1D bar height.
-- `narrow_bar_width` uses `0` for automatic 1D narrow-bar sizing; explicit
-  values are clamped to `[1, 32]`.
-- `show_size_warning` draws a warning mark when the cell is too small for a
-  faithful minimum-size barcode.
+- `narrow_bar_width` uses `0` for automatic 1D narrow-bar sizing; explicit values are clamped to `[1, 32]`.
+- `show_size_warning` draws a warning mark when the cell is too small for a faithful minimum-size barcode.
 - `use_full_rect` lets auto-sized symbols fill the whole barcode rectangle.
 
 ### Caption
@@ -138,13 +133,14 @@ message BarcodeCaptionOptions {
 }
 ```
 
-- Caption position defaults to `CAPTION_BOTTOM` for 1D barcodes and
-  `CAPTION_NONE` for QR.
+- Caption position defaults to `CAPTION_BOTTOM` for 1D barcodes and `CAPTION_NONE` for QR.
 - Empty caption text uses the encoded payload.
 - Caption color defaults to the barcode foreground.
 - Empty or zero font size inherits the cell font size.
 
-## Status And Validation
+Next: how to ask the engine whether your payload actually encodes.
+
+## Status and validation
 
 Readback can include a barcode encode probe:
 
@@ -159,8 +155,7 @@ message CellData {
 }
 ```
 
-`barcode_status` is only populated when `include_barcode_status` is true. It is
-off by default because probing requires an encode pass.
+`barcode_status` is only populated when `include_barcode_status` is true. It's off by default because probing requires an encode pass.
 
 Statuses:
 
@@ -168,21 +163,24 @@ Statuses:
 |---|---|
 | `BARCODE_RENDER_STATUS_OK` | The payload can be encoded. |
 | `BARCODE_RENDER_STATUS_EMPTY_PAYLOAD` | The barcode has no explicit value and the cell text is empty. |
-| `BARCODE_RENDER_STATUS_INVALID_PAYLOAD` | The payload is not valid for the selected symbology or encoding option. |
+| `BARCODE_RENDER_STATUS_INVALID_PAYLOAD` | The payload isn't valid for the selected symbology or encoding option. |
 | `BARCODE_RENDER_STATUS_UNSUPPORTED_SYMBOLOGY` | The symbology is unknown to this engine. |
 | `BARCODE_RENDER_STATUS_UNSPECIFIED` | No barcode status is available. |
 
-## Rendering Notes
+Next: a few notes about where and how the rendering happens.
+
+## Rendering notes
 
 - Pixel renderers draw barcodes in `RENDER_LAYER_BARCODES`.
 - The barcode layer only does work when visible cells contain barcodes.
-- The TUI renderer has no barcode drawing layer today. It renders the cell text
-  only, so storing the payload in the cell value is important.
-- Barcode rendering is useful for dedicated barcode columns or detail views.
-  Avoid filling every visible cell of a large sheet with barcode extras unless
-  you have measured the cost.
+- The TUI renderer has no barcode drawing layer today. It renders the cell text only, so storing the payload in the cell value is important.
+- Barcode rendering is useful for dedicated barcode columns or detail views. Avoid filling every visible cell of a large sheet with barcode extras unless you've measured the cost.
 
-## Minimal Example
+Next: a minimal end-to-end example.
+
+## Minimal example
+
+Here's a Code 39 cell with the payload coming from the cell value and a custom caption:
 
 ```text
 CellUpdate {
@@ -209,5 +207,4 @@ CellUpdate {
 }
 ```
 
-The barcode payload is `ABC123` because `BarcodeData.value` is empty, so the
-renderer falls back to the cell text.
+The barcode payload is `ABC123` because `BarcodeData.value` is empty, so the renderer falls back to the cell text.

@@ -1,332 +1,103 @@
 # GUI
 
-VolvoxGrid GUI is the pixel-rendered host path for VolvoxGrid. It uses a retained grid model in Rust, renders that model into either an RGBA pixel buffer or a GPU surface, and lets platform hosts handle windowing, input plumbing, and native overlays.
+## Who this is for
 
-This document is for developers who want to:
+You're an engineer building or modifying a pixel-rendered host for VolvoxGrid, on Android, Java desktop, Flutter, Web, .NET, or somewhere new. This doc walks through how the GUI stack actually works.
 
-- understand the pixel-grid engine architecture
-- build a new GUI host
-- extend the existing Android, Java, Flutter, Web, or `.NET` hosts
-- change the renderer or host contract safely
+After reading, you'll be able to:
 
-## Design Goals
+- pick the right rendering backend (CPU or GPU) for your platform
+- wire the render session and event stream to a new host
+- handle editor sessions and immediate UI requests correctly
+- swap in a custom text renderer for a lite build
 
-The GUI stack follows a few core rules.
+Next: the mental model below sets the scene.
 
-### One retained grid model
+## The mental model
 
-There is one `VolvoxGrid` state object per grid. It owns rows, columns, cells, layout, styling, selection, scrolling, editing state, sorting, spans, outline data, animations, and pending events.
+There's one retained `VolvoxGrid` state object per grid. It owns everything that defines the grid: rows, columns, cells, layout, styling, selection, scrolling, editing, sorting, spans, outline data, animations, pending events.
 
-The renderer does not own application state. It paints the current grid state.
+The engine paints that state into either a CPU RGBA buffer or a GPU surface. Hosts stay thin: they handle windows, input plumbing, and any native overlays. They don't reimplement grid logic.
 
-### Host-neutral rendering
+That separation is the entire design. The engine is host-neutral. The hosts are pixel-pipe shells.
 
-The engine is not tied to Swing, Flutter, Android views, HTML tables, or WinForms controls. Hosts interact with it through protobuf messages and render sessions.
+Next: how those layers stack up.
 
-### Pixel-first output
+## Architecture layers
 
-The GUI path renders actual pixels, not host-native table widgets. That keeps rendering behavior, layout, and interactions consistent across platforms.
+Here's how the GUI stack is layered:
 
-### Two rendering backends, one contract
+1. Retained grid state (`engine/src/grid.rs`)
+2. Backend-agnostic canvas pipeline (`engine/src/canvas.rs`)
+3. CPU and GPU renderers (`engine/src/render.rs`, `engine/src/gpu_render.rs`)
+4. Runtime render and event streams (`runtime/src/lib.rs`)
+5. Platform hosts (Android, Java, Flutter, Web, .NET)
 
-GUI hosts use one of two rendering targets:
+### Retained grid state
 
-- CPU rendering into a host-owned RGBA buffer
-- GPU rendering into a host-provided native surface
+`VolvoxGrid` is the central state container. It owns sparse cell storage, column/row properties, grid-wide and per-cell style, selection, scroll, edit state, span/merge state, outline state, sort state, drag state, animation state, the layout cache, and the event queue.
 
-Both backends are driven through the same render session and the same grid state.
+This is a retained-mode engine. You mutate grid state through API calls and input events, then ask for frames when something is dirty.
 
-### Thin platform shells
+A few retained-mode rules worth knowing:
 
-Hosts should own platform concerns:
+- `mark_dirty()` invalidates render-visible state and text-derived caches.
+- `mark_dirty_visual()` keeps caches but schedules another frame.
+- `ensure_layout()` rebuilds layout lazily and updates scroll bounds.
+- `clear_dirty()` keeps the grid dirty while animations, scrollbar fade, background work, or pull-to-refresh still need frames.
 
-- windows, views, canvases, and surfaces
-- input capture
-- OS text input / IME
-- native edit and dropdown overlays when needed
-- frame scheduling
+You don't recompute layout or paint logic in the host. You just keep rendering while the engine says more frames are needed.
 
-The engine and runtime own:
+### Canvas pipeline
 
-- grid state
-- layout
-- rendering
-- grid semantics
-- protocol translation
+The engine renders through a backend-agnostic `Canvas` trait in `engine/src/canvas.rs`. It exposes the drawing primitives: fill and blend rects, lines, pixels, text measurement and drawing, image blits, checker fills.
 
-## High-Level Architecture
-
-The GUI stack is layered like this:
-
-1. Retained grid state
-2. Backend-agnostic canvas pipeline
-3. CPU and GPU renderers
-4. Runtime render/event streams
-5. Platform hosts
-
-## 1. Retained Grid State
-
-Primary file:
-
-- `engine/src/grid.rs`
-
-`VolvoxGrid` is the central state container. It owns:
-
-- sparse cell storage
-- column and row properties
-- grid-wide style state
-- per-cell style overrides
-- selection state
-- scroll state
-- edit state
-- span and merge state
-- outline state
-- sort state
-- drag state
-- animation state
-- layout cache
-- event queue
-
-This is a retained-mode engine. Hosts mutate grid state through API calls and input events, then ask for frames when the grid is dirty.
-
-Important retained-mode behavior:
-
-- `mark_dirty()` invalidates render-visible state and text-derived caches
-- `mark_dirty_visual()` keeps caches but schedules another frame
-- `ensure_layout()` rebuilds layout lazily and updates scroll bounds
-- `clear_dirty()` keeps the grid dirty while animations, scrollbar fade, background work, or pull-to-refresh still need frames
-
-That means hosts do not need to recompute layout or paint logic themselves. They only need to keep rendering while the engine says more frames are needed.
-
-## 2. Canvas Pipeline
-
-Primary file:
-
-- `engine/src/canvas.rs`
-
-The engine renders through a backend-agnostic `Canvas` trait. That trait exposes core drawing primitives such as:
-
-- fill and blend rects
-- lines and pixels
-- text measurement and text drawing
-- image blits
-- checker fills
-
-All grid painting is composed on top of that shared interface. The same render orchestration is reused by both CPU and GPU paths.
-
-This is the key separation:
-
-- `canvas.rs` defines what gets painted
-- backend implementations define how pixels or instances are emitted
-
-## 3. Rendering Backends
+All grid painting composes on that shared interface, and the same orchestration is reused by both CPU and GPU paths. `canvas.rs` defines what gets painted; backend implementations define how pixels or instances are emitted.
 
 ### CPU renderer
 
-Primary files:
+Files: `engine/src/render.rs`, `engine/src/canvas_cpu.rs`.
 
-- `engine/src/render.rs`
-- `engine/src/canvas_cpu.rs`
+The CPU path renders into a host-owned RGBA buffer. The host sends `BufferReady` with a native buffer handle, stride, width, and height. The runtime maps the buffer and calls the CPU renderer, which paints the grid into that shared memory.
 
-The CPU path renders into a host-owned RGBA buffer. The host sends a `BufferReady` message containing:
-
-- native buffer handle
-- stride
-- width
-- height
-
-The runtime maps that buffer and calls the CPU renderer, which paints the grid into the shared memory region.
-
-Important CPU-path behavior:
-
-- shared `canvas.rs` pipeline
-- optional scroll-blit reuse through `ScrollCache`
-- shared text pipeline
-- dirty rect reporting through `FrameDone`
-
-This is the most portable GUI path and the easiest path for new hosts.
+Behaviors to know: the shared `canvas.rs` pipeline, optional scroll-blit reuse via `ScrollCache`, the shared text pipeline, and dirty-rect reporting through `FrameDone`. This is the most portable path and the easiest one for a new host.
 
 ### GPU renderer
 
-Primary files:
+Files: `engine/src/gpu_render.rs`, `engine/src/canvas_gpu.rs`.
 
-- `engine/src/gpu_render.rs`
-- `engine/src/canvas_gpu.rs`
+The GPU path uses `wgpu` and renders directly to a host-provided native surface. The host sends `GpuSurfaceReady` with a native surface handle, width, and height. The GPU renderer configures or reconfigures a `wgpu::Surface` and renders into it.
 
-The GPU path uses `wgpu` and renders directly to a host-provided native surface. The host sends `GpuSurfaceReady` with:
+The GPU path shares all the grid and layout logic, emits GPU-backed rectangles and textured quads, uses `GlyphAtlas` for text and image texture data, supports surface recreation on resize or loss, and reports an unrendered GPU frame if surface configuration fails.
 
-- native surface handle
-- width
-- height
+Next: when do you actually want GPU?
 
-The GPU renderer configures or reconfigures a `wgpu::Surface`, then renders the current grid into that surface.
+## CPU vs GPU: when do you need each?
 
-Important GPU-path behavior:
+Both backends drive through the same render session and the same grid state. The choice is mostly about what your platform can give the engine.
 
-- uses the same shared grid/layout logic
-- emits GPU-backed rectangles and textured quads
-- uses `GlyphAtlas` for text/image texture data
-- supports surface recreation on resize or surface loss
-- reports an unrendered GPU frame if GPU initialization or surface configuration fails
+Pick CPU when:
 
-In practice, the GPU path is best when the platform can provide a stable native surface or platform texture.
+- you want the simplest possible integration
+- portability matters more than peak rendering throughput
+- your platform doesn't expose a clean native surface handle (most widget toolkits)
+- you're embedding inside a traditional widget tree
 
-## 4. Runtime Session Layer
+Pick GPU when:
 
-Primary file:
+- you can hand the engine a stable native surface or platform texture
+- pixel-copy overhead from the CPU buffer to the screen is measurable
+- you've already got a compatible surface story (Android `SurfaceView`, a platform texture, a windowed native surface)
 
-- `runtime/src/lib.rs`
+A reasonable rollout is to start on CPU, get correctness right, then add GPU as an optional host optimization. The Android host is a good reference for a host that supports both modes over the same contract.
 
-The runtime is the bridge between platform hosts and the engine.
+Next: how a frame actually moves through the system.
 
-It exposes two important streaming interfaces:
+## The render lifecycle
 
-- `RenderSession(stream RenderInput) returns (stream RenderOutput)`
-- `EventStream(EventStreamRequest) returns (stream GridEvent)`
+### CPU flow
 
-### Render session responsibilities
-
-The render session receives:
-
-- `ViewportState`
-- `PointerEvent`
-- `KeyEvent`
-- `ScrollEvent`
-- `ZoomEvent`
-- `BufferReady`
-- `GpuSurfaceReady`
-- `EventDecision`
-
-For CPU rendering, the session:
-
-1. applies input
-2. updates layout and animation state
-3. renders into the supplied RGBA buffer
-4. returns `FrameDone`
-
-For GPU rendering, the session:
-
-1. applies input
-2. configures the native surface if needed
-3. renders to the surface
-4. returns `GpuFrameDone`
-
-The render session also emits immediate UI-facing outputs:
-
-- `SelectionUpdate`
-- `CursorChange`
-- `EditorSessionStarted`
-- `EditorSessionUpdated`
-- `EditorSessionEnded`
-- `TooltipRequest`
-
-These are not the same as the long-lived semantic event stream. They exist so the host can react immediately to render-time UI needs.
-
-### Event stream responsibilities
-
-The event stream exposes semantic grid events such as:
-
-- focus changes
-- selection changes
-- before/after edit
-- validation
-- before/after sort
-- scroll events
-- mouse and keyboard events
-- refresh and error events
-
-Cancelable events use `EventDecision` on the render session rather than embedding a cancel field directly in the event payload. By default, the engine waits until the host sends that decision. Hosts should only enable this path for events they intend to handle; if a decision channel is already enabled and an unhandled cancelable event arrives, send `cancel=false` so the action proceeds. Finite `decision_timeout_ms` values are watchdogs: on timeout the engine emits `ErrorEvent` and auto-allows.
-
-This split is important:
-
-- use `RenderOutput` for immediate render-coupled UI behavior
-- use `GridEvent` for semantic host callbacks and application logic
-
-## 5. Platform Hosts
-
-The repo already contains several GUI host styles.
-
-### Android
-
-Primary file:
-
-- `android/volvoxgrid-android/src/main/java/io/github/ivere27/volvoxgrid/VolvoxGridView.kt`
-
-The Android host is a `SurfaceView`-based shell. It supports:
-
-- CPU shared-buffer rendering
-- GPU surface rendering
-- touch, wheel, key, and pinch-zoom forwarding
-- IME integration
-- native `EditText` overlay for editing
-- event stream listeners
-
-It is the clearest reference for a host that supports both CPU and GPU modes over the same contract.
-
-### Java desktop
-
-Primary file:
-
-- `java/desktop/src/main/java/io/github/ivere27/volvoxgrid/desktop/VolvoxGridDesktopPanel.java`
-
-The Swing panel is a CPU shared-buffer and native-surface GPU host. It owns:
-
-- panel lifecycle
-- buffer allocation
-- repaint scheduling
-- input forwarding
-- event-stream consumption
-- Java2D text fallback for lite builds
-
-It is a good reference for a desktop host with native widget integration.
-
-### Flutter
-
-Primary pieces:
-
-- `flutter/lib/volvoxgrid_controller.dart`
-- `flutter/README.md`
-
-Flutter uses the same native engine through FFI:
-
-- CPU mode renders into a shared RGBA buffer and displays it via Flutter image plumbing
-- Android GPU mode renders into a Flutter platform texture
-
-Flutter is a good reference for a cross-platform host where the Dart controller is high-level but the rendering contract remains the same underneath.
-
-### Web
-
-Primary pieces:
-
-- `web/js/src/volvoxgrid.ts`
-- `web/js/src/volvoxgrid-element.ts`
-
-The web host wraps the WASM build and renders into an HTML canvas. It is useful as a reference for a browser shell that still uses the same grid engine ideas, even though the integration mechanics differ from native hosts.
-
-### `.NET`
-
-Relevant pieces:
-
-- `dotnet/src/common`
-
-The `.NET` side exposes controller and WinForms-oriented integration over the same native engine. It is also useful because it includes host text-rendering integration points.
-
-## Render Lifecycle
-
-### CPU render lifecycle
-
-The usual CPU path looks like this:
-
-1. Host creates a grid with an initial viewport and scale.
-2. Host configures layout, indicators, editing, selection, rendering, and data.
-3. Host opens a render session.
-4. Host sends `ViewportState` whenever size changes.
-5. Host allocates a direct RGBA buffer and sends `BufferReady`.
-6. Runtime renders into that buffer.
-7. Runtime returns `FrameDone` with dirty rect and optional metrics.
-8. Host blits or presents the resulting pixels.
-
-Flow:
+Here's the flow from start to finish:
 
 ```text
 host buffer
@@ -337,19 +108,20 @@ host buffer
     -> FrameDone(dirty rect, metrics)
 ```
 
-### GPU render lifecycle
+Step by step:
 
-The usual GPU path looks like this:
+1. Host creates a grid with an initial viewport and scale.
+2. Host configures layout, indicators, editing, selection, rendering, and data.
+3. Host opens a render session.
+4. Host sends `ViewportState` whenever the size changes.
+5. Host allocates a direct RGBA buffer and sends `BufferReady`.
+6. The runtime renders into that buffer.
+7. The runtime returns `FrameDone` with the dirty rect and optional metrics.
+8. Host blits or presents the resulting pixels.
 
-1. Host selects a GPU renderer mode.
-2. Host creates or exposes a native surface handle.
-3. Host sends `GpuSurfaceReady`.
-4. Runtime lazily creates `GpuRenderer` if needed.
-5. Runtime configures or reconfigures the `wgpu` surface.
-6. Engine renders directly to the surface.
-7. Runtime returns `GpuFrameDone`.
+### GPU flow
 
-Flow:
+Here's the flow from start to finish:
 
 ```text
 native surface handle
@@ -360,35 +132,45 @@ native surface handle
     -> GpuFrameDone
 ```
 
-If surface setup fails, the runtime returns an unrendered `GpuFrameDone`; the host must keep a valid native surface or switch to CPU mode explicitly.
+Step by step:
 
-## Input Lifecycle
+1. Host selects a GPU renderer mode.
+2. Host creates or exposes a native surface handle.
+3. Host sends `GpuSurfaceReady`.
+4. The runtime lazily creates `GpuRenderer` if needed.
+5. The runtime configures or reconfigures the `wgpu` surface.
+6. The engine renders directly to the surface.
+7. The runtime returns `GpuFrameDone`.
 
-Hosts forward user input as render-session messages:
+If surface setup fails, the runtime returns an unrendered `GpuFrameDone`. Your host must keep a valid native surface or fall back to CPU explicitly.
+
+Next: how user input gets in.
+
+## The input lifecycle
+
+You forward user input as render-session messages:
 
 - `PointerEvent`
 - `KeyEvent`
 - `ScrollEvent`
 - `ZoomEvent`
 
-The runtime translates those into shared engine input handlers. That keeps interaction behavior aligned across hosts.
+The runtime turns these into shared engine input handlers, so interaction behavior stays aligned across hosts. Touch and mouse presses become pointer down/up/move. Wheel and gesture deltas become scroll events. Keyboard navigation and editing become key down/press/up. Pinch gestures become zoom begin/update/end.
 
-Examples:
+Translate platform coordinates into viewport-local grid coordinates before sending them.
 
-- touch and mouse presses become pointer down/up/move
-- wheel and gesture deltas become scroll events
-- keyboard navigation and editing become key down/press/up
-- pinch gestures become zoom begin/update/end
+Next: there are two kinds of things coming back out, and you need to handle each differently.
 
-Hosts should translate platform coordinates into viewport-local grid coordinates before sending them.
+## Immediate UI vs semantic events
 
-## Immediate UI Requests Vs Semantic Events
+GUI hosts need both render-coupled UI outputs and application-level events. The runtime exposes them on two separate streams:
 
-GUI hosts usually need both render-coupled UI outputs and application-level events.
+- `RenderSession(stream RenderInput) returns (stream RenderOutput)`
+- `EventStream(EventStreamRequest) returns (stream GridEvent)`
 
-### Immediate UI requests
+### Immediate UI requests on `RenderOutput`
 
-These arrive on `RenderOutput`:
+These arrive on the render session because they're render-coupled:
 
 - `EditorSessionStarted`
 - `EditorSessionUpdated`
@@ -397,26 +179,15 @@ These arrive on `RenderOutput`:
 - `CursorChange`
 - `SelectionUpdate`
 
-Typical host behavior:
+You react immediately: show an edit overlay at the requested pixel rect, open a dropdown popup, show or hide a tooltip, update the cursor, sync mirrored selection state.
 
-- show an edit overlay at the requested pixel rect
-- open a dropdown popup
-- show or hide a tooltip
-- update the cursor
-- sync selection state if the host mirrors it
+### Semantic events on `GridEvent`
 
-### Semantic events
+These arrive on `EventStream` and feed application logic: focus changes, selection changes, before/after edit, validation, before/after sort, scroll, mouse and keyboard, refresh, errors.
 
-These arrive on `EventStream` as `GridEvent`.
+Cancelable events use `EventDecision` on the render session instead of embedding a cancel field directly. By default the engine waits for that decision. Only enable the decision path for events you intend to handle. If the channel is enabled and an unhandled cancelable event arrives, send `cancel=false` so the action proceeds. Finite `decision_timeout_ms` is a watchdog: on timeout the engine emits `ErrorEvent` and auto-allows.
 
-Typical host behavior:
-
-- notify application callbacks
-- validate or cancel edits
-- react to sort, scroll, or selection changes
-- listen for lifecycle and error events
-
-Use `EventDecision` when the host needs to cancel a cancelable event such as:
+Cancelable events include:
 
 - `BeforeEdit`
 - `CellEditValidate`
@@ -428,28 +199,30 @@ Use `EventDecision` when the host needs to cancel a cancelable event such as:
 - `BeforeMoveRow`
 - `BeforeMouseDown`
 
-`cancel=true` means veto. `cancel=false` means allow, and is the correct default for an unhandled cancelable event when a decision channel is active.
+`cancel=true` vetoes. `cancel=false` allows, and it's the right default for an unhandled cancelable event when the channel is active.
 
-## Editor Session Lifecycle
+Rule of thumb: use `RenderOutput` for render-coupled UI behavior, use `GridEvent` for semantic host callbacks.
 
-GUI editing is expressed as an editor session. The canonical wire shape is in `proto/volvoxgrid.proto`, but GUI hosts should follow the lifecycle below rather than treating each message independently.
+Next: the biggest lifecycle in the system.
+
+## Editor session lifecycle
+
+GUI editing is expressed as an editor session. The canonical wire shape lives in `proto/volvoxgrid.proto`, but you should follow the lifecycle as a whole, not message-by-message.
 
 ### Starting
 
-An edit can start from engine input handling or from the host calling `EditCommand.start`.
-
-`EditCommand.start` names the cell and the reason:
+An edit can start from engine input handling or from the host calling `EditCommand.start`. `EditCommand.start` names the cell and the reason:
 
 - `EDIT_START_F2`, `EDIT_START_DOUBLE_CLICK`, and `EDIT_START_CLICK_CARET` create edit-mode sessions with a caret.
 - `EDIT_START_ENTER_KEY`, `EDIT_START_PRINTABLE_KEY`, `EDIT_START_IME_COMPOSITION`, and `EDIT_START_PROGRAMMATIC` create enter-mode sessions unless the engine has a more specific rule.
 - `seed_value` carries the printable key or IME text that opened the session.
 - `caret_position` is meaningful for click-caret starts.
 
-The render session then emits `EditorSessionStarted` with a full `EditorSession` snapshot. Hosts should cache this snapshot by `session_id`.
+The render session emits `EditorSessionStarted` with a full `EditorSession` snapshot. Cache it by `session_id`.
 
-### Edit UI Modes
+### Edit UI modes
 
-`EditorSession.ui_mode` is the authoritative mode for keyboard and overlay behavior.
+`EditorSession.ui_mode` is the authoritative mode for keyboard and overlay behavior. Use it directly. Don't re-derive it from the key or pointer event.
 
 `EDIT_UI_MODE_ENTER` is spreadsheet-style entry:
 
@@ -464,19 +237,19 @@ The render session then emits `EditorSessionStarted` with a full `EditorSession`
 - the caret is placed in the text, usually at the end or at `caret_position`
 - printable keys insert at the caret instead of replacing the whole cell
 - arrow keys move the caret or selection inside the editor
-- Enter commits unless the editor is multiline or the host/editor handles it specially
+- Enter commits unless the editor is multiline or handled specially
 - Escape cancels and restores the original value
 
-Hosts should use `ui_mode` from the session rather than re-deriving it from the key or pointer event. The engine derives it from `EditStartReason`; for example, F2, double-click, and click-caret starts normally produce edit mode, while Enter, printable-key, IME, and programmatic starts normally produce enter mode.
+The engine derives `ui_mode` from `EditStartReason`. F2, double-click, and click-caret starts normally produce edit mode. Enter, printable-key, IME, and programmatic starts normally produce enter mode.
 
 ### Presentation
 
 `EditorSession.editor.presentation` decides whether the host shows a native widget:
 
-- `EDITOR_CANVAS`: the engine draws the editor on the canvas. The host must not mount an overlay, but must still track the session for focus, clipboard, keyboard, and command routing.
-- `EDITOR_INLINE`, `EDITOR_POPUP_OVER`, `EDITOR_POPUP_UNDER`, `EDITOR_MODAL`: the host mounts a native editor surface using the session's geometry and editor spec.
+- `EDITOR_CANVAS`: the engine draws the editor on the canvas. Don't mount an overlay, but do still track the session for focus, clipboard, keyboard, and command routing.
+- `EDITOR_INLINE`, `EDITOR_POPUP_OVER`, `EDITOR_POPUP_UNDER`, `EDITOR_MODAL`: mount a native editor surface using the session's geometry and editor spec.
 
-The engine default is `EDITOR_CANVAS`. Host wrappers that want native overlays must set a non-canvas presentation explicitly in their `EditorSpec`.
+The engine default is `EDITOR_CANVAS`. If your host wants native overlays, set a non-canvas presentation explicitly in `EditorSpec`.
 
 `EditorSession.editor.owner` decides who owns the editor implementation:
 
@@ -484,24 +257,24 @@ The engine default is `EDITOR_CANVAS`. Host wrappers that want native overlays m
 - `EDITOR_OWNER_HOST_NATIVE`: host-provided native editor for a built-in editor kind.
 - `EDITOR_OWNER_CUSTOM`: application/custom editor identified by `custom_editor_id`.
 
-Presentation and owner are related but not interchangeable. A host should key overlay creation from `presentation`, then use `owner` and `kind` to choose the widget implementation.
+Presentation and owner are related but not interchangeable. Key overlay creation from `presentation`, then use `owner` and `kind` to choose the widget implementation.
 
-### List Editors
+### List editors
 
-List editor semantics come from `EditorSpec.kind` and `ListEditorParams.allow_custom_value`; presentation only decides who draws the editor surface.
+List editor semantics come from `EditorSpec.kind` and `ListEditorParams.allow_custom_value`. Presentation only decides who draws the surface.
 
-- `EDITOR_SELECT` with `allow_custom_value=false` is a read-only select/list editor. It may have list navigation and type-ahead search, but it must not expose caret movement, text selection, or mutating paste/cut behavior. Committed values must match a list item.
+- `EDITOR_SELECT` with `allow_custom_value=false` is a read-only select/list editor. It may have list navigation and type-ahead search, but it must not expose caret movement, text selection, or mutating paste/cut. Committed values must match a list item.
 - `EDITOR_COMBO` with `allow_custom_value=true` is an editable dropdown/combobox. It accepts custom typed text in addition to choosing a list item.
 
-Host wrappers that use native text editors for normal cell editing should still keep select/dropdown lists engine-owned and canvas-presented unless they implement the same select-only restrictions.
+If your host uses native text editors for normal cell editing, keep select/dropdown lists engine-owned and canvas-presented unless you're going to implement the same select-only restrictions yourself.
 
-### Commit Validation
+### Commit validation
 
 Commit-time validation is layered:
 
-- `ColumnDef.data_type` controls display, sort, formatting, and aggregation behavior. It does not by itself make editing numeric, date-only, or list-only.
+- `ColumnDef.data_type` controls display, sort, formatting, and aggregation. It does not by itself make editing numeric, date-only, or list-only.
 - `EditorSpec.kind` plus editor params controls built-in edit validation.
-- `CellEditValidate` is for application rules that cannot be expressed by the editor params.
+- `CellEditValidate` is for application rules that the editor params can't express.
 
 Built-in validation runs before `CellEditValidate`. If it fails with `VALIDATION_BLOCK`, the editor stays open and `EditorSession.validation_errors` / `EditorSessionUpdated.validation_errors` carries the error state.
 
@@ -517,11 +290,11 @@ Use `CellEditValidate` for cross-cell, cross-row, server, permission, duplicate-
 
 ### Updating
 
-For an existing session, the engine emits `EditorSessionUpdated`. This is a sparse delta against the cached `EditorSessionStarted.session`.
+For an existing session, the engine emits `EditorSessionUpdated`, a sparse delta against the cached `EditorSessionStarted.session`.
 
 Host rules:
 
-- Ignore updates whose `session_id` does not match the active session.
+- Ignore updates whose `session_id` doesn't match the active session.
 - Use `state_version` to reject stale value/selection/preedit work.
 - Apply only fields that are present.
 - Treat `value` and `selection` as authoritative when present.
@@ -530,18 +303,11 @@ Host rules:
 - Treat `validation_errors` as the current validation state when sent.
 - Honor `force_refocus=true` on the next host UI tick.
 
-Same-session value, selection, validation, geometry, and visibility changes must be handled as `EditorSessionUpdated`. A host should not require another `EditorSessionStarted` unless the `session_id` changes.
+Same-session value, selection, validation, geometry, and visibility changes must be handled as `EditorSessionUpdated`. Don't require another `EditorSessionStarted` unless the `session_id` changes.
 
-### Sending Commands
+### Sending commands
 
-Hosts send editor mutations through `EditCommand.session`, which carries `EditorSessionCommand`.
-
-Every command should include the latest cached:
-
-- `session_id`
-- `state_version`
-
-The engine uses those fields for optimistic concurrency. Stale commands are ignored and the returned `EditState` is the authoritative current snapshot.
+Hosts send editor mutations through `EditCommand.session`, which carries `EditorSessionCommand`. Every command should include the latest cached `session_id` and `state_version`. The engine uses those fields for optimistic concurrency. Stale commands are ignored and the returned `EditState` is the authoritative current snapshot.
 
 Common commands:
 
@@ -554,69 +320,48 @@ Common commands:
 
 ### Ending
 
-The engine emits `EditorSessionEnded` when the session closes. The host should unmount any overlay, clear its cached session, and release session-specific focus/proxy state.
+The engine emits `EditorSessionEnded` when the session closes. Unmount any overlay, clear the cached session, and release session-specific focus/proxy state.
 
 `committed_value` is present for committed sessions. For canceled, reverted, focus-lost, removed-cell, or destroyed-grid sessions, use `reason` to decide host cleanup and application callbacks.
 
-### Synchronous State
+### Synchronous state
 
-`EditCommand.get_state` returns `EditState`.
+`EditCommand.get_state` returns `EditState`:
 
 - `active=false`: no session is open; ignore `session`.
 - `active=true`: `session` is a full current `EditorSession` snapshot.
 
-This is useful for wrappers, diagnostics, and reconnect paths. Render-session hosts should still use `EditorSessionStarted/Updated/Ended` as the primary live lifecycle.
+This is useful for wrappers, diagnostics, and reconnect paths. Render-session hosts should still treat `EditorSessionStarted/Updated/Ended` as the primary live lifecycle.
 
-## Text Rendering Strategy
+Next: text is its own subsystem with its own extension points.
 
-Text is part of the GUI engine contract, but it has extension points.
+## Text rendering strategy
 
-The full cross-platform design is documented in [TEXT_RENDERING.md](TEXT_RENDERING.md).
+Text is part of the GUI engine contract, but it has extension points. The full cross-platform design lives in [TEXT_RENDERING.md](TEXT_RENDERING.md).
 
-### Default path
+The engine normally uses `TextEngine` for measurement, shaping, caching, and rendering. That's the default.
 
-The engine normally uses `TextEngine` for measurement, shaping, caching, and rendering.
-
-### Full replacement: `TextRenderer`
-
-A platform can replace the whole text pipeline with a custom renderer. This is used by lite builds, where the host provides OS/browser font fallback and the engine still owns cache policy.
-
-Examples in the repo:
-
-- Web Canvas2D text renderer
-- Android Canvas text renderer for lite builds
-- CoreText/CoreGraphics renderer for macOS and iOS lite native runtimes
-- Java2D text renderer for Java desktop lite builds
-- GDI-based bridge on `.NET` lite builds and optional Wine experiments
-
-Use this when the host should handle both:
-
-- text measurement
-- glyph rasterization or text drawing
+For lite builds, a platform can replace the whole text pipeline with a custom `TextRenderer`. The host provides OS or browser font fallback and the engine still owns cache policy. Existing replacements in the repo: Web Canvas2D, Android Canvas (lite), CoreText/CoreGraphics (macOS/iOS lite), Java2D (Java desktop lite), GDI (.NET lite and optional Wine experiments).
 
 The debug overlay shows the active text backend as `Text:Engine`, `Text:Android`, `Text:Browser`, `Text:CoreText`, `Text:Java2D`, or `Text:GDI`. The `C:<used>/<cap>` value reports the engine-owned text cache.
 
-### Fallback path: `ExternalGlyphRasterizer`
+If you only need to fill in coverage for some glyphs while keeping engine shaping, use the `ExternalGlyphRasterizer` fallback instead of replacing the whole pipeline.
 
-A host can also provide per-glyph fallback rasterization while leaving layout and shaping inside the engine.
+Next: a clean line on who owns what.
 
-Use this when the default shaping path is correct, but some glyph coverage must come from a host-native font stack.
+## What the host owns vs what the engine owns
 
-## Host Responsibilities
-
-If you are building a new GUI host, keep these boundaries clear.
-
-The host should own:
+The host owns:
 
 - view or widget lifecycle
 - viewport sizing
 - direct buffer or native surface ownership
 - input capture
 - IME and composition
-- native overlay widgets for edit/dropdown if desired
+- native overlay widgets for edit and dropdown when desired
 - frame scheduling
 
-The host should not own:
+The host does not own:
 
 - grid layout rules
 - selection logic
@@ -625,53 +370,69 @@ The host should not own:
 - sort behavior
 - scroll bounds
 
-That logic already lives in the engine.
+That logic already lives in the engine. If you find yourself reimplementing any of it in a host, that's a smell.
 
-## Choosing CPU Vs GPU
+Next: the existing hosts you can crib from.
 
-Choose CPU when:
+## Existing hosts
 
-- you want the simplest host integration
-- portability matters more than peak rendering throughput
-- your platform does not expose a clean native surface handle
-- you are embedding in a traditional widget toolkit
+### Android
 
-Choose GPU when:
+File: `android/volvoxgrid-android/src/main/java/io/github/ivere27/volvoxgrid/VolvoxGridView.kt`.
 
-- the host can provide a stable native surface
-- pixel-copy overhead matters
-- the platform already has a compatible surface or platform texture story
+A `SurfaceView`-based shell that supports CPU shared-buffer rendering, GPU surface rendering, touch/wheel/key/pinch-zoom forwarding, IME integration, a native `EditText` overlay for editing, and event-stream listeners. The clearest reference for a host that supports both CPU and GPU modes over the same contract.
 
-A common strategy is:
+### Java desktop
 
-- start with CPU
-- add GPU later as an optional host optimization
+File: `java/desktop/src/main/java/io/github/ivere27/volvoxgrid/desktop/VolvoxGridDesktopPanel.java`.
 
-## Current Constraints
+A Swing panel that supports CPU shared-buffer and native-surface GPU paths. Owns panel lifecycle, buffer allocation, repaint scheduling, input forwarding, event-stream consumption, and Java2D text fallback for lite builds. Good reference for desktop with native widget integration.
 
-Useful constraints to keep in mind:
+### Flutter
 
-- not every host exposes both CPU and GPU paths
-- Flutter desktop currently uses CPU mode
-- GPU surface handling is platform-specific even though the engine contract is shared
-- lite text fallback uses the host font stack, so exact glyph selection can vary by OS
-- edit/dropdown overlays are host-driven, so exact UX can vary by platform
-- some hosts may redraw full surfaces even when the runtime reports only a dirty rect
+Files: `flutter/lib/volvoxgrid_controller.dart`, `flutter/README.md`.
 
-## Recommended Reading Order
+Same native engine through FFI. CPU mode renders into a shared RGBA buffer and displays it via Flutter image plumbing. Android GPU mode renders into a Flutter platform texture. Good reference for a cross-platform host where the Dart controller is high-level but the rendering contract underneath is unchanged.
 
-If you are modifying the GUI stack, read in this order:
+### Web
+
+Files: `web/js/src/volvoxgrid.ts`, `web/js/src/volvoxgrid-element.ts`.
+
+The web host wraps the WASM build and renders into an HTML canvas. Useful as a reference for a browser shell that still uses the same grid engine, even though the integration mechanics differ from native hosts.
+
+### .NET
+
+Files under: `dotnet/src/common`.
+
+Exposes controller and WinForms-oriented integration over the same native engine. Includes host text-rendering integration points.
+
+Next: a few things that are true today but might not stay that way.
+
+## Current constraints
+
+- Not every host exposes both CPU and GPU paths.
+- Flutter desktop currently uses CPU mode.
+- GPU surface handling is platform-specific even though the engine contract is shared.
+- Lite text fallback uses the host font stack, so exact glyph selection can vary by OS.
+- Edit and dropdown overlays are host-driven, so exact UX can vary by platform.
+- Some hosts may redraw full surfaces even when the runtime reports only a dirty rect.
+
+Next: where to start reading.
+
+## Reading order through the code
+
+If you're modifying the GUI stack, read in this order:
 
 1. `engine/src/grid.rs`
 2. `engine/src/canvas.rs`
 3. `engine/src/render.rs`
 4. `engine/src/gpu_render.rs`
 5. `runtime/src/lib.rs`
-6. the host for your platform:
+6. The host for your platform:
    - Android: `android/volvoxgrid-android/src/main/java/io/github/ivere27/volvoxgrid/VolvoxGridView.kt`
    - Java desktop: `java/desktop/src/main/java/io/github/ivere27/volvoxgrid/desktop/VolvoxGridDesktopPanel.java`
    - Flutter: `flutter/lib/volvoxgrid_controller.dart`
    - Web: `web/js/src/volvoxgrid.ts`
-   - `.NET`: `dotnet/src/common`
+   - .NET: `dotnet/src/common`
 
 That order matches the real layering: retained state first, render pipeline second, runtime bridge third, host shell last.
