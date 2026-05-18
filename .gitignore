@@ -1,3 +1,7 @@
+# Swift
+.build/
+.cache/
+
 # Rust
 target/
 **/*.rs.bk

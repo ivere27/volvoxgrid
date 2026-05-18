@@ -19,7 +19,7 @@
 # Variables
 # =============================================================================
 SYNURANG_MODULE ?= github.com/ivere27/synurang
-SYNURANG_VERSION ?= v0.5.13
+SYNURANG_VERSION ?= c219db2e992d5b74767563d2c0941354e1f82a56
 PROTOC_GEN_SYNURANG_FFI ?= $(shell gobin=$$(go env GOBIN 2>/dev/null); if [ -n "$$gobin" ]; then printf '%s/protoc-gen-synurang-ffi' "$$gobin"; else printf '%s/bin/protoc-gen-synurang-ffi' "$$(go env GOPATH 2>/dev/null)"; fi)
 PROTOC_GEN_SYNURANG_FFI_FLAG = --plugin=protoc-gen-synurang-ffi=$(PROTOC_GEN_SYNURANG_FFI)
 ANDROID_PROJECT_DIR := android
@@ -237,6 +237,7 @@ endif
         java-desktop-run java-desktop-run-release java-desktop-run-simple java-desktop-smoke \
         java-tui-run java-tui-run-release java-tui-smoke java-tui-smoke-release \
         go-tui-build go-tui-build-release go-tui-run go-tui-run-release go-tui-smoke go-tui-smoke-release \
+        swift-tui-build swift-tui-build-release swift-tui-run swift-tui-run-release swift-tui-smoke swift-tui-smoke-release \
         dotnet-build dotnet-build-release dotnet-run dotnet-run-release dotnet-smoke dotnet-smoke-release \
         dotnet-tui-build dotnet-tui-build-release dotnet-tui-run dotnet-tui-run-release dotnet-tui-smoke dotnet-tui-smoke-release \
         sheet sheet-lite sheet-build \
@@ -309,6 +310,12 @@ help:
 	@echo "  go-tui-run-release  Run Go terminal TUI sample (release library)"
 	@echo "  go-tui-smoke  Run Go terminal TUI smoke checks (debug library)"
 	@echo "  go-tui-smoke-release  Run Go terminal TUI smoke checks (release library)"
+	@echo "  swift-tui-build  Build Swift terminal TUI sample via docker swift:5.9 (debug)"
+	@echo "  swift-tui-build-release  Build Swift terminal TUI sample via docker swift:5.9 (release)"
+	@echo "  swift-tui-run  Run Swift terminal TUI sample interactively via docker (debug library)"
+	@echo "  swift-tui-run-release  Run Swift terminal TUI sample interactively via docker (release library)"
+	@echo "  swift-tui-smoke  Run Swift terminal TUI smoke checks via docker (debug library)"
+	@echo "  swift-tui-smoke-release  Run Swift terminal TUI smoke checks via docker (release library)"
 	@echo "  dotnet-build  Build VolvoxGrid .NET wrapper + sample (debug)"
 	@echo "  dotnet-build-release  Build VolvoxGrid .NET wrapper + sample (release)"
 	@echo "  dotnet-run    Run .NET sample (debug)"
@@ -536,6 +543,61 @@ go-tui-smoke-release: host-library-release go-tui-build-release
 	VOLVOXGRID_GO_TUI_SMOKE_MODE=1 "$(GO_TUI_BINARY_RELEASE)" "$(JAVA_DESKTOP_LIBRARY_RELEASE)"
 	@echo ""
 
+# ----- Swift terminal TUI sample (Linux only, via docker) -----
+# The Swift package on Linux dlopens libvolvoxgrid.so at runtime via
+# VOLVOXGRID_LIBRARY_PATH. Apple targets use the SwiftUI demos under
+# swift/Examples instead — these targets exist purely so engine devs
+# can validate the Swift wrapper against the same engine .so the
+# other language samples consume.
+SWIFT_TUI_DOCKER_IMAGE := swift:5.9
+SWIFT_TUI_WORKDIR := /workspace
+SWIFT_TUI_BINARY := $(SWIFT_TUI_WORKDIR)/.build/debug/VolvoxGridTuiSample
+SWIFT_TUI_BINARY_RELEASE := $(SWIFT_TUI_WORKDIR)/.build/release/VolvoxGridTuiSample
+SWIFT_TUI_LIBRARY := $(SWIFT_TUI_WORKDIR)/target/debug/libvolvoxgrid.so
+SWIFT_TUI_LIBRARY_RELEASE := $(SWIFT_TUI_WORKDIR)/target/release/libvolvoxgrid.so
+SWIFT_TUI_DOCKER := docker run --rm -v "$(CURDIR)":/workspace -w /workspace
+SWIFT_TUI_DOCKER_IT := docker run --rm -it -v "$(CURDIR)":/workspace -w /workspace
+
+swift-tui-build:
+	@echo "Building Swift terminal TUI sample (docker, debug)..."
+	$(SWIFT_TUI_DOCKER) $(SWIFT_TUI_DOCKER_IMAGE) swift build
+	@echo ""
+
+swift-tui-build-release:
+	@echo "Building Swift terminal TUI sample (docker, release)..."
+	$(SWIFT_TUI_DOCKER) $(SWIFT_TUI_DOCKER_IMAGE) swift build -c release
+	@echo ""
+
+swift-tui-run: host-library swift-tui-build
+	@echo "Running Swift terminal TUI sample (debug library)..."
+	$(SWIFT_TUI_DOCKER_IT) \
+		-e VOLVOXGRID_LIBRARY_PATH=$(SWIFT_TUI_LIBRARY) \
+		$(SWIFT_TUI_DOCKER_IMAGE) $(SWIFT_TUI_BINARY) --demo sales
+	@echo ""
+
+swift-tui-run-release: host-library-release swift-tui-build-release
+	@echo "Running Swift terminal TUI sample (release library)..."
+	$(SWIFT_TUI_DOCKER_IT) \
+		-e VOLVOXGRID_LIBRARY_PATH=$(SWIFT_TUI_LIBRARY_RELEASE) \
+		$(SWIFT_TUI_DOCKER_IMAGE) $(SWIFT_TUI_BINARY_RELEASE) --demo sales
+	@echo ""
+
+swift-tui-smoke: host-library swift-tui-build
+	@echo "Running Swift terminal TUI smoke test (debug library)..."
+	$(SWIFT_TUI_DOCKER) \
+		-e VOLVOXGRID_LIBRARY_PATH=$(SWIFT_TUI_LIBRARY) \
+		-e VOLVOXGRID_TUI_SMOKE_MODE=1 \
+		$(SWIFT_TUI_DOCKER_IMAGE) $(SWIFT_TUI_BINARY)
+	@echo ""
+
+swift-tui-smoke-release: host-library-release swift-tui-build-release
+	@echo "Running Swift terminal TUI smoke test (release library)..."
+	$(SWIFT_TUI_DOCKER) \
+		-e VOLVOXGRID_LIBRARY_PATH=$(SWIFT_TUI_LIBRARY_RELEASE) \
+		-e VOLVOXGRID_TUI_SMOKE_MODE=1 \
+		$(SWIFT_TUI_DOCKER_IMAGE) $(SWIFT_TUI_BINARY_RELEASE)
+	@echo ""
+
 dotnet-build:
 	@echo "Building VolvoxGrid .NET wrapper + sample (debug, $(DOTNET_TFM), $(DOTNET_ARCH))..."
 	./dotnet/build_dotnet.sh --tfm "$(DOTNET_TFM)" --arch "$(DOTNET_ARCH)"
@@ -736,6 +798,7 @@ doom-deps:
 VSFLEXGRID_DIR := adapters/vsflexgrid
 DOTNET_COMMON_CODEGEN_DIR := dotnet/src/common/Generated
 WEB_TS_CODEGEN_DIR := web/js/src/generated
+SWIFT_CODEGEN_DIR := swift/Sources/VolvoxGrid/Generated
 PROTO_INCLUDES := -Iproto -I$(VSFLEXGRID_DIR)/proto
 PROTO3_OPT := --experimental_allow_proto3_optional
 
@@ -748,6 +811,7 @@ codegen: build_codegen_tool
 	@mkdir -p codegen
 	@mkdir -p $(DOTNET_COMMON_CODEGEN_DIR)
 	@mkdir -p $(WEB_TS_CODEGEN_DIR)
+	@mkdir -p $(SWIFT_CODEGEN_DIR)
 	@mkdir -p $(GO_PROJECT_DIR)/api/v1
 	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
 		--go_out=$(GO_PROJECT_DIR) --go_opt=module=github.com/ivere27/volvoxgrid/go \
@@ -787,6 +851,12 @@ codegen: build_codegen_tool
 		$(PROTOC_GEN_SYNURANG_FFI_FLAG) \
 		--synurang-ffi_out=$(DOTNET_COMMON_CODEGEN_DIR) --synurang-ffi_opt=lang=csharp,mode=lite \
 		proto/volvoxgrid.proto
+	# Swift lite protobuf + FFI stubs
+	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
+		$(PROTOC_GEN_SYNURANG_FFI_FLAG) \
+		--synurang-ffi_out=$(SWIFT_CODEGEN_DIR) --synurang-ffi_opt=lang=swift,mode=lite \
+		proto/volvoxgrid.proto
+	@$(SED_I) 's|^import SynurangLite$$|// SynurangLite is vendored into this same module - no import needed.|' $(SWIFT_CODEGEN_DIR)/volvoxgrid_lite.swift
 	# Synurang server trait + dispatcher
 	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
 		$(PROTOC_GEN_SYNURANG_FFI_FLAG) \
@@ -843,7 +913,7 @@ codegen: build_codegen_tool
 		runtime/src/volvoxtree_ffi_runtime.rs \
 		runtime/src/wasm/volvoxgrid_wasm.rs \
 		$(VSFLEXGRID_DIR)/crate/src/volvoxgrid_ffi_native.rs
-	@echo "Codegen complete: codegen/ + $(DOTNET_COMMON_CODEGEN_DIR)/ + $(WEB_TS_CODEGEN_DIR)/ + runtime/ + web/ + $(VSFLEXGRID_DIR)/"
+	@echo "Codegen complete: codegen/ + $(DOTNET_COMMON_CODEGEN_DIR)/ + $(WEB_TS_CODEGEN_DIR)/ + $(SWIFT_CODEGEN_DIR)/ + runtime/ + web/ + $(VSFLEXGRID_DIR)/"
 
 # =============================================================================
 # Android
@@ -1773,9 +1843,9 @@ publish_github:
 		CHECKSUM=$$(swift package compute-checksum "$(IOS_XCFRAMEWORK_ZIP)" 2>/dev/null || shasum -a 256 "$(IOS_XCFRAMEWORK_ZIP)" | cut -d' ' -f1); \
 		echo "Checksum: $$CHECKSUM"; \
 		gh release upload "$$TAG" "$(IOS_XCFRAMEWORK_ZIP)" --repo "$(IOS_GITHUB_REPO)" --clobber; \
-		echo "Updating Package.swift..."; \
+		echo "Updating Package.swift full XCFramework binary target..."; \
 		URL="https://github.com/$(IOS_GITHUB_REPO)/releases/download/$$TAG/VolvoxGrid.xcframework.zip"; \
-			printf '// swift-tools-version:5.9\nimport PackageDescription\n\nlet package = Package(\n    name: "VolvoxGrid",\n    products: [\n        .library(name: "VolvoxGrid", targets: ["VolvoxGrid"]),\n    ],\n    targets: [\n        .binaryTarget(\n            name: "VolvoxGrid",\n            url: "%s",\n            checksum: "%s"\n        ),\n    ]\n)\n' "$$URL" "$$CHECKSUM" > Package.swift; \
+		bash "$(CURRENT_DIR)/scripts/update_swift_binary_target.sh" "$(CURRENT_DIR)/Package.swift" "VolvoxGridXCFramework" "$$URL" "$$CHECKSUM"; \
 		echo "XCFramework uploaded, Package.swift updated."; \
 	else \
 		echo "Skip iOS: $(IOS_XCFRAMEWORK_DIR) not found."; \
@@ -1790,12 +1860,9 @@ publish_github:
 		LITE_CHECKSUM=$$(swift package compute-checksum "$(IOS_XCFRAMEWORK_LITE_ZIP)" 2>/dev/null || shasum -a 256 "$(IOS_XCFRAMEWORK_LITE_ZIP)" | cut -d' ' -f1); \
 		echo "Lite checksum: $$LITE_CHECKSUM"; \
 		gh release upload "$$TAG" "$(IOS_XCFRAMEWORK_LITE_ZIP)" --repo "$(IOS_GITHUB_REPO)" --clobber; \
-		if [ -n "$${CHECKSUM:-}" ]; then \
-			echo "Updating Package.swift with lite product..."; \
-			FULL_URL="https://github.com/$(IOS_GITHUB_REPO)/releases/download/$$TAG/VolvoxGrid.xcframework.zip"; \
-			LITE_URL="https://github.com/$(IOS_GITHUB_REPO)/releases/download/$$TAG/VolvoxGridLite.xcframework.zip"; \
-			printf '// swift-tools-version:5.9\nimport PackageDescription\n\nlet package = Package(\n    name: "VolvoxGrid",\n    products: [\n        .library(name: "VolvoxGrid", targets: ["VolvoxGrid"]),\n        .library(name: "VolvoxGridLite", targets: ["VolvoxGridLite"]),\n    ],\n    targets: [\n        .binaryTarget(\n            name: "VolvoxGrid",\n            url: "%s",\n            checksum: "%s"\n        ),\n        .binaryTarget(\n            name: "VolvoxGridLite",\n            url: "%s",\n            checksum: "%s"\n        ),\n    ]\n)\n' "$$FULL_URL" "$$CHECKSUM" "$$LITE_URL" "$$LITE_CHECKSUM" > Package.swift; \
-		fi; \
+		echo "Updating Package.swift lite XCFramework binary target..."; \
+		LITE_URL="https://github.com/$(IOS_GITHUB_REPO)/releases/download/$$TAG/VolvoxGridLite.xcframework.zip"; \
+		bash "$(CURRENT_DIR)/scripts/update_swift_binary_target.sh" "$(CURRENT_DIR)/Package.swift" "VolvoxGridLiteXCFramework" "$$LITE_URL" "$$LITE_CHECKSUM"; \
 	else \
 		echo "Skip iOS lite: $(IOS_XCFRAMEWORK_LITE_DIR) not found."; \
 	fi; \

@@ -159,7 +159,20 @@ dependencies:
   volvoxgrid: ^0.8.9
 ```
 
-iOS consumers who'd rather pull frameworks directly can use the `VolvoxGrid` SwiftPM product for the full XCFramework, or `VolvoxGridLite` once a release has published `VolvoxGridLite.xcframework.zip`.
+### Swift (SwiftPM)
+
+```swift
+dependencies: [
+    .package(url: "https://github.com/ivere27/volvoxgrid", from: "0.8.9"),
+],
+targets: [
+    .target(name: "MyApp", dependencies: [
+        .product(name: "VolvoxGrid", package: "volvoxgrid"),
+    ])
+]
+```
+
+The `VolvoxGrid` product is the Swift wrapper. Use `import VolvoxGrid`, create `VolvoxGridClient()`, and render with `VolvoxGridView`, `VolvoxGridUIView`, or `VolvoxGridNSView`. The wrapper has no SwiftProtobuf or grpc-swift dependency. Raw binary products are also available as `VolvoxGridXCFramework` and `VolvoxGridLiteXCFramework`. Next: [swift/README.md](swift/README.md).
 
 ### Web (npm)
 
@@ -228,7 +241,7 @@ Compatibility layers in `adapters/` let you keep an existing API while running o
 - [ARCHITECTURE.md](ARCHITECTURE.md) — repo architecture and build workflow
 - [CONTRIBUTING.md](CONTRIBUTING.md) — contribution guidelines and CLA
 - [CHANGELOG.md](CHANGELOG.md) — release notes
-- [android/README.md](android/README.md), [flutter/README.md](flutter/README.md), [java/README.md](java/README.md), [dotnet/README.md](dotnet/README.md), [go/README.md](go/README.md), [web/js/README.md](web/js/README.md) — per-platform wrapper docs
+- [android/README.md](android/README.md), [flutter/README.md](flutter/README.md), [java/README.md](java/README.md), [dotnet/README.md](dotnet/README.md), [go/README.md](go/README.md), [swift/README.md](swift/README.md), [web/js/README.md](web/js/README.md) — per-platform wrapper docs
 
 ## Trademarks
 
