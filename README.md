@@ -1,11 +1,11 @@
 # VolvoxGrid
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.8.9-blue.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-0.8.10-blue.svg)](VERSION)
 
-You're shipping a datagrid that has to handle 100K+ rows, work across mobile, desktop, web, and terminal, and look the same on every platform. VolvoxGrid is one Rust engine that does that — you bring the host, it brings the pixels.
+You're shipping a datagrid that has to handle million-row datasets, work across mobile, desktop, web, and terminal, and look the same on every platform. VolvoxGrid is one Rust engine that does that — you bring the host, it brings the pixels.
 
-The engine in `engine/` owns layout, selection, editing, sorting, scrolling, merged cells, and rendering. Thin platform wrappers expose it to Flutter, Android, Java desktop, .NET, Go, the web (via WASM), and terminal hosts. The grid you ship on Android is the same grid you ship in Chrome — same code, same behavior, same pixels.
+The engine in `engine/` owns layout, selection, editing, sorting, scrolling, merged cells, and rendering. Thin platform wrappers expose it to Flutter, Android, Java desktop, .NET, Go, Swift, the web (via WASM), and terminal hosts. The grid you ship on Android is the same grid you ship in Chrome — same code, same behavior, same pixels.
 
 ## Screenshots
 
@@ -44,7 +44,6 @@ Install the package, point it at a container, hand it data. The grid loads its W
   import { VolvoxGrid } from "volvoxgrid";
 
   const grid = new VolvoxGrid(document.getElementById("grid"), {
-    wasmUrl: "./wasm/volvoxgrid_wasm.js",
     columnDefs: [
       { field: "name", headerName: "Name" },
       { field: "status", headerName: "Status" },
@@ -81,21 +80,39 @@ One pub package, one widget, one controller. Native binaries are resolved at bui
 
 ```yaml
 dependencies:
-  volvoxgrid: ^0.8.9
+  volvoxgrid: ^0.8.10
 ```
+
+Initialize the native runtime once before creating grids:
+
+```dart
+import 'package:flutter/widgets.dart';
+import 'package:volvoxgrid/volvoxgrid.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await initVolvoxGrid();
+  runApp(const MyApp());
+}
+```
+
+Then create and render a controller from your widget's async setup:
 
 ```dart
 import 'package:volvoxgrid/volvoxgrid.dart';
 
-final controller = VolvoxGridController();
-await controller.create(rows: 100, cols: 5);
+Future<VolvoxGridController> createGridController() async {
+  final controller = VolvoxGridController();
+  await controller.create(rows: 100, cols: 5);
 
-await controller.setColumnCaption(0, 'Name');
-await controller.setColumnCaption(1, 'Price');
-await controller.setCellText(0, 0, 'Widget A');
-await controller.setCellText(0, 1, '29.99');
+  await controller.setColumnCaption(0, 'Name');
+  await controller.setColumnCaption(1, 'Price');
+  await controller.setCellText(0, 0, 'Widget A');
+  await controller.setCellText(0, 1, '29.99');
+  return controller;
+}
 
-// In your widget tree:
+// After awaiting createGridController() and storing the controller:
 VolvoxGridWidget(controller: controller);
 ```
 
@@ -109,7 +126,7 @@ Drop a Swing panel into your frame, get a controller back, drive the grid from K
 
 ```kotlin
 dependencies {
-    implementation("io.github.ivere27:volvoxgrid-desktop:0.8.9")
+    implementation("io.github.ivere27:volvoxgrid-desktop:0.8.10")
 }
 ```
 
@@ -129,24 +146,24 @@ Next: [java/README.md](java/README.md).
 
 ## Install
 
-Everything in this section uses `0.8.9`. Swap the version for whichever release you're consuming.
+Everything in this section uses `0.8.10`. Swap the version for whichever release you're consuming.
 
 ### Maven / Gradle (Android, Java desktop)
 
 ```kotlin
 // Android
 dependencies {
-    implementation("io.github.ivere27:volvoxgrid-android:0.8.9")
-    // or: implementation("io.github.ivere27:volvoxgrid-android-lite:0.8.9")
-    // Compose:      implementation("io.github.ivere27:volvoxgrid-android-compose:0.8.9")
-    // Compose lite: implementation("io.github.ivere27:volvoxgrid-android-compose-lite:0.8.9")
+    implementation("io.github.ivere27:volvoxgrid-android:0.8.10")
+    // or: implementation("io.github.ivere27:volvoxgrid-android-lite:0.8.10")
+    // Compose:      implementation("io.github.ivere27:volvoxgrid-android-compose:0.8.10")
+    // Compose lite: implementation("io.github.ivere27:volvoxgrid-android-compose-lite:0.8.10")
 }
 
 // Java desktop
 repositories { mavenCentral() }
 dependencies {
-    implementation("io.github.ivere27:volvoxgrid-desktop:0.8.9")
-    // or: implementation("io.github.ivere27:volvoxgrid-desktop-lite:0.8.9")
+    implementation("io.github.ivere27:volvoxgrid-desktop:0.8.10")
+    // or: implementation("io.github.ivere27:volvoxgrid-desktop-lite:0.8.10")
 }
 ```
 
@@ -156,14 +173,14 @@ Platform-specific notes live in [android/README.md](android/README.md) and [java
 
 ```yaml
 dependencies:
-  volvoxgrid: ^0.8.9
+  volvoxgrid: ^0.8.10
 ```
 
 ### Swift (SwiftPM)
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/ivere27/volvoxgrid", from: "0.8.9"),
+    .package(url: "https://github.com/ivere27/volvoxgrid", from: "0.8.10"),
 ],
 targets: [
     .target(name: "MyApp", dependencies: [
@@ -187,12 +204,17 @@ The web and adapter packages publish minified `dist/*.min.js` browser bundles fo
 
 ### Go
 
-The Go package is not on a module proxy yet — consume it from the repo. It gives you a TUI host and a typed client over the native library.
+The Go modules are versioned with path-prefixed tags for the Go module proxy. The core module gives you a typed client over the native library; the Bubble Tea adapter adds a typed TUI component.
+
+```bash
+go get github.com/ivere27/volvoxgrid/go@v0.8.10
+go get github.com/ivere27/volvoxgrid/adapters/bubbletea@v0.8.10
+```
 
 ```go
 import (
-    "github.com/ivere27/volvoxgrid/pkg/volvoxgrid"
-    "github.com/ivere27/volvoxgrid/pkg/volvoxgrid/tui"
+    "github.com/ivere27/volvoxgrid/go/pkg/volvoxgrid"
+    "github.com/ivere27/volvoxgrid/go/pkg/volvoxgrid/tui"
 )
 ```
 
@@ -200,10 +222,11 @@ Next: [go/README.md](go/README.md).
 
 ### .NET (NuGet)
 
-The managed packages are `VolvoxGrid.DotNet` and `VolvoxGrid.DotNet.Lite`. Local pack flow:
+The managed packages are `VolvoxGrid.DotNet` and `VolvoxGrid.DotNet.Lite`.
 
 ```bash
-dotnet pack dotnet/src/VolvoxGrid.DotNet.csproj -c Release
+dotnet add package VolvoxGrid.DotNet --version 0.8.10
+# or: dotnet add package VolvoxGrid.DotNet.Lite --version 0.8.10
 ```
 
 The NuGet packages embed staged native libraries for supported RIDs. Project-reference or manual deployment flows still need the native `volvoxgrid` library beside your app or pointed at via `VOLVOXGRID_LIBRARY_PATH`. Full instructions in [dotnet/README.md](dotnet/README.md).
@@ -216,7 +239,7 @@ VolvoxGrid is not a single-framework widget — it's a shared grid engine with p
 host or adapter  ->  wrapper  ->  runtime or wasm binding  ->  engine
 ```
 
-The engine in `engine/` is the source of truth. The native runtime in `runtime/` exposes it over Synurang FFI to non-web hosts; `wasm-pack` builds the same engine for the browser. Platform wrappers (`flutter/`, `android/`, `java/`, `dotnet/`, `go/`) translate native events and surfaces into the shared protobuf contract defined in `proto/`.
+The engine in `engine/` is the source of truth. The native runtime in `runtime/` exposes it over Synurang FFI to non-web hosts; `wasm-pack` builds the same engine for the browser. Platform wrappers (`flutter/`, `android/`, `java/`, `dotnet/`, `go/`, `swift/`, `web/js/`) translate native events and surfaces into the shared protobuf contract defined in `proto/`.
 
 If you're changing internals, read [ARCHITECTURE.md](ARCHITECTURE.md). If you're evaluating the rendering paths, read [GUI.md](GUI.md), [TUI.md](TUI.md), and [TEXT_RENDERING.md](TEXT_RENDERING.md).
 

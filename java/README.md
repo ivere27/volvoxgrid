@@ -391,8 +391,8 @@ There are two artifacts:
 
 | Artifact | When to choose it |
 |---|---|
-| `io.github.ivere27:volvoxgrid-desktop:0.8.9` | Default. Includes the built-in Rust text engine, GPU renderer, regex search, and rayon parallelism. |
-| `io.github.ivere27:volvoxgrid-desktop-lite:0.8.9` | Smaller footprint. CPU-only. Uses Java2D for OS font fallback. No GPU, no regex search. |
+| `io.github.ivere27:volvoxgrid-desktop:0.8.9` | Default. Includes the built-in Rust text engine, GPU renderer, and rayon parallelism. |
+| `io.github.ivere27:volvoxgrid-desktop-lite:0.8.9` | Smaller footprint. CPU-only. Uses Java2D for OS font fallback. No GPU. |
 
 In the lite variant, the Swing wrapper auto-registers a Java2D text renderer when the loaded native library has no built-in text engine. The Rust runtime still owns the external text mask cache — Java2D only measures and rasterizes on cache misses, with a small Java-side `Font` object cache to keep allocation under control. See [../TEXT_RENDERING.md](../TEXT_RENDERING.md) for the full ownership and lifecycle story.
 

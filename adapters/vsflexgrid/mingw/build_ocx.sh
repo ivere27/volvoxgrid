@@ -61,13 +61,13 @@ fi
 export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-${BUILD_JOBS}}"
 
 if [ $IS_LITE -eq 1 ]; then
-    echo "--- LITE build enabled (rayon/regex disabled) ---"
+    echo "--- LITE build enabled (rayon disabled) ---"
     CARGO_FLAGS="$CARGO_FLAGS --no-default-features --features lite"
 elif [ $IS_GPU -eq 1 ]; then
     echo "--- GPU build enabled ---"
     CARGO_FLAGS="$CARGO_FLAGS --features gpu"
 else
-    echo "--- Default build enabled (includes rayon/regex) ---"
+    echo "--- Default build enabled (includes rayon, demo) ---"
 fi
 
 CRATE_DIR="../crate"

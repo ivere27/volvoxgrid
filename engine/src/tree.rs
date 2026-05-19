@@ -1269,19 +1269,9 @@ impl TreeState {
                 })
             }
             Some(pb::find_tree_request::Query::RegexQuery(query)) => {
-                #[cfg(feature = "regex")]
-                {
-                    regex::Regex::new(&query.pattern)
-                        .map(|regex| regex.is_match(&text))
-                        .map_err(|err| TreeError::InvalidArgument(err.to_string()))
-                }
-                #[cfg(not(feature = "regex"))]
-                {
-                    let _ = query;
-                    Err(TreeError::InvalidArgument(
-                        "regex feature is not enabled".to_string(),
-                    ))
-                }
+                regex::Regex::new(&query.pattern)
+                    .map(|regex| regex.is_match(&text))
+                    .map_err(|err| TreeError::InvalidArgument(err.to_string()))
             }
             None => Ok(false),
         }
@@ -1313,19 +1303,9 @@ impl TreeState {
                 })
             }
             Some(pb::filter_tree_request::Query::RegexQuery(query)) => {
-                #[cfg(feature = "regex")]
-                {
-                    regex::Regex::new(&query.pattern)
-                        .map(|regex| regex.is_match(&text))
-                        .map_err(|err| TreeError::InvalidArgument(err.to_string()))
-                }
-                #[cfg(not(feature = "regex"))]
-                {
-                    let _ = query;
-                    Err(TreeError::InvalidArgument(
-                        "regex feature is not enabled".to_string(),
-                    ))
-                }
+                regex::Regex::new(&query.pattern)
+                    .map(|regex| regex.is_match(&text))
+                    .map_err(|err| TreeError::InvalidArgument(err.to_string()))
             }
             None => Ok(false),
         }
