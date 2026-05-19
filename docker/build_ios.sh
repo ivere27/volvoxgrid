@@ -230,6 +230,24 @@ char *Synurang_Invoke_VolvoxGridService(
 
 void Synurang_Free(void *ptr);
 
+uint64_t Synurang_Stream_VolvoxGridService_Open(const char *method);
+
+int32_t Synurang_Stream_Send(
+    uint64_t handle,
+    const char *data,
+    int32_t data_len
+);
+
+char *Synurang_Stream_Recv(
+    uint64_t handle,
+    int32_t *resp_len,
+    int32_t *status
+);
+
+void Synurang_Stream_CloseSend(uint64_t handle);
+
+void Synurang_Stream_Close(uint64_t handle);
+
 #ifdef __cplusplus
 }
 #endif

@@ -19,7 +19,7 @@
 # Variables
 # =============================================================================
 SYNURANG_MODULE ?= github.com/ivere27/synurang
-SYNURANG_VERSION ?= c219db2e992d5b74767563d2c0941354e1f82a56
+SYNURANG_VERSION ?= v0.6.0
 PROTOC_GEN_SYNURANG_FFI ?= $(shell gobin=$$(go env GOBIN 2>/dev/null); if [ -n "$$gobin" ]; then printf '%s/protoc-gen-synurang-ffi' "$$gobin"; else printf '%s/bin/protoc-gen-synurang-ffi' "$$(go env GOPATH 2>/dev/null)"; fi)
 PROTOC_GEN_SYNURANG_FFI_FLAG = --plugin=protoc-gen-synurang-ffi=$(PROTOC_GEN_SYNURANG_FFI)
 ANDROID_PROJECT_DIR := android
@@ -2358,9 +2358,9 @@ publish_go_bubbletea:
 # =============================================================================
 flutter-setup:
 	@command -v flutter >/dev/null 2>&1 || { echo "Error: flutter not found in PATH."; exit 1; }
-	@if [ ! -d "$(FLUTTER_EXAMPLE_DIR)/android" ] || [ ! -d "$(FLUTTER_EXAMPLE_DIR)/linux" ]; then \
-		echo "Generating Flutter platform folders (android, linux)..."; \
-		cd "$(FLUTTER_EXAMPLE_DIR)" && flutter create . --platforms=android,linux; \
+	@if [ ! -d "$(FLUTTER_EXAMPLE_DIR)/android" ] || [ ! -d "$(FLUTTER_EXAMPLE_DIR)/ios" ] || [ ! -d "$(FLUTTER_EXAMPLE_DIR)/linux" ] || [ ! -d "$(FLUTTER_EXAMPLE_DIR)/macos" ]; then \
+		echo "Generating Flutter platform folders (android, ios, linux, macos)..."; \
+		cd "$(FLUTTER_EXAMPLE_DIR)" && flutter create . --platforms=android,ios,linux,macos; \
 	fi
 	@cd "$(FLUTTER_EXAMPLE_DIR)" && flutter pub get
 

@@ -2,6 +2,7 @@
 
 ## 0.8.9
 
+- Fixed Flutter iOS native loading through the statically linked XCFramework symbols.
 - Regenerated protocol bindings for editor sessions, edit validation, indicator configuration, and font fallbacks.
 - Added controller APIs for row/column indicator configuration and font fallback settings.
 - Refreshed Flutter docs and examples for Maven-backed native loading, hierarchy indicators, and edit validation demos.

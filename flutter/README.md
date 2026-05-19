@@ -192,7 +192,7 @@ The Flutter package resolves natives at build time, so consumers don't ship bina
 
 - **Android** AAR via Maven Central (`io.github.ivere27:volvoxgrid-android`)
 - **Desktop** (Linux, macOS, Windows) JAR via Maven Central (`io.github.ivere27:volvoxgrid-desktop`)
-- **iOS** `VolvoxGrid.xcframework` from GitHub releases (Lite uses `VolvoxGridLite.xcframework`)
+- **iOS** static `VolvoxGrid.xcframework` from GitHub releases (Lite uses `VolvoxGridLite.xcframework`)
 
 Override resolution with environment variables:
 
@@ -202,14 +202,14 @@ Override resolution with environment variables:
 | `VOLVOXGRID_VERSION` | matches package | Pin a specific Maven artifact version |
 | `VOLVOXGRID_VARIANT` | empty | Set to `lite` on supported platforms |
 
-The shared library is named `libvolvoxgrid.so` (Linux, Android), `libvolvoxgrid.dylib` (macOS), or `volvoxgrid.dll` (Windows). The Dart loader resolves it through Flutter's plugin FFI mechanism — you don't link it manually.
+The shared library is named `libvolvoxgrid.so` (Linux, Android), `libvolvoxgrid.dylib` (macOS), or `volvoxgrid.dll` (Windows). On iOS, the XCFramework is statically linked and Dart resolves the exported Synurang symbols from `DynamicLibrary.process()`. You don't link the native runtime manually.
 
 ## Platform support
 
 | Platform | Native artifact | CPU render | GPU render |
 |---|---|---|---|
 | Android | `libvolvoxgrid.so` (AAR) | yes | Vulkan + GLES via Flutter texture |
-| iOS | `VolvoxGrid.xcframework` | yes | not yet via Flutter texture |
+| iOS | static `VolvoxGrid.xcframework` | yes | not yet via Flutter texture |
 | macOS | `libvolvoxgrid.dylib` (JAR) | yes | not yet via Flutter texture |
 | Windows | `volvoxgrid.dll` (JAR) | yes | not yet via Flutter texture |
 | Linux | `libvolvoxgrid.so` (JAR) | yes | not yet via Flutter texture |

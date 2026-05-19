@@ -13,9 +13,12 @@ library;
 
 import 'dart:async';
 import 'dart:developer' as developer;
+import 'dart:ffi' as ffi;
 import 'dart:io' show Directory, File, Platform;
+import 'dart:isolate';
 import 'dart:typed_data';
 
+import 'package:ffi/ffi.dart';
 import 'package:protobuf/protobuf.dart' show GeneratedMessage;
 import 'package:synurang/synurang.dart' as synurang;
 
@@ -26,6 +29,469 @@ export 'src/generated/volvoxgrid.pb.dart';
 export 'src/generated/volvoxgrid_ffi.pb.dart';
 
 typedef _MessageDecoder<T> = T Function(List<int> bytes);
+
+abstract class _VolvoxGridTransport {
+  Future<Uint8List> invokeUnary(String method, Uint8List data);
+  Stream<Uint8List> invokeServerStream(String method, Uint8List data);
+  Stream<Uint8List> invokeBidiStream(String method, Stream<Uint8List> data);
+}
+
+class _SynurangVolvoxGridTransport implements _VolvoxGridTransport {
+  const _SynurangVolvoxGridTransport();
+
+  @override
+  Future<Uint8List> invokeUnary(String method, Uint8List data) {
+    return synurang.invokeBackendAsync(method, data);
+  }
+
+  @override
+  Stream<Uint8List> invokeServerStream(String method, Uint8List data) {
+    return synurang.invokeBackendServerStream(method, data);
+  }
+
+  @override
+  Stream<Uint8List> invokeBidiStream(String method, Stream<Uint8List> data) {
+    return synurang.invokeBackendBidiStream(method, data);
+  }
+}
+
+class _NativeLibrarySpec {
+  final String? path;
+
+  const _NativeLibrarySpec.process() : path = null;
+  const _NativeLibrarySpec.open(this.path);
+
+  ffi.DynamicLibrary open() {
+    final libraryPath = path;
+    return libraryPath == null
+        ? ffi.DynamicLibrary.process()
+        : ffi.DynamicLibrary.open(libraryPath);
+  }
+}
+
+typedef _NativeInvoke = ffi.Pointer<ffi.Char> Function(
+  ffi.Pointer<ffi.Char>,
+  ffi.Pointer<ffi.Char>,
+  ffi.Int32,
+  ffi.Pointer<ffi.Int32>,
+);
+typedef _DartInvoke = ffi.Pointer<ffi.Char> Function(
+  ffi.Pointer<ffi.Char>,
+  ffi.Pointer<ffi.Char>,
+  int,
+  ffi.Pointer<ffi.Int32>,
+);
+
+typedef _NativeFree = ffi.Void Function(ffi.Pointer<ffi.Void>);
+typedef _DartFree = void Function(ffi.Pointer<ffi.Void>);
+
+typedef _NativeStreamOpen = ffi.Uint64 Function(ffi.Pointer<ffi.Char>);
+typedef _DartStreamOpen = int Function(ffi.Pointer<ffi.Char>);
+
+typedef _NativeStreamSend = ffi.Int32 Function(
+  ffi.Uint64,
+  ffi.Pointer<ffi.Char>,
+  ffi.Int32,
+);
+typedef _DartStreamSend = int Function(
+  int,
+  ffi.Pointer<ffi.Char>,
+  int,
+);
+
+typedef _NativeStreamRecv = ffi.Pointer<ffi.Char> Function(
+  ffi.Uint64,
+  ffi.Pointer<ffi.Int32>,
+  ffi.Pointer<ffi.Int32>,
+);
+typedef _DartStreamRecv = ffi.Pointer<ffi.Char> Function(
+  int,
+  ffi.Pointer<ffi.Int32>,
+  ffi.Pointer<ffi.Int32>,
+);
+
+typedef _NativeStreamCloseSend = ffi.Void Function(ffi.Uint64);
+typedef _DartStreamCloseSend = void Function(int);
+
+typedef _NativeStreamClose = ffi.Void Function(ffi.Uint64);
+typedef _DartStreamClose = void Function(int);
+
+class _NativeVolvoxGridSymbols {
+  final _DartInvoke invoke;
+  final _DartFree free;
+  final _DartStreamOpen streamOpen;
+  final _DartStreamSend streamSend;
+  final _DartStreamRecv streamRecv;
+  final _DartStreamCloseSend streamCloseSend;
+  final _DartStreamClose streamClose;
+
+  _NativeVolvoxGridSymbols._({
+    required this.invoke,
+    required this.free,
+    required this.streamOpen,
+    required this.streamSend,
+    required this.streamRecv,
+    required this.streamCloseSend,
+    required this.streamClose,
+  });
+
+  factory _NativeVolvoxGridSymbols.open(_NativeLibrarySpec spec) {
+    final library = spec.open();
+    return _NativeVolvoxGridSymbols._(
+      invoke: library.lookupFunction<_NativeInvoke, _DartInvoke>(
+        'Synurang_Invoke_VolvoxGridService',
+      ),
+      free: library.lookupFunction<_NativeFree, _DartFree>('Synurang_Free'),
+      streamOpen: library.lookupFunction<_NativeStreamOpen, _DartStreamOpen>(
+        'Synurang_Stream_VolvoxGridService_Open',
+      ),
+      streamSend: library.lookupFunction<_NativeStreamSend, _DartStreamSend>(
+        'Synurang_Stream_Send',
+      ),
+      streamRecv: library.lookupFunction<_NativeStreamRecv, _DartStreamRecv>(
+        'Synurang_Stream_Recv',
+      ),
+      streamCloseSend:
+          library.lookupFunction<_NativeStreamCloseSend, _DartStreamCloseSend>(
+              'Synurang_Stream_CloseSend'),
+      streamClose: library.lookupFunction<_NativeStreamClose, _DartStreamClose>(
+          'Synurang_Stream_Close'),
+    );
+  }
+}
+
+class _NativeVolvoxGridTransport implements _VolvoxGridTransport {
+  final _NativeLibrarySpec _spec;
+  final _NativeVolvoxGridSymbols _symbols;
+
+  _NativeVolvoxGridTransport._(this._spec, this._symbols);
+
+  factory _NativeVolvoxGridTransport.open(_NativeLibrarySpec spec) {
+    return _NativeVolvoxGridTransport._(
+      spec,
+      _NativeVolvoxGridSymbols.open(spec),
+    );
+  }
+
+  @override
+  Future<Uint8List> invokeUnary(String method, Uint8List data) {
+    return Future<Uint8List>.value(_invokeNativeUnary(_symbols, method, data));
+  }
+
+  @override
+  Stream<Uint8List> invokeServerStream(String method, Uint8List data) {
+    return _NativeVolvoxGridStream(_spec, _symbols, method, initialData: data)
+        .stream;
+  }
+
+  @override
+  Stream<Uint8List> invokeBidiStream(String method, Stream<Uint8List> data) {
+    return _NativeVolvoxGridStream(_spec, _symbols, method, input: data).stream;
+  }
+}
+
+_VolvoxGridTransport? _transport;
+const _synurangTransport = _SynurangVolvoxGridTransport();
+
+_VolvoxGridTransport get _activeTransport => _transport ?? _synurangTransport;
+
+Uint8List _copyNativeBytes(ffi.Pointer<ffi.Char> ptr, int length) {
+  if (ptr == ffi.nullptr || length <= 0) {
+    return Uint8List(0);
+  }
+  return Uint8List.fromList(ptr.cast<ffi.Uint8>().asTypedList(length));
+}
+
+ffi.Pointer<ffi.Char> _copyBytesToNative(Uint8List bytes) {
+  if (bytes.isEmpty) {
+    return ffi.nullptr.cast<ffi.Char>();
+  }
+  final ptr = calloc<ffi.Uint8>(bytes.length);
+  ptr.asTypedList(bytes.length).setAll(0, bytes);
+  return ptr.cast<ffi.Char>();
+}
+
+Uint8List _invokeNativeUnary(
+  _NativeVolvoxGridSymbols symbols,
+  String method,
+  Uint8List data,
+) {
+  final methodPtr = method.toNativeUtf8(allocator: calloc).cast<ffi.Char>();
+  final dataPtr = _copyBytesToNative(data);
+  final responseLengthPtr = calloc<ffi.Int32>();
+
+  try {
+    final resultPtr =
+        symbols.invoke(methodPtr, dataPtr, data.length, responseLengthPtr);
+    final responseLength = responseLengthPtr.value;
+
+    if (resultPtr == ffi.nullptr) {
+      if (responseLength == 0) {
+        return Uint8List(0);
+      }
+      throw const synurang.FfiError('VolvoxGrid returned null', 2);
+    }
+
+    try {
+      if (responseLength < 0) {
+        final errorBytes = _copyNativeBytes(resultPtr, -responseLength);
+        throw synurang.FfiError.fromBuffer(errorBytes);
+      }
+      return _copyNativeBytes(resultPtr, responseLength);
+    } finally {
+      symbols.free(resultPtr.cast<ffi.Void>());
+    }
+  } finally {
+    calloc.free(methodPtr);
+    if (dataPtr != ffi.nullptr) {
+      calloc.free(dataPtr);
+    }
+    calloc.free(responseLengthPtr);
+  }
+}
+
+const _nativeStreamOpened = 0;
+const _nativeStreamData = 1;
+const _nativeStreamEnd = 2;
+const _nativeStreamError = 3;
+
+class _NativeVolvoxGridStream {
+  final _NativeLibrarySpec _spec;
+  final _NativeVolvoxGridSymbols _symbols;
+  final String _method;
+  final Uint8List? _initialData;
+  final Stream<Uint8List>? _input;
+  final StreamController<Uint8List> _controller = StreamController<Uint8List>();
+  final ReceivePort _receivePort = ReceivePort();
+
+  Isolate? _isolate;
+  int? _handle;
+  bool _closed = false;
+
+  _NativeVolvoxGridStream(
+    this._spec,
+    this._symbols,
+    this._method, {
+    Uint8List? initialData,
+    Stream<Uint8List>? input,
+  })  : _initialData = initialData,
+        _input = input {
+    _controller
+      ..onListen = () {
+        unawaited(_start());
+      }
+      ..onCancel = _close;
+  }
+
+  Stream<Uint8List> get stream => _controller.stream;
+
+  Future<void> _start() async {
+    _receivePort.listen(_handleWorkerMessage);
+    try {
+      final isolate = await Isolate.spawn<List<Object?>>(
+        _nativeStreamWorkerMain,
+        <Object?>[_receivePort.sendPort, _spec.path, _method],
+      );
+      if (_closed) {
+        isolate.kill(priority: Isolate.immediate);
+      } else {
+        _isolate = isolate;
+      }
+    } catch (error, stackTrace) {
+      _addError(error, stackTrace);
+      await _close();
+    }
+  }
+
+  void _handleWorkerMessage(Object? message) {
+    if (_closed || message is! List<Object?> || message.isEmpty) {
+      return;
+    }
+
+    switch (message[0]) {
+      case _nativeStreamOpened:
+        final handle = message[1] as int;
+        if (handle == 0) {
+          _addError(Exception('Failed to start VolvoxGrid stream'));
+          unawaited(_close());
+          return;
+        }
+        _handle = handle;
+        final initialData = _initialData;
+        if (initialData != null) {
+          _send(handle, initialData);
+        }
+        final input = _input;
+        if (input != null) {
+          unawaited(_sendInput(handle, input));
+        }
+        break;
+      case _nativeStreamData:
+        _controller.add(message[1] as Uint8List);
+        break;
+      case _nativeStreamEnd:
+        unawaited(_finish());
+        break;
+      case _nativeStreamError:
+        final payload = message[1];
+        if (payload is Uint8List) {
+          _addError(_tryDecodeFfiError(payload) ??
+              Exception('VolvoxGrid stream error: ${_bytePreview(payload)}'));
+        } else {
+          _addError(Exception(payload.toString()));
+        }
+        unawaited(_close());
+        break;
+    }
+  }
+
+  void _send(int handle, Uint8List data) {
+    final dataPtr = _copyBytesToNative(data);
+    try {
+      final result = _symbols.streamSend(handle, dataPtr, data.length);
+      if (result != 0) {
+        throw Exception('VolvoxGrid stream send failed: $result');
+      }
+    } finally {
+      if (dataPtr != ffi.nullptr) {
+        calloc.free(dataPtr);
+      }
+    }
+  }
+
+  Future<void> _sendInput(int handle, Stream<Uint8List> input) async {
+    try {
+      await for (final data in input) {
+        if (_closed) {
+          return;
+        }
+        _send(handle, data);
+      }
+      if (!_closed) {
+        _symbols.streamCloseSend(handle);
+      }
+    } catch (error, stackTrace) {
+      _addError(error, stackTrace);
+      await _close();
+    }
+  }
+
+  Future<void> _finish() async {
+    if (_closed) {
+      return;
+    }
+    _closed = true;
+    _receivePort.close();
+    await _controller.close();
+  }
+
+  Future<void> _close() async {
+    if (_closed) {
+      return;
+    }
+    _closed = true;
+    final handle = _handle;
+    if (handle != null) {
+      try {
+        _symbols.streamClose(handle);
+      } catch (_) {
+        // Ignore close races with the worker's own stream cleanup.
+      }
+    }
+    _receivePort.close();
+    _isolate?.kill(priority: Isolate.immediate);
+    if (!_controller.isClosed) {
+      await _controller.close();
+    }
+  }
+
+  void _addError(Object error, [StackTrace? stackTrace]) {
+    if (!_closed && !_controller.isClosed) {
+      _controller.addError(error, stackTrace);
+    }
+  }
+}
+
+void _nativeStreamWorkerMain(List<Object?> args) {
+  final replyTo = args[0] as SendPort;
+  final libraryPath = args[1] as String?;
+  final method = args[2] as String;
+  final spec = libraryPath == null
+      ? const _NativeLibrarySpec.process()
+      : _NativeLibrarySpec.open(libraryPath);
+
+  _NativeVolvoxGridSymbols? symbols;
+  int handle = 0;
+  final responseLengthPtr = calloc<ffi.Int32>();
+  final statusPtr = calloc<ffi.Int32>();
+
+  try {
+    symbols = _NativeVolvoxGridSymbols.open(spec);
+    final methodPtr = method.toNativeUtf8(allocator: calloc).cast<ffi.Char>();
+    try {
+      handle = symbols.streamOpen(methodPtr);
+    } finally {
+      calloc.free(methodPtr);
+    }
+
+    replyTo.send(<Object?>[_nativeStreamOpened, handle]);
+    if (handle == 0) {
+      return;
+    }
+
+    while (true) {
+      final dataPtr = symbols.streamRecv(handle, responseLengthPtr, statusPtr);
+      final responseLength = responseLengthPtr.value;
+      final status = statusPtr.value;
+
+      if (status == 1) {
+        if (dataPtr != ffi.nullptr) {
+          symbols.free(dataPtr.cast<ffi.Void>());
+        }
+        replyTo.send(<Object?>[_nativeStreamEnd]);
+        return;
+      }
+
+      if (status < 0) {
+        final errorBytes = _copyNativeBytes(dataPtr, responseLength);
+        if (dataPtr != ffi.nullptr) {
+          symbols.free(dataPtr.cast<ffi.Void>());
+        }
+        replyTo.send(<Object?>[_nativeStreamError, errorBytes]);
+        return;
+      }
+
+      if (status != 0) {
+        if (dataPtr != ffi.nullptr) {
+          symbols.free(dataPtr.cast<ffi.Void>());
+        }
+        replyTo.send(<Object?>[
+          _nativeStreamError,
+          'unexpected VolvoxGrid stream status $status',
+        ]);
+        return;
+      }
+
+      final payload = _copyNativeBytes(dataPtr, responseLength);
+      if (dataPtr != ffi.nullptr) {
+        symbols.free(dataPtr.cast<ffi.Void>());
+      }
+      replyTo.send(<Object?>[_nativeStreamData, payload]);
+    }
+  } catch (error) {
+    replyTo.send(<Object?>[_nativeStreamError, error.toString()]);
+  } finally {
+    calloc.free(responseLengthPtr);
+    calloc.free(statusPtr);
+    if (handle != 0 && symbols != null) {
+      try {
+        symbols.streamClose(handle);
+      } catch (_) {
+        // Best-effort cleanup from a worker isolate.
+      }
+    }
+  }
+}
 
 String _serviceMethodPath(String method) =>
     '/volvoxgrid.v1.VolvoxGridService/$method';
@@ -132,7 +598,7 @@ Future<T> _invokeUnary<T>(
   GeneratedMessage request,
   _MessageDecoder<T> decode,
 ) async {
-  final resultBytes = await synurang.invokeBackendAsync(
+  final resultBytes = await _activeTransport.invokeUnary(
     method,
     _serializeMessage(request),
   );
@@ -144,8 +610,8 @@ Stream<T> _invokeServerStream<T>(
   GeneratedMessage request,
   _MessageDecoder<T> decode,
 ) {
-  return synurang
-      .invokeBackendServerStream(method, _serializeMessage(request))
+  return _activeTransport
+      .invokeServerStream(method, _serializeMessage(request))
       .map((data) => _decodeMessage(method, data, decode));
 }
 
@@ -154,8 +620,8 @@ Stream<TOut> _invokeBidiStream<TIn extends GeneratedMessage, TOut>(
   Stream<TIn> requests,
   _MessageDecoder<TOut> decode,
 ) {
-  return synurang
-      .invokeBackendBidiStream(
+  return _activeTransport
+      .invokeBidiStream(
         method,
         requests.map((request) => _serializeMessage(request)),
       )
@@ -515,6 +981,9 @@ String _defaultLibraryFileName() {
   if (Platform.isWindows) {
     return 'volvoxgrid.dll';
   }
+  if (Platform.isIOS) {
+    return 'VolvoxGrid.framework/VolvoxGrid';
+  }
   return 'libvolvoxgrid.so';
 }
 
@@ -574,6 +1043,9 @@ Iterable<String> _candidateLibraryPaths(String fileName) sync* {
 
   for (final root in _searchRoots()) {
     addExistingPath(join(root, fileName));
+    addExistingPath(join(root, 'Frameworks${separator}$fileName'));
+    addExistingPath(
+        join(root, 'Contents${separator}Frameworks${separator}$fileName'));
     addExistingPath(join(root, 'target${separator}debug${separator}$fileName'));
     addExistingPath(
         join(root, 'target${separator}release${separator}$fileName'));
@@ -595,6 +1067,14 @@ Iterable<String> _candidateLibraryPaths(String fileName) sync* {
 Future<void> initVolvoxGrid({String? libraryName}) {
   final raw = libraryName?.trim();
   final hasRaw = raw != null && raw.isNotEmpty;
+
+  if (Platform.isIOS && !hasRaw) {
+    _transport = _NativeVolvoxGridTransport.open(
+      const _NativeLibrarySpec.process(),
+    );
+    return Future<void>.value();
+  }
+
   final treatAsPath = hasRaw && _looksLikeLibraryPath(raw);
   final effectivePath = treatAsPath ? raw : _defaultLibraryFileName();
   final candidates = treatAsPath
@@ -606,6 +1086,7 @@ Future<void> initVolvoxGrid({String? libraryName}) {
   for (final candidate in candidates) {
     try {
       synurang.registerPlugin(candidate, ['VolvoxGridService']);
+      _transport = _synurangTransport;
       return Future<void>.value();
     } catch (error, stackTrace) {
       lastError = error;
