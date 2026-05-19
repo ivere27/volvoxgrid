@@ -16,6 +16,16 @@ if [ ! -f "$package_file" ]; then
   exit 1
 fi
 
+if [ -z "$target_url" ]; then
+  echo "error: target URL is empty for $target_name" >&2
+  exit 1
+fi
+
+if [ -z "$target_checksum" ]; then
+  echo "error: checksum is empty for $target_name" >&2
+  exit 1
+fi
+
 tmp_file="$(mktemp "${package_file}.XXXXXX")"
 trap 'rm -f "$tmp_file"' EXIT
 

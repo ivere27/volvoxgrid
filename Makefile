@@ -247,7 +247,7 @@ endif
         vsflexgrid vsflexgrid-release \
         docker_android_aar_image docker_android docker_desktop_image docker_desktop docker_desktop_lite \
         docker_web_image docker_web \
-        docker_ios_image docker_ios docker_ios_lite docker_all_image docker_all publish_maven \
+        docker_ios_image docker_ios docker_ios_lite update_swift_package_checksums docker_all_image docker_all publish_maven \
         publish_local publish_github publish_web publish_npm publish_nuget \
         publish_go publish_go_bubbletea \
         gtk-test gtk-test-release gtk-bench clean clean-all help
@@ -1611,6 +1611,52 @@ docker_ios: docker_ios_image
 docker_ios_lite:
 	$(MAKE) docker_ios IOS_LIBRARY_BUILD_MODE=lite
 
+SWIFT_PACKAGE_RELEASE_TAG ?= v$(VOLVOXGRID_VERSION)
+
+update_swift_package_checksums:
+	@command -v zip >/dev/null 2>&1 || { echo "Error: zip not found in PATH."; exit 1; }
+	@compute_checksum() { \
+		file="$$1"; \
+		checksum=""; \
+		if command -v swift >/dev/null 2>&1; then \
+			checksum=$$(swift package compute-checksum "$$file" 2>/dev/null || true); \
+		fi; \
+		if [ -z "$$checksum" ] && command -v shasum >/dev/null 2>&1; then \
+			checksum=$$(shasum -a 256 "$$file" | cut -d' ' -f1); \
+		fi; \
+		if [ -z "$$checksum" ] && command -v sha256sum >/dev/null 2>&1; then \
+			checksum=$$(sha256sum "$$file" | cut -d' ' -f1); \
+		fi; \
+		if [ -z "$$checksum" ] && command -v openssl >/dev/null 2>&1; then \
+			checksum=$$(openssl dgst -sha256 "$$file" | awk '{print $$NF}'); \
+		fi; \
+		if [ -z "$$checksum" ]; then \
+			echo "Error: could not compute SHA-256 checksum for $$file" >&2; \
+			return 1; \
+		fi; \
+		printf '%s\n' "$$checksum"; \
+	}; \
+	update_target() { \
+		target_name="$$1"; \
+		framework_name="$$2"; \
+		zip_name="$$3"; \
+		framework_dir="dist/ios/$$framework_name"; \
+		zip_path="dist/ios/$$zip_name"; \
+		if [ ! -d "$$framework_dir" ]; then \
+			echo "Skip Swift package target $$target_name: $$framework_dir not found."; \
+			return 0; \
+		fi; \
+		echo "Zipping $$framework_name for Swift package checksum..."; \
+		cd dist/ios && rm -f "$$zip_name" && zip -qr "$$zip_name" "$$framework_name" || exit 1; \
+		cd "$(CURRENT_DIR)"; \
+		checksum=$$(compute_checksum "$$zip_path") || exit 1; \
+		url="https://github.com/$(IOS_GITHUB_REPO)/releases/download/$(SWIFT_PACKAGE_RELEASE_TAG)/$$zip_name"; \
+		echo "Updating Package.swift $$target_name checksum: $$checksum"; \
+		bash "$(CURRENT_DIR)/scripts/update_swift_binary_target.sh" "$(CURRENT_DIR)/Package.swift" "$$target_name" "$$url" "$$checksum" || exit 1; \
+	}; \
+	update_target "VolvoxGridXCFramework" "VolvoxGrid.xcframework" "VolvoxGrid.xcframework.zip" || exit 1; \
+	update_target "VolvoxGridLiteXCFramework" "VolvoxGridLite.xcframework" "VolvoxGridLite.xcframework.zip" || exit 1
+
 
 docker_all_image:
 	@echo "Building unified Docker image (all toolchains)..."
@@ -1666,6 +1712,7 @@ docker_all: docker_all_image
 		-e DESKTOP_BUILD_DATE="$(DESKTOP_BUILD_DATE)" \
 		-e ANDROID_ABIS="$(AAR_ANDROID_ABIS)" \
 		"$(ALL_DOCKER_IMAGE)"
+	@$(MAKE) update_swift_package_checksums SWIFT_PACKAGE_RELEASE_TAG="v$(VOLVOXGRID_VERSION)"
 	@echo "All platform artifacts built."
 	@if [ "$(DESKTOP_BUILD_DOTNET)" = "0" ]; then \
 		echo ".NET artifacts: skipped (set DESKTOP_BUILD_DOTNET=1 to enable)"; \
@@ -1832,37 +1879,28 @@ publish_github:
 	fi; \
 	echo "Creating/updating GitHub release $$TAG..."; \
 	gh release view "$$TAG" --repo "$(IOS_GITHUB_REPO)" >/dev/null 2>&1 || \
-		gh release create "$$TAG" $$PRERELEASE_FLAG --repo "$(IOS_GITHUB_REPO)" --title "$$TAG" --notes "Release $$TAG"; \
+		gh release create "$$TAG" $$PRERELEASE_FLAG --repo "$(IOS_GITHUB_REPO)" --title "$$TAG" --notes "Release $$TAG" || exit 1; \
+	$(MAKE) update_swift_package_checksums SWIFT_PACKAGE_RELEASE_TAG="$$TAG" || exit 1; \
 		if [ -d "$(IOS_XCFRAMEWORK_DIR)" ]; then \
 			echo "Verifying embedded version for XCFramework (expected $(IOS_VERSION))..."; \
 			bash "$$VERIFY_SCRIPT" "$(IOS_VERSION)" "$(IOS_XCFRAMEWORK_DIR)" || exit 1; \
-			echo "Zipping XCFramework..."; \
-		cd dist/ios && rm -f VolvoxGrid.xcframework.zip && \
-			zip -r VolvoxGrid.xcframework.zip VolvoxGrid.xcframework/; \
-		cd "$(CURRENT_DIR)"; \
-		CHECKSUM=$$(swift package compute-checksum "$(IOS_XCFRAMEWORK_ZIP)" 2>/dev/null || shasum -a 256 "$(IOS_XCFRAMEWORK_ZIP)" | cut -d' ' -f1); \
-		echo "Checksum: $$CHECKSUM"; \
-		gh release upload "$$TAG" "$(IOS_XCFRAMEWORK_ZIP)" --repo "$(IOS_GITHUB_REPO)" --clobber; \
-		echo "Updating Package.swift full XCFramework binary target..."; \
-		URL="https://github.com/$(IOS_GITHUB_REPO)/releases/download/$$TAG/VolvoxGrid.xcframework.zip"; \
-		bash "$(CURRENT_DIR)/scripts/update_swift_binary_target.sh" "$(CURRENT_DIR)/Package.swift" "VolvoxGridXCFramework" "$$URL" "$$CHECKSUM"; \
-		echo "XCFramework uploaded, Package.swift updated."; \
+		if [ ! -f "$(IOS_XCFRAMEWORK_ZIP)" ]; then \
+			echo "Error: Swift package zip not found: $(IOS_XCFRAMEWORK_ZIP)" >&2; \
+			exit 1; \
+		fi; \
+		gh release upload "$$TAG" "$(IOS_XCFRAMEWORK_ZIP)" --repo "$(IOS_GITHUB_REPO)" --clobber || exit 1; \
+		echo "XCFramework uploaded."; \
 	else \
 		echo "Skip iOS: $(IOS_XCFRAMEWORK_DIR) not found."; \
 	fi; \
 	if [ -d "$(IOS_XCFRAMEWORK_LITE_DIR)" ]; then \
 		echo "Verifying embedded version for lite XCFramework (expected $(IOS_VERSION))..."; \
 		bash "$$VERIFY_SCRIPT" "$(IOS_VERSION)" "$(IOS_XCFRAMEWORK_LITE_DIR)" || exit 1; \
-		echo "Zipping lite XCFramework..."; \
-		cd dist/ios && rm -f VolvoxGridLite.xcframework.zip && \
-			zip -r VolvoxGridLite.xcframework.zip VolvoxGridLite.xcframework/; \
-		cd "$(CURRENT_DIR)"; \
-		LITE_CHECKSUM=$$(swift package compute-checksum "$(IOS_XCFRAMEWORK_LITE_ZIP)" 2>/dev/null || shasum -a 256 "$(IOS_XCFRAMEWORK_LITE_ZIP)" | cut -d' ' -f1); \
-		echo "Lite checksum: $$LITE_CHECKSUM"; \
-		gh release upload "$$TAG" "$(IOS_XCFRAMEWORK_LITE_ZIP)" --repo "$(IOS_GITHUB_REPO)" --clobber; \
-		echo "Updating Package.swift lite XCFramework binary target..."; \
-		LITE_URL="https://github.com/$(IOS_GITHUB_REPO)/releases/download/$$TAG/VolvoxGridLite.xcframework.zip"; \
-		bash "$(CURRENT_DIR)/scripts/update_swift_binary_target.sh" "$(CURRENT_DIR)/Package.swift" "VolvoxGridLiteXCFramework" "$$LITE_URL" "$$LITE_CHECKSUM"; \
+		if [ ! -f "$(IOS_XCFRAMEWORK_LITE_ZIP)" ]; then \
+			echo "Error: Swift package zip not found: $(IOS_XCFRAMEWORK_LITE_ZIP)" >&2; \
+			exit 1; \
+		fi; \
+		gh release upload "$$TAG" "$(IOS_XCFRAMEWORK_LITE_ZIP)" --repo "$(IOS_GITHUB_REPO)" --clobber || exit 1; \
 	else \
 		echo "Skip iOS lite: $(IOS_XCFRAMEWORK_LITE_DIR) not found."; \
 	fi; \
@@ -1887,14 +1925,14 @@ publish_github:
 		      echo "Skipping native embedded-version verification for $$(basename "$$f") ($$mode)."; \
 		    fi; \
 		    echo "Uploading $$(basename $$f) to $$TAG..."; \
-	    gh release upload "$$TAG" "$$f" --repo "$(IOS_GITHUB_REPO)" --clobber; \
+	    gh release upload "$$TAG" "$$f" --repo "$(IOS_GITHUB_REPO)" --clobber || exit 1; \
 	  fi; \
 	done; \
 	for f in "$(WEB_BUNDLE_ZIP)" "$(WEB_BUNDLE_LITE_ZIP)"; \
 	do \
 	  if [ -f "$$f" ]; then \
 	    echo "Uploading $$(basename "$$f") to $$TAG..."; \
-	    gh release upload "$$TAG" "$$f" --repo "$(IOS_GITHUB_REPO)" --clobber; \
+	    gh release upload "$$TAG" "$$f" --repo "$(IOS_GITHUB_REPO)" --clobber || exit 1; \
 	  else \
 	    echo "Skip web bundle: $$f not found."; \
 	  fi; \
@@ -1915,7 +1953,7 @@ publish_github:
 	    if [ -f "$$f" ]; then \
 	      found_symbols=1; \
 	      echo "Uploading debug symbols $$(basename "$$f") to $$TAG..."; \
-	      gh release upload "$$TAG" "$$f" --repo "$(IOS_GITHUB_REPO)" --clobber; \
+	      gh release upload "$$TAG" "$$f" --repo "$(IOS_GITHUB_REPO)" --clobber || exit 1; \
 	    fi; \
 	  done; \
 	  if [ "$$found_symbols" = "0" ]; then \
@@ -1948,7 +1986,7 @@ publish_github:
 	    find "$$stage_dir/$$top_dir" -maxdepth 1 -type f -name '*.log' -delete; \
 	    (cd "$$stage_dir" && zip -qr "$$zip_path" "$$top_dir") || { rm -rf "$$stage_dir" "$$zip_path"; exit 1; }; \
 	    echo "Uploading $$(basename "$$zip_path") to $$TAG..."; \
-	    gh release upload "$$TAG" "$$zip_path" --repo "$(IOS_GITHUB_REPO)" --clobber; \
+	    gh release upload "$$TAG" "$$zip_path" --repo "$(IOS_GITHUB_REPO)" --clobber || { rm -rf "$$stage_dir" "$$zip_path"; exit 1; }; \
 	    rm -rf "$$stage_dir" "$$zip_path"; \
 	  else \
 	    echo "Skip .NET bundle $$top_dir: $$dir not found."; \
@@ -1975,7 +2013,7 @@ publish_github:
 	  else \
 	    (cd "$$ocx_stage_dir" && zip -qr "$$ocx_zip" "$$ocx_top_dir") || { rm -rf "$$ocx_stage_dir" "$$ocx_zip"; exit 1; }; \
 	    echo "Uploading $$(basename "$$ocx_zip") to $$TAG..."; \
-	    gh release upload "$$TAG" "$$ocx_zip" --repo "$(IOS_GITHUB_REPO)" --clobber; \
+	    gh release upload "$$TAG" "$$ocx_zip" --repo "$(IOS_GITHUB_REPO)" --clobber || { rm -rf "$$ocx_stage_dir" "$$ocx_zip"; exit 1; }; \
 	    rm -rf "$$ocx_stage_dir" "$$ocx_zip"; \
 	  fi; \
 	else \
