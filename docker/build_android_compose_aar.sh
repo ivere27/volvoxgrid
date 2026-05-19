@@ -10,10 +10,17 @@ set -euo pipefail
 # This module does NOT bundle native code — its POM declares a runtime
 # dependency on PARENT_ARTIFACT_ID (which carries the JNI .so files).
 #
-# Usage (inside Docker): VERSION=0.8.9 /opt/volvoxgrid/build_android_compose_aar.sh
+# Usage (inside Docker): VERSION=$(cat VERSION) /opt/volvoxgrid/build_android_compose_aar.sh
 
 REPO_ROOT="${REPO_ROOT:-$(pwd)}"
-VERSION="${VERSION:-0.8.9}"
+if [[ -z "${VERSION:-}" && -f "${REPO_ROOT}/VERSION" ]]; then
+  VERSION="$(tr -d '[:space:]' < "${REPO_ROOT}/VERSION")"
+fi
+VERSION="${VERSION:-}"
+if [[ -z "${VERSION}" ]]; then
+  echo "Error: VERSION is empty. Set VERSION or populate ${REPO_ROOT}/VERSION." >&2
+  exit 1
+fi
 GROUP_ID="${GROUP_ID:-io.github.ivere27}"
 ARTIFACT_ID="${ARTIFACT_ID:-volvoxgrid-android-compose}"
 PARENT_ARTIFACT_ID="${PARENT_ARTIFACT_ID:-volvoxgrid-android}"

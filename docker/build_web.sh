@@ -6,7 +6,14 @@ set -euo pipefail
 
 REPO_ROOT="${REPO_ROOT:-$(pwd)}"
 TARGET="${WEB_DOCKER_TARGET:-all}"
-VERSION="${VOLVOXGRID_VERSION:-${VERSION:-0.8.9}}"
+if [[ -z "${VOLVOXGRID_VERSION:-}" && -z "${VERSION:-}" && -f "${REPO_ROOT}/VERSION" ]]; then
+  VERSION="$(tr -d '[:space:]' < "${REPO_ROOT}/VERSION")"
+fi
+VERSION="${VOLVOXGRID_VERSION:-${VERSION:-}}"
+if [[ -z "${VERSION}" ]]; then
+  echo "Error: VERSION is empty. Set VOLVOXGRID_VERSION, VERSION, or populate ${REPO_ROOT}/VERSION." >&2
+  exit 1
+fi
 export WASM_PACK_OPT_FLAGS="${WASM_PACK_OPT_FLAGS-}"
 WASM_DIST_ROOT="${REPO_ROOT}/dist/wasm"
 WASM_LITE_DIST_ROOT="${REPO_ROOT}/dist/wasm-lite"

@@ -14,6 +14,14 @@ BUILD_TARGET="${BUILD_TARGET:-all}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="${REPO_ROOT:-$(pwd)}"
 
+read_repo_version() {
+  if [[ -f "${REPO_ROOT}/VERSION" ]]; then
+    tr -d '[:space:]' < "${REPO_ROOT}/VERSION"
+  fi
+}
+
+DEFAULT_VERSION="$(read_repo_version)"
+
 run_android() {
   echo "========================================"
   echo "  Building: Android AAR"
@@ -80,7 +88,7 @@ run_desktop() {
   local desktop_artifact_id="${DESKTOP_ARTIFACT_ID:-volvoxgrid-desktop}"
   local desktop_lite_group_id="${DESKTOP_LITE_GROUP_ID:-${desktop_group_id}}"
   local desktop_lite_artifact_id="${DESKTOP_LITE_ARTIFACT_ID:-volvoxgrid-desktop-lite}"
-  local desktop_version="${DESKTOP_VERSION:-${VERSION:-0.8.9}}"
+  local desktop_version="${DESKTOP_VERSION:-${VERSION:-${DEFAULT_VERSION}}}"
   local desktop_git_commit="${DESKTOP_GIT_COMMIT:-${GIT_COMMIT:-unknown}}"
   local desktop_build_date="${DESKTOP_BUILD_DATE:-${BUILD_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}}"
 
@@ -136,7 +144,7 @@ run_wasm() {
   local dist_lite_dir="${DIST_LITE_DIR:-${REPO_ROOT}/dist/wasm-lite}"
   local web_target="${WEB_DOCKER_TARGET:-all}"
   WEB_DIST_DIR="${WEB_DIST_DIR:-${REPO_ROOT}/dist/web}"
-  WEB_BUNDLE_VERSION="${WEB_BUNDLE_VERSION:-${VERSION:-0.8.9}}"
+  WEB_BUNDLE_VERSION="${WEB_BUNDLE_VERSION:-${VERSION:-${DEFAULT_VERSION}}}"
   if [[ -z "${WEB_DOCKER_TARGET:-}" && "${BUILD_TARGET}" == "wasm" ]]; then
     web_target="bundle"
   fi
