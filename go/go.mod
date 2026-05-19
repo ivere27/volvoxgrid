@@ -1,6 +1,6 @@
 module github.com/ivere27/volvoxgrid/go
 
-go 1.24.0
+go 1.24
 
 require (
 	github.com/ivere27/synurang v0.5.10

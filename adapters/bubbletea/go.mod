@@ -1,10 +1,10 @@
 module github.com/ivere27/volvoxgrid/adapters/bubbletea
 
-go 1.24.0
+go 1.24
 
 require (
 	github.com/charmbracelet/bubbletea v1.3.10
-	github.com/ivere27/volvoxgrid/go v0.8.9
+	github.com/ivere27/volvoxgrid/go v0.8.10
 	google.golang.org/protobuf v1.36.0
 )
 

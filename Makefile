@@ -19,7 +19,7 @@
 # Variables
 # =============================================================================
 SYNURANG_MODULE ?= github.com/ivere27/synurang
-SYNURANG_VERSION ?= v0.5.13
+SYNURANG_VERSION ?= v0.6.0
 PROTOC_GEN_SYNURANG_FFI ?= $(shell gobin=$$(go env GOBIN 2>/dev/null); if [ -n "$$gobin" ]; then printf '%s/protoc-gen-synurang-ffi' "$$gobin"; else printf '%s/bin/protoc-gen-synurang-ffi' "$$(go env GOPATH 2>/dev/null)"; fi)
 PROTOC_GEN_SYNURANG_FFI_FLAG = --plugin=protoc-gen-synurang-ffi=$(PROTOC_GEN_SYNURANG_FFI)
 ANDROID_PROJECT_DIR := android
@@ -237,6 +237,7 @@ endif
         java-desktop-run java-desktop-run-release java-desktop-run-simple java-desktop-smoke \
         java-tui-run java-tui-run-release java-tui-smoke java-tui-smoke-release \
         go-tui-build go-tui-build-release go-tui-run go-tui-run-release go-tui-smoke go-tui-smoke-release \
+        swift-tui-build swift-tui-build-release swift-tui-run swift-tui-run-release swift-tui-smoke swift-tui-smoke-release \
         dotnet-build dotnet-build-release dotnet-run dotnet-run-release dotnet-smoke dotnet-smoke-release \
         dotnet-tui-build dotnet-tui-build-release dotnet-tui-run dotnet-tui-run-release dotnet-tui-smoke dotnet-tui-smoke-release \
         sheet sheet-lite sheet-build \
@@ -246,7 +247,7 @@ endif
         vsflexgrid vsflexgrid-release \
         docker_android_aar_image docker_android docker_desktop_image docker_desktop docker_desktop_lite \
         docker_web_image docker_web \
-        docker_ios_image docker_ios docker_ios_lite docker_all_image docker_all publish_maven \
+        docker_ios_image docker_ios docker_ios_lite update_swift_package_checksums docker_all_image docker_all publish_maven \
         publish_local publish_github publish_web publish_npm publish_nuget \
         publish_go publish_go_bubbletea \
         gtk-test gtk-test-release gtk-bench clean clean-all help
@@ -309,6 +310,12 @@ help:
 	@echo "  go-tui-run-release  Run Go terminal TUI sample (release library)"
 	@echo "  go-tui-smoke  Run Go terminal TUI smoke checks (debug library)"
 	@echo "  go-tui-smoke-release  Run Go terminal TUI smoke checks (release library)"
+	@echo "  swift-tui-build  Build Swift terminal TUI sample via docker swift:5.9 (debug)"
+	@echo "  swift-tui-build-release  Build Swift terminal TUI sample via docker swift:5.9 (release)"
+	@echo "  swift-tui-run  Run Swift terminal TUI sample interactively via docker (debug library)"
+	@echo "  swift-tui-run-release  Run Swift terminal TUI sample interactively via docker (release library)"
+	@echo "  swift-tui-smoke  Run Swift terminal TUI smoke checks via docker (debug library)"
+	@echo "  swift-tui-smoke-release  Run Swift terminal TUI smoke checks via docker (release library)"
 	@echo "  dotnet-build  Build VolvoxGrid .NET wrapper + sample (debug)"
 	@echo "  dotnet-build-release  Build VolvoxGrid .NET wrapper + sample (release)"
 	@echo "  dotnet-run    Run .NET sample (debug)"
@@ -356,10 +363,10 @@ help:
 	@echo "  publish_go_bubbletea      Tag + push 'adapters/bubbletea/vX.Y.Z' (requires publish_go to have shipped first)"
 	@echo ""
 	@echo "Example dependency source flags (default is local):"
-	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.8.9"
-	@echo "  make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.8.9"
-	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.8.9"
-	@echo "  make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.8.9"
+	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=$(VOLVOXGRID_VERSION)"
+	@echo "  make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=$(VOLVOXGRID_VERSION)"
+	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=$(VOLVOXGRID_VERSION)"
+	@echo "  make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=$(VOLVOXGRID_VERSION)"
 	@echo "  (maven mode skips local native library build for the example targets)"
 	@echo "  Flutter defaults to maven when VOLVOXGRID_SOURCE is omitted."
 	@echo "  VOLVOXGRID_SOURCE=local builds from source."
@@ -534,6 +541,61 @@ go-tui-smoke: host-library go-tui-build
 go-tui-smoke-release: host-library-release go-tui-build-release
 	@echo "Running Go terminal TUI smoke test (release library)..."
 	VOLVOXGRID_GO_TUI_SMOKE_MODE=1 "$(GO_TUI_BINARY_RELEASE)" "$(JAVA_DESKTOP_LIBRARY_RELEASE)"
+	@echo ""
+
+# ----- Swift terminal TUI sample (Linux only, via docker) -----
+# The Swift package on Linux dlopens libvolvoxgrid.so at runtime via
+# VOLVOXGRID_LIBRARY_PATH. Apple targets use the SwiftUI demos under
+# swift/Examples instead — these targets exist purely so engine devs
+# can validate the Swift wrapper against the same engine .so the
+# other language samples consume.
+SWIFT_TUI_DOCKER_IMAGE := swift:5.9
+SWIFT_TUI_WORKDIR := /workspace
+SWIFT_TUI_BINARY := $(SWIFT_TUI_WORKDIR)/.build/debug/VolvoxGridTuiSample
+SWIFT_TUI_BINARY_RELEASE := $(SWIFT_TUI_WORKDIR)/.build/release/VolvoxGridTuiSample
+SWIFT_TUI_LIBRARY := $(SWIFT_TUI_WORKDIR)/target/debug/libvolvoxgrid.so
+SWIFT_TUI_LIBRARY_RELEASE := $(SWIFT_TUI_WORKDIR)/target/release/libvolvoxgrid.so
+SWIFT_TUI_DOCKER := docker run --rm -v "$(CURDIR)":/workspace -w /workspace
+SWIFT_TUI_DOCKER_IT := docker run --rm -it -v "$(CURDIR)":/workspace -w /workspace
+
+swift-tui-build:
+	@echo "Building Swift terminal TUI sample (docker, debug)..."
+	$(SWIFT_TUI_DOCKER) $(SWIFT_TUI_DOCKER_IMAGE) swift build
+	@echo ""
+
+swift-tui-build-release:
+	@echo "Building Swift terminal TUI sample (docker, release)..."
+	$(SWIFT_TUI_DOCKER) $(SWIFT_TUI_DOCKER_IMAGE) swift build -c release
+	@echo ""
+
+swift-tui-run: host-library swift-tui-build
+	@echo "Running Swift terminal TUI sample (debug library)..."
+	$(SWIFT_TUI_DOCKER_IT) \
+		-e VOLVOXGRID_LIBRARY_PATH=$(SWIFT_TUI_LIBRARY) \
+		$(SWIFT_TUI_DOCKER_IMAGE) $(SWIFT_TUI_BINARY) --demo sales
+	@echo ""
+
+swift-tui-run-release: host-library-release swift-tui-build-release
+	@echo "Running Swift terminal TUI sample (release library)..."
+	$(SWIFT_TUI_DOCKER_IT) \
+		-e VOLVOXGRID_LIBRARY_PATH=$(SWIFT_TUI_LIBRARY_RELEASE) \
+		$(SWIFT_TUI_DOCKER_IMAGE) $(SWIFT_TUI_BINARY_RELEASE) --demo sales
+	@echo ""
+
+swift-tui-smoke: host-library swift-tui-build
+	@echo "Running Swift terminal TUI smoke test (debug library)..."
+	$(SWIFT_TUI_DOCKER) \
+		-e VOLVOXGRID_LIBRARY_PATH=$(SWIFT_TUI_LIBRARY) \
+		-e VOLVOXGRID_TUI_SMOKE_MODE=1 \
+		$(SWIFT_TUI_DOCKER_IMAGE) $(SWIFT_TUI_BINARY)
+	@echo ""
+
+swift-tui-smoke-release: host-library-release swift-tui-build-release
+	@echo "Running Swift terminal TUI smoke test (release library)..."
+	$(SWIFT_TUI_DOCKER) \
+		-e VOLVOXGRID_LIBRARY_PATH=$(SWIFT_TUI_LIBRARY_RELEASE) \
+		-e VOLVOXGRID_TUI_SMOKE_MODE=1 \
+		$(SWIFT_TUI_DOCKER_IMAGE) $(SWIFT_TUI_BINARY_RELEASE)
 	@echo ""
 
 dotnet-build:
@@ -736,6 +798,7 @@ doom-deps:
 VSFLEXGRID_DIR := adapters/vsflexgrid
 DOTNET_COMMON_CODEGEN_DIR := dotnet/src/common/Generated
 WEB_TS_CODEGEN_DIR := web/js/src/generated
+SWIFT_CODEGEN_DIR := swift/Sources/VolvoxGrid/Generated
 PROTO_INCLUDES := -Iproto -I$(VSFLEXGRID_DIR)/proto
 PROTO3_OPT := --experimental_allow_proto3_optional
 
@@ -748,6 +811,7 @@ codegen: build_codegen_tool
 	@mkdir -p codegen
 	@mkdir -p $(DOTNET_COMMON_CODEGEN_DIR)
 	@mkdir -p $(WEB_TS_CODEGEN_DIR)
+	@mkdir -p $(SWIFT_CODEGEN_DIR)
 	@mkdir -p $(GO_PROJECT_DIR)/api/v1
 	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
 		--go_out=$(GO_PROJECT_DIR) --go_opt=module=github.com/ivere27/volvoxgrid/go \
@@ -787,6 +851,12 @@ codegen: build_codegen_tool
 		$(PROTOC_GEN_SYNURANG_FFI_FLAG) \
 		--synurang-ffi_out=$(DOTNET_COMMON_CODEGEN_DIR) --synurang-ffi_opt=lang=csharp,mode=lite \
 		proto/volvoxgrid.proto
+	# Swift lite protobuf + FFI stubs
+	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
+		$(PROTOC_GEN_SYNURANG_FFI_FLAG) \
+		--synurang-ffi_out=$(SWIFT_CODEGEN_DIR) --synurang-ffi_opt=lang=swift,mode=lite \
+		proto/volvoxgrid.proto
+	@$(SED_I) 's|^import SynurangLite$$|// SynurangLite is vendored into this same module - no import needed.|' $(SWIFT_CODEGEN_DIR)/volvoxgrid_lite.swift
 	# Synurang server trait + dispatcher
 	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
 		$(PROTOC_GEN_SYNURANG_FFI_FLAG) \
@@ -843,7 +913,7 @@ codegen: build_codegen_tool
 		runtime/src/volvoxtree_ffi_runtime.rs \
 		runtime/src/wasm/volvoxgrid_wasm.rs \
 		$(VSFLEXGRID_DIR)/crate/src/volvoxgrid_ffi_native.rs
-	@echo "Codegen complete: codegen/ + $(DOTNET_COMMON_CODEGEN_DIR)/ + $(WEB_TS_CODEGEN_DIR)/ + runtime/ + web/ + $(VSFLEXGRID_DIR)/"
+	@echo "Codegen complete: codegen/ + $(DOTNET_COMMON_CODEGEN_DIR)/ + $(WEB_TS_CODEGEN_DIR)/ + $(SWIFT_CODEGEN_DIR)/ + runtime/ + web/ + $(VSFLEXGRID_DIR)/"
 
 # =============================================================================
 # Android
@@ -1541,6 +1611,52 @@ docker_ios: docker_ios_image
 docker_ios_lite:
 	$(MAKE) docker_ios IOS_LIBRARY_BUILD_MODE=lite
 
+SWIFT_PACKAGE_RELEASE_TAG ?= v$(VOLVOXGRID_VERSION)
+
+update_swift_package_checksums:
+	@command -v zip >/dev/null 2>&1 || { echo "Error: zip not found in PATH."; exit 1; }
+	@compute_checksum() { \
+		file="$$1"; \
+		checksum=""; \
+		if command -v swift >/dev/null 2>&1; then \
+			checksum=$$(swift package compute-checksum "$$file" 2>/dev/null || true); \
+		fi; \
+		if [ -z "$$checksum" ] && command -v shasum >/dev/null 2>&1; then \
+			checksum=$$(shasum -a 256 "$$file" | cut -d' ' -f1); \
+		fi; \
+		if [ -z "$$checksum" ] && command -v sha256sum >/dev/null 2>&1; then \
+			checksum=$$(sha256sum "$$file" | cut -d' ' -f1); \
+		fi; \
+		if [ -z "$$checksum" ] && command -v openssl >/dev/null 2>&1; then \
+			checksum=$$(openssl dgst -sha256 "$$file" | awk '{print $$NF}'); \
+		fi; \
+		if [ -z "$$checksum" ]; then \
+			echo "Error: could not compute SHA-256 checksum for $$file" >&2; \
+			return 1; \
+		fi; \
+		printf '%s\n' "$$checksum"; \
+	}; \
+	update_target() { \
+		target_name="$$1"; \
+		framework_name="$$2"; \
+		zip_name="$$3"; \
+		framework_dir="dist/ios/$$framework_name"; \
+		zip_path="dist/ios/$$zip_name"; \
+		if [ ! -d "$$framework_dir" ]; then \
+			echo "Skip Swift package target $$target_name: $$framework_dir not found."; \
+			return 0; \
+		fi; \
+		echo "Zipping $$framework_name for Swift package checksum..."; \
+		cd dist/ios && rm -f "$$zip_name" && zip -qr "$$zip_name" "$$framework_name" || exit 1; \
+		cd "$(CURRENT_DIR)"; \
+		checksum=$$(compute_checksum "$$zip_path") || exit 1; \
+		url="https://github.com/$(IOS_GITHUB_REPO)/releases/download/$(SWIFT_PACKAGE_RELEASE_TAG)/$$zip_name"; \
+		echo "Updating Package.swift $$target_name checksum: $$checksum"; \
+		bash "$(CURRENT_DIR)/scripts/update_swift_binary_target.sh" "$(CURRENT_DIR)/Package.swift" "$$target_name" "$$url" "$$checksum" || exit 1; \
+	}; \
+	update_target "VolvoxGridXCFramework" "VolvoxGrid.xcframework" "VolvoxGrid.xcframework.zip" || exit 1; \
+	update_target "VolvoxGridLiteXCFramework" "VolvoxGridLite.xcframework" "VolvoxGridLite.xcframework.zip" || exit 1
+
 
 docker_all_image:
 	@echo "Building unified Docker image (all toolchains)..."
@@ -1596,6 +1712,7 @@ docker_all: docker_all_image
 		-e DESKTOP_BUILD_DATE="$(DESKTOP_BUILD_DATE)" \
 		-e ANDROID_ABIS="$(AAR_ANDROID_ABIS)" \
 		"$(ALL_DOCKER_IMAGE)"
+	@$(MAKE) update_swift_package_checksums SWIFT_PACKAGE_RELEASE_TAG="v$(VOLVOXGRID_VERSION)"
 	@echo "All platform artifacts built."
 	@if [ "$(DESKTOP_BUILD_DOTNET)" = "0" ]; then \
 		echo ".NET artifacts: skipped (set DESKTOP_BUILD_DOTNET=1 to enable)"; \
@@ -1762,40 +1879,28 @@ publish_github:
 	fi; \
 	echo "Creating/updating GitHub release $$TAG..."; \
 	gh release view "$$TAG" --repo "$(IOS_GITHUB_REPO)" >/dev/null 2>&1 || \
-		gh release create "$$TAG" $$PRERELEASE_FLAG --repo "$(IOS_GITHUB_REPO)" --title "$$TAG" --notes "Release $$TAG"; \
+		gh release create "$$TAG" $$PRERELEASE_FLAG --repo "$(IOS_GITHUB_REPO)" --title "$$TAG" --notes "Release $$TAG" || exit 1; \
+	$(MAKE) update_swift_package_checksums SWIFT_PACKAGE_RELEASE_TAG="$$TAG" || exit 1; \
 		if [ -d "$(IOS_XCFRAMEWORK_DIR)" ]; then \
 			echo "Verifying embedded version for XCFramework (expected $(IOS_VERSION))..."; \
 			bash "$$VERIFY_SCRIPT" "$(IOS_VERSION)" "$(IOS_XCFRAMEWORK_DIR)" || exit 1; \
-			echo "Zipping XCFramework..."; \
-		cd dist/ios && rm -f VolvoxGrid.xcframework.zip && \
-			zip -r VolvoxGrid.xcframework.zip VolvoxGrid.xcframework/; \
-		cd "$(CURRENT_DIR)"; \
-		CHECKSUM=$$(swift package compute-checksum "$(IOS_XCFRAMEWORK_ZIP)" 2>/dev/null || shasum -a 256 "$(IOS_XCFRAMEWORK_ZIP)" | cut -d' ' -f1); \
-		echo "Checksum: $$CHECKSUM"; \
-		gh release upload "$$TAG" "$(IOS_XCFRAMEWORK_ZIP)" --repo "$(IOS_GITHUB_REPO)" --clobber; \
-		echo "Updating Package.swift..."; \
-		URL="https://github.com/$(IOS_GITHUB_REPO)/releases/download/$$TAG/VolvoxGrid.xcframework.zip"; \
-			printf '// swift-tools-version:5.9\nimport PackageDescription\n\nlet package = Package(\n    name: "VolvoxGrid",\n    products: [\n        .library(name: "VolvoxGrid", targets: ["VolvoxGrid"]),\n    ],\n    targets: [\n        .binaryTarget(\n            name: "VolvoxGrid",\n            url: "%s",\n            checksum: "%s"\n        ),\n    ]\n)\n' "$$URL" "$$CHECKSUM" > Package.swift; \
-		echo "XCFramework uploaded, Package.swift updated."; \
+		if [ ! -f "$(IOS_XCFRAMEWORK_ZIP)" ]; then \
+			echo "Error: Swift package zip not found: $(IOS_XCFRAMEWORK_ZIP)" >&2; \
+			exit 1; \
+		fi; \
+		gh release upload "$$TAG" "$(IOS_XCFRAMEWORK_ZIP)" --repo "$(IOS_GITHUB_REPO)" --clobber || exit 1; \
+		echo "XCFramework uploaded."; \
 	else \
 		echo "Skip iOS: $(IOS_XCFRAMEWORK_DIR) not found."; \
 	fi; \
 	if [ -d "$(IOS_XCFRAMEWORK_LITE_DIR)" ]; then \
 		echo "Verifying embedded version for lite XCFramework (expected $(IOS_VERSION))..."; \
 		bash "$$VERIFY_SCRIPT" "$(IOS_VERSION)" "$(IOS_XCFRAMEWORK_LITE_DIR)" || exit 1; \
-		echo "Zipping lite XCFramework..."; \
-		cd dist/ios && rm -f VolvoxGridLite.xcframework.zip && \
-			zip -r VolvoxGridLite.xcframework.zip VolvoxGridLite.xcframework/; \
-		cd "$(CURRENT_DIR)"; \
-		LITE_CHECKSUM=$$(swift package compute-checksum "$(IOS_XCFRAMEWORK_LITE_ZIP)" 2>/dev/null || shasum -a 256 "$(IOS_XCFRAMEWORK_LITE_ZIP)" | cut -d' ' -f1); \
-		echo "Lite checksum: $$LITE_CHECKSUM"; \
-		gh release upload "$$TAG" "$(IOS_XCFRAMEWORK_LITE_ZIP)" --repo "$(IOS_GITHUB_REPO)" --clobber; \
-		if [ -n "$${CHECKSUM:-}" ]; then \
-			echo "Updating Package.swift with lite product..."; \
-			FULL_URL="https://github.com/$(IOS_GITHUB_REPO)/releases/download/$$TAG/VolvoxGrid.xcframework.zip"; \
-			LITE_URL="https://github.com/$(IOS_GITHUB_REPO)/releases/download/$$TAG/VolvoxGridLite.xcframework.zip"; \
-			printf '// swift-tools-version:5.9\nimport PackageDescription\n\nlet package = Package(\n    name: "VolvoxGrid",\n    products: [\n        .library(name: "VolvoxGrid", targets: ["VolvoxGrid"]),\n        .library(name: "VolvoxGridLite", targets: ["VolvoxGridLite"]),\n    ],\n    targets: [\n        .binaryTarget(\n            name: "VolvoxGrid",\n            url: "%s",\n            checksum: "%s"\n        ),\n        .binaryTarget(\n            name: "VolvoxGridLite",\n            url: "%s",\n            checksum: "%s"\n        ),\n    ]\n)\n' "$$FULL_URL" "$$CHECKSUM" "$$LITE_URL" "$$LITE_CHECKSUM" > Package.swift; \
+		if [ ! -f "$(IOS_XCFRAMEWORK_LITE_ZIP)" ]; then \
+			echo "Error: Swift package zip not found: $(IOS_XCFRAMEWORK_LITE_ZIP)" >&2; \
+			exit 1; \
 		fi; \
+		gh release upload "$$TAG" "$(IOS_XCFRAMEWORK_LITE_ZIP)" --repo "$(IOS_GITHUB_REPO)" --clobber || exit 1; \
 	else \
 		echo "Skip iOS lite: $(IOS_XCFRAMEWORK_LITE_DIR) not found."; \
 	fi; \
@@ -1820,14 +1925,14 @@ publish_github:
 		      echo "Skipping native embedded-version verification for $$(basename "$$f") ($$mode)."; \
 		    fi; \
 		    echo "Uploading $$(basename $$f) to $$TAG..."; \
-	    gh release upload "$$TAG" "$$f" --repo "$(IOS_GITHUB_REPO)" --clobber; \
+	    gh release upload "$$TAG" "$$f" --repo "$(IOS_GITHUB_REPO)" --clobber || exit 1; \
 	  fi; \
 	done; \
 	for f in "$(WEB_BUNDLE_ZIP)" "$(WEB_BUNDLE_LITE_ZIP)"; \
 	do \
 	  if [ -f "$$f" ]; then \
 	    echo "Uploading $$(basename "$$f") to $$TAG..."; \
-	    gh release upload "$$TAG" "$$f" --repo "$(IOS_GITHUB_REPO)" --clobber; \
+	    gh release upload "$$TAG" "$$f" --repo "$(IOS_GITHUB_REPO)" --clobber || exit 1; \
 	  else \
 	    echo "Skip web bundle: $$f not found."; \
 	  fi; \
@@ -1848,7 +1953,7 @@ publish_github:
 	    if [ -f "$$f" ]; then \
 	      found_symbols=1; \
 	      echo "Uploading debug symbols $$(basename "$$f") to $$TAG..."; \
-	      gh release upload "$$TAG" "$$f" --repo "$(IOS_GITHUB_REPO)" --clobber; \
+	      gh release upload "$$TAG" "$$f" --repo "$(IOS_GITHUB_REPO)" --clobber || exit 1; \
 	    fi; \
 	  done; \
 	  if [ "$$found_symbols" = "0" ]; then \
@@ -1881,7 +1986,7 @@ publish_github:
 	    find "$$stage_dir/$$top_dir" -maxdepth 1 -type f -name '*.log' -delete; \
 	    (cd "$$stage_dir" && zip -qr "$$zip_path" "$$top_dir") || { rm -rf "$$stage_dir" "$$zip_path"; exit 1; }; \
 	    echo "Uploading $$(basename "$$zip_path") to $$TAG..."; \
-	    gh release upload "$$TAG" "$$zip_path" --repo "$(IOS_GITHUB_REPO)" --clobber; \
+	    gh release upload "$$TAG" "$$zip_path" --repo "$(IOS_GITHUB_REPO)" --clobber || { rm -rf "$$stage_dir" "$$zip_path"; exit 1; }; \
 	    rm -rf "$$stage_dir" "$$zip_path"; \
 	  else \
 	    echo "Skip .NET bundle $$top_dir: $$dir not found."; \
@@ -1908,7 +2013,7 @@ publish_github:
 	  else \
 	    (cd "$$ocx_stage_dir" && zip -qr "$$ocx_zip" "$$ocx_top_dir") || { rm -rf "$$ocx_stage_dir" "$$ocx_zip"; exit 1; }; \
 	    echo "Uploading $$(basename "$$ocx_zip") to $$TAG..."; \
-	    gh release upload "$$TAG" "$$ocx_zip" --repo "$(IOS_GITHUB_REPO)" --clobber; \
+	    gh release upload "$$TAG" "$$ocx_zip" --repo "$(IOS_GITHUB_REPO)" --clobber || { rm -rf "$$ocx_stage_dir" "$$ocx_zip"; exit 1; }; \
 	    rm -rf "$$ocx_stage_dir" "$$ocx_zip"; \
 	  fi; \
 	else \
@@ -2291,9 +2396,9 @@ publish_go_bubbletea:
 # =============================================================================
 flutter-setup:
 	@command -v flutter >/dev/null 2>&1 || { echo "Error: flutter not found in PATH."; exit 1; }
-	@if [ ! -d "$(FLUTTER_EXAMPLE_DIR)/android" ] || [ ! -d "$(FLUTTER_EXAMPLE_DIR)/linux" ]; then \
-		echo "Generating Flutter platform folders (android, linux)..."; \
-		cd "$(FLUTTER_EXAMPLE_DIR)" && flutter create . --platforms=android,linux; \
+	@if [ ! -d "$(FLUTTER_EXAMPLE_DIR)/android" ] || [ ! -d "$(FLUTTER_EXAMPLE_DIR)/ios" ] || [ ! -d "$(FLUTTER_EXAMPLE_DIR)/linux" ] || [ ! -d "$(FLUTTER_EXAMPLE_DIR)/macos" ]; then \
+		echo "Generating Flutter platform folders (android, ios, linux, macos)..."; \
+		cd "$(FLUTTER_EXAMPLE_DIR)" && flutter create . --platforms=android,ios,linux,macos; \
 	fi
 	@cd "$(FLUTTER_EXAMPLE_DIR)" && flutter pub get
 

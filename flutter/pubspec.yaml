@@ -1,6 +1,6 @@
 name: volvoxgrid
 description: VolvoxGrid pixel-rendering grid widget for Flutter
-version: 0.8.9
+version: 0.8.10
 homepage: https://github.com/ivere27/volvoxgrid
 repository: https://github.com/ivere27/volvoxgrid/tree/main/flutter
 
@@ -14,7 +14,7 @@ dependencies:
   ffi: ^2.1.0
   fixnum: ^1.1.0
   protobuf: ^6.0.0
-  synurang: 0.5.10
+  synurang: 0.6.0
 
 dev_dependencies:
   flutter_test:
@@ -30,6 +30,7 @@ flutter:
         pluginClass: VolvoxGridPlugin
       ios:
         ffiPlugin: true
+        pluginClass: VolvoxGridPlugin
       linux:
         ffiPlugin: true
       macos:

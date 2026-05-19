@@ -2,6 +2,15 @@
 
 All notable changes to VolvoxGrid are documented here. Per-package changelogs may have additional detail (e.g. [flutter/CHANGELOG.md](flutter/CHANGELOG.md)).
 
+## 0.8.10
+
+- Added a Swift package surface with the `VolvoxGrid` client, SwiftUI/UIKit/AppKit render views, Apple binary-target products, Linux support, and a Swift terminal TUI sample.
+- Added Flutter iOS/macOS example projects and direct iOS FFI loading for statically linked XCFramework symbols.
+- Fixed .NET native library discovery for NuGet `runtimes/<rid>/native` payloads and added cell text/value helper APIs to `VolvoxGridClient`.
+- Fixed Java desktop initialization so a null library path can resolve the packaged native library automatically.
+- Fixed Go module release metadata by pinning the Bubble Tea adapter to the matching core Go module version.
+- Refreshed platform documentation for Swift, Flutter, Java, Android, .NET, Go, Web, and build/release flows.
+
 ## 0.8.9
 
 - Added editor-session lifecycle and validation-on-cell-edit support across the engine, protocol, generated bindings, native hosts, Web/WASM, TUI, Flutter, Go, .NET, and ActiveX adapters.

@@ -1,18 +1,23 @@
 # IME in VolvoxGrid
 
-This document covers VolvoxGrid IME behavior across:
+You're trying to get input method composition working in a VolvoxGrid host. Here's how VolvoxGrid handles it on your platform.
 
-- shared Rust engine and proto contract
-- language bindings and native hosts
-- compatibility adapters
-- natural-language composition coverage
+## Who this is for
 
-## Design Summary
+You're either wiring IME into a new host adapter, or you're debugging why composition (Korean Hangul, Japanese Kana, Chinese Pinyin, French accents) misbehaves on an existing one. Either way, you need to know which side owns what.
 
-VolvoxGrid has two distinct input paths:
+This doc covers the shared engine and proto contract, the language bindings and native hosts, the compatibility adapters, and how far the engine's own compose layer reaches across natural languages.
+
+Next: skim the mental model below before you go hunting in `engine/src/`.
+
+## The mental model
+
+VolvoxGrid splits IME into two distinct input paths:
 
 1. GUI hosts use the platform IME.
 2. TUI hosts use engine-side compose.
+
+That's it. The rest of this document is just the consequences of that one rule.
 
 For GUI hosts, VolvoxGrid follows the same broad model used by mature grids:
 
@@ -27,7 +32,9 @@ VolvoxGrid does the same on GUI platforms: the host owns focus surfaces, composi
 
 TUI is the exception. A terminal has no OS IME, so the engine can optionally run a lightweight compose layer itself.
 
-## Shared Engine Contract
+Next: the shared contract is what every host has to satisfy.
+
+## The shared engine contract
 
 The common IME contract is defined once and reused everywhere. IME is layered on top of the editor-session lifecycle described in [GUI.md](GUI.md#editor-session-lifecycle).
 
@@ -41,19 +48,19 @@ The common IME contract is defined once and reused everywhere. IME is layered on
 - `EditState.session.preedit_text`
 - `EditConfig.compose_method`
 
-Meaning:
+What each field means:
 
-- `text` + `cursor` updates the current preedit string.
+- `text` + `cursor` update the current preedit string.
 - `commit = true` commits the supplied text into the active editor.
-- empty preedit clears composition state.
-- preedit commands must carry the active editor session's latest `session_id` and `state_version`.
+- An empty preedit clears composition state.
+- Preedit commands must carry the active editor session's latest `session_id` and `state_version`.
 - `compose_method` selects the engine-side compose algorithm when engine compose is active.
 - GUI hosts normally use host-driven IME through native editor surfaces.
-- TUI mode enables engine compose by default because terminals do not provide an OS IME surface.
+- TUI mode enables engine compose by default, because terminals don't provide an OS IME surface.
 
-### Editor Session Use
+### How the editor session connects
 
-GUI hosts should treat composition as active editor-session state:
+You should treat composition as active editor-session state, not as a side channel:
 
 - If composition starts while no editor is active, start an edit session for the current cell with `EDIT_START_IME_COMPOSITION`.
 - When the engine emits `EditorSessionStarted`, cache `session_id`, `state_version`, `value`, `selection`, `composing`, and `preedit_text`.
@@ -61,9 +68,11 @@ GUI hosts should treat composition as active editor-session state:
 - Apply `EditorSessionUpdated` deltas back to the host editor or proxy before sending the next command.
 - Ignore stale composition callbacks after `EditorSessionEnded`.
 
-For visible host-native editors, the host widget owns platform composition events and forwards only the normalized edit state to the engine. For `EDITOR_CANVAS` sessions, the engine renders the preedit underline/caret itself, but the host still owns the platform IME focus surface or idle proxy on GUI platforms.
+For visible host-native editors, the host widget owns platform composition events and forwards only the normalized edit state to the engine. For `EDITOR_CANVAS` sessions, the engine renders the preedit underline and caret itself, but the host still owns the platform IME focus surface or idle proxy on GUI platforms.
 
-### Engine
+Next: the engine side of that contract.
+
+### Engine flow
 
 The engine-side flow lives in:
 
@@ -77,10 +86,12 @@ Core behavior:
 - `commit_preedit()` inserts committed text into `edit_text`.
 - `cancel_preedit()` clears composition without changing `edit_text`.
 - `flush_preedit()` finalizes pending preedit before commit/navigation keys.
-- the active editor renderer draws preedit inline with underline and caret.
-- host-driven IME composition suppresses normal grid key handling until composition ends.
+- The active editor renderer draws preedit inline with underline and caret.
+- Host-driven IME composition suppresses normal grid key handling until composition ends.
 
-## Runtime Matrix
+Next: which host owns the IME on your runtime.
+
+## Runtime matrix
 
 | Runtime | Language | IME owner | Strategy |
 |---|---|---|---|
@@ -91,7 +102,9 @@ Core behavior:
 | Web/WASM | TypeScript | browser + OS IME | hidden `<textarea>` proxy plus visible host editor |
 | Go / .NET / Java TUI | Go / C# / Java + Rust engine | engine compose | no host IME; compose handled in the shared engine |
 
-## GUI Hosts
+Next: per-platform specifics.
+
+## GUI hosts
 
 ### Android
 
@@ -99,22 +112,22 @@ Primary file:
 
 - `android/volvoxgrid-android/src/main/java/io/github/ivere27/volvoxgrid/VolvoxGridView.kt`
 
-Current behavior:
+What the host does:
 
-- uses a hidden 1x1 `EditText` as `imeProxy` when the grid is focused but not actively editing
-- keeps `showSoftInputOnFocus = false` on the idle proxy so it does not pop the keyboard on every tap
-- starts engine edit when composition begins on the idle proxy
-- defers showing the visible editor until composition settles
-- swaps to a real overlay `EditText` during active edit
-- reads composing spans from `BaseInputConnection` and forwards them through `EditorSessionCommand.preedit_changed`
-- commits plain text through `EditorSessionCommand.value_changed` when no composition is active
-- ignores stale composition callbacks after the active `session_id` changes
+- Uses a hidden 1x1 `EditText` as `imeProxy` when the grid is focused but not actively editing.
+- Keeps `showSoftInputOnFocus = false` on the idle proxy so it doesn't pop the keyboard on every tap.
+- Starts engine edit when composition begins on the idle proxy.
+- Defers showing the visible editor until composition settles.
+- Swaps to a real overlay `EditText` during active edit.
+- Reads composing spans from `BaseInputConnection` and forwards them through `EditorSessionCommand.preedit_changed`.
+- Commits plain text through `EditorSessionCommand.value_changed` when no composition is active.
+- Ignores stale composition callbacks after the active `session_id` changes.
 
 Practical result:
 
-- touch devices get the native Android keyboard and IME
-- hardware-keyboard composition can begin before the overlay is visible
-- the engine still renders the preedit state
+- Touch devices get the native Android keyboard and IME.
+- Hardware-keyboard composition can begin before the overlay is visible.
+- The engine still renders the preedit state.
 
 ### Flutter
 
@@ -123,20 +136,20 @@ Primary files:
 - `flutter/lib/volvoxgrid.dart`
 - `flutter/lib/volvoxgrid_controller.dart`
 
-Current behavior:
+What the host does:
 
-- active editing uses a host `TextField`
-- desktop uses a hidden `imeProxy` `TextField` so hardware-keyboard IME can start while the grid is idle
-- mobile intentionally skips idle proxy focus to avoid opening the soft keyboard on every tap
-- composition updates are forwarded with `VolvoxGridController.setEditPreedit(...)`
-- plain edits still use normal edit RPCs such as `beginEdit`, `commitEdit`, and `cancelEdit`
-- overlay key handling ignores commit/cancel shortcuts while Flutter reports an active composing range
-- edit RPCs include the current `session_id` and `state_version` when mutating the active session
+- Active editing uses a host `TextField`.
+- Desktop uses a hidden `imeProxy` `TextField` so hardware-keyboard IME can start while the grid is idle.
+- Mobile intentionally skips idle proxy focus to avoid opening the soft keyboard on every tap.
+- Composition updates are forwarded with `VolvoxGridController.setEditPreedit(...)`.
+- Plain edits still use the normal edit RPCs: `beginEdit`, `commitEdit`, `cancelEdit`.
+- Overlay key handling ignores commit/cancel shortcuts while Flutter reports an active composing range.
+- Edit RPCs include the current `session_id` and `state_version` when mutating the active session.
 
 Practical result:
 
-- Android/iOS Flutter builds rely on the normal platform text system
-- desktop Flutter builds can start IME composition before the visible edit box exists
+- Android/iOS Flutter builds rely on the normal platform text system.
+- Desktop Flutter builds can start IME composition before the visible edit box exists.
 
 ### Java Desktop
 
@@ -144,20 +157,20 @@ Primary file:
 
 - `java/desktop/src/main/java/io/github/ivere27/volvoxgrid/desktop/VolvoxGridDesktopPanel.java`
 
-Current behavior:
+What the host does:
 
-- the panel itself disables input methods
-- a transparent `JTextField` proxy is always present and input-method enabled
-- the proxy captures `InputMethodEvent` traffic even when the visible edit overlay is not yet shown
-- IME input can trigger `beginHostEditOverlay()` before cell geometry is ready
-- committed and composed text are separated from the `InputMethodEvent`
-- `InputContext.endComposition()` is called before commit/cancel to flush pending composition
-- a `DocumentFilter` guards against stale post-cancel mutations from the proxy text field
+- The panel itself disables input methods.
+- A transparent `JTextField` proxy is always present and input-method enabled.
+- The proxy captures `InputMethodEvent` traffic even when the visible edit overlay isn't yet shown.
+- IME input can trigger `beginHostEditOverlay()` before cell geometry is ready.
+- Committed and composed text are separated from the `InputMethodEvent`.
+- `InputContext.endComposition()` is called before commit/cancel to flush pending composition.
+- A `DocumentFilter` guards against stale post-cancel mutations from the proxy text field.
 
 Why this shape exists:
 
-- on Swing/X11, `InputMethodEvent` is delivered to `JTextComponent`, not to a plain painted panel
-- the transparent proxy gives the pixel-rendered grid a real IME-capable text target
+- On Swing/X11, `InputMethodEvent` is delivered to `JTextComponent`, not to a plain painted panel.
+- The transparent proxy gives the pixel-rendered grid a real IME-capable text target.
 
 ### .NET WinForms
 
@@ -165,26 +178,26 @@ Primary file:
 
 - `dotnet/src/common/Volvox/RenderHostCpu.cs`
 
-Current behavior:
+What the host does:
 
-- visible editing uses a borderless WinForms `TextBox` with `ImeMode.On`
-- when the overlay is hidden, the host `Control` itself intercepts:
+- Visible editing uses a borderless WinForms `TextBox` with `ImeMode.On`.
+- When the overlay is hidden, the host `Control` itself intercepts:
   - `WM_IME_STARTCOMPOSITION`
   - `WM_IME_COMPOSITION`
   - `WM_IME_ENDCOMPOSITION`
   - `WM_IME_CHAR`
-- `WM_IME_STARTCOMPOSITION` starts a clean engine edit session for the active cell
+- `WM_IME_STARTCOMPOSITION` starts a clean engine edit session for the active cell.
 - `WM_IME_COMPOSITION` reads:
   - `GCS_RESULTSTR` for committed text
   - `GCS_COMPSTR` for preedit text
-- `WM_IME_ENDCOMPOSITION` clears preedit state
-- `WM_IME_CHAR` is suppressed to avoid duplicate insertion after `GCS_RESULTSTR`
+- `WM_IME_ENDCOMPOSITION` clears preedit state.
+- `WM_IME_CHAR` is suppressed to avoid duplicate insertion after `GCS_RESULTSTR`.
 
 Practical result:
 
-- WinForms does not need a second hidden proxy HWND
-- IMM32 can drive composition directly through the focused control
-- the overlay `TextBox` still takes over when visible editing is active
+- WinForms doesn't need a second hidden proxy HWND.
+- IMM32 can drive composition directly through the focused control.
+- The overlay `TextBox` still takes over when visible editing is active.
 
 ### Web/WASM
 
@@ -193,24 +206,26 @@ Primary files:
 - `web/js/src/volvoxgrid.ts`
 - `runtime/src/wasm.rs`
 
-Current behavior:
+What the host does:
 
-- the visible editor is a real DOM `input` or `select`
-- a hidden `textarea` `imeProxy` stays focused instead of the canvas while idle
-- `compositionstart` on the proxy begins engine editing at the current selection
-- `compositionupdate` forwards preedit through `set_edit_preedit`
-- `compositionend` commits through `commit_edit_preedit`
-- transition from proxy to visible editor is delayed so Korean-style immediate follow-up composition does not lose focus
-- the visible editor also handles `compositionstart/update/end`
-- non-IME key redispatch uses `event.isComposing` and `keyCode === 229` guards
-- session updates from the engine remain authoritative for overlay text and selection
+- The visible editor is a real DOM `input` or `select`.
+- A hidden `textarea` `imeProxy` stays focused instead of the canvas while idle.
+- `compositionstart` on the proxy begins engine editing at the current selection.
+- `compositionupdate` forwards preedit through `set_edit_preedit`.
+- `compositionend` commits through `commit_edit_preedit`.
+- The transition from proxy to visible editor is delayed so Korean-style immediate follow-up composition doesn't lose focus.
+- The visible editor also handles `compositionstart/update/end`.
+- Non-IME key redispatch uses `event.isComposing` and `keyCode === 229` guards.
+- Session updates from the engine remain authoritative for overlay text and selection.
 
 Practical result:
 
-- browser IME toggle keys and CJK composition work even though the grid is canvas-rendered
-- the engine remains the source of truth for edit state
+- Browser IME toggle keys and CJK composition work even though the grid is canvas-rendered.
+- The engine remains the source of truth for edit state.
 
-## TUI Hosts
+Next: TUI is a different shape entirely.
+
+## TUI hosts
 
 Relevant files:
 
@@ -220,17 +235,17 @@ Relevant files:
 - `engine/src/input.rs`
 - `engine/src/grid.rs`
 
-TUI behavior is different:
+TUI behavior is different on purpose:
 
-- terminal hosts only forward raw bytes and viewport/capability information
-- there is no host IME surface
-- the engine can enable compose internally
+- Terminal hosts only forward raw bytes and viewport/capability information.
+- There's no host IME surface.
+- The engine can enable compose internally.
 
 Default behavior:
 
 - TUI mode enables engine compose by default.
 - TUI mode defaults `compose_method = DeadKey`.
-- GUI mode leaves engine compose disabled unless a host/session explicitly enables it.
+- GUI mode leaves engine compose disabled unless a host or session explicitly enables it.
 
 Shipped engine compose methods:
 
@@ -238,16 +253,18 @@ Shipped engine compose methods:
 - `Hangul`
 - `Telex`
 
-This means:
+What that means in practice:
 
-- Latin dead-key accents can work in TUI without a host IME
-- Korean Hangul can use the engine algorithm
-- Vietnamese Telex can use the engine algorithm
-- TUI still cannot replace dictionary-based IMEs such as Chinese Pinyin or Japanese Kana/Kanji conversion
+- Latin dead-key accents can work in TUI without a host IME.
+- Korean Hangul can use the engine algorithm.
+- Vietnamese Telex can use the engine algorithm.
+- TUI still can't replace dictionary-based IMEs such as Chinese Pinyin or Japanese Kana/Kanji conversion.
 
-## Compatibility Adapter Matrix
+Next: how the compatibility adapters fit on top.
 
-These adapters do not all own IME themselves. Most inherit behavior from their host runtime.
+## Compatibility adapter matrix
+
+These adapters don't all own IME themselves. Most inherit behavior from their host runtime.
 
 | Adapter | Runtime | IME behavior | Status |
 |---|---|---|---|
@@ -258,7 +275,7 @@ These adapters do not all own IME themselves. Most inherit behavior from their h
 | `adapters/vsflexgrid` | Windows ActiveX / C/C++/Rust | `ImeComposition` dispatch bridge plus demo host `WM_IME_*` forwarding | external containers must forward IME messages |
 | `adapters/xtragrid` | WinForms compare harness | Volvox side inherits WinForms host IME; reference side uses DevExpress native editors | not a standalone IME implementation |
 
-### Sheet Adapter
+### Sheet adapter
 
 Primary file:
 
@@ -266,11 +283,11 @@ Primary file:
 
 Extra behavior:
 
-- hooks into VolvoxGrid's `onCompositionEditStart`
-- synchronizes the sheet edit state machine before focus moves to the visible grid editor
-- keeps formula-bar state and sheet edit state aligned during IME-driven entry
+- Hooks into VolvoxGrid's `onCompositionEditStart`.
+- Synchronizes the sheet edit state machine before focus moves to the visible grid editor.
+- Keeps formula-bar state and sheet edit state aligned during IME-driven entry.
 
-### SfDataGrid Adapter
+### SfDataGrid adapter
 
 Primary file:
 
@@ -278,11 +295,11 @@ Primary file:
 
 Behavior:
 
-- wraps `VolvoxGridWidget`
-- inherits Flutter's IME path directly
-- does not implement a separate composition bridge
+- Wraps `VolvoxGridWidget`.
+- Inherits Flutter's IME path directly.
+- Doesn't implement a separate composition bridge.
 
-### AG Grid Adapter
+### AG Grid adapter
 
 Primary file:
 
@@ -290,11 +307,11 @@ Primary file:
 
 Behavior:
 
-- instantiates the normal web `VolvoxGrid`
-- relies on the browser + VolvoxGrid web host IME path
-- does not add separate composition logic
+- Instantiates the normal web `VolvoxGrid`.
+- Relies on the browser + VolvoxGrid web host IME path.
+- Doesn't add separate composition logic.
 
-### VSFlexGrid ActiveX Adapter
+### VSFlexGrid ActiveX adapter
 
 Relevant files:
 
@@ -305,18 +322,18 @@ Relevant files:
 
 Current status:
 
-- the Rust adapter core understands `EditorSessionCommand.preedit_changed` and `preedit_text`
-- the windowless OCX exposes `ImeComposition(text, cursor, commit)` and encodes `preedit_changed` through the existing native edit protobuf path
-- the MinGW demo host forwards `WM_IME_STARTCOMPOSITION`, `WM_IME_COMPOSITION`, `WM_IME_ENDCOMPOSITION`, and suppresses `WM_IME_CHAR` duplicates
-- `WM_IME_COMPOSITION` reads `GCS_RESULTSTR` and `GCS_COMPSTR` through IMM32 and forwards them to the OCX DISPID bridge
+- The Rust adapter core understands `EditorSessionCommand.preedit_changed` and `preedit_text`.
+- The windowless OCX exposes `ImeComposition(text, cursor, commit)` and encodes `preedit_changed` through the existing native edit protobuf path.
+- The MinGW demo host forwards `WM_IME_STARTCOMPOSITION`, `WM_IME_COMPOSITION`, and `WM_IME_ENDCOMPOSITION`, and suppresses `WM_IME_CHAR` duplicates.
+- `WM_IME_COMPOSITION` reads `GCS_RESULTSTR` and `GCS_COMPSTR` through IMM32 and forwards them to the OCX DISPID bridge.
 
-Interpretation:
+What that means for you:
 
-- host wrappers can now drive the engine preedit API through the ActiveX dispatch surface instead of falling back to plain `WM_CHAR`
-- the shipped demo host has functional CJK/dead-key composition support, including inline preedit and commit without duplicate `WM_IME_CHAR` insertion
-- because the OCX is windowless, any other ActiveX container still needs to forward `WM_IME_*` messages from its host window to `ImeComposition`
+- Host wrappers can now drive the engine preedit API through the ActiveX dispatch surface instead of falling back to plain `WM_CHAR`.
+- The shipped demo host has functional CJK/dead-key composition support, including inline preedit and commit without duplicate `WM_IME_CHAR` insertion.
+- Because the OCX is windowless, any other ActiveX container still needs to forward `WM_IME_*` messages from its host window to `ImeComposition`.
 
-### XtraGrid Adapter
+### XtraGrid adapter
 
 Relevant files:
 
@@ -325,12 +342,14 @@ Relevant files:
 
 Current status:
 
-- this is a comparison harness, not a production host layer
-- the DevExpress reference side uses DevExpress editors
-- the Volvox side uses the normal `.NET` host path
-- no additional IME implementation lives in the harness
+- This is a comparison harness, not a production host layer.
+- The DevExpress reference side uses DevExpress editors.
+- The Volvox side uses the normal `.NET` host path.
+- No additional IME implementation lives in the harness.
 
-## Natural-Language Coverage
+Next: how far the shipped paths actually carry you across human languages.
+
+## Natural-language coverage
 
 IME requirements differ by human language. VolvoxGrid's runtime split maps cleanly onto those categories.
 
@@ -342,12 +361,14 @@ IME requirements differ by human language. VolvoxGrid's runtime split maps clean
 | algorithmic composition not shipped | Hindi, Bengali, Tamil | host handles natively | not currently implemented |
 | dictionary-based IME | Chinese, Japanese | required | out of scope |
 
-Important consequence:
+Two things follow from that table:
 
-- GUI hosts should continue to prefer the platform IME for full language coverage.
-- TUI can cover a useful subset, but not full CJK dictionary input.
+- GUI hosts should keep preferring the platform IME if you want full language coverage.
+- TUI covers a useful subset, but not full CJK dictionary input.
 
-## Current Repo Position
+Next: where the repo actually stands today.
+
+## Current repo position
 
 Today, the repo is strongest on IME in these public hosts:
 

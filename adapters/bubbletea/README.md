@@ -92,7 +92,7 @@ make tui-smoke
 The source is in [`examples/tui`](examples/tui). It mirrors the Go TUI sample
 data modes and also keeps the original simple typed-row example: `--demo simple`,
 `--demo sales`, `--demo hierarchy`, and `--demo stress`. The running TUI
-switches demos with `F5` Simple, `F6` Sales, `F7` Hierarchy, and `F8` Stress.
+switches demos with `F5` Simple, `F6` Sales, `F7` Tree, and `F8` Stress.
 `F12` toggles a debug panel like the Go TUI sample. Demo switches reuse the
 same adapter model and native terminal session. Simple, Sales, and Hierarchy
 are loaded as typed Go rows; Stress uses the native million-row loader while

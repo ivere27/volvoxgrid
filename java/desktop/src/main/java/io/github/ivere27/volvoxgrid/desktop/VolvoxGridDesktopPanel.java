@@ -600,17 +600,26 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         int rows,
         int cols
     ) throws SynurangDesktopBridge.SynurangBridgeException {
-        Objects.requireNonNull(libraryPath, "libraryPath");
+        String resolvedPath = libraryPath;
+        if (resolvedPath == null) {
+            resolvedPath = NativeLibraryPathResolver.resolveLibraryPath(null);
+            if (resolvedPath == null) {
+                throw new SynurangDesktopBridge.SynurangBridgeException(
+                    "Could not locate native library. Set VOLVOXGRID_LIBRARY_PATH, "
+                        + "include the bundled native on the classpath, or pass an explicit path. "
+                        + "Expected file: " + NativeLibraryPathResolver.expectedLibraryFileHint());
+            }
+        }
 
         release();
 
-        this.bridge = SynurangDesktopBridge.load(libraryPath);
+        this.bridge = SynurangDesktopBridge.load(resolvedPath);
         this.ownsHost = true;
         this.client = new VolvoxGridDesktopClient(this.bridge);
-        this.textRendererBridge = Java2DTextRendererBridge.tryCreate(libraryPath);
-        this.gpuSupported = NativeLibraryCapabilities.hasGpuRenderer(libraryPath);
+        this.textRendererBridge = Java2DTextRendererBridge.tryCreate(resolvedPath);
+        this.gpuSupported = NativeLibraryCapabilities.hasGpuRenderer(resolvedPath);
         this.nativeSurfaceBridge = this.gpuSupported
-            ? DesktopNativeSurfaceBridge.tryCreate(libraryPath)
+            ? DesktopNativeSurfaceBridge.tryCreate(resolvedPath)
             : null;
         this.gpuSupported = this.gpuSupported && this.nativeSurfaceBridge != null;
 

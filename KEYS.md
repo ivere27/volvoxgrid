@@ -1,16 +1,16 @@
 # Keyboard & Mouse Events in VolvoxGrid
 
-This document covers VolvoxGrid keyboard and mouse event handling across:
+You're trying to handle keyboard or mouse input in a VolvoxGrid host. Here's how VolvoxGrid handles it on your platform.
 
-- shared Rust engine and proto contract
-- grid modes and action dispatch
-- mouse hit-testing and pointer interactions
-- configuration options
-- adapter key forwarding
+## Who this is for
+
+You're wiring input into a new host adapter, debugging a key that doesn't do what you expect, or extending keyboard behavior in the engine. This doc walks you through the proto contract, the three input modes, the action tables, mouse hit-testing, configuration, and how each adapter forwards platform key events.
 
 For IME composition input, see `IME.md`.
 
-## Design Summary
+Next: the mental model.
+
+## The mental model
 
 VolvoxGrid has two input paths for non-IME events:
 
@@ -19,12 +19,13 @@ VolvoxGrid has two input paths for non-IME events:
 
 Adapters use web/Windows virtual key codes as the common key code space where the platform exposes them directly. Android forwards Android key codes for hardware keys; the engine handles the common Android/web differences such as Enter. The engine dispatches actions based on key code + modifier + current mode (non-editing, ENTER mode, EDIT mode).
 
-Editing behavior is configured through `EditConfig.activation`, primarily
-`EditTrigger` and `TabBehavior`.
+Editing behavior is configured through `EditConfig.activation`, primarily `EditTrigger` and `TabBehavior`.
 
-## Key Code Convention
+Next: the shared key code convention.
 
-Key codes generally use web/Windows virtual key values. Android is the main exception; Android hardware key codes are forwarded directly and normalized by engine-side handling where needed. The common web/Windows codes used by the engine:
+## Key code convention
+
+Key codes generally use web/Windows virtual key values. Android is the main exception; Android hardware key codes are forwarded directly and normalized by engine-side handling where needed. These are the common web/Windows codes the engine cares about:
 
 | Key code | Key |
 |----------|-----|
@@ -48,7 +49,9 @@ Key codes generally use web/Windows virtual key values. Android is the main exce
 | 88 | X |
 | 113 | F2 |
 
-### Modifier Bitmask
+### Modifier bitmask
+
+Modifiers are packed as a single int. Bits and values:
 
 | Bit | Value | Modifier |
 |-----|-------|----------|
@@ -57,9 +60,9 @@ Key codes generally use web/Windows virtual key values. Android is the main exce
 | 2 | `0x04` | Alt |
 | 3 | `0x08` | Meta |
 
-### Proto Messages
+### Proto messages
 
-`proto/volvoxgrid.proto` defines:
+`proto/volvoxgrid.proto` defines the wire shape:
 
 ```protobuf
 message KeyEvent {
@@ -73,23 +76,25 @@ message KeyEvent {
 
 `KEY_DOWN` and `KEY_UP` carry `key_code` for action dispatch. `KEY_PRESS` carries the typed character for text input.
 
-## Grid Modes
+Next: the engine has three modes, and that's what decides what a key does.
+
+## Grid modes
 
 The engine has three input modes that determine how keys are dispatched.
 
 ### Non-editing mode
 
-The grid is focused but no cell editor is active. Arrow keys navigate, Enter/F2 start editing, Ctrl+C copies.
+The grid is focused but no cell editor is active. Arrow keys navigate, Enter and F2 start editing, Ctrl+C copies.
 
 ### ENTER mode (`EDIT_UI_MODE_ENTER`)
 
-Spreadsheet-style editing. Usually activated by Enter, printable-key, IME, or programmatic starts. The current cell text starts selected, so the first printable key replaces it. Up/Down commit the edit and move to the adjacent row. Enter commits without moving the grid cursor.
+Spreadsheet-style editing. Usually activated by Enter, a printable key, IME, or a programmatic start. The current cell text starts selected, so the first printable key replaces it. Up and Down commit the edit and move to the adjacent row. Enter commits without moving the grid cursor.
 
 ### EDIT mode (`EDIT_UI_MODE_EDIT`)
 
-F2-style editing. Usually activated by F2, double-click, or click-caret starts. The caret is placed at the end of the existing text or at the clicked position. Left/Right move the caret within the text. For single-line editors, Up behaves like Home and Down behaves like End. Enter commits without moving.
+F2-style editing. Usually activated by F2, double-click, or a click-caret start. The caret is placed at the end of the existing text or at the clicked position. Left and Right move the caret within the text. For single-line editors, Up behaves like Home and Down behaves like End. Enter commits without moving.
 
-Defined on the wire as `EditUiMode` and carried by `EditorSession.ui_mode`. Hosts should use the session value instead of re-deriving mode from the input event:
+Defined on the wire as `EditUiMode` and carried by `EditorSession.ui_mode`. Use the session value instead of re-deriving mode from the input event:
 
 ```protobuf
 enum EditUiMode {
@@ -98,9 +103,11 @@ enum EditUiMode {
 }
 ```
 
-## Keyboard Action Tables
+Next: the full per-mode action tables.
 
-All key dispatch logic lives in `engine/src/input.rs`, functions `handle_key_down_with_behavior` and `handle_key_press_with_behavior`.
+## Keyboard action tables
+
+All key dispatch logic lives in `engine/src/input.rs`, in `handle_key_down_with_behavior` and `handle_key_press_with_behavior`.
 
 ### Non-editing mode
 
@@ -174,9 +181,11 @@ Dropdown-specific overrides in ENTER mode:
 | Backspace | Backspace | | |
 | Delete forward | Delete | | |
 
-## Mouse Event Dispatch
+Next: mouse and pointer dispatch.
 
-### Proto Messages
+## Mouse event dispatch
+
+### Proto messages
 
 ```protobuf
 message PointerEvent {
@@ -195,9 +204,9 @@ message ScrollEvent {
 }
 ```
 
-### Hit Areas
+### Hit areas
 
-The engine hit-tests pointer coordinates against these regions, defined in `engine/src/input.rs`:
+The engine hit-tests pointer coordinates against these regions. Definitions live in `engine/src/input.rs`:
 
 | HitArea | Description |
 |---------|-------------|
@@ -222,54 +231,54 @@ The engine hit-tests pointer coordinates against these regions, defined in `engi
 | FastScroll | fast scroll touch zone (right edge) |
 | Background | empty area beyond grid |
 
-### Click Behavior
+### Click behavior
 
 **Single click on a data cell** (`Cell`, `CellText`, `CellPicture`, `CellButtonPicture`):
 
-- Moves cell selection (fires `CellFocusChanging` / `CellFocusChanged`)
-- Shift+click extends selection range
-- Ctrl+click toggles row in ListBox selection mode
-- Opens dropdown editor on single-click for dropdown cells (when `EditTrigger >= KEY_CLICK`)
-- Click-away from active editor commits plain text edits, cancels dropdown edits
+- Moves cell selection (fires `CellFocusChanging` / `CellFocusChanged`).
+- Shift+click extends selection range.
+- Ctrl+click toggles row in ListBox selection mode.
+- Opens dropdown editor on single-click for dropdown cells (when `EditTrigger >= KEY_CLICK`).
+- Click-away from an active editor commits plain text edits, cancels dropdown edits.
 
 **Double click on a data cell**:
 
-- Begins EDIT mode (F2-style) with caret positioned at click location
-- Requires `EditTrigger >= KEY_CLICK`
+- Begins EDIT mode (F2-style) with caret positioned at click location.
+- Requires `EditTrigger >= KEY_CLICK`.
 
 **Checkbox cell click**:
 
-- Single click toggles the checkbox value
+- Single click toggles the checkbox value.
 
 **Dropdown button click**:
 
-- Opens the dropdown list for the cell
-- If already editing the same cell, fires `DropdownOpened`
+- Opens the dropdown list for the cell.
+- If already editing the same cell, fires `DropdownOpened`.
 
 **Outline button click**:
 
-- Toggles tree node expand/collapse
-- Fires `BeforeNodeToggle` / `AfterNodeToggle`
+- Toggles tree node expand/collapse.
+- Fires `BeforeNodeToggle` / `AfterNodeToggle`.
 
 **Column header click** (`IndicatorColTop`, `FixedRow`):
 
-- When `header_features & 1` (sort): triggers column sort (`BeforeSort` / `AfterSort`)
-- When `header_features & 2` (move): initiates column drag/reorder on long-press
-- When `header_click_select` and no header features: selects the entire column
+- When `header_features & 1` (sort): triggers column sort (`BeforeSort` / `AfterSort`).
+- When `header_features & 2` (move): initiates column drag/reorder on long-press.
+- When `header_click_select` and no header features: selects the entire column.
 
 **Row header click** (`IndicatorRowStart`):
 
-- When `header_click_select`: selects the entire row
+- When `header_click_select`: selects the entire row.
 
 **Indicator corner click** (`IndicatorCornerTopStart`):
 
-- Selects all cells (equivalent to Ctrl+A)
+- Selects all cells (equivalent to Ctrl+A).
 
 **Column border double click** (`ColBorder`):
 
-- Auto-fits column width (when `auto_size_mouse` is enabled)
+- Auto-fits column width (when `auto_size_mouse` is enabled).
 
-### Drag Behavior
+### Drag behavior
 
 | Gesture | Hit area | Action |
 |---------|----------|--------|
@@ -283,11 +292,13 @@ The engine hit-tests pointer coordinates against these regions, defined in `engi
 
 ### Scroll
 
-`ScrollEvent` with `delta_x` / `delta_y` scrolls the viewport. The engine supports fling/momentum scrolling which decelerates over time.
+`ScrollEvent` with `delta_x` / `delta_y` scrolls the viewport. The engine supports fling/momentum scrolling that decelerates over time.
 
 Scrollbar track clicks scroll by one page. Scrollbar arrow clicks scroll by a small step. Both support auto-repeat on held press.
 
-## Configuration Options
+Next: how you configure all of this.
+
+## Configuration options
 
 Defined in `proto/volvoxgrid.proto`:
 
@@ -301,9 +312,9 @@ enum EditTrigger {
 }
 ```
 
-- `NONE`: cells are read-only to user input; editing only via API
-- `KEY`: Enter key, F2, and printable character keystrokes start editing
-- `KEY_CLICK`: adds double-click to start editing
+- `NONE`: cells are read-only to user input; editing only via API.
+- `KEY`: Enter key, F2, and printable character keystrokes start editing.
+- `KEY_CLICK`: adds double-click to start editing.
 
 ### TabBehavior
 
@@ -333,7 +344,9 @@ message EditActivation {
 }
 ```
 
-## Event Output
+Next: what events come back out.
+
+## Event output
 
 All events are defined in `engine/src/event.rs` as variants of `GridEventData`.
 
@@ -385,15 +398,19 @@ All events are defined in `engine/src/event.rs` as variants of `GridEventData`.
 | `Cut` | Ctrl+X pressed |
 | `Paste` | Ctrl+V pressed |
 
-The engine emits these events but does not access the system clipboard. The host adapter receives the event and implements actual clipboard read/write using platform APIs.
+The engine emits these events but doesn't access the system clipboard. The host adapter receives the event and implements actual clipboard read/write using platform APIs.
 
-## Adapter Key Forwarding
+Next: per-adapter forwarding.
+
+## Adapter key forwarding
 
 Each adapter translates platform key events into the common `KeyEvent` proto. The translation strategy varies by platform.
 
 ### Flutter
 
 File: `flutter/lib/volvoxgrid.dart`
+
+The Flutter side maps Flutter's `LogicalKeyboardKey.keyId` onto a web/Windows virtual key code:
 
 ```dart
 void _forwardRawKeyEvent(KeyEvent event) {
@@ -404,50 +421,58 @@ void _forwardRawKeyEvent(KeyEvent event) {
 }
 ```
 
-- `LogicalKeyboardKey.keyId & 0x7FFFFFFF` yields web/Windows virtual key codes
-- Modifier bitmask built from `HardwareKeyboard.instance.isShiftPressed` etc.
-- Sends `KEY_DOWN` and `KEY_UP`; character input handled separately by the host text field
+- `LogicalKeyboardKey.keyId & 0x7FFFFFFF` yields web/Windows virtual key codes.
+- Modifier bitmask is built from `HardwareKeyboard.instance.isShiftPressed` and friends.
+- Sends `KEY_DOWN` and `KEY_UP`; character input is handled separately by the host text field.
 
 ### Java Desktop
 
 File: `java/desktop/.../VolvoxGridDesktopPanel.java`
 
+AWT key codes already match the virtual-key space, so the panel passes them through directly:
+
 ```java
 sendKeyDirect(type, keyCode, modifier, character);
 ```
 
-- AWT `KeyEvent.getKeyCode()` returns `VK_*` constants which are the same as web/Windows virtual key codes
-- Direct passthrough — no translation needed
-- Sends `KEY_DOWN`, `KEY_UP`, and `KEY_PRESS` for printable characters
+- AWT `KeyEvent.getKeyCode()` returns `VK_*` constants which are the same as web/Windows virtual key codes.
+- Direct passthrough — no translation needed.
+- Sends `KEY_DOWN`, `KEY_UP`, and `KEY_PRESS` for printable characters.
 
 ### .NET WinForms
 
 File: `dotnet/src/common/Volvox/RenderHostCpu.cs`
 
+WinForms `Keys` is also a virtual-key alias, so the host casts and forwards:
+
 ```csharp
 var payload = _client.EncodeRenderInputKey(_gridId, KeyDownEvent, (int)e.KeyCode, GetModifiers(), string.Empty);
 ```
 
-- `System.Windows.Forms.Keys` enum values are the same as Windows virtual key codes
-- Direct cast — no translation needed
-- Sends `KEY_DOWN`, `KEY_UP`, and `KEY_PRESS` for printable characters
+- `System.Windows.Forms.Keys` enum values are the same as Windows virtual key codes.
+- Direct cast — no translation needed.
+- Sends `KEY_DOWN`, `KEY_UP`, and `KEY_PRESS` for printable characters.
 
 ### Web/WASM
 
 File: `web/js/src/default-input.ts`
 
+The browser already gives you the right key code; the host just builds the modifier bitmask and forwards:
+
 ```typescript
 wasm.handle_key_down(gridId, e.keyCode, modifier);
 ```
 
-- DOM `KeyboardEvent.keyCode` is already a web virtual key code
-- Modifier built from `shiftKey`, `ctrlKey`/`metaKey`, `altKey`
-- Meta key is folded into Ctrl bit (`m |= 2`) for Mac Cmd key compatibility
-- IME guard: events with `isComposing` or `keyCode === 229` are suppressed
+- DOM `KeyboardEvent.keyCode` is already a web virtual key code.
+- Modifier built from `shiftKey`, `ctrlKey`/`metaKey`, `altKey`.
+- Meta key is folded into the Ctrl bit (`m |= 2`) for Mac Cmd key compatibility.
+- IME guard: events with `isComposing` or `keyCode === 229` are suppressed.
 
 ### Android
 
 File: `android/.../VolvoxGridView.kt`
+
+Android forwards its own `KEYCODE_*` values; the engine knows about the Android-vs-web overlaps (Enter being the obvious one):
 
 ```kotlin
 KeyEvent.newBuilder()
@@ -457,12 +482,12 @@ KeyEvent.newBuilder()
     .setCharacter(...)
 ```
 
-- Android `KEYCODE_*` constants are forwarded directly
-- Android key codes overlap with web/Windows virtual key codes for common keys (Enter=66 on Android vs 13 on web — the engine handles both)
-- Navigation keys (`DPAD_UP/DOWN/LEFT/RIGHT`, `ENTER`, `ESCAPE`, `TAB`) are intercepted from the idle proxy and forwarded
-- Printable characters generate a follow-up `KEY_PRESS` with the unicode character
+- Android `KEYCODE_*` constants are forwarded directly.
+- Android key codes overlap with web/Windows virtual key codes for common keys (Enter is 66 on Android vs 13 on web — the engine handles both).
+- Navigation keys (`DPAD_UP/DOWN/LEFT/RIGHT`, `ENTER`, `ESCAPE`, `TAB`) are intercepted from the idle proxy and forwarded.
+- Printable characters generate a follow-up `KEY_PRESS` with the unicode character.
 
-### Summary Table
+### Summary table
 
 | Adapter | Platform key type | Translation method |
 |---------|-------------------|--------------------|

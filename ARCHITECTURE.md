@@ -1,156 +1,101 @@
 # Architecture
 
-This document is for developers changing VolvoxGrid itself.
+## Why this doc exists
 
-For product overview and package installation, see [README.md](README.md). For renderer-specific design, see [GUI.md](GUI.md), [TUI.md](TUI.md), and [TEXT_RENDERING.md](TEXT_RENDERING.md).
+You're here because you're changing VolvoxGrid itself — not consuming a package, but touching the engine, the protobuf contract, a wrapper, or the build. This doc gives you the mental model and the daily commands you'll lean on. For product overview and package installation, see [README.md](README.md). For renderer-specific design, see [GUI.md](GUI.md), [TUI.md](TUI.md), and [TEXT_RENDERING.md](TEXT_RENDERING.md).
 
-## System Overview
+## The mental model
 
-VolvoxGrid is organized around one Rust grid engine with multiple host paths:
+VolvoxGrid is one Rust engine wrapped in many shells. There are four layers, in order from the inside out.
 
-- GUI hosts use the shared pixel-rendering engine through the native runtime or WASM bindings
-- TUI hosts use the same engine through terminal-oriented render sessions
-- full builds use the built-in Rust text engine, while lite builds register host OS/browser text renderers
-- platform wrappers stay thin and translate native events, buffers, and lifecycle into the shared contract
-- adapters sit above wrappers and map third-party grid APIs into VolvoxGrid behavior
+**The engine** in `engine/` owns retained grid state, layout, selection, edit flow, sorting, scrolling, rendering, and the semantic grid events you can react to. If a behavior should look the same on every platform, it lives here.
 
-At a high level:
+**The protocol** in `proto/` is the contract between the engine and everything else. Generated bindings flow into Rust, Dart, Java, C/C++, .NET, and Go consumers. If the shape of a request, response, or render-session message needs to change, start in `proto/` and run `make codegen`.
 
-`host or adapter -> wrapper -> runtime or wasm binding -> engine`
+**The wrappers** in `runtime/` and the web bindings expose the engine outward. `runtime/` is the shared Rust crate behind the native Synurang FFI used by Flutter, Android, Java, .NET, and Go; the web path builds the same engine via `wasm-pack` and layers `web/js/` on top.
 
-The engine owns grid state, layout, selection, edit flow, sorting, scrolling, rendering, and semantic grid events. Hosts own windowing, event loops, surfaces, and packaging.
+**The adapters and hosts** sit at the edge. Platform wrappers (`flutter/`, `android/`, `java/`, `dotnet/`, `go/`) handle windowing, input, packaging, and lifecycle. Compatibility adapters in `adapters/` translate third-party APIs (AG Grid, SfDataGrid, VSFlexGrid, etc.) into VolvoxGrid behavior. At runtime, calls flow:
 
-## Repo Layout
-
-- `engine/`: core retained grid model, layout, rendering, text integration, and event production
-- `runtime/`: shared Rust crate for the native Synurang runtime and WASM build targets
-- `web/js/`: browser loader, TypeScript API, default input helpers, npm package files, and WASM packaging glue
-- `web/example/`: Vite browser demo and release-demo source
-- `proto/`: protobuf service and render-session contract
-- `codegen/`: generated bindings and shared generated outputs
-- `flutter/`, `android/`, `java/`, `dotnet/`, `go/`: platform wrappers and samples
-- `adapters/`: compatibility layers such as AG Grid, Sheet, SfDataGrid, VSFlexGrid, and XtraGrid
-- `gtk-test/`, `smoke-test/`: focused local verification harnesses
-- `docker/`: reproducible packaging for published artifacts
-- `dist/`: packaged distribution artifacts
-- `public/`: static assets
-- `scripts/`: build and utility scripts
-- `testdata/`: test fixture data
-
-## Core Layers
-
-### Engine
-
-The Rust engine is the source of truth for:
-
-- retained grid state
-- row and column layout
-- selection and edit behavior
-- render orchestration
-- grid event generation
-
-If behavior changes should be shared across platforms, they usually belong here.
-
-### Contract
-
-The protobuf definitions in `proto/` define the public contract between the engine and its wrappers. Generated outputs then flow into Rust, Dart, Java, C/C++, and `.NET` consumers.
-
-If the shape of requests, responses, or render-session messages changes, start in `proto/`.
-
-### Native Runtime
-
-The native runtime is the shared host-facing boundary for non-web integrations. It exposes the protobuf-driven API over Synurang FFI and manages render and event streams for native clients.
-
-### WASM Path
-
-The web path builds the WASM-facing entry points from `runtime/` with `wasm-pack` and layers the `web/js/` TypeScript wrapper on top. The engine logic is still shared, but loading, JS interop, packaging, and browser integration are web-specific.
-
-### Text Rendering
-
-Text is still an engine concern even when a lite package delegates measurement and rasterization to the host.
-
-- Full builds use the built-in Rust text engine.
-- Lite builds register a named external text renderer, such as `Android`, `Browser`, `Java2D`, or `GDI`.
-- The Rust engine/runtime owns cache capacity, cache eviction, color-independent alpha masks, clipping, and final blending.
-- Platform bridges keep only small object or scratch-buffer caches.
-- When a render stream switches to another active grid, the previous grid's text cache is cleared.
-
-See [TEXT_RENDERING.md](TEXT_RENDERING.md) for the package matrix and debug-overlay behavior.
-
-### Wrappers And Hosts
-
-Platform wrappers should stay thin. Their job is to:
-
-- create or attach a grid/session
-- forward native input and viewport changes
-- present the rendered output
-- map platform-specific callbacks to the shared contract
-
-If a fix is only about one toolkit's lifecycle, packaging, or event model, it usually belongs in that wrapper rather than the engine.
-
-## Language And Platform Extensibility
-
-The protobuf contract in `proto/` and the [Synurang](https://github.com/ivere27/synurang) FFI transport together make VolvoxGrid language-agnostic and platform-agnostic. In theory, any language that can load a shared library and exchange protobuf messages can become a VolvoxGrid host.
-
-The engine exposes two output modes through the same proto API:
-
-- **GUI (pixel)**: the engine renders to a CPU RGBA buffer or GPU surface. The host provides a window, canvas, buffer, or native surface and presents the result. This path drives Flutter, Android, Java desktop, `.NET` desktop, and ActiveX hosts. The web/WASM host uses the same engine through wasm-bindgen instead of Synurang FFI.
-- **TUI (terminal)**: the engine renders to ANSI escape sequences or structured cell buffers. The host writes the output to a terminal. This path drives Java TUI, `.NET` TUI, and Go TUI hosts.
-
-Adding a new native language binding does not require changing the engine. The steps are:
-
-1. Generate protobuf bindings for the target language (`make codegen` or run `protoc` directly).
-2. Load `libvolvoxgrid` and call into it via Synurang FFI.
-3. Open a `RenderSession` stream for GUI or TUI rendering.
-4. Forward host input (pointer, keyboard, terminal bytes) and present the rendered output.
-
-The existing native wrappers (Flutter/Dart, Java/Kotlin, C#, Go) are concrete examples of this pattern. Each is a thin shell over the same proto API — the engine does not know or care which language is driving it.
-
-## Where To Change Things
-
-- Grid behavior, layout, painting, or shared event semantics: `engine/`
-- Native FFI/session behavior: `runtime/`
-- Browser-only loading or JS ergonomics: `web/js/`
-- Shared API surface: `proto/` then `make codegen`
-- Flutter wrapper behavior: `flutter/`
-- Android wrapper behavior: `android/`
-- Java wrapper behavior: `java/`
-- `.NET` wrapper behavior: `dotnet/`
-- Go wrapper behavior: `go/`
-- Framework compatibility or migration behavior: `adapters/`
-
-## Build Prerequisites
-
-You do not need every tool for every change, but the full repo can involve:
-
-- Rust stable via `rustup` (engine, runtime, all native builds)
-- `protoc` (proto contract changes via `make codegen`)
-- Go 1.22+ for `protoc-gen-synurang-ffi` and the Go TUI host (`go/`)
-- Node.js and npm for web demos, the web package, and adapter packages (`web/js/`, `web/example/`, `adapters/`)
-- Rust nightly and `wasm-pack` for WASM builds (`runtime/`)
-- Flutter SDK for Flutter work (`flutter/`)
-- Android SDK, Android NDK, and `cargo-ndk` for Android work (`android/`)
-- JDK and Gradle for Java and Android packaging (`java/`, `android/`)
-- `.NET` SDK for `.NET` wrappers (`dotnet/`)
-- Wine and MinGW-w64 for some Windows-oriented local flows
-
-## Common Development Commands
-
-Core loop:
-
-```bash
-make build
-make run
-make test
+```
+host or adapter  ->  wrapper  ->  runtime or wasm binding  ->  engine
 ```
 
-Codegen:
+The engine doesn't know — or care — which language is driving it. That's what makes adding a new host tractable: generate protobuf bindings, load `libvolvoxgrid`, open a `RenderSession`, present the bytes.
+
+## Repo tour
+
+Here's what each top-level directory is for. Read it once, then refer back when you're deciding where a change goes.
+
+- `engine/` — core retained grid model, layout, rendering, text integration, and event production. This is the source of truth.
+- `runtime/` — the shared Rust crate behind the native Synurang FFI and the WASM build targets. Native hosts go through here.
+- `proto/` — protobuf service and render-session contract. The single point of truth for the API shape.
+- `codegen/` — generated bindings and shared generated outputs. Don't hand-edit; regenerate.
+- `web/js/` — browser loader, TypeScript API, default input helpers, the npm package files, and WASM packaging glue.
+- `web/example/` — Vite browser demo and release-demo source.
+- `flutter/`, `android/`, `java/`, `dotnet/`, `go/` — platform wrappers and their sample apps.
+- `adapters/` — compatibility layers: `aggrid`, `bubbletea`, `report`, `sfdatagrid`, `sheet`, `vsflexgrid`, `xtragrid`.
+- `gtk-test/`, `smoke-test/` — focused local verification harnesses (workspace members alongside `engine` and `runtime`).
+- `docker/` plus `Dockerfile*` at the repo root — reproducible packaging for published artifacts.
+- `dist/` — packaged distribution artifacts.
+- `public/` — static assets.
+- `scripts/` — build and utility scripts.
+- `testdata/` — test fixture data.
+- `screenshots/`, `legacy/` — visual references and historical material.
+
+The Cargo workspace itself is small: `engine`, `runtime`, `smoke-test`, `gtk-test`, and `adapters/vsflexgrid/crate`. Everything else is built by its own toolchain (Gradle, dotnet, pub, npm, go).
+
+## Where each kind of change goes
+
+When you're about to touch something, find the matching row first:
+
+- Grid behavior, layout, painting, shared event semantics: `engine/`
+- Native FFI / session behavior: `runtime/`
+- Browser-only loading or JS ergonomics: `web/js/`
+- Public API surface: `proto/`, then `make codegen`
+- Flutter wrapper behavior: `flutter/`
+- Android wrapper behavior: `android/`
+- Java desktop or Java TUI behavior: `java/`
+- .NET wrapper behavior: `dotnet/`
+- Go wrapper or Go TUI behavior: `go/`
+- Framework compatibility or migration behavior: `adapters/`
+
+If you find yourself patching the same fix into three wrappers, it almost certainly belongs in the engine.
+
+## Building locally
+
+You don't need every tool for every change. Install what the area you're touching requires.
+
+- Rust stable via `rustup` — engine, runtime, every native build
+- `protoc` — proto contract changes via `make codegen`
+- Go 1.24+ — `protoc-gen-synurang-ffi` and the Go TUI host (matches `go/go.mod`)
+- Node.js and npm — web demos, the web package, adapter packages
+- Rust nightly and `wasm-pack` — WASM builds in `runtime/`
+- Flutter SDK — anything in `flutter/`
+- Android SDK, Android NDK, and `cargo-ndk` — anything in `android/`
+- JDK and Gradle — Java desktop and Android packaging
+- .NET SDK — `dotnet/` wrappers
+- Wine and MinGW-w64 — some Windows-oriented local flows (e.g. ActiveX)
+
+## Daily commands
+
+These are the make targets you'll run most. Each one is wired up in the root `Makefile`.
+
+**The core loop.** Build the engine and native library, smoke-test it, run unit tests. If your change is in `engine/` or `runtime/`, this is usually enough.
+
+```bash
+make build      # debug native library
+make release    # release native library
+make run        # smoke test against the native library
+make test       # Rust unit tests
+```
+
+**Codegen.** Run this every time you change a `.proto` file. It regenerates bindings for every language.
 
 ```bash
 make codegen
 ```
 
-Targeted local loops:
+**Targeted host runs.** Pick the one that matches what you're working on.
 
 ```bash
 make web
@@ -169,64 +114,75 @@ make dotnet-tui-run
 make go-tui-run
 ```
 
-## Proto And Codegen Workflow
+Notice the env-var overrides on the desktop runs — that's how you switch between local builds, Maven Central, and full/lite variants without editing the Makefile.
 
-When changing the public contract:
+## Proto and codegen workflow
+
+When you change the public contract, follow these steps in order:
 
 1. Edit the relevant file in `proto/`.
 2. Run `make codegen`.
-3. Update the engine, runtime, and every affected wrapper.
+3. Update the engine, the runtime, and every affected wrapper.
 4. Rebuild at least one affected host path.
 5. Run the relevant smoke or sample flow.
 
-Do not hand-edit generated binding outputs unless you are fixing the generation pipeline itself.
+Generated bindings live in `codegen/` and inside per-wrapper directories. Don't hand-edit them — fix the generation pipeline instead.
 
-## Build And Packaging
+Next: [proto/volvoxgrid.proto](proto/volvoxgrid.proto) for the schema itself.
+
+## Packaging and publishing
 
 Local developer builds:
 
-- `make build`: debug native library build
-- `make release`: release native library build
+```bash
+make build      # debug
+make release    # release
+```
 
-Packaging builds:
+Docker packaging (reproducible, what releases are built from):
 
-- `make docker_android_aar`
-- `make docker_desktop`
-- `make docker_web`
-- `make docker_ios`
-- `make docker_all`
+```bash
+make docker_android
+make docker_desktop
+make docker_web
+make docker_ios
+make docker_all
+```
 
-`make docker_all` builds the publishable full and lite Maven artifacts for Android, Android Compose, and Java desktop, plus iOS full and lite XCFrameworks. When `.NET` packaging is enabled, it also builds WinForms full and lite x64/x86 output for NuGet staging.
+`make docker_all` builds the publishable full and lite Maven artifacts for Android, Android Compose, and Java desktop, plus iOS full and lite XCFrameworks. When .NET packaging is enabled it also produces WinForms full and lite x64/x86 output for NuGet staging.
 
 Web packaging is targetable with `WEB_DOCKER_TARGET={all|bundle|web|sheet|sheet-lite|report|wasm|wasm-lite|wasm-threaded}`. The web and sheet release-demo targets externalize package JavaScript through CDN import maps and use the minified browser bundles.
 
 Publishing:
 
-- `make publish_maven`
-- `make publish_nuget`
-- `make publish_npm`
+```bash
+make publish_maven
+make publish_nuget
+make publish_npm
+```
 
-Internal Maven local flow:
+For local wrapper testing, the internal Docker packaging flows can install generated Maven artifacts (including lite) into `~/.m2/repository`.
 
-- Internal Docker packaging flows can install generated Maven artifacts, including lite artifacts, into `~/.m2/repository` for local wrapper testing.
+## Testing and verification
 
-## Testing And Verification
+Pick the smallest loop that proves your change.
 
-Use the smallest loop that proves the change:
+- `make test` — Rust unit tests in the workspace
+- `make run` — native library smoke test (the fastest end-to-end check)
+- `make gtk-test` — native GUI host verification on Linux
+- `make java-desktop-run` — desktop wrapper verification
+- `make android` or `make flutter-run` — mobile wrapper verification
+- `make java-tui-run`, `make dotnet-tui-run`, `make go-tui-run` — terminal host verification
 
-- `make test`: Rust unit tests
-- `make run`: native library smoke test
-- `make gtk-test`: native GUI host verification on Linux
-- `make java-desktop-run`: desktop wrapper verification
-- `make android` or `make flutter-run`: mobile wrapper verification
-- `make java-tui-run`, `make dotnet-tui-run`, `make go-tui-run`: terminal host verification
+Adapter-specific comparison tests and visual checks live with each adapter under `adapters/`.
 
-Adapter-specific comparison tests and visual checks live with the adapter projects under `adapters/`.
+Next: [CONTRIBUTING.md](CONTRIBUTING.md) for how to land changes.
 
-## Recommended Reading Order
+## What to read next
 
-- [README.md](README.md) for project positioning and package entry points
-- [GUI.md](GUI.md) if you are changing pixel-rendered GUI behavior
-- [TUI.md](TUI.md) if you are changing terminal rendering or host integration
-- [TEXT_RENDERING.md](TEXT_RENDERING.md) if you are changing full/lite font fallback or text cache behavior
-- this document for repo structure, build workflow, and development entry points
+- [README.md](README.md) — project positioning and package entry points
+- [GUI.md](GUI.md) — if you're changing pixel-rendered GUI behavior
+- [TUI.md](TUI.md) — if you're changing terminal rendering or host integration
+- [TEXT_RENDERING.md](TEXT_RENDERING.md) — if you're changing full/lite font fallback or text cache behavior
+- [BUILD_VARIANTS.md](BUILD_VARIANTS.md) — full vs lite features and artifact types
+- [CONTRIBUTING.md](CONTRIBUTING.md) — CLA, PR flow, and code style

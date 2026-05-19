@@ -1,46 +1,53 @@
-# VolvoxGrid for Web
+# VolvoxGrid for the web
 
-The `volvoxgrid` npm package wraps the Rust VolvoxGrid engine compiled to WebAssembly. All grid state lives in WASM memory; the JavaScript layer manages the render loop, HTML canvas, and event forwarding.
+VolvoxGrid is a pixel-rendered datagrid: the Rust engine compiles to WebAssembly and paints rows, headers, IME caret and selection straight onto a `<canvas>`. You get spreadsheet-class scroll performance in the browser without leaning on DOM virtualization tricks.
 
-## Installation
+## Quick start
+
+Install the package and the runtime ships alongside it.
 
 ```bash
 npm install volvoxgrid
 ```
 
-For the lite WASM runtime:
-
-```bash
-npm install volvoxgrid-lite
+```html
+<div id="grid" style="width: 800px; height: 400px"></div>
 ```
 
-## Quick Start
-
-### Using `VolvoxGrid` directly
-
-```js
+```ts
 import { VolvoxGrid } from "volvoxgrid";
 
-const grid = new VolvoxGrid(document.getElementById("grid"), {
-  wasmUrl: "./wasm/volvoxgrid_wasm.js",
+const grid = new VolvoxGrid(document.getElementById("grid")!, {
   columnDefs: [
-    { field: "name", headerName: "Name", width: 180 },
-    { field: "price", headerName: "Price", width: 90 },
-    { field: "qty", headerName: "Qty", width: 80 },
+    { field: "name",  headerName: "Name",  width: 180 },
+    { field: "price", headerName: "Price", width: 100 },
+    { field: "qty",   headerName: "Qty",   width: 80 },
   ],
   rowData: [
     { id: "a", name: "Widget A", price: 29.99, qty: 150 },
     { id: "b", name: "Widget B", price: 49.99, qty: 200 },
   ],
-  getRowId: ({ data }) => data.id,
+  getRowId: ({ data }) => (data as { id: string }).id,
 });
 
 await grid.loaded;
 grid.updateRows([{ id: "a", qty: 175 }]);
-grid.applyTransaction({ add: [{ id: "c", name: "Widget C", price: 9.99, qty: 80 }] });
 ```
 
-### Using the `<volvox-grid>` custom element
+That's the whole hello-world. In five minutes you have a scrollable, focusable, IME-aware grid with two rows and three columns drawn pixel-for-pixel by the Rust engine.
+
+## What you just built
+
+A few things to call out:
+
+- `new VolvoxGrid(host, options)` accepts any `HTMLElement`. Pass a `<canvas>` to render into it directly, or a container like a `<div>` and a child canvas is created to fill it.
+- Construction loads the WASM module asynchronously. `grid.loaded` is a `Promise<this>` you await before calling render-affecting methods.
+- `columnDefs`, `rowData`, `getRowId` mirror the vocabulary you already know from AG Grid / MUI / Kendo. `columns` and `data` are accepted as aliases.
+- All grid state lives in WASM memory. The JS facade just owns the canvas, the render loop, and event forwarding.
+
+## The custom element shortcut
+
+If you're HTML-first or shipping a quick demo without a bundler, use `<volvox-grid>`.
 
 ```html
 <script type="module">
@@ -51,274 +58,245 @@ grid.applyTransaction({ add: [{ id: "c", name: "Widget C", price: 9.99, qty: 80 
   row-count="100"
   col-count="5"
   show-column-headers
+  style="width: 800px; height: 400px;"
 ></volvox-grid>
 ```
 
-The custom element creates a shadow DOM canvas and initializes VolvoxGrid automatically. Supported attributes:
+Supported attributes:
 
-| Attribute | Default | Description |
+| Attribute | Default | Meaning |
 |---|---|---|
 | `row-count` | `10` | Total row count |
 | `col-count` | `5` | Total column count |
 | `frozen-row-count` | `0` | Number of frozen data rows |
 | `frozen-col-count` | `0` | Number of frozen data columns |
-| `show-column-headers` | `true` | Show the top column indicator band |
-| `show-row-indicator` | `false` | Show the start row indicator band |
-| `wasm-url` | `"./wasm/volvoxgrid_wasm.js"` | URL of the WASM module |
+| `show-column-headers` | `true` | Top column indicator band |
+| `show-row-indicator` | `false` | Start row indicator band |
+| `wasm-url` | `./wasm/volvoxgrid_wasm.js` | URL of the WASM glue |
 
-## Package Exports
+The element builds its own shadow DOM `<canvas>` and creates a `VolvoxGrid` once the WASM module is ready.
 
-| Export | Description |
-|---|---|
-| `volvoxgrid` | Main entry: `VolvoxGrid`, `VolvoxGridElement`, types |
-| `volvoxgrid/generated/volvoxgrid_ffi.js` | Generated low-level FFI constants |
-| `volvoxgrid/generated/volvoxgrid_lite.js` | Generated protobuf-lite message codecs |
-| `volvoxgrid/default-input.js` | Default keyboard/mouse input helpers |
-| `volvoxgrid/volvoxgrid-element.js` | Custom element registration |
+## Two packages: full vs lite
 
-## Package Builds
+You pick the runtime by your bundle budget. The JS API lives in `volvoxgrid` either way — the `volvoxgrid-lite` package ships only the slimmer WASM bytes, which you point `wasmUrl` at. See [BUILD_VARIANTS.md](../../BUILD_VARIANTS.md) for the build matrix.
 
-```bash
-npm run build
-```
+### `volvoxgrid` (full)
 
-This compiles the TypeScript package into `dist/` and also writes the minified browser bundle at `dist/volvoxgrid.min.js` with a source map. The package `unpkg` and `jsdelivr` fields point to that minified file.
+The default. Includes the built-in Rust text engine, GPU renderer, regex search, and (with the threaded build) rayon-parallel rasterization. WASM is around 3.3 MiB. Pick this for desktop apps and any deploy where bundle size isn't the bottleneck.
 
-The adapter packages follow the same release shape:
+### `volvoxgrid-lite` (lite)
 
-| Package | Minified bundle |
-|---|---|
-| `volvoxgrid` | `dist/volvoxgrid.min.js` |
-| `@volvoxgrid/ag-grid` | `dist/ag-grid-volvox.min.js` |
-| `@volvoxgrid/sheet` | `dist/volvox-sheet.min.js` |
+A smaller WASM — around 1.3 MiB — that drops the embedded text engine and GPU paths. Text measurement and rasterization fall back to the browser's Canvas2D APIs; the WASM still owns the external text-mask cache. Use this for low-bandwidth deploys, embeds, or anywhere you can't afford the full payload.
 
-Release demos can load these bundles from jsDelivr with import maps, while generated low-level modules remain available under `dist/generated/`.
-
-## Lite WASM Runtime
-
-`volvoxgrid-lite` contains the lite WASM runtime. Use the normal `volvoxgrid` JavaScript API and point `wasmUrl` at the lite package's WASM glue:
-
-```js
+```ts
 import { VolvoxGrid } from "volvoxgrid";
 
-const grid = new VolvoxGrid(document.getElementById("grid"), {
+const grid = new VolvoxGrid(document.getElementById("grid")!, {
   wasmUrl: new URL("volvoxgrid-lite/wasm/volvoxgrid_wasm.js", import.meta.url).href,
   rowCount: 100,
   colCount: 5,
 });
 ```
 
-Lite WASM excludes the built-in Rust text engine, GPU renderer, regex search, and rayon parallelism. Browser Canvas2D provides text measurement and rasterization on cache misses, while the WASM runtime owns the external text mask cache shown as `C:<used>/<cap>` in the debug overlay.
+For the full picture of which features live where, see [TEXT_RENDERING.md](../../TEXT_RENDERING.md).
 
-See [../../TEXT_RENDERING.md](../../TEXT_RENDERING.md) for full/lite text rendering and cache ownership.
+## Loading data
 
-## Font Fallback Policy
+The application-level API takes `columnDefs` + `rowData` and resolves stable row identity through `getRowId`.
 
-Font fallback is enabled by default. When enabled, the WASM runtime can use the
-registered browser glyph rasterizer for missing glyphs; the web demo may also
-fall back to browser Canvas2D text rendering when demo font downloads fail.
-Browser fallback font families are derived from the runtime fallback policy and
-the browser locale hints.
-
-If no font source can render a glyph, the engine uses a small internal final
-fallback: printable ASCII uses an embedded bitmap font, and other missing
-characters render as a diagnostic tofu box with the codepoint inside.
-
-Disable fallback at runtime if you prefer missing text over substituted or
-diagnostic fallback glyphs:
-
-```js
-await grid.loaded;
-grid.fontFallbackEnabled = false;
-// or:
-grid.setFontFallbackEnabled(false);
-```
-
-The same setting is also available in the shared protobuf API as
-`RenderConfig.font_fallback_enabled`. It applies to CPU and GPU rendering in
-the WASM runtime.
-
-## Data Operations
-
-#### RowData / Transactions
-
-Use `columnDefs` and `rowData` for the normal application API:
-
-```js
+```ts
 grid.setColumns([
-  { field: "name", headerName: "Name" },
+  { field: "name",   headerName: "Name" },
   { field: "status", headerName: "Status" },
 ]);
 
 grid.setData([
   { id: "1", name: "Alpha", status: "Ready" },
-  { id: "2", name: "Beta", status: "Queued" },
+  { id: "2", name: "Beta",  status: "Queued" },
 ], {
-  getRowId: ({ data }) => data.id,
-});
-
-grid.updateRows([{ id: "2", status: "Done" }]);
-
-grid.applyTransaction({
-  add: [{ id: "3", name: "Gamma", status: "Ready" }],
-  update: [{ id: "1", status: "Paused" }],
-  remove: ["2"],
+  getRowId: ({ data }) => (data as { id: string }).id,
 });
 ```
 
-For tree data, pass nested children or parent ids:
+`columnDefs` accepts `field`, `colId`, `headerName`, `width`, plus `valueGetter` / `valueFormatter` for host-side projection and display.
 
-```js
+Tree data passes through `setTreeData`, with either nested `children` or `parentId` fields:
+
+```ts
 grid.setTreeData([
-  {
-    id: "root",
-    name: "Root",
-    children: [{ id: "child", name: "Child" }],
-  },
+  { id: "root", name: "Root", children: [
+    { id: "child", name: "Child" },
+  ]},
 ], {
   columns: [{ field: "name", headerName: "Name" }],
 });
 ```
 
-#### Raw Protobuf Calls
+Bulk-load primitives are there when you don't want the row-id machinery:
 
-For exact `proto/volvoxgrid.proto` request/response access, import the generated
-protobuf-lite messages and call the runtime RPC by service method name:
-
-```js
-import { VolvoxGrid } from "volvoxgrid";
-import {
-  CellUpdate,
-  CellValue,
-  UpdateCellsRequest,
-  WriteResult,
-} from "volvoxgrid/generated/volvoxgrid_lite.js";
-
-const request = new UpdateCellsRequest({
-  cells: [
-    new CellUpdate({
-      row: 0,
-      col: 0,
-      value: new CellValue({ text: "Raw protobuf write" }),
-    }),
-  ],
-  atomic: true,
-});
-
-const result = grid.callProto("UpdateCells", request, WriteResult);
-```
-
-`callProto` fills `request.gridId` with the current engine id when the generated
-message has an unset `gridId` field. `callProtoBytes(method, bytes)` is available
-when you already have encoded protobuf bytes.
-
-#### LoadData
-
-Parse CSV or JSON bytes into the grid:
-
-```js
-// CSV
+```ts
+// CSV or JSON bytes parsed by the engine
 grid.loadData("Name,Price,Qty\nWidget A,29.99,150\nWidget B,49.99,200");
 
-// JSON matrix with options
-grid.loadData(
-  JSON.stringify([["Name", "Price"], ["Alpha", "10"]]),
-  { json: {}, headerPolicy: HeaderPolicy.HEADER_NONE },
-);
+// Row-major flat value array
+grid.loadTable(2, 3, ["Widget A", 29.99, 150, "Widget B", 49.99, 200]);
+
+// Single-cell write
+grid.setCellText(0, 0, "Alpha");
 ```
 
-#### UpdateCells
+## Updating rows
 
-Batch update cells:
+You've got three knobs depending on what you know:
 
-```js
+```ts
+// 1. Partial-by-id: only the changed fields
+grid.updateRows([{ id: "a", qty: 175 }]);
+
+// 2. AG Grid-style transaction
+grid.applyTransaction({
+  add:    [{ id: "c", name: "Widget C", price: 9.99, qty: 80 }],
+  update: [{ id: "a", qty: 200 }],
+  remove: ["b"],
+});
+
+// 3. Direct cell writes when you already have (row, col)
 grid.setCells([
   { row: 0, col: 0, text: "Alpha" },
   { row: 0, col: 1, text: "29.99" },
-  { row: 1, col: 0, text: "Beta" },
-  { row: 1, col: 1, text: "49.99" },
 ]);
 ```
 
-#### GetCells
+`updateRows` and `applyTransaction` both use `getRowId` to match rows. Pass `{ atomic: true }` in the options to commit the whole batch under a single engine transaction.
 
-Read cell values:
+## Events
 
-```js
-const text = grid.getCellText(0, 0);
-const price = grid.getCellText(0, 1);
+Listen with `on(name, listener)`. Listeners are strongly typed via `VolvoxGridEventMap`.
+
+```ts
+grid.on("editorSessionStarted", (e) => {
+  console.log("editing", e.row, e.col, e.initialText);
+});
+
+grid.on("editorSessionEnded", (e) => {
+  if (e.committedText !== undefined) {
+    console.log("committed", e.committedText);
+  }
+});
+
+grid.on("beforeSort", (e) => {
+  if (e.col === 0) e.cancel = true; // veto sort on column 0
+});
+
+grid.on("contextMenuRequest", (e) => {
+  // e.clientX/Y, e.row, e.col, e.selection — open your own menu
+});
 ```
 
-#### Clear
+Available events:
 
-```js
-// Clear everything
-grid.clear();
+| Name | Cancelable | Payload |
+|---|---|---|
+| `beforeEdit` | yes | `VolvoxGridBeforeEditDetails` |
+| `cellEditValidating` | yes | `VolvoxGridCellEditValidatingDetails` |
+| `beforeSort` | yes | `VolvoxGridBeforeSortDetails` |
+| `editorSessionStarted` | no | `VolvoxGridEditorSessionStartedDetails` |
+| `editorSessionUpdated` | no | `VolvoxGridEditorSessionUpdatedDetails` |
+| `editorSessionEnded` | no | `VolvoxGridEditorSessionEndedDetails` |
+| `zoomChange` | no | `number` |
+| `contextMenuRequest` | no | `VolvoxGridContextMenuRequest` |
+| `gridEventRaw` | no | `Uint8Array` (raw protobuf — escape hatch) |
 
-// Clear only data (keep formatting)
-grid.clear(/* scope */ 2, /* region */ 0);
-// Scopes: 0 = EVERYTHING, 1 = FORMATTING, 2 = DATA, 3 = SELECTION
-// Regions: 0 = SCROLLABLE, 1 = FIXED_ROWS, 2 = FIXED_COLS, 5 = ALL_REGIONS
+`off(name, listener)` removes; `once(name, listener)` runs once and unsubscribes. Cancelable events set `details.cancel = true` to veto.
 
-// Clear a specific cell range
-grid.clearCellRange(0, 0, 9, 4);
+## Editing
+
+The grid runs its own editor session: text input, dropdowns, checkbox toggles, IME composition and validation are all native paths.
+
+```ts
+grid.on("beforeEdit", (e) => {
+  if (e.col === 0) e.cancel = true; // make column 0 read-only
+});
+
+grid.on("cellEditValidating", (e) => {
+  if (e.editText.trim() === "") e.cancel = true; // reject empty
+});
 ```
 
-#### LoadTable
+For richer editor configuration — dropdowns, number/checkbox editors, custom presentation — use `setColDataType`, `setColDropdown`, `setCellDropdown`, and the typed editor APIs on the `VolvoxGrid` class.
 
-`loadTable` bulk-loads a row-major flat array of values in a single call:
+IME (Hangul, Pinyin, Kana) composition is handled by the WASM runtime and rendered onto the canvas. See [IME.md](../../IME.md) for the architecture and any platform caveats. The rest of the GUI behavior — selection model, keyboard map, copy/paste — lives in [GUI.md](../../GUI.md).
 
-```js
-grid.loadTable(2, 3, ["Widget A", 29.99, 150, "Widget B", 49.99, 200]);
+## CDN / no-bundler usage
+
+For demos and scratch pads, load the minified bundle directly from a CDN with an import map. The package's `unpkg` and `jsdelivr` fields both point at `dist/volvoxgrid.min.js`.
+
+```html
+<!doctype html>
+<script type="importmap">
+{
+  "imports": {
+    "volvoxgrid": "https://cdn.jsdelivr.net/npm/volvoxgrid@0.8.9/dist/volvoxgrid.min.js",
+    "volvoxgrid/volvoxgrid-element.js":
+      "https://cdn.jsdelivr.net/npm/volvoxgrid@0.8.9/dist/volvoxgrid-element.js"
+  }
+}
+</script>
+
+<div id="grid" style="width: 800px; height: 400px"></div>
+
+<script type="module">
+  import { VolvoxGrid } from "volvoxgrid";
+
+  const grid = new VolvoxGrid(document.getElementById("grid"), {
+    wasmUrl: "https://cdn.jsdelivr.net/npm/volvoxgrid@0.8.9/wasm/volvoxgrid_wasm.js",
+    rowCount: 50,
+    colCount: 6,
+  });
+  await grid.loaded;
+</script>
 ```
 
-Values are coerced to strings internally. For typed `CellValue` payloads (text, number, boolean, bytes, timestamp), use the generated FFI bindings in `volvoxgrid/generated/volvoxgrid_ffi.js`. For the full `LoadTableRequest` schema, see [`proto/volvoxgrid.proto`](../../proto/volvoxgrid.proto).
+Because `import.meta.url` no longer points at the package once a bundler inlines things, set `wasmUrl` explicitly when the default resolution can't find the WASM glue.
 
-## Adapter Packages
+## Adapter packages
 
-Compatibility adapters that map third-party grid APIs to VolvoxGrid:
+If you're migrating from another grid library, the adapter packages translate that library's API onto VolvoxGrid:
 
-- [`@volvoxgrid/ag-grid`](../../adapters/aggrid) - AG Grid API adapter
-- [`@volvoxgrid/sheet`](../../adapters/sheet) - Spreadsheet-style sheet adapter
+- **`@volvoxgrid/ag-grid`** — maps the AG Grid options surface (column defs, row models, the transaction API) onto `VolvoxGrid` so you can swap in with minimal code change. Ships as `dist/ag-grid-volvox.min.js`.
+- **`@volvoxgrid/sheet`** — a spreadsheet-style facade on top of `VolvoxGrid` for cell-addressing workflows. Ships as `dist/volvox-sheet.min.js`.
 
-## WASM Build
+Both adapters are thin wrappers — they don't fork the engine, and the underlying `VolvoxGrid` instance is reachable.
 
-To rebuild the WASM module from source:
+## Troubleshooting
 
-```bash
-# Standard build
-npm run build:wasm
+**Threaded WASM build returns 0x0 canvas or crashes on load.** The threaded build needs cross-origin isolation. Serve with `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`. The non-threaded build has no such requirement.
 
-# Threaded build (requires nightly Rust)
-npm run build:wasm:threaded
+**CSP blocks WASM instantiation.** Add `'wasm-unsafe-eval'` to `script-src` (or `'unsafe-eval'` for older policies). The WASM module is instantiated from bytes at load time.
+
+**Lite WASM renders empty / wrong-glyph text.** Lite uses the browser's Canvas2D text engine, so it inherits whatever fonts are installed on the client. If your design ships custom fonts, register them with the browser font face set before constructing the grid, or use the full build.
+
+**Mismatched `wasmUrl` and package.** Pointing the full JS facade at the lite WASM (or vice versa) usually shows up as undefined symbols at runtime. Keep the JS package and the WASM glue on the same side of the full/lite split.
+
+**Font fallback substitutes glyphs I'd rather leave missing.** Disable it:
+
+```ts
+await grid.loaded;
+grid.setFontFallbackEnabled(false);
 ```
 
-These scripts build the WASM-facing target from the shared `runtime/` crate and write package-local output to `web/js/wasm/`. Repo-level `make wasm` and `make web` write demo output to `web/example/wasm/`.
+The same setting lives on `RenderConfig.font_fallback_enabled` in the protobuf API.
 
-Repo-level lite build:
+## What's next
 
-```bash
-make wasm-lite
-make web-lite
-```
+- [CHANGELOG](../../CHANGELOG.md) — current version is `0.8.9`
+- [GUI.md](../../GUI.md) — selection model, keyboard map, mouse behavior
+- [TEXT_RENDERING.md](../../TEXT_RENDERING.md) — text engine and cache ownership for full vs lite
+- [IME.md](../../IME.md) — IME composition pipeline
+- [ARCHITECTURE.md](../../ARCHITECTURE.md) — engine internals, FFI surface, render loop
+- [BUILD_VARIANTS.md](../../BUILD_VARIANTS.md) — full vs lite vs threaded build matrix
 
-## Running the Example
-
-From the repo root:
-
-```bash
-make web
-```
-
-This builds the runtime WASM target and starts the Vite dev server for the example app in `web/example/`.
-
-For release-style demo output:
-
-```bash
-WEB_DOCKER_TARGET=web make docker_web
-```
-
-That build writes `dist/web/demos/web/` and externalizes `volvoxgrid` through a CDN import map. Use `WEB_DOCKER_TARGET=sheet` or `WEB_DOCKER_TARGET=sheet-lite` for the sheet demos.
+If you're reaching for `grid.ffi`, `grid.rawWasm`, or `grid.callProto(...)` — the typed-proto and raw escape hatches in [src/index.ts](src/index.ts) — that's a signal the facade is missing a typed method. File an issue.
 
 ## License
 

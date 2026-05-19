@@ -1,19 +1,26 @@
 # Text Rendering
 
-This document describes how VolvoxGrid renders text across full and lite builds.
+## Who this is for
 
-For GUI rendering as a whole, see [GUI.md](GUI.md). For repo structure and build workflow, see [ARCHITECTURE.md](ARCHITECTURE.md).
+You're an engineer wiring up text for a VolvoxGrid host, or you're building a lite build that has to outsource rasterization to a platform font stack. This doc walks through how text works in full and lite modes.
 
-## Overview
+After reading, you'll know which mode you're in, who owns the cache, what your host renderer has to do, and what the debug overlay is telling you. For broader GUI context, see [GUI.md](GUI.md). For repo structure and build workflow, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
-VolvoxGrid has two text-rendering modes:
+Next: why there are two modes at all.
 
-- **Engine text**: normal native and WASM builds include the Rust text engine (`cosmic-text`). The engine measures, shapes, caches, and renders text.
-- **External text**: lite builds remove the built-in text engine. The host registers a platform text renderer, and the Rust engine still owns cache policy, clipping, color blending, and render orchestration.
+## Why two modes exist
 
-Lite builds use the operating system or browser font stack instead of bundling the full engine text stack. That keeps artifacts smaller while preserving font fallback through the host platform.
+VolvoxGrid has two text-rendering modes. They exist for very different reasons.
 
-## Package Mapping
+**Engine text.** Normal native and WASM builds include the Rust text engine (`cosmic-text`). The engine measures, shapes, caches, and renders text. You don't think about it.
+
+**External text.** Lite builds remove the built-in text engine. The host registers a platform text renderer, and the Rust engine still owns cache policy, clipping, color blending, and render orchestration.
+
+The point of lite builds is artifact size. They use the operating system or browser font stack instead of bundling the full engine text stack. You give up exact glyph parity across platforms; you gain a much smaller binary and you inherit platform font fallback for free.
+
+Next: which package is which.
+
+## The package matrix
 
 | Platform path | Full package | Lite package | Lite backend |
 |---|---|---|---|
@@ -25,11 +32,13 @@ Lite builds use the operating system or browser font stack instead of bundling t
 | Web / WASM | `volvoxgrid` | `volvoxgrid-lite` | Browser Canvas2D |
 | `.NET` | `VolvoxGrid.DotNet` | `VolvoxGrid.DotNet.Lite` | GDI / GDI+ |
 
-The same `VOLVOXGRID_VARIANT=lite` convention is used by local sample targets where the host supports both variants.
+The same `VOLVOXGRID_VARIANT=lite` convention drives local sample targets where the host supports both variants.
 
-## Engine Cache Ownership
+Next: the key insight about lite mode.
 
-The engine owns the primary text cache in both full and lite modes.
+## Who owns the cache?
+
+The engine owns the primary text cache in both full and lite modes. This is the part that surprises people.
 
 In full mode, `TextEngine` caches shaped layouts. In lite mode, the runtime wraps the host callbacks in an external text renderer and caches measured sizes plus alpha masks in Rust. Cached alpha masks are color-independent, so the engine can blend the same cached text mask with different cell colors.
 
@@ -43,13 +52,15 @@ The cache key includes:
 
 The cache key does not include color.
 
-The debug overlay reports this cache as `C:<used>/<cap>` on the `Vis:` line. For lite builds, `used` is the Rust-owned external text mask cache count, not a platform-side cache count.
+In lite mode, the host isn't a caching layer. It's just a rasterizer that gets called on cache misses. The engine decides what gets cached, when to evict, and how to blend the result.
 
 `text_layout_cache_cap` controls the cache capacity. Setting it to `0` disables and clears the cache.
 
-## Host Responsibilities
+Next: what that means for your host code.
 
-In lite mode, the host callback is responsible for only the platform-specific parts:
+## What the host renderer has to do
+
+In lite mode, the host callback handles only the platform-specific parts:
 
 - measure text
 - rasterize text into an RGBA scratch buffer or mask
@@ -64,19 +75,23 @@ The engine remains responsible for:
 - final blending into the grid buffer
 - debug overlay cache reporting
 
-Hosts may still keep small platform caches for font objects or scratch buffers. For example, Java2D caches `Font` objects, `.NET` caches `Font` objects, Android reuses a scratch `Bitmap` / `Canvas`, and Browser Canvas2D reuses canvas state. These are not the main text layout or mask cache; they avoid repeatedly allocating platform objects on cache misses.
+Hosts may keep small platform caches for font objects or scratch buffers. For example, Java2D caches `Font` objects, .NET caches `Font` objects, Android reuses a scratch `Bitmap` / `Canvas`, and Browser Canvas2D reuses canvas state. These aren't the main text layout or mask cache. They just avoid reallocating platform objects on every cache miss.
 
-## Cache Lifetime
+Next: how long caches stick around.
+
+## Cache lifetime
 
 Text caches are intentionally grid-local.
 
-When a render stream switches from one active grid to another, the runtime clears the previous grid's text cache and the active renderer cache. This prevents stale caches from accumulating when an app opens grids A, B, and C, then only keeps rendering C.
+When a render stream switches from one active grid to another, the runtime clears the previous grid's text cache and the active renderer cache. That prevents stale caches from accumulating when an app opens grids A, B, and C, then only keeps rendering C.
 
 Destroying or releasing a grid also clears the external text renderer registration for that grid.
 
-## Debug Overlay
+Next: the debug overlay tells you everything you need.
 
-The third debug-overlay line shows the renderer mode and text backend:
+## Debug overlay
+
+The third debug-overlay line shows the renderer mode and text backend. Sample lines:
 
 ```text
 CPU Text:Engine 1000000x12 CLEAN
@@ -85,14 +100,14 @@ GPU(vulkan-fifo) Text:Engine 1000000x12 CLEAN
 CPU Text:GDI 1000000x12 DIRTY(V:1200)
 ```
 
-Common text backend names:
+Backend names:
 
 - `Engine`: built-in Rust text engine
 - `Android`: Android lite fallback
 - `Browser`: WASM lite fallback
 - `CoreText`: macOS/iOS native lite fallback
 - `Java2D`: Java desktop lite fallback
-- `GDI`: `.NET` lite fallback
+- `GDI`: .NET lite fallback
 
 The next line contains `C:<used>/<cap>`, for example:
 
@@ -100,9 +115,13 @@ The next line contains `C:<used>/<cap>`, for example:
 Vis: 45x9(405) P:0,0 M:12.4MB C:3021/8192
 ```
 
-If `C:0/8192` appears in lite mode while text is visible, the host may not have registered the external renderer, or the grid may be using an older WASM/native artifact.
+In lite mode, `used` is the Rust-owned external text mask cache count, not a platform-side cache count.
 
-## Platform Notes
+If you see `C:0/8192` in lite mode while text is visible, the host probably hasn't registered its external renderer, or the grid is using an older WASM/native artifact.
+
+Next: a few per-platform notes.
+
+## Per-platform notes
 
 ### Android
 
@@ -112,36 +131,36 @@ Android lite registers an Android text renderer through JNI only when the native
 
 Flutter Android goes through the Android host layer, so it can use the same Android text fallback when the Android native/runtime artifact is lite.
 
-### Flutter Desktop
+### Flutter desktop
 
 Flutter desktop uses the native library directly from Dart FFI. On macOS, `volvoxgrid-desktop-lite` uses the runtime's CoreText fallback, so Flutter macOS can use `VOLVOXGRID_VARIANT=lite`. Linux and Windows Flutter desktop should use the full native runtime until a platform text fallback bridge or native default backend exists for those hosts.
 
-### Apple Native
+### Apple native
 
-macOS and iOS lite runtimes register a CoreText/CoreGraphics renderer inside the native runtime when `cosmic-text` is not compiled in. This path uses the Apple system font stack for fallback and keeps the primary measure/mask cache in Rust, so it works for Swift, Flutter, and other hosts that load the Apple native library.
+macOS and iOS lite runtimes register a CoreText/CoreGraphics renderer inside the native runtime when `cosmic-text` isn't compiled in. This path uses the Apple system font stack for fallback and keeps the primary measure/mask cache in Rust, so it works for Swift, Flutter, and any other host that loads the Apple native library.
 
-iOS lite is packaged as `VolvoxGridLite.xcframework`. Consumers that link it directly must link `CoreFoundation`, `CoreGraphics`, and `CoreText`; the Flutter iOS podspec does this automatically.
+iOS lite is packaged as `VolvoxGridLite.xcframework`. Consumers that link it directly must link `CoreFoundation`, `CoreGraphics`, and `CoreText`. The Flutter iOS podspec does this automatically.
 
-### Java Desktop
+### Java desktop
 
 Java desktop lite registers a Java2D renderer only when the native library has no built-in text engine. The Java2D bridge keeps a small `Font` object cache, while Rust owns the layout/mask cache shown as `C:` in the overlay.
 
 ### Web / WASM
 
-`volvoxgrid-lite` uses Browser Canvas2D callbacks. The WASM runtime owns the external text mask cache; Canvas2D only performs measurement and rasterization on cache misses.
+`volvoxgrid-lite` uses Browser Canvas2D callbacks. The WASM runtime owns the external text mask cache. Canvas2D only performs measurement and rasterization on cache misses.
 
-### `.NET`
+### .NET
 
-`VolvoxGrid.DotNet.Lite` registers a GDI/GDI+ renderer when the native library has no built-in text engine. Full `.NET` builds use the engine text path by default. On Wine, the GDI bridge can also be enabled for compatibility experiments with `VOLVOXGRID_DOTNET_USE_HOST_TEXT_RENDERER=1`.
+`VolvoxGrid.DotNet.Lite` registers a GDI/GDI+ renderer when the native library has no built-in text engine. Full .NET builds use the engine text path by default. On Wine, the GDI bridge can also be enabled for compatibility experiments with `VOLVOXGRID_DOTNET_USE_HOST_TEXT_RENDERER=1`.
 
-Wine logs such as `fixme:gdiplus:GdipGetLineSpacing ignoring style` come from Wine's GDI+ implementation. They are not VolvoxGrid engine errors and should not appear on real Windows for the same reason.
+Wine logs such as `fixme:gdiplus:GdipGetLineSpacing ignoring style` come from Wine's GDI+ implementation. They're not VolvoxGrid engine errors and won't appear on real Windows for the same reason.
 
-## Development Checklist
+Next: a short checklist when you add a new lite host.
 
-When adding a new lite host:
+## Checklist when adding a new lite host
 
 1. Register a named external text renderer only when `volvox_grid_has_builtin_text_engine()` is false.
 2. Implement measurement and rasterization callbacks in platform code.
-3. Keep platform caches small and object-focused; let Rust own layout and mask caching.
+3. Keep platform caches small and object-focused. Let Rust own layout and mask caching.
 4. Clear the registration when the grid is released.
-5. Confirm the debug overlay shows the expected `Text:<backend>` name and `C:<used>/<cap>` behavior.
+5. Confirm the debug overlay shows the expected `Text:<backend>` name and that `C:<used>/<cap>` behaves as text gets cached.

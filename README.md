@@ -1,14 +1,15 @@
 # VolvoxGrid
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-0.8.9-blue.svg)](VERSION)
 
-VolvoxGrid is a pixel-rendered datagrid engine written in Rust. The engine owns layout, selection, editing, sorting, scrolling, merged cells, and rendering, while thin platform wrappers expose it to Android, Java desktop, Flutter, web/WASM, Go, `.NET`, and terminal hosts.
+You're shipping a datagrid that has to handle 100K+ rows, work across mobile, desktop, web, and terminal, and look the same on every platform. VolvoxGrid is one Rust engine that does that — you bring the host, it brings the pixels.
+
+The engine in `engine/` owns layout, selection, editing, sorting, scrolling, merged cells, and rendering. Thin platform wrappers expose it to Flutter, Android, Java desktop, .NET, Go, the web (via WASM), and terminal hosts. The grid you ship on Android is the same grid you ship in Chrome — same code, same behavior, same pixels.
 
 ## Screenshots
 
-Checked-in screenshots across the current GUI, mobile, desktop, terminal, and compatibility hosts.
-
-WASM example: <https://volvox-171cc.web.app/demos/web/>
+Visual proof across the GUI, mobile, desktop, terminal, and compatibility hosts. Live WASM demo: <https://volvox-171cc.web.app/demos/web/>
 
 | Web / Wasm | ActiveX / Windows |
 |---|---|
@@ -30,70 +31,13 @@ WASM example: <https://volvox-171cc.web.app/demos/web/>
 |---|---|
 | <img src="screenshots/flutter-linux.png" alt="VolvoxGrid Flutter Linux demo" width="100%"> | <img src="screenshots/go-tui.png" alt="VolvoxGrid Go TUI demo" width="100%"> |
 
-## What VolvoxGrid Is
+## Quick start
 
-VolvoxGrid is not a single-framework widget. It is a shared grid engine with platform-specific shells on top of it.
-
-The same retained grid model can drive GUI surfaces, terminal hosts, and compatibility adapters, while the platform layer stays focused on windowing, input wiring, packaging, and native lifecycle.
-
-If you are evaluating the rendering paths themselves, read [GUI.md](GUI.md), [TUI.md](TUI.md), and [TEXT_RENDERING.md](TEXT_RENDERING.md). If you are changing VolvoxGrid internals, read [ARCHITECTURE.md](ARCHITECTURE.md).
-
-## Features
-
-### Rendering
-
-- Pixel-rendered GUI engine with CPU and native-surface GPU backends through `wgpu`
-- Shared Rust engine across Flutter, Android, Java desktop, web/WASM, Go, `.NET`, and terminal hosts
-- Full packages use the built-in Rust text engine; lite packages use OS/browser text fallback with an engine-owned cache, including CoreText on Apple platforms
-- Thin-host TUI path for ANSI streams or structured cell buffers
-- Fling physics scrolling with scrollbar fade animations
-- Background images and custom icon themes
-
-### Data
-
-- Cell types: text, numbers, booleans, timestamps, checkboxes (with indeterminate state), progress bars, dropdowns, pictures
-- CSV, JSON, and XML import and export
-- Formula editing mode with reference highlighting
-- Protobuf-based contract and code-generated bindings across all platforms
-
-### Interaction
-
-- Cell editing with IME and international text input support
-- Selection modes: free, by row, by column, listbox, multi-range
-- Sorting with multi-column and custom comparators
-- Search (text and regex) and find
-- Clipboard: copy, cut, paste, and delete
-- Pull-to-refresh for mobile
-- Right-to-left layout support
-
-### Layout
-
-- Merged cells and cell spanning modes
-- Frozen rows and columns
-- Pinned rows and columns (separate from frozen panes)
-- Row and column insert, remove, move, hide, and auto-resize
-- Word wrap, shrink-to-fit, and text overflow modes
-- Outline and grouping with tree indicators
-- Subtotals and aggregates
-
-### Styling
-
-- Per-cell and range-based style overrides
-- Column data types and number/date/currency formatting
-- Scrollbar modes and debug overlays
-- Animation support with configurable duration
-
-### Adapters
-
-- Compatibility adapters for [AG Grid](adapters/aggrid), [Sheet](adapters/sheet), [SfDataGrid](adapters/sfdatagrid), [VSFlexGrid](adapters/vsflexgrid), [XtraGrid](adapters/xtragrid), and [Report](adapters/report) APIs
-
-## Quick Start
+Three flagship paths. Pick the one that matches what you're building and copy the snippet.
 
 ### Web
 
-```bash
-npm install volvoxgrid
-```
+Install the package, point it at a container, hand it data. The grid loads its WASM on its own.
 
 ```html
 <script type="module">
@@ -119,7 +63,7 @@ npm install volvoxgrid
 <div id="grid" style="width: 800px; height: 400px;"></div>
 ```
 
-Or use the `<volvox-grid>` custom element:
+Notice the `await grid.loaded` — that's WASM init. After that, every call is synchronous from your side. If you'd rather declare the grid in HTML, use the `<volvox-grid>` custom element:
 
 ```html
 <script type="module">
@@ -129,7 +73,11 @@ Or use the `<volvox-grid>` custom element:
 <volvox-grid row-count="100" col-count="5"></volvox-grid>
 ```
 
+Next: [web/js/README.md](web/js/README.md) for the full TypeScript API.
+
 ### Flutter
+
+One pub package, one widget, one controller. Native binaries are resolved at build time from Maven Central (Android, desktop) and GitHub releases (iOS XCFrameworks).
 
 ```yaml
 dependencies:
@@ -148,10 +96,16 @@ await controller.setCellText(0, 0, 'Widget A');
 await controller.setCellText(0, 1, '29.99');
 
 // In your widget tree:
-VolvoxGridWidget(controller: controller)
+VolvoxGridWidget(controller: controller);
 ```
 
-### Java Desktop
+The controller talks to the Rust engine over Synurang FFI — you don't see the FFI, just the awaits. Set `VOLVOXGRID_VARIANT=lite` on supported platforms to ship the smaller artifact.
+
+Next: [flutter/README.md](flutter/README.md).
+
+### Java desktop
+
+Drop a Swing panel into your frame, get a controller back, drive the grid from Kotlin or Java.
 
 ```kotlin
 dependencies {
@@ -169,53 +123,58 @@ ctrl.setColumnCaption(0, "Name");
 ctrl.setCellText(0, 0, "Widget A");
 ```
 
-## Packages
+The desktop artifact embeds the native `libvolvoxgrid` for Linux, macOS, and Windows. The lite variant (`volvoxgrid-desktop-lite`) routes text through Java2D instead of the bundled Rust text engine.
 
-Examples below use `0.8.9`. Replace it with the release you want to consume.
+Next: [java/README.md](java/README.md).
 
-### Maven / Gradle
+## Install
 
-Android:
+Everything in this section uses `0.8.9`. Swap the version for whichever release you're consuming.
+
+### Maven / Gradle (Android, Java desktop)
 
 ```kotlin
+// Android
 dependencies {
     implementation("io.github.ivere27:volvoxgrid-android:0.8.9")
     // or: implementation("io.github.ivere27:volvoxgrid-android-lite:0.8.9")
-    // Compose: implementation("io.github.ivere27:volvoxgrid-android-compose:0.8.9")
+    // Compose:      implementation("io.github.ivere27:volvoxgrid-android-compose:0.8.9")
     // Compose lite: implementation("io.github.ivere27:volvoxgrid-android-compose-lite:0.8.9")
 }
-```
 
-Java desktop:
-
-```kotlin
-repositories {
-    mavenCentral()
-}
-
+// Java desktop
+repositories { mavenCentral() }
 dependencies {
     implementation("io.github.ivere27:volvoxgrid-desktop:0.8.9")
     // or: implementation("io.github.ivere27:volvoxgrid-desktop-lite:0.8.9")
 }
 ```
 
-Platform docs:
+Platform-specific notes live in [android/README.md](android/README.md) and [java/README.md](java/README.md).
 
-- [android/README.md](android/README.md)
-- [java/README.md](java/README.md)
-
-### Flutter / pub.dev
+### Flutter (pub.dev)
 
 ```yaml
 dependencies:
   volvoxgrid: ^0.8.9
 ```
 
-The Flutter package resolves Android and desktop native binaries from Maven Central at build time, and iOS XCFrameworks from GitHub releases. Set `VOLVOXGRID_VARIANT=lite` on supported platforms to use lite artifacts. See [flutter/README.md](flutter/README.md).
+### Swift (SwiftPM)
 
-iOS native consumers can use the `VolvoxGrid` SwiftPM product for the full XCFramework, or `VolvoxGridLite` after a release has published `VolvoxGridLite.xcframework.zip`.
+```swift
+dependencies: [
+    .package(url: "https://github.com/ivere27/volvoxgrid", from: "0.8.9"),
+],
+targets: [
+    .target(name: "MyApp", dependencies: [
+        .product(name: "VolvoxGrid", package: "volvoxgrid"),
+    ])
+]
+```
 
-### Web / npm
+The `VolvoxGrid` product is the Swift wrapper. Use `import VolvoxGrid`, create `VolvoxGridClient()`, and render with `VolvoxGridView`, `VolvoxGridUIView`, or `VolvoxGridNSView`. The wrapper has no SwiftProtobuf or grpc-swift dependency. Raw binary products are also available as `VolvoxGridXCFramework` and `VolvoxGridLiteXCFramework`. Next: [swift/README.md](swift/README.md).
+
+### Web (npm)
 
 ```bash
 npm install volvoxgrid
@@ -224,13 +183,11 @@ npm install @volvoxgrid/ag-grid
 npm install @volvoxgrid/sheet
 ```
 
-The web and adapter npm packages publish minified `dist/*.min.js` browser bundles for unpkg/jsDelivr usage in addition to their module exports.
-
-The `volvoxgrid-lite` package ships the lite WASM runtime and uses browser Canvas2D for OS/browser font fallback. See [web/js/README.md](web/js/README.md) for the web package API and [TEXT_RENDERING.md](TEXT_RENDERING.md) for the text-rendering model.
+The web and adapter packages publish minified `dist/*.min.js` browser bundles for unpkg and jsDelivr in addition to module exports. `volvoxgrid-lite` ships the lite WASM runtime and falls back to Canvas2D for OS/browser fonts — see [TEXT_RENDERING.md](TEXT_RENDERING.md) for the full cache model.
 
 ### Go
 
-The Go package provides a TUI host and client API for the native library. It is not published to a module proxy yet; use it from the repo:
+The Go package is not on a module proxy yet — consume it from the repo. It gives you a TUI host and a typed client over the native library.
 
 ```go
 import (
@@ -239,33 +196,52 @@ import (
 )
 ```
 
-See [go/README.md](go/README.md) for setup and usage.
+Next: [go/README.md](go/README.md).
 
-### .NET
+### .NET (NuGet)
 
-The managed wrapper package IDs are `VolvoxGrid.DotNet` and `VolvoxGrid.DotNet.Lite`. The repo currently documents local project and local NuGet flows in [dotnet/README.md](dotnet/README.md):
+The managed packages are `VolvoxGrid.DotNet` and `VolvoxGrid.DotNet.Lite`. Local pack flow:
 
 ```bash
 dotnet pack dotnet/src/VolvoxGrid.DotNet.csproj -c Release
 ```
 
-The NuGet packages embed staged native libraries for supported RIDs. Project-reference or manual deployment flows still need the native `volvoxgrid` library beside the app or configured through `VOLVOXGRID_LIBRARY_PATH`.
+The NuGet packages embed staged native libraries for supported RIDs. Project-reference or manual deployment flows still need the native `volvoxgrid` library beside your app or pointed at via `VOLVOXGRID_LIBRARY_PATH`. Full instructions in [dotnet/README.md](dotnet/README.md).
+
+## What's inside
+
+VolvoxGrid is not a single-framework widget — it's a shared grid engine with platform-specific shells.
+
+```
+host or adapter  ->  wrapper  ->  runtime or wasm binding  ->  engine
+```
+
+The engine in `engine/` is the source of truth. The native runtime in `runtime/` exposes it over Synurang FFI to non-web hosts; `wasm-pack` builds the same engine for the browser. Platform wrappers (`flutter/`, `android/`, `java/`, `dotnet/`, `go/`) translate native events and surfaces into the shared protobuf contract defined in `proto/`.
+
+If you're changing internals, read [ARCHITECTURE.md](ARCHITECTURE.md). If you're evaluating the rendering paths, read [GUI.md](GUI.md), [TUI.md](TUI.md), and [TEXT_RENDERING.md](TEXT_RENDERING.md).
+
+## Adapters
+
+Compatibility layers in `adapters/` let you keep an existing API while running on the VolvoxGrid engine.
+
+- [aggrid](adapters/aggrid) — drop-in for AG Grid users on the web
+- [bubbletea](adapters/bubbletea) — Bubble Tea component for Go TUIs
+- [report](adapters/report) — report-style printable output
+- [sfdatagrid](adapters/sfdatagrid) — comparison tests against Syncfusion SfDataGrid
+- [sheet](adapters/sheet) — spreadsheet-style web API
+- [vsflexgrid](adapters/vsflexgrid) — Windows ActiveX control with the legacy VSFlexGrid surface
+- [xtragrid](adapters/xtragrid) — DevExpress XtraGrid-shaped API
 
 ## Documents
 
-- [GUI.md](GUI.md): GUI rendering design and host responsibilities
-- [TUI.md](TUI.md): terminal rendering design and host responsibilities
-- [BUILD_VARIANTS.md](BUILD_VARIANTS.md): full/lite features, artifact types, and binary size notes
-- [TEXT_RENDERING.md](TEXT_RENDERING.md): full/lite text rendering and cache ownership
-- [ARCHITECTURE.md](ARCHITECTURE.md): repo architecture, build workflow, and VolvoxGrid development
-- [CONTRIBUTING.md](CONTRIBUTING.md): contribution guidelines
-- [CHANGELOG.md](CHANGELOG.md): project-level changelog
-- [android/README.md](android/README.md): Android wrapper usage
-- [flutter/README.md](flutter/README.md): Flutter wrapper usage
-- [java/README.md](java/README.md): Java desktop wrapper usage
-- [dotnet/README.md](dotnet/README.md): `.NET` wrapper usage
-- [go/README.md](go/README.md): Go TUI host usage
-- [web/js/README.md](web/js/README.md): Web/npm package usage
+- [GUI.md](GUI.md) — GUI rendering design and host responsibilities
+- [TUI.md](TUI.md) — terminal rendering design and host responsibilities
+- [BUILD_VARIANTS.md](BUILD_VARIANTS.md) — full vs lite features, artifact types, and binary size
+- [TEXT_RENDERING.md](TEXT_RENDERING.md) — full/lite text rendering and cache ownership
+- [ARCHITECTURE.md](ARCHITECTURE.md) — repo architecture and build workflow
+- [CONTRIBUTING.md](CONTRIBUTING.md) — contribution guidelines and CLA
+- [CHANGELOG.md](CHANGELOG.md) — release notes
+- [android/README.md](android/README.md), [flutter/README.md](flutter/README.md), [java/README.md](java/README.md), [dotnet/README.md](dotnet/README.md), [go/README.md](go/README.md), [swift/README.md](swift/README.md), [web/js/README.md](web/js/README.md) — per-platform wrapper docs
 
 ## Trademarks
 

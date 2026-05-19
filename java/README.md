@@ -1,17 +1,14 @@
-# VolvoxGrid for Java Desktop
+# VolvoxGrid for Java desktop
 
-A high-performance datagrid panel for Java Swing applications. Renders through CPU pixel buffers, with native-surface GPU rendering available in full desktop builds. Supports cell editing, sorting, merged cells, scrolling, and more.
+Welcome. VolvoxGrid is a datagrid for Java Swing that draws every pixel itself. A Rust engine renders rows, columns, headers, selection, and editors into a shared pixel buffer, and the Swing host composites that buffer into a `JComponent`. You get native-feeling performance on a million rows, identical look across Linux, macOS, and Windows, and a small, predictable API that fits naturally next to `JTable`.
 
-The repo also includes a Unix-oriented terminal sample that uses the thin TUI byte-stream path:
+This page is the full guide. If you just want to skim the in-source samples, see [desktop/README.md](desktop/README.md).
 
-```bash
-make java-tui-run
-make java-tui-smoke
-```
+## Quick start
 
-## Installation
+Add the dependency, drop a panel into a frame, hand it a typed row list, and you have an editable grid. Here is the whole thing.
 
-Add the Maven dependency to your `build.gradle.kts`:
+`build.gradle.kts`:
 
 ```kotlin
 repositories {
@@ -24,203 +21,132 @@ dependencies {
 }
 ```
 
-The JAR bundles native libraries for Linux (x86, x86_64, armv7, aarch64), macOS (x86_64, aarch64), and Windows (x86, x86_64).
-
-**Requirements:** Java 8+
-
-### Lite Variant
-
-`volvoxgrid-desktop-lite` is the Java desktop package built without the built-in Rust text engine, GPU renderer, regex search, or rayon parallelism. It uses Java2D for OS font fallback and keeps the primary text mask cache in the Rust runtime.
-
-Use `VOLVOXGRID_VARIANT=lite` for local and Maven sample runs:
-
-```bash
-make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.8.9
-make java-desktop-run-release VOLVOXGRID_VARIANT=lite
-```
-
-See [../TEXT_RENDERING.md](../TEXT_RENDERING.md) for full/lite text rendering and cache ownership.
-
-## Quick Start
+`App.java`:
 
 ```java
 import io.github.ivere27.volvoxgrid.desktop.*;
 import javax.swing.*;
-import java.awt.*;
+import java.util.*;
 
-public class MyApp {
+public class App {
+    static final class Product {
+        final String name; final double price; final int qty;
+        Product(String name, double price, int qty) {
+            this.name = name; this.price = price; this.qty = qty;
+        }
+        String getName()  { return name; }
+        double getPrice() { return price; }
+        int    getQty()   { return qty; }
+    }
+
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
             JFrame frame = new JFrame("VolvoxGrid");
-            frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-            frame.setSize(800, 600);
+            VolvoxGridDesktopPanel panel = new VolvoxGridDesktopPanel();
+            panel.initialize(null, 100, 3); // null = auto-detect native library
 
-            VolvoxGridDesktopPanel gridPanel = new VolvoxGridDesktopPanel();
-            frame.add(gridPanel, BorderLayout.CENTER);
-            frame.setVisible(true);
+            List<Product> products = new ArrayList<>(Arrays.asList(
+                new Product("Widget A", 29.99, 150),
+                new Product("Widget B", 19.50,  80)
+            ));
 
-            // Initialize: loads the native library and creates a grid
-            gridPanel.initialize(
-                null,  // auto-detect library path from JAR
-                100,   // rows
-                5      // cols
-            );
-
-            // Get a controller for grid operations
-            VolvoxGridDesktopController ctrl = gridPanel.createController();
-
-            // Set column headers in the top indicator band
-            ctrl.setColumnCaption(0, "Name");
-            ctrl.setColumnCaption(1, "Price");
-            ctrl.setColumnCaption(2, "Qty");
-
-            // Set data
-            ctrl.setCellText(0, 0, "Widget A");
-            ctrl.setCellText(0, 1, "29.99");
-            ctrl.setCellText(0, 2, "150");
-
-            // Clean up on close
-            frame.addWindowListener(new java.awt.event.WindowAdapter() {
-                @Override
-                public void windowClosing(java.awt.event.WindowEvent e) {
-                    gridPanel.release();
-                }
+            VolvoxGridTableModelAdapter<Product> adapter =
+                new VolvoxGridTableModelAdapter<>(panel, Arrays.asList(
+                    VolvoxGridTableModelAdapter.column  ("name",  "Name",  Product::getName),
+                    VolvoxGridTableModelAdapter.editable("price", "Price",
+                        p -> String.format("%.2f", p.getPrice())),
+                    VolvoxGridTableModelAdapter.column  ("qty",   "Qty",
+                        p -> Integer.toString(p.getQty()))
+                ));
+            adapter.setOnCellEdit(edit -> {
+                Product p = edit.getRow();
+                try {
+                    products.set(edit.getRowIndex(), new Product(
+                        p.getName(),
+                        Double.parseDouble(edit.getNewText()),
+                        p.getQty()
+                    ));
+                } catch (NumberFormatException ignore) { }
             });
+            adapter.setRows(products);
+
+            frame.setContentPane(panel);
+            frame.setSize(800, 600);
+            frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+            frame.setVisible(true);
         });
     }
 }
 ```
 
-### Library Path Resolution
+Run it. You'll see three columns, two rows, and the "Price" column accepting edits. Try typing a new number into a Price cell — the change flows through `setOnCellEdit` so your `products` list stays the source of truth.
 
-When using the Maven JAR, the native library is bundled and extracted automatically. If you need manual control, the library path is resolved in this order:
+## What you just built
 
-1. First command-line argument
-2. `VOLVOXGRID_LIBRARY_PATH` environment variable
-3. Bundled native library from classpath (Maven JAR)
-4. Auto-detect in `target/debug/` or `target/release/`
+The fast path uses two pieces. `VolvoxGridDesktopPanel` is the `JPanel` you add to your frame; it owns the native library, the render loop, and the input pipeline. `VolvoxGridTableModelAdapter<T>` is a small typed wrapper modeled after Swing's `TableModel` idiom — you describe columns once, pass a row list, and edits surface through one callback.
 
-## API Reference
+Passing `null` as the first argument to `panel.initialize(...)` is intentional. The panel runs the library-resolution chain for you (env var, classpath, workspace fallback) and loads the right native binary for your OS and architecture. There is no `LD_LIBRARY_PATH` to set.
 
-### VolvoxGridDesktopPanel
+**Requirements:** Java 8 or newer. The Maven JAR bundles native libraries for Linux (x86, x86_64, armv7, aarch64), macOS (x86_64, aarch64), and Windows (x86, x86_64), named `libvolvoxgrid.so`, `libvolvoxgrid.dylib`, and `volvoxgrid.dll`.
 
-A Swing `JPanel` that hosts the grid. Handles rendering, mouse/keyboard input, and the native library lifecycle.
+## Two paths: adapter or controller
 
-#### Initialization
+You have two ways to drive the grid, and you can mix them freely on the same panel.
+
+- **`VolvoxGridTableModelAdapter<T>`** — data-first. You hand it typed rows and column descriptors. Best when your data already lives in `List<T>` and you want edits to flow back to that list.
+- **`VolvoxGridDesktopPanel` + `VolvoxGridDesktopController`** — engine-first. You write cells, captions, sizes, and selections directly. Best when you need partial updates, programmatic sorts, merged regions, subtotals, or custom dropdown sources.
+
+The adapter uses the controller under the hood, so anything you can do with one, you can do alongside the other.
+
+## Low-level: panel and controller
+
+Use the controller when you want direct command of the engine. You create a panel the same way, then ask it for a controller.
 
 ```java
-// Option A: Auto-detect or specify library path
-gridPanel.initialize(libraryPath, rows, cols);
+VolvoxGridDesktopPanel panel = new VolvoxGridDesktopPanel();
+panel.initialize(null, 100, 5);
 
-// Option B: Reuse an existing bridge and grid (for multi-grid apps)
-gridPanel.initialize(bridge, existingGridId);
+VolvoxGridDesktopController ctrl = panel.createController();
+ctrl.setColumnCaption(0, "Name");
+ctrl.setColumnCaption(1, "Price");
+ctrl.setColumnCaption(2, "Qty");
+
+ctrl.setCellText(0, 0, "Widget A");
+ctrl.setCellText(0, 1, "29.99");
+ctrl.setCellText(0, 2, "150");
 ```
 
-#### Panel Methods
+The panel itself has a handful of methods you'll reach for often.
 
-| Method | Description |
+| Method | When you'd use it |
 |---|---|
-| `createController()` | Create a `VolvoxGridDesktopController` for this grid |
-| `getGridId()` | Get the native grid ID |
+| `createController()` | Get a `VolvoxGridDesktopController` for this grid |
+| `getGridId()` | Get the native grid ID (for multi-grid wiring) |
 | `getServiceClient()` | Get the underlying RPC client |
-| `detachGrid()` | Stop render/event session but keep the grid alive |
-| `release()` | Clean up all resources |
-| `requestFrame()` | Request a render on next repaint |
-| `requestFrameImmediate()` | Request a render immediately |
+| `detachGrid()` | Stop the render/event session while keeping the grid alive |
+| `release()` | Clean up everything on close |
+| `requestFrame()` | Queue a render on the next repaint |
+| `requestFrameImmediate()` | Render right now |
 | `setRendererBackend(backend)` | `CPU`, `GPU`, or `AUTO` |
-| `setRendererMode(mode)` | Select `RENDERER_CPU`, `RENDERER_GPU`, `RENDERER_GPU_VULKAN`, `RENDERER_GPU_GLES`, `RENDERER_GPU_OPENGL`, `RENDERER_GPU_DX12`, or `RENDERER_GPU_METAL` |
-| `isGpuSupported()` | Check if the loaded native library and host expose native-surface GPU rendering |
-| `setHostFlingEnabled(enabled)` | Enable/disable momentum scrolling |
+| `setRendererMode(mode)` | Pick a specific renderer (see below) |
+| `isGpuSupported()` | Check whether the loaded native library exposes GPU rendering |
+| `setHostFlingEnabled(enabled)` | Toggle momentum scrolling at the host |
 
-Full desktop builds can use native-surface GPU rendering when the platform and selected backend are compatible. Lite desktop builds are CPU-only.
+## Loading data
 
-#### Event Listeners
+You typically load a grid in one of two ways.
+
+`loadData(bytes)` parses CSV or JSON and figures out the shape for you. Use it when you have a file or an HTTP response and don't want to type each value.
 
 ```java
-// Grid events (selection change, sort, edit, etc.)
-gridPanel.setGridEventListener(event -> {
-    if (event.hasCellFocusChanged()) {
-        var e = event.getCellFocusChanged();
-        System.out.println("Moved to row=" + e.getNewRow() + " col=" + e.getNewCol());
-    }
-    if (event.hasAfterSort()) { /* sort completed */ }
-    if (event.hasAfterEdit()) { /* cell edited */ }
-});
-
-// Cancelable "before" events. Supported here: BeforeEdit, CellEditValidate,
-// BeforeSort. Unhandled cancelable events are allowed with
-// cancel=false when the decision channel is active.
-gridPanel.setBeforeEditListener(details -> {
-    if (details.getRow() == 0) {
-        details.setCancel(true);
-    }
-});
-
-gridPanel.setCellEditValidatingListener(details -> {
-    if (details.getEditText().isEmpty()) {
-        details.setCancel(true);
-    }
-});
-
-gridPanel.setBeforeSortListener(details -> {
-    if (details.getCol() == 0) {
-        details.setCancel(true);
-    }
-});
-
-// Editor session callback
-gridPanel.setEditorSessionStartedListener(session -> {
-    // handle inline editor sessions
-});
+LoadDataResult loaded = ctrl.loadData(
+    "name,qty\napple,3\nbanana,5".getBytes(java.nio.charset.StandardCharsets.UTF_8));
 ```
 
-### VolvoxGridDesktopController
-
-High-level API for grid operations. Obtained via `gridPanel.createController()`.
-
-#### Grid Dimensions
+`loadTable(rows, cols, values, atomic)` is the typed, bulk path. Use it when you already know the shape and want the engine to apply the whole table in one round trip.
 
 ```java
-ctrl.setRowCount(1000);
-ctrl.setColCount(10);
-```
-
-#### Cell Data
-
-```java
-// Single cell
-ctrl.setCellText(row, col, "text");
-String text = ctrl.getCellText(row, col);
-
-// Batch update
-ctrl.setCells(List.of(
-    new GridCellText(0, 0, "A"),
-    new GridCellText(0, 1, "B"),
-    new GridCellText(1, 0, "C")
-));
-
-// Read a range of cells via proto
-CellsResponse resp = ctrl.getCells(GetCellsRequest.newBuilder()
-    .setRow1(0).setCol1(0).setRow2(1).setCol2(2)
-    .build());
-for (CellData cell : resp.getCellsList()) {
-    System.out.println(cell.getRow() + "," + cell.getCol() + " = " + cell.getValue().getText());
-}
-
-// Clear all data
-ctrl.clear(ClearScope.CLEAR_EVERYTHING, ClearRegion.CLEAR_SCROLLABLE);
-
-// Clear only data (keep formatting)
-ctrl.clear(ClearScope.CLEAR_DATA, ClearRegion.CLEAR_SCROLLABLE);
-// Scopes: CLEAR_EVERYTHING, CLEAR_FORMATTING, CLEAR_DATA, CLEAR_SELECTION
-```
-
-#### LoadTable
-
-`loadTable` bulk-loads a row-major flat array of typed `CellValue` entries in a single RPC call.
-
-```java
-ctrl.loadTable(2, 3, List.of(
+ctrl.loadTable(2, 3, Arrays.asList(
     CellValue.newBuilder().setText("Widget A").build(),
     CellValue.newBuilder().setNumber(29.99).build(),
     CellValue.newBuilder().setNumber(150).build(),
@@ -230,25 +156,94 @@ ctrl.loadTable(2, 3, List.of(
 ), true /* atomic */);
 ```
 
-`CellValue` supports `text`, `number`, `flag` (boolean), `raw` (bytes), and `timestamp` (epoch-ms). For the full `LoadTableRequest` schema, see [`proto/volvoxgrid.proto`](../proto/volvoxgrid.proto) and the generated protobuf classes.
+`CellValue` carries one of `text`, `number`, `flag` (boolean), `raw` (bytes), or `timestamp` (epoch-ms). For the full schema, look at [`proto/volvoxgrid.proto`](../proto/volvoxgrid.proto) and the generated protobuf classes.
 
-#### Row & Column Sizing
+Cells, ranges, and clearing are direct:
 
 ```java
-ctrl.setRowHeight(0, 40);
-ctrl.setColWidth(0, 200);
+ctrl.setCellText(row, col, "text");
+String text = ctrl.getCellText(row, col);
+
+ctrl.setCells(Arrays.asList(
+    new GridCellText(0, 0, "A"),
+    new GridCellText(0, 1, "B"),
+    new GridCellText(1, 0, "C")
+));
+
+CellsResponse resp = ctrl.getCells(GetCellsRequest.newBuilder()
+    .setRow1(0).setCol1(0).setRow2(1).setCol2(2)
+    .build());
+
+ctrl.clear(ClearScope.CLEAR_EVERYTHING, ClearRegion.CLEAR_SCROLLABLE);
 ```
 
-#### Sorting
+`ClearScope` is one of `CLEAR_EVERYTHING`, `CLEAR_FORMATTING`, `CLEAR_DATA`, `CLEAR_SELECTION`. `ClearRegion` selects which band of the grid the clear applies to.
+
+## Editing and events
+
+Listening for what the user did is one listener; vetoing what they're about to do is another. You'll use both in any non-trivial app.
 
 ```java
-// Simple sort
-ctrl.sort(1, true);  // col 1, ascending
+gridPanel.setGridEventListener(event -> {
+    if (event.hasCellFocusChanged()) {
+        CellFocusChanged e = event.getCellFocusChanged();
+        System.out.println("Moved to row=" + e.getNewRow() + " col=" + e.getNewCol());
+    }
+    if (event.hasAfterSort()) { /* sort completed */ }
+    if (event.hasAfterEdit()) { /* cell edited */ }
+});
+```
 
-// With sort order enum
+`BeforeEdit`, `CellEditValidate`, and `BeforeSort` are cancelable. If you don't handle a cancelable event, it proceeds as if you set `cancel=false`, as long as the decision channel is active.
+
+```java
+gridPanel.setBeforeEditListener(details -> {
+    if (details.getRow() == 0) details.setCancel(true);
+});
+
+gridPanel.setCellEditValidatingListener(details -> {
+    if (details.getEditText().isEmpty()) details.setCancel(true);
+});
+
+gridPanel.setBeforeSortListener(details -> {
+    if (details.getCol() == 0) details.setCancel(true);
+});
+
+gridPanel.setEditorSessionStartedListener(session -> {
+    // wire up an inline editor session
+});
+```
+
+Enable editing globally with `ctrl.setEditable(true)`.
+
+## Renderer modes
+
+VolvoxGrid renders into a CPU pixel buffer by default. Full desktop builds can also render onto a real native surface using `wgpu`, which is faster on large grids and animated viewports. The lite build is CPU-only, so GPU modes are rejected by capability checks.
+
+Pick a mode on the controller when you want to be explicit:
+
+```java
+ctrl.setRendererModeCpu();
+ctrl.setRendererModeGpu();          // auto-pick the best GPU backend
+ctrl.setRendererModeGpuVulkan();
+ctrl.setRendererModeGpuGles();
+ctrl.setRendererModeGpuOpenGl();
+ctrl.setRendererModeGpuDx12();
+ctrl.setRendererModeGpuMetal();
+```
+
+Or set it on the panel with `setRendererMode(...)` using the enum: `RENDERER_CPU`, `RENDERER_GPU`, `RENDERER_GPU_VULKAN`, `RENDERER_GPU_GLES`, `RENDERER_GPU_OPENGL`, `RENDERER_GPU_DX12`, `RENDERER_GPU_METAL`.
+
+Use `panel.isGpuSupported()` to test the loaded library at runtime — handy when you ship both variants from one app.
+
+## Sorting
+
+Sort programmatically or let users click headers.
+
+```java
+ctrl.sort(1, true);                       // col 1, ascending
 ctrl.sort(SortOrder.SORT_ASCENDING, 1);
 
-// Configure header features with the generated proto message
 ctrl.configure(
     GridConfig.newBuilder()
         .setInteraction(
@@ -260,56 +255,45 @@ ctrl.configure(
 );
 ```
 
-**SortOrder values:** `SORT_NONE`, `SORT_ASCENDING`, `SORT_DESCENDING`
+| Enum | Values |
+|---|---|
+| `SortOrder` | `SORT_NONE`, `SORT_ASCENDING`, `SORT_DESCENDING` |
+| `SortType` | `SORT_TYPE_AUTO`, `SORT_TYPE_NUMERIC`, `SORT_TYPE_STRING`, `SORT_TYPE_STRING_NO_CASE`, `SORT_TYPE_CUSTOM` |
 
-**SortType values:** `SORT_TYPE_AUTO`, `SORT_TYPE_NUMERIC`, `SORT_TYPE_STRING`, `SORT_TYPE_STRING_NO_CASE`, `SORT_TYPE_CUSTOM`
-
-#### Selection
+## Selection
 
 ```java
-// Select a range
-ctrl.selectRange(1, 0, 5, 3);  // row1, col1, row2, col2
+ctrl.selectRange(1, 0, 5, 3);             // row1, col1, row2, col2
 
-// Select multiple ranges
-ctrl.selectRanges(List.of(
+ctrl.selectRanges(Arrays.asList(
     new GridCellRange(1, 0, 2, 1),
     new GridCellRange(4, 3, 6, 4)
 ));
 
-// Select multiple ranges with an explicit active cell
 ctrl.selectRanges(
-    List.of(
-        new GridCellRange(1, 0, 2, 1),
-        new GridCellRange(4, 3, 6, 4)
-    ),
-    6,
-    4
+    Arrays.asList(new GridCellRange(1, 0, 2, 1), new GridCellRange(4, 3, 6, 4)),
+    6, 4                                  // explicit active cell
 );
 
-// Get current selection
 GridSelection sel = ctrl.getSelection();
-// sel.getRow(), sel.getCol(), sel.getRowEnd(), sel.getColEnd(), sel.getTopRow(), sel.getLeftCol(), sel.getRanges()
+// sel.getRow(), sel.getCol(), sel.getRowEnd(), sel.getColEnd(),
+// sel.getTopRow(), sel.getLeftCol(), sel.getRanges()
 ```
 
-#### Cell Merging
+## Merged cells
 
 ```java
-ctrl.mergeCells(0, 0, 0, 3);     // merge row 0, cols 0-3
+ctrl.mergeCells(0, 0, 0, 3);
 ctrl.unmergeCells(0, 0, 0, 3);
 CellRange range = ctrl.getMergedRange(0, 0);
 MergedRegionsResponse regions = ctrl.getMergedRegions();
 ```
 
-#### Editing
+## Subtotal and outline
+
+Add aggregate rows under groups, or collapse rows by outline level.
 
 ```java
-ctrl.setEditable(true);
-```
-
-#### Subtotals & Outlining
-
-```java
-// Add subtotal rows
 ctrl.subtotal(SubtotalRequest.newBuilder()
     .setGridId(ctrl.getGridId())
     .setAggregateType(AggregateType.AGG_SUM)
@@ -317,82 +301,146 @@ ctrl.subtotal(SubtotalRequest.newBuilder()
     .setAggregateCol(2)
     .build());
 
-// Outline levels
 ctrl.outline(OutlineRequest.newBuilder()
     .setGridId(ctrl.getGridId())
     .setLevel(2)
     .build());
 ```
 
-#### Clipboard
+## Clipboard
 
 ```java
 ClipboardResponse copied = ctrl.copy();
-ClipboardResponse cut = ctrl.cut();
+ClipboardResponse cut    = ctrl.cut();
 ctrl.paste("tab\tseparated\nrows");
 ctrl.deleteSelection();
 ```
 
-#### Search
+## Search
 
 ```java
-int row = ctrl.findRow("Widget A", 0, 0, false);  // text, col, startRow, caseSensitive
+int row  = ctrl.findRow("Widget A", 0, 0, false); // text, col, startRow, caseSensitive
 int row2 = ctrl.findRowByRegex("^Widget.*", 0, 0);
 ```
 
-#### Aggregates
+Regex search is only available in the full variant.
+
+## Aggregates
 
 ```java
 double sum = ctrl.aggregate(AggregateType.AGG_SUM, 1, 1, 100, 1);
-// AGG_SUM, AGG_COUNT, AGG_AVERAGE, AGG_MAX, AGG_MIN, AGG_STD_DEV, AGG_VAR,
-// AGG_RANGE, AGG_COUNT_ALL, AGG_MEDIAN, AGG_COUNT_DISTINCT
 ```
 
-#### Export & LoadData
+Aggregate types: `AGG_SUM`, `AGG_COUNT`, `AGG_AVERAGE`, `AGG_MAX`, `AGG_MIN`, `AGG_STD_DEV`, `AGG_VAR`, `AGG_RANGE`, `AGG_COUNT_ALL`, `AGG_MEDIAN`, `AGG_COUNT_DISTINCT`.
+
+## Export and load
 
 ```java
 ExportResponse exported = ctrl.saveGrid(ExportFormat.EXPORT_BINARY, ExportScope.EXPORT_ALL);
-LoadDataResult loaded = ctrl.loadData("name,qty\napple,3\nbanana,5".getBytes(java.nio.charset.StandardCharsets.UTF_8));
-// loadData parses CSV or JSON bytes; saveGrid remains export-only.
+LoadDataResult loaded   = ctrl.loadData(bytes);
 ```
 
-#### Rendering
+`saveGrid` exports; `loadData` parses CSV or JSON bytes and populates the grid.
+
+## Viewport, sizing, and rendering control
 
 ```java
-ctrl.setDebugOverlay(true);       // show debug grid overlay
-ctrl.setScrollBars(ScrollBarsMode.SCROLL_BARS_BOTH);
-ctrl.setFlingEnabled(true);       // momentum scrolling
-ctrl.setRedraw(false);            // batch: disable rendering
-// ... make many changes ...
-ctrl.setRedraw(true);             // re-enable and repaint
-ctrl.refresh();                   // force full repaint
-```
+ctrl.setRowCount(1000);
+ctrl.setColCount(10);
+ctrl.setRowHeight(0, 40);
+ctrl.setColWidth(0, 200);
 
-#### Viewport
-
-```java
 ctrl.resizeViewport(800, 600);
+
+ctrl.setDebugOverlay(true);
+ctrl.setScrollBars(ScrollBarsMode.SCROLL_BARS_BOTH);
+ctrl.setFlingEnabled(true);
+
+ctrl.setRedraw(false);          // batch many changes
+// ... lots of edits ...
+ctrl.setRedraw(true);
+ctrl.refresh();                 // force a full repaint
 ```
 
-#### Built-in Demos
+## Built-in demos
+
+Handy for benchmarking and for screenshots:
 
 ```java
-ctrl.loadDemo("stress");      // 1,000,000 rows for performance testing
-
-byte[] salesJson = ctrl.getDemoData("sales");           // pair with loadData + explicit setup
-byte[] hierarchyJson = ctrl.getDemoData("hierarchy");   // pair with loadData + explicit setup
+ctrl.loadDemo("stress");                              // 1,000,000 rows
+byte[] salesJson     = ctrl.getDemoData("sales");     // pair with loadData + setup
+byte[] hierarchyJson = ctrl.getDemoData("hierarchy"); // pair with loadData + setup
 ```
 
-## Multi-Grid Apps
+## Multi-grid apps
 
-Share a single bridge across multiple grids:
+When you show several grids side by side, share one bridge so they cooperate over a single RPC channel.
 
 ```java
 SynurangDesktopBridge bridge = SynurangDesktopBridge.load(libraryPath);
 
-gridPanel1.initialize(bridge, gridId1);
-gridPanel2.initialize(bridge, gridId2);
+panel1.initialize(bridge, gridId1);
+panel2.initialize(bridge, gridId2);
 ```
+
+`SynurangDesktopBridge.load(...)` accepts the same library-path argument shape as the panel — pass `null` to use auto-detection.
+
+## Full versus lite
+
+There are two artifacts:
+
+| Artifact | When to choose it |
+|---|---|
+| `io.github.ivere27:volvoxgrid-desktop:0.8.9` | Default. Includes the built-in Rust text engine, GPU renderer, regex search, and rayon parallelism. |
+| `io.github.ivere27:volvoxgrid-desktop-lite:0.8.9` | Smaller footprint. CPU-only. Uses Java2D for OS font fallback. No GPU, no regex search. |
+
+In the lite variant, the Swing wrapper auto-registers a Java2D text renderer when the loaded native library has no built-in text engine. The Rust runtime still owns the external text mask cache — Java2D only measures and rasterizes on cache misses, with a small Java-side `Font` object cache to keep allocation under control. See [../TEXT_RENDERING.md](../TEXT_RENDERING.md) for the full ownership and lifecycle story.
+
+## How the native library is found
+
+When you call `panel.initialize(null, rows, cols)`, the panel walks this chain and uses the first hit:
+
+1. The first command-line argument passed to your `main`.
+2. The `VOLVOXGRID_LIBRARY_PATH` environment variable.
+3. The bundled native library on the classpath (this is what the Maven JAR provides).
+4. A development build under the workspace `target/debug/` or `target/release/` directory.
+
+If you already have a path in hand — for example from a packaging step — pass it explicitly: `panel.initialize("/opt/myapp/libvolvoxgrid.so", rows, cols)`.
+
+## Local development
+
+When you've cloned the repo and want to iterate on the samples, the Makefile drives everything.
+
+```bash
+# Run the desktop sample against the locally built native library.
+make java-desktop-run
+make java-desktop-run-release
+
+# Run against the published Maven artifact instead.
+make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.8.9
+
+# Lite variant.
+make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.8.9
+make java-desktop-run-release VOLVOXGRID_VARIANT=lite
+```
+
+## TUI sample
+
+The repo also ships a Unix-oriented terminal sample that uses the thin TUI byte-stream path. Useful for SSH sessions, CI smoke tests, and headless servers.
+
+```bash
+make java-tui-run
+make java-tui-smoke
+```
+
+The corresponding `VolvoxGridDesktopTuiExample.java` lives next to the Swing demos.
+
+## What's next
+
+- [../TEXT_RENDERING.md](../TEXT_RENDERING.md) — how the engine and the host divide responsibility for text shaping, the external mask cache, and OS font fallback.
+- [../TUI.md](../TUI.md) — the terminal-host integration in depth.
+- [../ARCHITECTURE.md](../ARCHITECTURE.md) — the engine, the RPC channel, and how host adapters fit on top.
+- [desktop/README.md](desktop/README.md) — the in-source pointer next to the runnable samples.
 
 ## License
 

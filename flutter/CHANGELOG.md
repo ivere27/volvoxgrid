@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.10
+
+- Added checked-in iOS and macOS example projects for the Flutter package.
+- Fixed Flutter iOS native loading through the statically linked XCFramework symbols.
+- Added direct iOS FFI transport through `DynamicLibrary.process()` for statically linked XCFramework symbols.
+- Added iOS plugin registration files that keep the Synurang/VolvoxGrid native symbols linked.
+- Updated Flutter metadata for the iOS plugin class and the Synurang 0.6.0 package.
+- Expanded native library probing for framework bundle locations.
+
 ## 0.8.9
 
 - Regenerated protocol bindings for editor sessions, edit validation, indicator configuration, and font fallbacks.

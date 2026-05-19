@@ -1,16 +1,27 @@
 # Build Variants and Binary Sizes
 
-This document explains the VolvoxGrid full, lite, .NET, Java desktop, WASM,
-and ActiveX build variants, and why their binary sizes differ.
+You're trying to figure out which VolvoxGrid binary to ship, why one is 10 MB and another is 2 MB, or how to inspect what's actually inside them. Here's how VolvoxGrid handles it on your platform.
 
-Binary sizes are examples, not compatibility guarantees. They change with Rust,
-Zig/MinGW, LLVM, target OS ABI, enabled features, link-time optimization, and
-post-build stripping.
+This document covers the VolvoxGrid full, lite, .NET, Java desktop, WASM, and ActiveX build variants, and why their binary sizes differ.
 
-The example sizes below are illustrative and use current `0.8.9`
-filenames. The measurements were last inspected on 2026-05-10.
+Binary sizes are examples, not compatibility guarantees. They change with Rust, Zig/MinGW, LLVM, target OS ABI, enabled features, link-time optimization, and post-build stripping.
 
-## Artifact Types
+The example sizes below are illustrative and use current `0.8.9` filenames. The measurements were last inspected on 2026-05-10.
+
+Next: there are two main variants for a reason.
+
+## Why two variants exist
+
+The split is simple:
+
+- **Full** ships the built-in Rust text engine, the GPU renderer, regex, and rayon parallelism. You drop it into your host, point it at a grid, and everything works without you wiring anything text-shaping-related.
+- **Lite** drops all four. The host has to provide its own text fallback (GDI+, Java2D, Canvas2D, CoreText), there's no GPU path, no regex, no rayon. In return, you get a much smaller binary.
+
+If you're shipping into a constrained channel — small download, embedded surface, or a wrapper that already owns text — you want lite. Otherwise stay on full.
+
+Next: the artifact types you'll actually see in `dist/`.
+
+## Artifact types
 
 | Artifact | What it is | Typical role |
 | --- | --- | --- |
@@ -25,12 +36,13 @@ filenames. The measurements were last inspected on 2026-05-10.
 | `volvoxgrid-web-*.zip` | Web bundle | Browser demos and WASM packaging output |
 | `dist/symbols/*debug-symbols.zip` | Split debug symbols | Public debug-symbol archives uploaded beside GitHub release artifacts |
 
-Do not compare `VolvoxGrid.DotNet.dll` directly to `volvoxgrid.dll`. The former
-is managed glue; the latter is the native engine/runtime.
+Don't compare `VolvoxGrid.DotNet.dll` directly to `volvoxgrid.dll`. The former is managed glue; the latter is the native engine/runtime.
 
-## Runtime Features
+Next: the runtime features that drive the size difference.
 
-The main native runtime is `runtime/Cargo.toml`.
+## Runtime features
+
+The main native runtime lives in `runtime/Cargo.toml`.
 
 | Feature | Pulls in | Size impact | Notes |
 | --- | --- | --- | --- |
@@ -41,7 +53,7 @@ The main native runtime is `runtime/Cargo.toml`.
 | `gpu` | `wgpu`, `pollster`, GPU surface/rendering path, and `cosmic-text` | Large | Largest full-vs-lite size driver |
 | `wasm-threads` | `wasm-bindgen-rayon` and atomics flow | WASM-specific | Requires browser COOP/COEP at runtime |
 
-The runtime feature groups are:
+### Feature groups
 
 ```text
 default       = standard + demo
@@ -56,7 +68,7 @@ The Docker desktop/.NET full native runtime uses:
 cargo build --release --features gpu
 ```
 
-Because Cargo default features remain enabled, this means:
+Because Cargo default features remain enabled, that means:
 
 ```text
 demo + cosmic-text + rayon + regex + gpu + wgpu + pollster
@@ -68,20 +80,19 @@ The lite native runtime uses:
 cargo build --release --no-default-features --features demo
 ```
 
-That disables:
+Which disables:
 
 ```text
 cosmic-text, rayon, regex, gpu, wgpu, pollster
 ```
 
-Lite is still not tiny because it still contains the core Rust runtime bridge,
-protobuf/prost encoding, the engine core, CPU raster support, demo support, and
-platform runtime code.
+Lite is still not tiny because it contains the core Rust runtime bridge, protobuf/prost encoding, the engine core, CPU raster support, demo support, and platform runtime code.
 
-## ActiveX Features
+Next: ActiveX is built from a different crate and follows different rules.
 
-ActiveX is built from `adapters/vsflexgrid/crate/Cargo.toml`, not from the same
-runtime crate used by Java desktop and .NET.
+## ActiveX features
+
+ActiveX is built from `adapters/vsflexgrid/crate/Cargo.toml`, not from the same runtime crate used by Java desktop and .NET.
 
 The packaged ActiveX release artifacts use these modes:
 
@@ -90,8 +101,7 @@ The packaged ActiveX release artifacts use these modes:
 | `VolvoxGrid_*.ocx` | default: `demo + rayon + regex` | CPU/COM ActiveX control |
 | `VolvoxGrid_*.lite.ocx` | `--no-default-features --features lite` | No rayon/regex |
 
-This is why a normal OCX is much smaller than a normal runtime DLL: the normal
-OCX packaged by Docker is not the GPU runtime. It is a CPU ActiveX adapter.
+That's why a normal OCX is much smaller than a normal runtime DLL: the normal OCX packaged by Docker isn't the GPU runtime. It's a CPU ActiveX adapter.
 
 The OCX PE export table only exposes COM DLL entry points:
 
@@ -104,7 +114,9 @@ DllUnregisterServer
 
 Its user-facing API is COM/ActiveX, not a large native C export table.
 
-## Full vs Lite Behavior
+Next: capability matrix and host text fallback.
+
+## Full vs lite behavior
 
 | Capability | Full runtime | Lite runtime |
 | --- | --- | --- |
@@ -116,7 +128,7 @@ Its user-facing API is COM/ActiveX, not a large native C export table.
 | Rayon parallelism | Yes | No |
 | Demo/stress sample data | Yes | Yes |
 
-Wrapper-specific host text fallback:
+Wrapper-specific host text fallback (this is what your wrapper has to supply when you ship lite):
 
 | Wrapper | Lite text fallback |
 | --- | --- |
@@ -125,15 +137,13 @@ Wrapper-specific host text fallback:
 | Web lite | Browser Canvas2D text fallback |
 | Apple platforms | OS text fallback, including CoreText where applicable |
 
-## Split Debug Symbols
+Next: split debug symbols so you can still resolve crashes from a stripped build.
 
-`make docker_all VOLVOXGRID_VERSION=0.8.9` builds release binaries with
-line-table debug information, extracts that information into separate archives
-under `dist/symbols/`, then strips the production binaries that are packaged
-into Maven, GitHub release, .NET, and Apple artifacts.
+## Split debug symbols
 
-The production artifacts stay thin. The symbol archives are only for
-post-mortem debugging, crash reports, and address-to-source-line resolution.
+`make docker_all VOLVOXGRID_VERSION=0.8.9` builds release binaries with line-table debug information, extracts that information into separate archives under `dist/symbols/`, then strips the production binaries that get packaged into Maven, GitHub release, .NET, and Apple artifacts.
+
+The production artifacts stay thin. The symbol archives are only for post-mortem debugging, crash reports, and address-to-source-line resolution.
 
 | Platform/package | Production artifact | Debug-symbol artifact |
 | --- | --- | --- |
@@ -145,10 +155,7 @@ post-mortem debugging, crash reports, and address-to-source-line resolution.
 | Android Compose AAR | Thin wrapper, no native runtime | No separate native debug symbols |
 | WASM/web | Optimized WASM bundle | No split debug-symbol archive in the current Docker build |
 
-For iOS, the debug-symbol archive intentionally stores unstripped static
-archives instead of `.dSYM` bundles. In this Docker cross-build, the final
-deliverable is a static library archive, so the unstripped `.a` per slice is the
-practical symbol artifact that matches the stripped production `.a`.
+For iOS, the debug-symbol archive intentionally stores unstripped static archives instead of `.dSYM` bundles. In this Docker cross-build, the final deliverable is a static library archive, so the unstripped `.a` per slice is the practical symbol artifact that matches the stripped production `.a`.
 
 `make publish_github` always uploads matching files from:
 
@@ -156,13 +163,13 @@ practical symbol artifact that matches the stripped production `.a`.
 dist/symbols/*<version>*debug-symbols.zip
 ```
 
-No `publish_*` target is required to validate a local `dist/` tree. Publishing
-only creates or updates remote package/release entries.
+No `publish_*` target is required to validate a local `dist/` tree. Publishing only creates or updates remote package/release entries.
 
-## Example Native Runtime Sizes
+Next: actual measured sizes from a 0.8.9 build.
 
-Sizes below are uncompressed native files inside the Java desktop JARs, measured
-with:
+## Example native runtime sizes
+
+Sizes below are uncompressed native files inside the Java desktop JARs, measured with:
 
 ```bash
 unzip -l dist/maven/volvoxgrid-desktop-0.8.9.jar 'native/*/*'
@@ -187,10 +194,9 @@ Compressed JAR sizes from the same build:
 | `volvoxgrid-desktop-0.8.9.jar` | 30 MiB |
 | `volvoxgrid-desktop-lite-0.8.9.jar` | 9.6 MiB |
 
-The macOS native rows are lower than older builds because Docker now runs
-`llvm-strip` on packaged `.dylib` files after Zig cross-linking.
+The macOS native rows are lower than older builds because Docker now runs `llvm-strip` on packaged `.dylib` files after Zig cross-linking.
 
-## Example Android, iOS, and WASM Sizes
+## Example Android, iOS, and WASM sizes
 
 Android sizes from `dist/maven/`:
 
@@ -224,7 +230,7 @@ WASM and web bundle sizes:
 | `volvoxgrid-web-0.8.9.zip` | 1.7 MiB |
 | `volvoxgrid-web-lite-0.8.9.zip` | 960 KiB |
 
-## Example .NET and ActiveX Sizes
+## Example .NET and ActiveX sizes
 
 These files are from `dist/dotnet/` and `dist/desktop/ocx/`.
 
@@ -236,13 +242,11 @@ These files are from `dist/dotnet/` and `dist/desktop/ocx/`.
 | `ActiveX x64 OCX`, `VolvoxGrid_x86_64*.ocx` | 2.7 MiB | 1.7 MiB |
 | `ActiveX x86 OCX`, `VolvoxGrid_i686*.ocx` | 2.6 MiB | 1.7 MiB |
 
-The managed .NET wrapper is almost unchanged between full and lite because the
-feature difference lives in the native runtime beside it.
+The managed .NET wrapper is almost unchanged between full and lite because the feature difference lives in the native runtime beside it.
 
-## Example Debug-Symbol Archive Sizes
+## Example debug-symbol archive sizes
 
-These are the public symbol archives produced in `dist/symbols/` by the same
-Docker build.
+These are the public symbol archives produced in `dist/symbols/` by the same Docker build.
 
 | Symbol archive | Size | Contains |
 | --- | ---: | --- |
@@ -254,10 +258,11 @@ Docker build.
 | `VolvoxGrid-0.8.9-debug-symbols.zip` | 25 MiB | iOS full unstripped static archives |
 | `VolvoxGridLite-0.8.9-debug-symbols.zip` | 15 MiB | iOS lite unstripped static archives |
 
-## Why Full Runtime DLLs Are Around 10 MB
+Next: where the bytes actually go.
 
-The full Windows runtime DLL is large mostly because of compiled native code and
-read-only data, not debug symbols. In a representative x64 build:
+## Why full runtime DLLs are around 10 MB
+
+The full Windows runtime DLL is large mostly because of compiled native code and read-only data, not debug symbols. In a representative x64 build:
 
 ```text
 full volvoxgrid.dll:
@@ -279,10 +284,9 @@ rayon parallelism
 target-specific Rust std/platform support
 ```
 
-## Why OCX Is Smaller Than Runtime DLL
+## Why OCX is smaller than a runtime DLL
 
-The packaged normal OCX is not built with the same feature set as the normal
-runtime DLL.
+The packaged normal OCX isn't built with the same feature set as the normal runtime DLL.
 
 ```text
 normal runtime DLL = default features + gpu
@@ -291,10 +295,9 @@ lite runtime DLL   = demo only
 lite OCX           = ActiveX lite feature, no rayon/regex
 ```
 
-So the OCX has an API, but it is a COM API and the packaged OCX does not pull in
-the `wgpu` runtime stack that makes the full native runtime DLL large.
+So the OCX has an API, but it's a COM API, and the packaged OCX doesn't pull in the `wgpu` runtime stack that makes the full native runtime DLL large.
 
-## Platform Size Notes
+## Platform size notes
 
 The same feature set can produce different sizes across OS/CPU targets.
 
@@ -306,13 +309,13 @@ Common reasons:
 | x86/x86_64 vs ARM | Different instruction density and ABI metadata |
 | Dynamic system libraries | Linux can leave more support in libc/libm/libgcc |
 | Windows PE unwind sections | `.pdata` and `.xdata` add metadata |
-| macOS Mach-O link metadata | `__LINKEDIT` can be large if symbols are not stripped |
+| macOS Mach-O link metadata | `__LINKEDIT` can be large if symbols aren't stripped |
 
-If a macOS dylib is unexpectedly large, check whether it was post-stripped with
-`llvm-strip`. Older Zig-based macOS cross-builds can retain large Mach-O symbol
-metadata because Zig 0.13 rejects Darwin `-exported_symbols_list`.
+If a macOS dylib is unexpectedly large, check whether it was post-stripped with `llvm-strip`. Older Zig-based macOS cross-builds can retain large Mach-O symbol metadata because Zig 0.13 rejects Darwin `-exported_symbols_list`.
 
-## Inspection Commands
+Next: commands for poking around inside a build.
+
+## Inspection commands
 
 Show JAR embedded native file sizes:
 
@@ -379,7 +382,9 @@ unzip -p dist/maven/volvoxgrid-desktop-0.8.9.jar \
 llvm-objdump --macho --private-headers /tmp/libvolvoxgrid.dylib
 ```
 
-## Build Commands
+Next: the build commands themselves.
+
+## Build commands
 
 Build everything:
 

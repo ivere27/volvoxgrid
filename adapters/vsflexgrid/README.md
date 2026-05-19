@@ -1,15 +1,24 @@
 # VolvoxGrid ActiveX (OCX)
 
-VolvoxGrid ActiveX is for feasibility testing against battle-tested, mature
-FlexGrid OCX controls. It packages the VolvoxGrid Rust engine as a standard
-COM/OLE control (`.ocx`) for VB6, VBA, VBScript, C++, or any COM-aware host,
-so teams can identify current VolvoxGrid gaps and prioritize improvements.
+Welcome. If you've spent years writing VB6, Excel VBA, or VBScript against the classic FlexGrid OCX and you're wondering whether you can swap that control out for something modern without rewriting your forms, this adapter is for you. It packages the VolvoxGrid Rust engine as a standard COM/OLE control — a single self-contained `.ocx` you can `regsvr32` and drop into any COM-aware host. The ProgID is `VolvoxGrid.VolvoxGridCtrl`, and most of the property and method names you already know map straight through.
+
+The other reason this adapter exists is more pragmatic. FlexGrid is battle-tested in a way no new control can claim, so we treat it as the reference oracle. Every release runs through a 36-scenario side-by-side comparison harness, pixel-diffs the renders, and surfaces gaps in VolvoxGrid that we can then prioritize. If you're a VolvoxGrid contributor, this directory is where you'll run that harness. If you're an evaluator, the same harness gives you an honest, visual answer to "does it look like FlexGrid yet?" without taking our word for it.
+
+If you'd like to skip ahead and just see it working under Wine on Linux:
+
+```bash
+make activex-run-release
+```
+
+That builds the `x86_64` OCX, registers it in your Wine prefix, and launches the classic demo shell.
 
 ## Screenshot
 
 <img src="../../screenshots/activex.png" alt="VolvoxGrid ActiveX demo running under Wine on Ubuntu" width="100%">
 
 ## Architecture
+
+Here's the shape of what gets built, because it explains the trade-offs in the rest of the document. The OCX is a thin C shim that implements COM, calling through a stable C FFI into a Rust static library. There is no Rust runtime to ship and no separate engine DLL — everything links into one file.
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -45,12 +54,11 @@ so teams can identify current VolvoxGrid gaps and prioritize improvements.
                               └─────────────────────┘
 ```
 
-**Key design:** A thin C shim (`volvoxgrid_ocx.c`) implements the COM interfaces
-and dispatches property/method calls through a C FFI layer into the Rust engine,
-which is linked as a static library (`.a`). The result is a single self-contained
-`.ocx` file with no Rust runtime dependency.
+The C shim `volvoxgrid_ocx.c` handles `IDispatch` and `IViewObject` and dispatches every property and method call through the C FFI into the Rust engine, which is linked as a `.a` static library. The output is one `.ocx` file with no Rust runtime dependency, which is the only sane way to ship into VB6 and legacy COM environments.
 
-## Directory Structure
+## Directory structure
+
+If you want to know where to look before you start changing things, here's the layout under `adapters/vsflexgrid/`.
 
 ```
 adapters/vsflexgrid/
@@ -86,27 +94,36 @@ adapters/vsflexgrid/
 
 ## Prerequisites
 
-**Linux cross-compilation (recommended):**
+You'll build this from Linux using MinGW-w64. That's the supported path; native MSVC builds aren't wired up because Wine is the cheapest way to run the comparison harness without a Windows VM.
 
-- Rust toolchain with cross-compilation targets:
-  ```
-  rustup target add i686-pc-windows-gnu
-  rustup target add x86_64-pc-windows-gnu
-  ```
-- MinGW-w64 cross-compilers:
-  ```
-  sudo apt install gcc-mingw-w64-i686 gcc-mingw-w64-x86-64
-  ```
-- Wine (for testing):
-  ```
-  sudo apt install wine
-  ```
-- ImageMagick (optional, for BMP-to-PNG conversion):
-  ```
-  sudo apt install imagemagick
-  ```
+Install the Rust cross targets:
+
+```
+rustup target add i686-pc-windows-gnu
+rustup target add x86_64-pc-windows-gnu
+```
+
+Install the MinGW cross compilers:
+
+```
+sudo apt install gcc-mingw-w64-i686 gcc-mingw-w64-x86-64
+```
+
+Install Wine so you can run and register the OCX:
+
+```
+sudo apt install wine
+```
+
+ImageMagick is optional, but the capture tests write BMP and the conversion to PNG for reports is friendlier with it:
+
+```
+sudo apt install imagemagick
+```
 
 ## Building
+
+When you're ready to actually produce an `.ocx`, run the build script from the `mingw` directory. It builds both 32-bit (i686) and 64-bit (x86_64) variants in one shot.
 
 ```bash
 cd adapters/vsflexgrid/mingw
@@ -117,9 +134,9 @@ cd adapters/vsflexgrid/mingw
 make activex-run-release
 ```
 
-The ActiveX demo runner defaults to `ACTIVEX_ARCH=x86_64`. Use `ACTIVEX_ARCH=i686` only when you need the 32-bit Wine/OCX host.
+The `make activex-run-release` target defaults to `ACTIVEX_ARCH=x86_64`. Set `ACTIVEX_ARCH=i686` only when you specifically need the 32-bit Wine and 32-bit OCX host — VB6 IDE, older Office, that sort of thing.
 
-**Output** (in `target/ocx/`):
+Everything lands in `target/ocx/`:
 
 | File | Description |
 |------|-------------|
@@ -130,7 +147,9 @@ The ActiveX demo runner defaults to `ACTIVEX_ARCH=x86_64`. Use `ACTIVEX_ARCH=i68
 | `bcryptprimitives.dll` | Wine stub DLL (not needed on real Windows) |
 | `api-ms-win-core-synch-l1-2-0.dll` | Wine stub DLL (not needed on real Windows) |
 
-### Build Flow
+### Build flow
+
+If something breaks mid-build, this is the order of operations so you can pick up where it failed:
 
 ```
 1. cargo build --target i686-pc-windows-gnu
@@ -150,20 +169,18 @@ The ActiveX demo runner defaults to `ACTIVEX_ARCH=x86_64`. Use `ACTIVEX_ARCH=i68
        → VolvoxGrid_i686.ocx
 ```
 
-**Critical:** `xp_compat.o` must be linked before the Rust static library. It
-defines symbols (`__imp_ProcessPrng`, `_InitOnceBeginInitialize@16`, etc.) that
-override Rust's DLL import stubs, eliminating dependencies on Vista+/Win8+/Win10+ APIs.
+The link order matters. `xp_compat.o` MUST be linked before the Rust static library. It defines symbols (`__imp_ProcessPrng`, `_InitOnceBeginInitialize@16`, and friends) that override Rust's DLL import stubs, which is what lets the resulting OCX run on Windows XP without dragging in Vista, Win8, or Win10 APIs.
 
 ## Registration
 
-On the target Windows machine (or in Wine):
+Once the build finishes, register the OCX the same way you'd register any classic COM control. On the target Windows machine, or under Wine:
 
 ```
 regsvr32 VolvoxGrid_i686.ocx       # Register
 regsvr32 /u VolvoxGrid_i686.ocx    # Unregister
 ```
 
-This creates the following registry entries:
+This writes the standard self-registration entries:
 
 | Key | Value |
 |-----|-------|
@@ -172,20 +189,20 @@ This creates the following registry entries:
 | `HKCR\CLSID\{...}\ProgID` | VolvoxGrid.VolvoxGridCtrl |
 | `HKCR\VolvoxGrid.VolvoxGridCtrl\CLSID` | `{A7E3B4D1-...}` |
 
-**ProgID:** `VolvoxGrid.VolvoxGridCtrl`
+The ProgID is `VolvoxGrid.VolvoxGridCtrl`, so `CreateObject("VolvoxGrid.VolvoxGridCtrl")` from VB6, VBA, or VBScript will instantiate the control.
 
-## Comparison Harness
+## Comparison harness
 
-The UI/data comparison runners under `adapters/vsflexgrid/mingw/` now default to a Wine prefix that uses Microsoft MDAC 2.8 SP1 ADO components instead of Wine's builtin `msado15`. This is required for VBScript `CreateObject("ADODB.Recordset")` and ADO binding behavior used by legacy hosts.
+This is the part you'll spend the most time in if you're tracking compatibility. The harness drives both controls from VBScript, captures their renders, and produces an HTML report with pixel diffs. To make ADO-bound scenarios match real Windows behavior, the runners default to a Wine prefix configured with Microsoft MDAC 2.8 SP1 instead of Wine's builtin `msado15`. This is required for `CreateObject("ADODB.Recordset")` and the binding patterns legacy hosts use.
 
-Default compare environment:
+The default compare environment looks like this:
 
 - `WINEPREFIX=$HOME/.wine`
 - `WINEDLLOVERRIDES=msado15,mtxdm,odbc32,odbccp32,oledb32=n,b`
 
-Use `$HOME/...`, not a quoted literal `~`, when setting the prefix path.
+Use `$HOME/...`, not a quoted literal `~`, when setting the prefix path — Wine's argument handling is unkind to unexpanded tildes.
 
-Examples:
+Typical usage:
 
 ```bash
 cd adapters/vsflexgrid/mingw
@@ -193,26 +210,33 @@ cd adapters/vsflexgrid/mingw
 ./run_compare_ui.sh --data
 ```
 
-Before the first compare run, prepare the prefix once:
+Before your first compare run, prepare the Wine prefix once with MDAC:
 
 ```bash
 cd adapters/vsflexgrid/mingw
 MDAC28SDK_DIR=/path/to/mdac28sdk ./setup_mdac28.sh /path/to/MDAC_TYP.EXE
 ```
 
-Start the MSSQL test server before running UI comparison tests that include SQL cases `84-103`. `./run_compare_ui.sh` includes them by default:
+The UI compare suite includes SQL cases `84-103` by default, which need a live MSSQL server. Bring one up in Docker:
 
 ```bash
 docker run -e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=sapassword12#$%" -e "MSSQL_PID=Express" -p 1433:1433 -d mcr.microsoft.com/mssql/server:2017-latest
 ```
 
-`run_compare_ui.sh` verifies the MDAC/MSSQL client setup when SQL compare tests are selected, but it does not install anything for you. Prepare the prefix once with `setup_mdac28.sh` before running the live SQL cases.
+`run_compare_ui.sh` verifies the MDAC and MSSQL client setup when SQL cases are selected, but it won't install anything for you — that's what `setup_mdac28.sh` is for, and you only need to run it once per prefix.
 
-Override the SQL target with `VFG_SQL_SERVER`, `VFG_SQL_DATABASE`, `VFG_SQL_USER`, and `VFG_SQL_PASSWORD` when needed. The defaults match the Docker command above: `127.0.0.1,1433`, `tempdb`, `sa`, and `sapassword12#$%`.
+Override the SQL target with these environment variables when needed:
 
-If the typelibs in `~/.wine` still point to `/tmp/mdac28sdk`, rerun `setup_mdac28.sh` with `MDAC28SDK_DIR` to rehome them into `C:\windows\system32\mdac28` inside the prefix.
+- `VFG_SQL_SERVER` (default `127.0.0.1,1433`)
+- `VFG_SQL_DATABASE` (default `tempdb`)
+- `VFG_SQL_USER` (default `sa`)
+- `VFG_SQL_PASSWORD` (default `sapassword12#$%`)
 
-Override the defaults when needed:
+The defaults match the Docker command above, so if you used that you can skip the overrides.
+
+If the typelibs in `~/.wine` still point to `/tmp/mdac28sdk` from an earlier run, rerun `setup_mdac28.sh` with `MDAC28SDK_DIR` set so it rehomes them into `C:\windows\system32\mdac28` inside the prefix.
+
+To override the defaults entirely:
 
 ```bash
 WINEPREFIX=/path/to/prefix \
@@ -220,18 +244,17 @@ WINEDLLOVERRIDES=msado15,mtxdm,odbc32,odbccp32,oledb32=n,b \
 ./run_compare_ui.sh --data
 ```
 
-If the default native MDAC prefix does not exist, `run_compare_ui.sh` exits with an error and asks you to provide a valid `WINEPREFIX` or `DEFAULT_NATIVE_WINEPREFIX`.
+If the default native MDAC prefix does not exist, `run_compare_ui.sh` exits with an error and asks you to supply a valid `WINEPREFIX` or `DEFAULT_NATIVE_WINEPREFIX`.
 
-## COM Interfaces
+## COM interfaces
 
-The OCX exposes two COM interfaces:
+The OCX exposes two interfaces. Everything you'd recognize from a normal control — properties, indexed properties, methods — comes through `IDispatch`. Rendering is separated out into `IViewObject` because the OCX is windowless.
 
-### IDispatch (Property/Method Access)
+### IDispatch (property and method access)
 
-All grid properties and methods are accessed through `IDispatch::Invoke()`.
-The control maps property/method names to DISPIDs via `GetIDsOfNames()`.
+Properties and methods are routed through `IDispatch::Invoke()`. `GetIDsOfNames()` maps the name your VB code uses to a stable DISPID, and the tables below are the property map: if you're wondering whether a particular FlexGrid property is wired up, find it here.
 
-**Grid Structure:**
+**Grid structure**
 
 | DISPID | Name | Type | Description |
 |--------|------|------|-------------|
@@ -253,7 +276,7 @@ The control maps property/method names to DISPIDs via `GetIDsOfNames()`.
 | 22 | RowSel | int | Selection end row |
 | 23 | ColSel | int | Selection end column |
 
-**Appearance:**
+**Appearance**
 
 | DISPID | Name | Type | Description |
 |--------|------|------|-------------|
@@ -267,7 +290,7 @@ The control maps property/method names to DISPIDs via `GetIDsOfNames()`.
 | 48 | GridLines | int | Data area gridline style |
 | 49 | GridLinesFixed | int | Fixed area gridline style |
 
-**Colors** (ARGB format, e.g. `&HFFE0E0FF`):
+**Colors** (ARGB format, e.g. `&HFFE0E0FF`)
 
 | DISPID | Name | Description |
 |--------|------|-------------|
@@ -281,7 +304,7 @@ The control maps property/method names to DISPIDs via `GetIDsOfNames()`.
 | 47 | BackColorAlternate | Alternate row background |
 | 50 | TreeColor | Outline tree line color |
 
-**Merge & Outline:**
+**Merge and outline**
 
 | DISPID | Name | Type | Description |
 |--------|------|------|-------------|
@@ -294,7 +317,7 @@ The control maps property/method names to DISPIDs via `GetIDsOfNames()`.
 | 57 | IsCollapsed(i) | bool | Row i is collapsed |
 | 33 | SubtotalPosition | int | Subtotal placement (0=above, 1=below) |
 
-**Indexed Properties:**
+**Indexed properties**
 
 | DISPID | Name | Type | Description |
 |--------|------|------|-------------|
@@ -305,7 +328,7 @@ The control maps property/method names to DISPIDs via `GetIDsOfNames()`.
 | 64 | CellChecked(r,c) | int | Checkbox state |
 | 65 | CellFlood(r,c) | int | Cell fill level (0-100) |
 
-**Methods:**
+**Methods**
 
 | DISPID | Name | Signature | Description |
 |--------|------|-----------|-------------|
@@ -318,35 +341,31 @@ The control maps property/method names to DISPIDs via `GetIDsOfNames()`.
 | 76 | Select | r1, c1, r2, c2 | Set selection range |
 | 77 | Refresh | | Force redraw |
 
-### IViewObject (Rendering)
+### IViewObject (rendering)
 
-The `Draw()` method renders the grid to any device context (HDC). Internally
-it calls the CPU renderer (`volvox_grid_render_bgra()`) and blits the BGRA
-pixel buffer to the target DC via `SetDIBitsToDevice`.
+The host calls `Draw()` whenever the control needs to paint, passing in any device context. Internally that turns into a call to the CPU renderer (`volvox_grid_render_bgra()`), followed by a `SetDIBitsToDevice` blit of the BGRA buffer onto the target DC.
 
-No GPU rendering in ActiveX mode.
+There is no GPU rendering path in ActiveX mode. The GPU backend exists in the engine but is intentionally off here because COM hosts hand us an HDC, not a window.
 
-## Units: Twips
+## Units: twips
 
-Following the classic FlexGrid API convention, `RowHeight` and `ColWidth` use
-**twips** (1 inch = 1440 twips). At 96 DPI: **1 pixel = 15 twips**.
+FlexGrid measures `RowHeight` and `ColWidth` in twips, and so does this OCX. The conversion math, since you'll need it when you're debugging a layout mismatch: 1 inch = 1440 twips, and at 96 DPI that means 1 pixel = 15 twips.
 
 The OCX converts at the boundary:
+
 - **Put:** `pixels = (twips + 7) / 15` (rounded)
 - **Get:** `twips = pixels * 15`
-- Special value `-1` (auto-size) passes through unchanged.
+- The special value `-1` (auto-size) passes through unchanged.
 
-The engine internally uses pixels.
+The engine itself uses pixels internally; twips only exist at the COM surface for compatibility.
 
-## Windows Version Compatibility
+## Windows version compatibility
 
-The OCX is a single `.ocx` file with **no external DLL dependencies** beyond
-standard Windows system DLLs.
+The OCX is a single `.ocx` with no external DLL dependencies beyond standard Windows system DLLs. Here's the story on which versions of Windows it actually runs on, because Rust's standard library imports a lot of modern APIs and we go to some trouble to neutralize them.
 
-### Minimum: Windows XP (SP2)
+### Minimum: Windows XP SP2
 
-`xp_compat.c` provides static fallback implementations for 17 APIs that Rust's
-standard library imports but which don't exist on XP:
+`xp_compat.c` provides static fallback implementations for 17 APIs that Rust's stdlib imports but which don't exist on XP:
 
 | API | Introduced | Fallback |
 |-----|-----------|----------|
@@ -362,84 +381,63 @@ standard library imports but which don't exist on XP:
 | `GetUserPreferredUILanguages` | Vista | Returns `"en-US"` |
 | `ProcThreadAttributeList` functions | Vista | Returns `ERROR_NOT_SUPPORTED` |
 
-**How it works:** The `xp_compat.o` object file is linked before the Rust
-static library. Two mechanisms:
+How the stubbing works: `xp_compat.o` is linked before the Rust static library, and two mechanisms make the imports disappear.
 
-1. **KERNEL32 stdcall functions** — Our C implementations (e.g.
-   `_InitOnceBeginInitialize@16`) satisfy the symbol references before the
-   MinGW import library is consulted, so these functions are never imported
-   from KERNEL32.dll.
+1. **KERNEL32 stdcall functions.** Our C implementations (e.g. `_InitOnceBeginInitialize@16`) satisfy the symbol references before the MinGW import library is consulted, so these functions are never imported from KERNEL32.dll.
 
-2. **raw-dylib functions** (ProcessPrng, WaitOnAddress) — Rust uses
-   `__imp_FuncName` indirect call pointers. We define these via inline
-   assembly pointing to our `__stdcall` implementations. The DLL imports
-   for `bcryptprimitives.dll` and `api-ms-win-core-synch-l1-2-0.dll`
-   disappear entirely from the PE import table.
+2. **raw-dylib functions** (`ProcessPrng`, `WaitOnAddress`). Rust uses `__imp_FuncName` indirect call pointers for these. We define those pointers via inline assembly so they point at our `__stdcall` implementations. The DLL imports for `bcryptprimitives.dll` and `api-ms-win-core-synch-l1-2-0.dll` disappear entirely from the PE import table.
 
 ### Remaining KERNEL32 imports (all XP-compatible)
 
-After stubbing, the OCX only imports from: ADVAPI32, GDI32, KERNEL32,
-msvcrt, ntdll, OLEAUT32, USER32, USERENV, WS2_32 — all present on Windows XP.
-
-The few XP-era KERNEL32 functions used (`AddVectoredExceptionHandler`,
-`GetProcessId`, `SetThreadStackGuarantee`) are available on XP SP1/SP2.
+After stubbing, the OCX only imports from ADVAPI32, GDI32, KERNEL32, msvcrt, ntdll, OLEAUT32, USER32, USERENV, and WS2_32 — all present on Windows XP. The few XP-era KERNEL32 functions used (`AddVectoredExceptionHandler`, `GetProcessId`, `SetThreadStackGuarantee`) are available on XP SP1/SP2.
 
 ### Not supported: Windows 2000 and earlier
 
-Windows 2000 is missing ~21 additional KERNEL32 functions including
-`AddVectoredExceptionHandler` (XP+), and ntdll's `RtlCaptureContext` (XP+).
-Windows 95/98/ME are not possible — Rust's stdlib fundamentally requires
-NT-based Windows (Unicode W functions, ntdll.dll).
+Windows 2000 is missing roughly 21 additional KERNEL32 functions including `AddVectoredExceptionHandler` (XP+), and ntdll's `RtlCaptureContext` (XP+). Windows 95/98/ME are not possible at all — Rust's stdlib fundamentally requires NT-based Windows (Unicode W functions, `ntdll.dll`), and no amount of shimming gets you back to those kernels.
 
-## Wine Compatibility
+## Wine compatibility
 
-The OCX works under Wine (tested with Wine 6.x). Two additional stub DLLs
-are built for older Wine versions that lack Win8+ system DLLs:
+The OCX works under Wine (tested with Wine 6.x), but older Wine versions ship without the Win8+ system DLLs that some imports resolve to, so two additional stub DLLs are built alongside the OCX:
 
-- `bcryptprimitives.dll` — Provides `ProcessPrng` via `RtlGenRandom`
-- `api-ms-win-core-synch-l1-2-0.dll` — Provides `WaitOnAddress`/`WakeByAddress*`
+- `bcryptprimitives.dll` — provides `ProcessPrng` via `RtlGenRandom`
+- `api-ms-win-core-synch-l1-2-0.dll` — provides `WaitOnAddress`/`WakeByAddress*`
 
-**These stubs are only needed for Wine** (not for real Windows) because the
-`xp_compat.c` stubs are already embedded in the OCX. The separate DLLs exist
-because older Wine loads and resolves all DLL imports before our internal stubs
-take effect.
+These stubs are only needed for Wine, not for real Windows, because the `xp_compat.c` stubs are already embedded in the OCX. The separate DLLs exist because older Wine loads and resolves all DLL imports before our internal stubs take effect.
 
-To install for Wine:
+To install them in a Wine prefix:
+
 ```bash
 cp target/ocx/bcryptprimitives.dll ~/.wine/drive_c/windows/system32/
 cp target/ocx/api-ms-win-core-synch-l1-2-0.dll ~/.wine/drive_c/windows/system32/
 ```
 
-### Wine Text Antialiasing
+### Wine text antialiasing
 
-Wine does not apply font smoothing (antialiasing) to text rendered on memory
-DCs (`CreateCompatibleDC` + `CreateCompatibleBitmap`). Since the OCX is
-windowless and renders text to an offscreen buffer via GDI callbacks, text
-appears non-antialiased under Wine. This does not affect real Windows, where
-GDI correctly antialiases text on memory DCs.
+Wine does not apply font smoothing to text rendered on memory DCs (`CreateCompatibleDC` + `CreateCompatibleBitmap`). Because the OCX is windowless and renders text to an offscreen buffer via GDI callbacks, text appears non-antialiased under Wine. This does not affect real Windows, where GDI correctly antialiases text on memory DCs.
 
-The original FlexGrid control is a windowed control that renders text directly
-to its window DC during `WM_PAINT`, which Wine does antialias. This causes a
-visible text quality difference in the comparison tests that does not exist on
-real Windows.
+The original FlexGrid control is a windowed control that renders text directly to its window DC during `WM_PAINT`, which Wine does antialias. The result is a visible text-quality difference in the comparison tests that does not exist on real Windows — keep that in mind when reading diff images.
 
-### Wine XP Mode
+### Wine XP mode
 
-Wine can emulate Windows XP for testing:
+If you want to verify the XP compatibility story end-to-end, Wine can emulate Windows XP:
+
 ```bash
 wine reg add "HKCU\Software\Wine" /v Version /t REG_SZ /d winxp /f
 ```
 
 Reset to default:
+
 ```bash
 wine reg add "HKCU\Software\Wine" /v Version /t REG_SZ /d win7 /f
 ```
 
 ## Testing
 
-### Quick Capture Test
+There are two test harnesses, one quick and one thorough.
 
-Renders VolvoxGrid to a BMP:
+### Quick capture test
+
+The capture test is the fastest smoke check: it renders a single VolvoxGrid to a BMP and exits. If this works, the OCX is registered and the FFI is alive.
 
 ```bash
 cd adapters/vsflexgrid/mingw
@@ -448,9 +446,9 @@ wine ../../../target/ocx/grid_capture_test_i686.exe
 # Output: grid_output.bmp
 ```
 
-### Visual Comparison Test
+### Visual comparison test
 
-Side-by-side comparison against FlexGrid OCX (36 test scenarios):
+The comparison harness is what you want when you're tracking compatibility against FlexGrid. It runs 36 scripted scenarios in both controls and emits a side-by-side HTML report.
 
 ```bash
 cd adapters/vsflexgrid/mingw
@@ -460,7 +458,7 @@ cd adapters/vsflexgrid/mingw
 ./run_compare_ux.sh               # UX interaction comparison with HTML report
 ```
 
-**Output** (in `target/ocx/compare/`):
+Output lands in `target/ocx/compare/`:
 
 | File | Description |
 |------|-------------|
@@ -479,7 +477,9 @@ The HTML report displays a 2x2 grid per test:
 └──────────────┴───────────────┘
 ```
 
-### Test Scenarios (36 tests)
+### Test scenarios (36 tests)
+
+Each scenario isolates one FlexGrid feature so a diff points unambiguously at the responsible code path. Names match the `.vbs` files in `mingw/tests/`.
 
 | # | Name | What it tests |
 |---|------|---------------|
@@ -520,10 +520,11 @@ The HTML report displays a 2x2 grid per test:
 | 35 | multi_fixed | Multiple fixed rows and columns |
 | 36 | unicode | CJK, Cyrillic, Greek, symbols, mixed scripts |
 
-Each test has a corresponding `.vbs` file in `mingw/tests/` that documents the
-VBScript equivalent of the test setup (used in the HTML report).
+Each test has a matching `.vbs` file in `mingw/tests/` that documents the VBScript equivalent of the setup — the HTML report renders that script alongside the images so you can read what produced the difference.
 
 ## Usage from VB6/VBA
+
+If you've made it this far and you want to see the API in your own host, the code looks like classic FlexGrid because that's the whole point.
 
 ```vb
 ' Create instance
@@ -560,6 +561,8 @@ fg.Subtotal 5, 1, 2, "Total", &HFFC0C0FF, &HFF000000, True
 
 ## GUIDs
 
+If you're hand-rolling a registration script or referencing the type library, here are the canonical identifiers:
+
 | Name | GUID |
 |------|------|
 | CLSID_VolvoxGrid | `{A7E3B4D1-5C2F-4E8A-B9D6-1F3C7E2A4B5D}` |
@@ -569,16 +572,15 @@ fg.Subtotal 5, 1, 2, "Total", &HFFC0C0FF, &HFF000000, True
 
 ## Limitations
 
-- **No type information** — `GetTypeInfoCount()` returns 0. Design-time
-  IntelliSense is not provided by the OCX.
-- **No event sourcing** — The OCX does not fire events (e.g. `Click`,
-  `RowColChange`). Properties are read/written only.
-- **CPU rendering only** — `IViewObject::Draw()` uses the software renderer.
-  The GPU renderer (`feature = "gpu"`) is not available in ActiveX mode.
-- **No embedded window** — The OCX does not create its own HWND. It renders
-  on demand via `IViewObject::Draw()` to any DC provided by the host.
-- **Wine text antialiasing** — Text appears non-antialiased under Wine because
-  Wine does not apply font smoothing to memory DCs. On real Windows, text is
-  properly antialiased. See [Wine Text Antialiasing](#wine-text-antialiasing).
-- **Wine thread cleanup crash** — A benign page fault may occur during Wine
-  process exit (thread cleanup). This does not affect functionality.
+A few things are intentionally not in scope for the ActiveX adapter. Some are because COM hosting doesn't make sense for them, and some are open work.
+
+- **No type information.** `GetTypeInfoCount()` returns 0. Design-time IntelliSense is not provided by the OCX, so VB6 IDE auto-complete on a late-bound `Object` reference won't have type hints.
+- **No event sourcing.** The OCX does not fire events (e.g. `Click`, `RowColChange`). Properties and methods are read/written only — there is no outgoing dispinterface yet.
+- **CPU rendering only.** `IViewObject::Draw()` uses the software renderer. The GPU renderer (`feature = "gpu"`) is not available in ActiveX mode, because the host hands us a DC, not a swap chain.
+- **No embedded window.** The OCX does not create its own HWND. It renders on demand via `IViewObject::Draw()` to any DC the host provides. That keeps the integration model simple but means you can't capture native input directly from the control.
+- **Wine text antialiasing.** Text appears non-antialiased under Wine because Wine does not apply font smoothing to memory DCs. On real Windows, text is properly antialiased. See [Wine text antialiasing](#wine-text-antialiasing) above.
+- **Wine thread cleanup crash.** A benign page fault may occur during Wine process exit (thread cleanup). It happens after work is done and does not affect functionality, but if you're driving the harness from CI you'll want to ignore non-zero exit codes from that specific path.
+
+## What's next
+
+For the bigger picture — how this adapter fits alongside the Flutter, Web, .NET, Java, and Go bindings — head back to the repo root [README](../../README.md). For the engine internals, the renderer model, and how the FFI surface is generated, read [ARCHITECTURE.md](../../ARCHITECTURE.md).

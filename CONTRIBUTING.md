@@ -1,8 +1,8 @@
 # Contributing to VolvoxGrid
 
-Thank you for your interest in contributing to VolvoxGrid! This document provides guidelines and information for contributors.
+Thanks for being here. Whether you're filing a bug, fixing one, or adding a feature, this doc walks you through what to expect.
 
-For repo architecture, local build commands, and development workflow, see [ARCHITECTURE.md](ARCHITECTURE.md). This file stays focused on contribution policy and review expectations.
+For repo architecture, prerequisites, and the daily build commands, see [ARCHITECTURE.md](ARCHITECTURE.md) — this file stays focused on policy and review.
 
 ## Contributor License Agreement (CLA)
 
@@ -14,33 +14,46 @@ By submitting a pull request or patch to this repository, you agree to the follo
 
 3. **No Warranty**: You provide your contribution "as is" without any warranty.
 
-## How to Contribute
+## How to report an issue
 
-### Reporting Issues
+Before you open one, check the existing issue list — there's a good chance the bug or feature you're thinking about is already tracked.
 
-- Check existing issues before creating a new one.
-- Include relevant details: OS, Rust version, Flutter version, steps to reproduce.
-- Provide error messages, logs, and stack traces if applicable.
+When you do file, give us enough to reproduce. The shape we expect is:
 
-### Submitting Code
+- OS and version, Rust version, and the relevant SDK version (Flutter, JDK, .NET, Node, Go) for the path you hit the bug on
+- Exact steps to reproduce
+- The error message, log, and stack trace if there is one
+- What you expected to happen, and what actually happened
+
+For feature requests, lead with the use case — what you're trying to build and what's blocking you. That makes it much easier to design something that fits.
+
+## How to submit code
 
 1. Fork the repository.
-2. Create a feature branch (`git checkout -b feature/your-feature`).
-3. Make your changes.
-4. Ensure tests pass (`make test`).
-5. Commit with clear messages.
-6. Push to your fork.
-7. Open a pull request.
+2. Branch off `main` (`git checkout -b feature/your-feature`).
+3. Make your change. Keep it scoped — one logical change per PR.
+4. Run the relevant tests (`make test` at minimum; see [Testing](#testing) below).
+5. Commit with a clear message (see the [Commit messages](#commit-messages) section).
+6. Push to your fork and open a PR against `main`.
+7. Make sure CI is green before requesting review.
 
-### Code Style
+If your change touches the public API, update the matching docs in the same PR. If it adds behavior, add a test.
 
-- **Rust**: Follow standard Rust conventions. Run `cargo fmt` and `cargo clippy` before submitting.
-- **Flutter/Dart**: Follow standard Dart conventions. Run `dart format .` in the Flutter directories.
-- **Proto**: Follow Google's protobuf style guide.
+## Code style
 
-### Commit Messages
+Each language follows its native conventions — don't fight the tooling.
 
-Use clear, descriptive commit messages:
+- **Rust** — run `cargo fmt` and `cargo clippy` before submitting. Treat clippy warnings as errors unless you have a reason not to.
+- **Flutter/Dart** — run `dart format .` in the Flutter directories.
+- **Proto** — follow Google's protobuf style guide. Field numbers are forever, so think before you assign them.
+- **Java/Kotlin** — match the surrounding file. Gradle wrappers are checked in.
+- **C# / .NET** — `dotnet format` before pushing.
+- **Go** — `gofmt`, `go vet`, and the usual.
+- **TypeScript** — the `web/js/` package has its own lint/format setup; run it before pushing.
+
+## Commit messages
+
+The format is `component: short description`, with an optional body explaining the why (not the how — the code shows how).
 
 ```
 component: short description
@@ -49,118 +62,101 @@ Longer explanation if needed. Explain what and why,
 not how (the code shows how).
 ```
 
-Examples:
+Real examples from the history:
+
 - `engine: optimize cell rendering performance`
 - `flutter: add support for custom cell editors`
 - `web: fix wasm memory leak in grid disposal`
 - `runtime: update ffi bindings for new proto fields`
 
-### Pull Request Guidelines
+Keep the subject under 72 characters. If you can't summarize the change in one line, the PR is probably doing too much.
 
-- Keep PRs focused on a single change.
-- Update documentation if needed.
-- Add tests for new functionality.
-- Ensure CI passes before requesting review.
+## Local development quick links
 
-## Development Setup
-
-### Prerequisites
-
-- **Rust**: Latest stable version (via `rustup`).
-- **Flutter**: Latest stable version (if working on Flutter components).
-- **Protobuf Compiler**: `protoc` (if modifying `.proto` files).
-- **Go**: 1.22+ (for `protoc-gen-synurang-ffi` codegen and the Go TUI host).
-- **Android SDK/NDK**: For Android/Flutter builds.
-- **Node.js/npm**: For web and adapter package builds.
-- **.NET SDK**: For `.NET` wrapper builds.
-
-### Build & Run
+The full prerequisites, mental model, and `make` targets live in [ARCHITECTURE.md](ARCHITECTURE.md). The short version:
 
 ```bash
-# Clone the repository
+# clone
 git clone https://github.com/ivere27/volvoxgrid.git
 cd volvoxgrid
 
-# Build Engine & Runtime (Debug)
+# build the engine and native library
 make build
 
-# Run Smoke Test
+# smoke-test the native library
 make run
 
-# Run Unit Tests
+# run unit tests
 make test
 
-# Build WASM & Start Web Dev Server
+# pick the host you're working on
 make web
-
-# Run Flutter Example (Android)
-# Requires connected Android device or emulator
 make flutter-run
-
-# Run GTK4 Runtime-Host Visual Test (Linux)
+make java-desktop-run
 make gtk-test
-
-# Run Go TUI Example
 make go-tui-run
-
-# Run .NET TUI Example
 make dotnet-tui-run
-
-# Run Java TUI Example
 make java-tui-run
 ```
 
-## Project Structure
+If you're changing `.proto` files, run `make codegen` before rebuilding anything.
+
+## Project layout
 
 ```
 volvoxgrid/
-├── engine/          # Core grid logic (Rust)
+├── engine/           # Core grid logic (Rust)
 ├── runtime/          # Synurang FFI runtime wrapper and WASM targets (Rust)
-├── proto/           # Protobuf definitions
-├── codegen/         # Generated FFI bindings
-├── flutter/         # Flutter runtime & example app
-├── android/         # Android wrapper & example
-├── java/            # Java desktop wrapper & TUI example
+├── proto/            # Protobuf definitions
+├── codegen/          # Generated FFI bindings
+├── flutter/          # Flutter runtime & example app
+├── android/          # Android wrapper & example
+├── java/             # Java desktop wrapper & TUI example
 │   ├── common/
 │   └── desktop/
-├── dotnet/          # .NET wrapper (WinForms, client, TUI)
+├── dotnet/           # .NET wrapper (WinForms, client, TUI)
 │   ├── src/
 │   └── examples/
-├── go/              # Go TUI host & client API
+├── go/               # Go TUI host & client API
 │   ├── pkg/
 │   └── examples/
-├── web/             # Browser package and demo
-│   ├── js/          # JS/TS npm package and package-local WASM output
-│   └── example/     # Vite browser demo and release-demo source
-├── adapters/        # Compatibility layers
-│   ├── aggrid/      # AG Grid API adapter (npm)
-│   ├── sheet/       # Sheet API adapter (npm)
-│   ├── sfdatagrid/  # SfDataGrid comparison tests
-│   ├── vsflexgrid/  # ActiveX control (Windows)
-│   ├── xtragrid/    # XtraGrid adapter
-│   └── report/      # Report adapter
-├── gtk-test/        # GTK4 library-host visual test harness
-├── smoke-test/      # CLI smoke test
-├── docker/          # Reproducible packaging
-├── scripts/         # Build and utility scripts
-├── dist/            # Packaged distribution artifacts
-├── public/          # Static assets
-└── testdata/        # Test fixture data
+├── web/              # Browser package and demo
+│   ├── js/           # JS/TS npm package and package-local WASM output
+│   └── example/      # Vite browser demo and release-demo source
+├── adapters/         # Compatibility layers
+│   ├── aggrid/       # AG Grid API adapter (npm)
+│   ├── bubbletea/    # Bubble Tea component for Go TUIs
+│   ├── report/       # Report adapter
+│   ├── sfdatagrid/   # SfDataGrid comparison tests
+│   ├── sheet/        # Sheet API adapter (npm)
+│   ├── vsflexgrid/   # ActiveX control (Windows)
+│   └── xtragrid/     # XtraGrid adapter
+├── gtk-test/         # GTK4 library-host visual test harness
+├── smoke-test/       # CLI smoke test
+├── docker/           # Reproducible packaging
+├── scripts/          # Build and utility scripts
+├── dist/             # Packaged distribution artifacts
+├── public/           # Static assets
+└── testdata/         # Test fixture data
 ```
 
 ## Testing
 
-- **Unit Tests**: Run `make test` to run Rust unit tests in the `engine` crate.
-- **Smoke Test**: Run `make run` to verify the native library works with the Rust host.
-- **Integration**:
-    - **Flutter**: Run the example app via `make flutter-run`.
-    - **Web**: Run the web demo via `make web`.
-    - **GTK**: Run the GTK library-host harness via `make gtk-test` to visually verify the native FFI path on Linux.
+Use the smallest loop that proves your change works.
 
-## Questions?
+- **Unit tests** — `make test` runs the Rust unit tests in the workspace.
+- **Smoke test** — `make run` verifies the native library works end-to-end from a Rust host.
+- **GTK harness** — `make gtk-test` visually verifies the native FFI path on Linux.
+- **Flutter** — `make flutter-run` against a connected device or emulator.
+- **Web** — `make web` boots the Vite demo.
+- **Terminal hosts** — `make go-tui-run`, `make dotnet-tui-run`, `make java-tui-run`.
+
+Adapter tests (including visual comparisons against the original third-party APIs) live alongside each adapter under `adapters/`.
+
+## Questions
 
 - Open a GitHub Issue for bugs or feature requests.
-- Open a GitHub Discussion for general questions.
+- Open a GitHub Discussion for general questions or design conversations.
 
 ## License
 
