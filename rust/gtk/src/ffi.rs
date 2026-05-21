@@ -276,12 +276,12 @@ pub fn resolve_default_library_path() -> String {
     let candidates = [
         "target/debug/libvolvoxgrid.so",
         "target/release/libvolvoxgrid.so",
-        "../target/debug/libvolvoxgrid.so",
-        "../target/release/libvolvoxgrid.so",
+        "../../target/debug/libvolvoxgrid.so",
+        "../../target/release/libvolvoxgrid.so",
         "runtime/target/debug/libvolvoxgrid.so",
         "runtime/target/release/libvolvoxgrid.so",
-        "../runtime/target/debug/libvolvoxgrid.so",
-        "../runtime/target/release/libvolvoxgrid.so",
+        "../../runtime/target/debug/libvolvoxgrid.so",
+        "../../runtime/target/release/libvolvoxgrid.so",
     ];
     for candidate in candidates {
         if Path::new(candidate).exists() {

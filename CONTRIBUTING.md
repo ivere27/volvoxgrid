@@ -93,7 +93,7 @@ make test
 make web
 make flutter-run
 make java-desktop-run
-make gtk-test
+make rust-gtk-run
 make go-tui-run
 make dotnet-tui-run
 make java-tui-run
@@ -131,7 +131,8 @@ volvoxgrid/
 │   ├── sheet/        # Sheet API adapter (npm)
 │   ├── vsflexgrid/   # ActiveX control (Windows)
 │   └── xtragrid/     # XtraGrid adapter
-├── gtk-test/         # GTK4 library-host visual test harness
+├── rust/gtk/         # GTK4 library-host visual test harness (Rust)
+├── cpp/              # Header-only C++ binding around the FFI
 ├── smoke-test/       # CLI smoke test
 ├── docker/           # Reproducible packaging
 ├── scripts/          # Build and utility scripts
@@ -146,7 +147,7 @@ Use the smallest loop that proves your change works.
 
 - **Unit tests** — `make test` runs the Rust unit tests in the workspace.
 - **Smoke test** — `make run` verifies the native library works end-to-end from a Rust host.
-- **GTK harness** — `make gtk-test` visually verifies the native FFI path on Linux.
+- **GTK harness** — `make rust-gtk-run` visually verifies the native FFI path on Linux.
 - **Flutter** — `make flutter-run` against a connected device or emulator.
 - **Web** — `make web` boots the Vite demo.
 - **Terminal hosts** — `make go-tui-run`, `make dotnet-tui-run`, `make java-tui-run`.

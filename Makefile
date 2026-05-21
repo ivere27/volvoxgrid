@@ -19,7 +19,7 @@
 # Variables
 # =============================================================================
 SYNURANG_MODULE ?= github.com/ivere27/synurang
-SYNURANG_VERSION ?= v0.6.0
+SYNURANG_VERSION ?= v0.6.1
 PROTOC_GEN_SYNURANG_FFI ?= $(shell gobin=$$(go env GOBIN 2>/dev/null); if [ -n "$$gobin" ]; then printf '%s/protoc-gen-synurang-ffi' "$$gobin"; else printf '%s/bin/protoc-gen-synurang-ffi' "$$(go env GOPATH 2>/dev/null)"; fi)
 PROTOC_GEN_SYNURANG_FFI_FLAG = --plugin=protoc-gen-synurang-ffi=$(PROTOC_GEN_SYNURANG_FFI)
 ANDROID_PROJECT_DIR := android
@@ -44,8 +44,8 @@ DOTNET_TFM ?= net40
 DOTNET_TUI_TFM ?= net8.0
 DOTNET_ARCH ?= x64
 ACTIVEX_ARCH ?= x86_64
-GTK_BENCH_RUNS ?= 5
-GTK_BENCH_ARGS ?=
+RUST_GTK_BENCH_RUNS ?= 5
+RUST_GTK_BENCH_ARGS ?=
 JAVA_DESKTOP_PROJECT_DIR := java/desktop
 GO_PROJECT_DIR := go
 ROOT_DIR := $(patsubst %/,%,$(abspath $(dir $(lastword $(MAKEFILE_LIST)))))
@@ -250,7 +250,8 @@ endif
         docker_ios_image docker_ios docker_ios_lite update_swift_package_checksums docker_all_image docker_all publish_maven \
         publish_local publish_github publish_web publish_npm publish_nuget \
         publish_go publish_go_bubbletea \
-        gtk-test gtk-test-release gtk-bench clean clean-all help
+        rust-gtk-run rust-gtk-run-release rust-gtk-bench \
+        cpp-build cpp-tui-run cpp-gtk-run clean clean-all help
 
 # =============================================================================
 # Default
@@ -335,10 +336,13 @@ help:
 	@echo "  sheet-lite     Build WASM lite + start Sheet adapter Vite dev server"
 	@echo "  sheet-build    Build Sheet adapter npm package only"
 	@echo "  doom-deps      Download GPL-2.0 DOOM assets for web mode (not part of Apache-2.0 source)"
-	@echo "  gtk-test       Build & launch GTK4 library-host visual test (debug; requires GTK4 dev libs)"
-	@echo "  gtk-test-release  Build & launch GTK4 library-host visual test (release)"
-	@echo "  gtk-bench      Build and run GTK4 benchmark matrix (release; real GPU surface for GPU cases, sudo with desktop session env)"
-	@echo "    gtk bench options: GTK_BENCH_RUNS=<n>, GTK_BENCH_ARGS='<extra headless_bench args>'"
+	@echo "  rust-gtk-run         Build & launch the Rust GTK4 library-host visual test (debug; requires GTK4 dev libs)"
+	@echo "  rust-gtk-run-release Build & launch the Rust GTK4 library-host visual test (release)"
+	@echo "  rust-gtk-bench       Build and run the Rust GTK4 benchmark matrix (release; real GPU surface for GPU cases, sudo with desktop session env)"
+	@echo "    rust-gtk-bench options: RUST_GTK_BENCH_RUNS=<n>, RUST_GTK_BENCH_ARGS='<extra headless_bench args>'"
+	@echo "  cpp-build            Build both ./cpp/examples (tui + gtk) via cmake to verify volvoxgrid.hpp compiles"
+	@echo "  cpp-tui-run          Build & run ./cpp/examples/tui ASCII-table demo against the debug host library"
+	@echo "  cpp-gtk-run          Build & launch ./cpp/examples/gtk sales-demo data grid (requires GTK4 + Cairo dev libs)"
 	@echo ""
 	@echo "Docker + Maven:"
 	@echo "  docker_android_aar_image  Build Docker image for Android AAR"
@@ -799,6 +803,7 @@ VSFLEXGRID_DIR := adapters/vsflexgrid
 DOTNET_COMMON_CODEGEN_DIR := dotnet/src/common/Generated
 WEB_TS_CODEGEN_DIR := web/js/src/generated
 SWIFT_CODEGEN_DIR := swift/Sources/VolvoxGrid/Generated
+CPP_LITE_CODEGEN_DIR := cpp/include/generated
 PROTO_INCLUDES := -Iproto -I$(VSFLEXGRID_DIR)/proto
 PROTO3_OPT := --experimental_allow_proto3_optional
 
@@ -812,6 +817,7 @@ codegen: build_codegen_tool
 	@mkdir -p $(DOTNET_COMMON_CODEGEN_DIR)
 	@mkdir -p $(WEB_TS_CODEGEN_DIR)
 	@mkdir -p $(SWIFT_CODEGEN_DIR)
+	@mkdir -p $(CPP_LITE_CODEGEN_DIR)
 	@mkdir -p $(GO_PROJECT_DIR)/api/v1
 	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
 		--go_out=$(GO_PROJECT_DIR) --go_opt=module=github.com/ivere27/volvoxgrid/go \
@@ -833,6 +839,11 @@ codegen: build_codegen_tool
 	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
 		$(PROTOC_GEN_SYNURANG_FFI_FLAG) \
 		--synurang-ffi_out=codegen --synurang-ffi_opt=lang=cpp \
+		proto/volvoxgrid.proto
+	# C++ lite protobuf + FFI stubs (header-only, no libprotobuf dependency)
+	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
+		$(PROTOC_GEN_SYNURANG_FFI_FLAG) \
+		--synurang-ffi_out=$(CPP_LITE_CODEGEN_DIR) --synurang-ffi_opt=lang=cpp,mode=lite \
 		proto/volvoxgrid.proto
 	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
 		$(PROTOC_GEN_SYNURANG_FFI_FLAG) \
@@ -2460,21 +2471,21 @@ flutter-linux: flutter-setup
 # =============================================================================
 # GTK4 Visual Test — library FFI host path
 # =============================================================================
-gtk-test: host-library
+rust-gtk-run: host-library
 	@echo "Building GTK4 test..."
-	cd gtk-test && cargo build $(CARGO_JOBS_FLAG)
+	cd rust/gtk && cargo build $(CARGO_JOBS_FLAG)
 	@echo "Launching GTK4 test..."
 	VOLVOXGRID_LIBRARY_PATH="$(JAVA_DESKTOP_LIBRARY)" ./target/debug/volvoxgrid-gtk-test
 
-gtk-test-release: host-library-release
+rust-gtk-run-release: host-library-release
 	@echo "Building GTK4 test (release)..."
-	cd gtk-test && cargo build $(CARGO_JOBS_FLAG) --release
+	cd rust/gtk && cargo build $(CARGO_JOBS_FLAG) --release
 	@echo "Launching GTK4 test (release)..."
 	VOLVOXGRID_LIBRARY_PATH="$(JAVA_DESKTOP_LIBRARY_RELEASE)" ./target/release/volvoxgrid-gtk-test
 
-gtk-bench: host-library-release
+rust-gtk-bench: host-library-release
 	@echo "Building GTK4 benchmark (release)..."
-	cd gtk-test && cargo build $(CARGO_JOBS_FLAG) --release --bin headless_bench
+	cd rust/gtk && cargo build $(CARGO_JOBS_FLAG) --release --bin headless_bench
 	@echo "Running GTK4 benchmark matrix (release, sudo with session env)..."
 	sudo env \
 		"PATH=$$PATH" \
@@ -2482,7 +2493,36 @@ gtk-bench: host-library-release
 		"DISPLAY=$$DISPLAY" \
 		"WAYLAND_DISPLAY=$${WAYLAND_DISPLAY:-}" \
 		"XAUTHORITY=$${XAUTHORITY:-$$HOME/.Xauthority}" \
-		./scripts/run_headless_bench_matrix.sh --runs "$(GTK_BENCH_RUNS)" --profile release --no-build -- --visual-host --gpu-path surface $(GTK_BENCH_ARGS)
+		./scripts/run_headless_bench_matrix.sh --runs "$(RUST_GTK_BENCH_RUNS)" --profile release --no-build -- --visual-host --gpu-path surface $(RUST_GTK_BENCH_ARGS)
+
+# =============================================================================
+# C++ header-only binding (./cpp) — examples build + run
+# =============================================================================
+cpp-build:
+	@echo "Configuring ./cpp/examples/tui..."
+	cmake -S cpp/examples/tui -B cpp/examples/tui/build
+	@echo "Building ./cpp/examples/tui..."
+	cmake --build cpp/examples/tui/build -j $(BUILD_JOBS)
+	@echo "Configuring ./cpp/examples/gtk..."
+	cmake -S cpp/examples/gtk -B cpp/examples/gtk/build
+	@echo "Building ./cpp/examples/gtk..."
+	cmake --build cpp/examples/gtk/build -j $(BUILD_JOBS)
+
+cpp-tui-run: host-library
+	@echo "Configuring ./cpp/examples/tui..."
+	cmake -S cpp/examples/tui -B cpp/examples/tui/build
+	@echo "Building ./cpp/examples/tui..."
+	cmake --build cpp/examples/tui/build -j $(BUILD_JOBS)
+	@echo "Running ./cpp/examples/tui against $(JAVA_DESKTOP_LIBRARY)..."
+	./cpp/examples/tui/build/vg_tui "$(JAVA_DESKTOP_LIBRARY)"
+
+cpp-gtk-run: host-library
+	@echo "Configuring ./cpp/examples/gtk..."
+	cmake -S cpp/examples/gtk -B cpp/examples/gtk/build
+	@echo "Building ./cpp/examples/gtk..."
+	cmake --build cpp/examples/gtk/build -j $(BUILD_JOBS)
+	@echo "Launching ./cpp/examples/gtk with VOLVOXGRID_LIBRARY=$(JAVA_DESKTOP_LIBRARY)..."
+	VOLVOXGRID_LIBRARY="$(JAVA_DESKTOP_LIBRARY)" ./cpp/examples/gtk/build/vg_gtk
 
 # =============================================================================
 # ActiveX OCX — Windows control via MinGW cross-compilation
@@ -2519,11 +2559,12 @@ vsflexgrid-release: activex-release
 # Clean
 # =============================================================================
 clean:
-	@for dir in engine runtime smoke-test gtk-test $(VSFLEXGRID_DIR)/crate; do \
+	@for dir in engine runtime smoke-test rust/gtk $(VSFLEXGRID_DIR)/crate; do \
 		echo "Cleaning $$dir..."; \
 		( cd "$$dir" && cargo clean ); \
 	done
 	rm -rf "$(FLUTTER_EXAMPLE_DIR)/build"
+	rm -rf cpp/examples/tui/build cpp/examples/gtk/build
 clean-all: clean
 	rm -rf web/example/wasm web/example/node_modules web/js/wasm web/js/node_modules
 	rm -rf web/example/public/doom

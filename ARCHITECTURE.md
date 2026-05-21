@@ -34,7 +34,8 @@ Here's what each top-level directory is for. Read it once, then refer back when 
 - `web/example/` — Vite browser demo and release-demo source.
 - `flutter/`, `android/`, `java/`, `dotnet/`, `go/` — platform wrappers and their sample apps.
 - `adapters/` — compatibility layers: `aggrid`, `bubbletea`, `report`, `sfdatagrid`, `sheet`, `vsflexgrid`, `xtragrid`.
-- `gtk-test/`, `smoke-test/` — focused local verification harnesses (workspace members alongside `engine` and `runtime`).
+- `rust/gtk/`, `smoke-test/` — focused local verification harnesses (workspace members alongside `engine` and `runtime`).
+- `cpp/` — header-only C++ binding (`include/volvoxgrid.hpp`) plus TUI + GTK4 examples for ATL/WTL/MFC/Qt/raw-Win32/POSIX C++ hosts.
 - `docker/` plus `Dockerfile*` at the repo root — reproducible packaging for published artifacts.
 - `dist/` — packaged distribution artifacts.
 - `public/` — static assets.
@@ -42,7 +43,7 @@ Here's what each top-level directory is for. Read it once, then refer back when 
 - `testdata/` — test fixture data.
 - `screenshots/`, `legacy/` — visual references and historical material.
 
-The Cargo workspace itself is small: `engine`, `runtime`, `smoke-test`, `gtk-test`, and `adapters/vsflexgrid/crate`. Everything else is built by its own toolchain (Gradle, dotnet, pub, npm, go).
+The Cargo workspace itself is small: `engine`, `runtime`, `smoke-test`, `rust/gtk`, and `adapters/vsflexgrid/crate`. Everything else is built by its own toolchain (Gradle, dotnet, pub, npm, go).
 
 ## Where each kind of change goes
 
@@ -108,7 +109,7 @@ make java-desktop-run
 make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.8.9
 make dotnet-build
 make dotnet-run-release VOLVOXGRID_VARIANT=lite
-make gtk-test
+make rust-gtk-run
 make java-tui-run
 make dotnet-tui-run
 make go-tui-run
@@ -169,7 +170,7 @@ Pick the smallest loop that proves your change.
 
 - `make test` — Rust unit tests in the workspace
 - `make run` — native library smoke test (the fastest end-to-end check)
-- `make gtk-test` — native GUI host verification on Linux
+- `make rust-gtk-run` — native GUI host verification on Linux
 - `make java-desktop-run` — desktop wrapper verification
 - `make android` or `make flutter-run` — mobile wrapper verification
 - `make java-tui-run`, `make dotnet-tui-run`, `make go-tui-run` — terminal host verification

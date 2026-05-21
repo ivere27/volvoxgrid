@@ -178,20 +178,20 @@ unzip -l dist/maven/volvoxgrid-desktop-lite-0.8.11.jar 'native/*/*'
 
 | Target | Full native runtime | Lite native runtime |
 | --- | ---: | ---: |
-| `linux-aarch64/libvolvoxgrid.so` | 7.0 MiB | 2.0 MiB |
-| `linux-armv7/libvolvoxgrid.so` | 6.1 MiB | 1.9 MiB |
-| `linux-x86/libvolvoxgrid.so` | 8.3 MiB | 2.6 MiB |
-| `linux-x86_64/libvolvoxgrid.so` | 8.2 MiB | 2.4 MiB |
-| `macos-aarch64/libvolvoxgrid.dylib` | 9.2 MiB | 3.1 MiB |
-| `macos-x86_64/libvolvoxgrid.dylib` | 10.5 MiB | 3.4 MiB |
-| `windows-x86/volvoxgrid.dll` | 10.1 MiB | 3.1 MiB |
-| `windows-x86_64/volvoxgrid.dll` | 10.4 MiB | 3.1 MiB |
+| `linux-aarch64/libvolvoxgrid.so` | 5.9 MiB | 2.1 MiB |
+| `linux-armv7/libvolvoxgrid.so` | 5.3 MiB | 1.9 MiB |
+| `linux-x86/libvolvoxgrid.so` | 7.3 MiB | 2.6 MiB |
+| `linux-x86_64/libvolvoxgrid.so` | 7.0 MiB | 2.5 MiB |
+| `macos-aarch64/libvolvoxgrid.dylib` | 8.3 MiB | 3.1 MiB |
+| `macos-x86_64/libvolvoxgrid.dylib` | 9.3 MiB | 3.5 MiB |
+| `windows-x86/volvoxgrid.dll` | 9.3 MiB | 3.1 MiB |
+| `windows-x86_64/volvoxgrid.dll` | 9.4 MiB | 3.1 MiB |
 
 Compressed JAR sizes from the same build:
 
 | Artifact | Size |
 | --- | ---: |
-| `volvoxgrid-desktop-0.8.11.jar` | 30 MiB |
+| `volvoxgrid-desktop-0.8.11.jar` | 27 MiB |
 | `volvoxgrid-desktop-lite-0.8.11.jar` | 10 MiB |
 
 The macOS native rows are lower than older builds because Docker now runs `llvm-strip` on packaged `.dylib` files after Zig cross-linking.
@@ -202,34 +202,34 @@ Android sizes from `dist/maven/`:
 
 | Artifact | Size | Notes |
 | --- | ---: | --- |
-| `volvoxgrid-android-0.8.11.aar` | 7.5 MiB | `arm64-v8a` and `armeabi-v7a` native runtimes |
-| `volvoxgrid-android-lite-0.8.11.aar` | 3.6 MiB | Lite native runtimes |
-| `volvoxgrid-android-compose-0.8.11.aar` | 12 KiB | Thin Compose wrapper |
-| `volvoxgrid-android-compose-lite-0.8.11.aar` | 12 KiB | Thin Compose wrapper for lite |
+| `volvoxgrid-android-0.8.11.aar` | 6.8 MiB | `arm64-v8a` and `armeabi-v7a` native runtimes |
+| `volvoxgrid-android-lite-0.8.11.aar` | 3.8 MiB | Lite native runtimes |
+| `volvoxgrid-android-compose-0.8.11.aar` | 11 KiB | Thin Compose wrapper |
+| `volvoxgrid-android-compose-lite-0.8.11.aar` | 11 KiB | Thin Compose wrapper for lite |
 
 Uncompressed Android native runtime sizes inside the AARs:
 
 | Target | Full native runtime | Lite native runtime |
 | --- | ---: | ---: |
-| `arm64-v8a` | 6.9 MiB | 2.0 MiB |
-| `armeabi-v7a` | 4.5 MiB | 1.3 MiB |
+| `arm64-v8a` | 5.9 MiB | 2.0 MiB |
+| `armeabi-v7a` | 3.8 MiB | 1.3 MiB |
 
 iOS static-library sizes from `dist/ios/`:
 
 | Artifact slice | Full | Lite |
 | --- | ---: | ---: |
-| `ios-arm64/libvolvoxgrid.a` | 6.2 MiB | 3.8 MiB |
-| `ios-arm64_x86_64-simulator/libvolvoxgrid.a` | 13 MiB | 7.5 MiB |
-| `VolvoxGrid.xcframework.zip` | 6.0 MiB | 3.6 MiB |
+| `ios-arm64/libvolvoxgrid.a` | 5.2 MiB | 3.8 MiB |
+| `ios-arm64_x86_64-simulator/libvolvoxgrid.a` | 10 MiB | 7.6 MiB |
+| `VolvoxGrid.xcframework.zip` | 5.1 MiB | 3.6 MiB |
 
 WASM and web bundle sizes:
 
 | Artifact | Size |
 | --- | ---: |
-| `dist/wasm/volvoxgrid_wasm_bg.wasm` | 3.4 MiB |
+| `dist/wasm/volvoxgrid_wasm_bg.wasm` | 2.6 MiB |
 | `dist/wasm-lite/volvoxgrid_wasm_bg.wasm` | 1.4 MiB |
-| `volvoxgrid-web-0.8.11.zip` | 2.0 MiB |
-| `volvoxgrid-web-lite-0.8.11.zip` | 1.3 MiB |
+| `volvoxgrid-web-0.8.11.zip` | 1.7 MiB |
+| `volvoxgrid-web-lite-0.8.11.zip` | 1.2 MiB |
 
 ## Example .NET and ActiveX sizes
 
@@ -237,12 +237,14 @@ These files are from `dist/dotnet/` and `dist/desktop/ocx/`.
 
 | Artifact | Full | Lite |
 | --- | ---: | ---: |
-| `.NET x64 native runtime`, `volvoxgrid.dll` | 10.4 MiB | 3.1 MiB |
-| `.NET x86 native runtime`, `volvoxgrid.dll` | 10.1 MiB | 3.1 MiB |
-| `.NET managed wrapper`, `VolvoxGrid.DotNet.dll` | 539 KiB | 539 KiB |
-| `ActiveX x64 OCX`, `VolvoxGrid_x86_64*.ocx` | 2.8 MiB | 1.8 MiB |
-| `ActiveX x86 OCX`, `VolvoxGrid_i686*.ocx` | 2.6 MiB | 1.8 MiB |
-| `VolvoxGrid.DotNet.0.8.11.nupkg` | 25 MiB | 8.3 MiB |
+| `.NET x64 native runtime`, `volvoxgrid.dll` | 9.4 MiB | 3.1 MiB |
+| `.NET x86 native runtime`, `volvoxgrid.dll` | 9.3 MiB | 3.1 MiB |
+| `.NET managed wrapper`, `VolvoxGrid.DotNet.dll` | 574 KiB | 574 KiB |
+| `ActiveX x64 OCX`, `VolvoxGrid_x86_64*.ocx` | 1.9 MiB | 1.8 MiB |
+| `ActiveX x86 OCX`, `VolvoxGrid_i686*.ocx` | 1.9 MiB | 1.8 MiB |
+| `VolvoxGrid.DotNet.0.8.11.nupkg` | n/a | n/a |
+
+`make docker_all` does not produce the `.nupkg` for 0.8.11; `dist/nuget/` still has the 0.8.10 archive (25 MiB full, 8.3 MiB lite). Run `make dotnet-pack VOLVOXGRID_VERSION=0.8.11` separately to refresh it.
 
 The managed .NET wrapper is almost unchanged between full and lite because the feature difference lives in the native runtime beside it.
 
@@ -252,12 +254,12 @@ These are the public symbol archives produced in `dist/symbols/` by the same Doc
 
 | Symbol archive | Size | Contains |
 | --- | ---: | --- |
-| `volvoxgrid-android-0.8.11-debug-symbols.zip` | 16 MiB | Android full `.so.debug` files |
-| `volvoxgrid-android-lite-0.8.11-debug-symbols.zip` | 5.6 MiB | Android lite `.so.debug` files |
-| `volvoxgrid-desktop-0.8.11-debug-symbols.zip` | 64 MiB | Desktop native symbols, macOS `.dSYM`, and .NET PDBs |
+| `volvoxgrid-android-0.8.11-debug-symbols.zip` | 14 MiB | Android full `.so.debug` files |
+| `volvoxgrid-android-lite-0.8.11-debug-symbols.zip` | 5.7 MiB | Android lite `.so.debug` files |
+| `volvoxgrid-desktop-0.8.11-debug-symbols.zip` | 58 MiB | Desktop native symbols, macOS `.dSYM`, and .NET PDBs |
 | `volvoxgrid-desktop-lite-0.8.11-debug-symbols.zip` | 22 MiB | Desktop lite native symbols and macOS `.dSYM` |
-| `volvoxgrid-activex-0.8.11-debug-symbols.zip` | 6.8 MiB | Full and lite OCX `.debug` files |
-| `VolvoxGrid-0.8.11-debug-symbols.zip` | 26 MiB | iOS full unstripped static archives |
+| `volvoxgrid-activex-0.8.11-debug-symbols.zip` | 6.1 MiB | Full and lite OCX `.debug` files |
+| `VolvoxGrid-0.8.11-debug-symbols.zip` | 22 MiB | iOS full unstripped static archives |
 | `VolvoxGridLite-0.8.11-debug-symbols.zip` | 15 MiB | iOS lite unstripped static archives |
 
 Next: where the bytes actually go.
