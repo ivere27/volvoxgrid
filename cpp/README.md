@@ -152,7 +152,7 @@ selection; `q` or `Ctrl+C` quits. All wire-format encoding uses
 cd cpp/examples/tui
 g++ -std=c++11 -I../../include main.cpp -ldl -o vg_tui
 curl -L -o /tmp/volvoxgrid-desktop.jar \
-    https://github.com/ivere27/volvoxgrid/releases/download/v0.8.10/volvoxgrid-desktop-0.8.10.jar
+    https://github.com/ivere27/volvoxgrid/releases/download/v0.8.11/volvoxgrid-desktop-0.8.11.jar
 unzip -p /tmp/volvoxgrid-desktop.jar \
     native/linux-x86_64/libvolvoxgrid.so > /tmp/libvolvoxgrid.so
 ./vg_tui /tmp/libvolvoxgrid.so

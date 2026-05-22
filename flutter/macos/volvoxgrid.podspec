@@ -4,7 +4,7 @@
 #
 Pod::Spec.new do |s|
   s.name             = 'volvoxgrid'
-  s.version          = '0.8.10'
+  s.version          = '0.8.11'
   s.summary          = 'VolvoxGrid pixel-rendering grid widget for Flutter.'
   s.description      = <<-DESC
 VolvoxGrid pixel-rendering grid widget for Flutter.

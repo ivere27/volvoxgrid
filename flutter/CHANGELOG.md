@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.11
+
+- Bumped iOS, macOS, Linux, and Windows artifact resolution to the v0.8.11 release: podspecs pull the matching `VolvoxGrid.xcframework` / `VolvoxGridLite.xcframework` from the GitHub v0.8.11 release, and the Linux/Windows CMake glue resolves `volvoxgrid-desktop-0.8.11.jar` from Maven Central.
+- No Dart-side API changes. The 0.8.11 release focuses on a new header-only C++ binding (`cpp/include/volvoxgrid.hpp`) for non-Flutter hosts and a Rust reimplementation of the codegen plugin — see the [top-level CHANGELOG](../CHANGELOG.md) for full detail.
+
 ## 0.8.10
 
 - Added checked-in iOS and macOS example projects for the Flutter package.

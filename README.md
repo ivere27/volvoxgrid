@@ -1,7 +1,7 @@
 # VolvoxGrid
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.8.10-blue.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-0.8.11-blue.svg)](VERSION)
 
 You're shipping a datagrid that has to handle million-row datasets, work across mobile, desktop, web, and terminal, and look the same on every platform. VolvoxGrid is one Rust engine that does that — you bring the host, it brings the pixels.
 
@@ -80,7 +80,7 @@ One pub package, one widget, one controller. Native binaries are resolved at bui
 
 ```yaml
 dependencies:
-  volvoxgrid: ^0.8.10
+  volvoxgrid: ^0.8.11
 ```
 
 Initialize the native runtime once before creating grids:
@@ -126,7 +126,7 @@ Drop a Swing panel into your frame, get a controller back, drive the grid from K
 
 ```kotlin
 dependencies {
-    implementation("io.github.ivere27:volvoxgrid-desktop:0.8.10")
+    implementation("io.github.ivere27:volvoxgrid-desktop:0.8.11")
 }
 ```
 
@@ -146,24 +146,24 @@ Next: [java/README.md](java/README.md).
 
 ## Install
 
-Everything in this section uses `0.8.10`. Swap the version for whichever release you're consuming.
+Everything in this section uses `0.8.11`. Swap the version for whichever release you're consuming.
 
 ### Maven / Gradle (Android, Java desktop)
 
 ```kotlin
 // Android
 dependencies {
-    implementation("io.github.ivere27:volvoxgrid-android:0.8.10")
-    // or: implementation("io.github.ivere27:volvoxgrid-android-lite:0.8.10")
-    // Compose:      implementation("io.github.ivere27:volvoxgrid-android-compose:0.8.10")
-    // Compose lite: implementation("io.github.ivere27:volvoxgrid-android-compose-lite:0.8.10")
+    implementation("io.github.ivere27:volvoxgrid-android:0.8.11")
+    // or: implementation("io.github.ivere27:volvoxgrid-android-lite:0.8.11")
+    // Compose:      implementation("io.github.ivere27:volvoxgrid-android-compose:0.8.11")
+    // Compose lite: implementation("io.github.ivere27:volvoxgrid-android-compose-lite:0.8.11")
 }
 
 // Java desktop
 repositories { mavenCentral() }
 dependencies {
-    implementation("io.github.ivere27:volvoxgrid-desktop:0.8.10")
-    // or: implementation("io.github.ivere27:volvoxgrid-desktop-lite:0.8.10")
+    implementation("io.github.ivere27:volvoxgrid-desktop:0.8.11")
+    // or: implementation("io.github.ivere27:volvoxgrid-desktop-lite:0.8.11")
 }
 ```
 
@@ -173,14 +173,14 @@ Platform-specific notes live in [android/README.md](android/README.md) and [java
 
 ```yaml
 dependencies:
-  volvoxgrid: ^0.8.10
+  volvoxgrid: ^0.8.11
 ```
 
 ### Swift (SwiftPM)
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/ivere27/volvoxgrid", from: "0.8.10"),
+    .package(url: "https://github.com/ivere27/volvoxgrid", from: "0.8.11"),
 ],
 targets: [
     .target(name: "MyApp", dependencies: [
@@ -207,8 +207,8 @@ The web and adapter packages publish minified `dist/*.min.js` browser bundles fo
 The Go modules are versioned with path-prefixed tags for the Go module proxy. The core module gives you a typed client over the native library; the Bubble Tea adapter adds a typed TUI component.
 
 ```bash
-go get github.com/ivere27/volvoxgrid/go@v0.8.10
-go get github.com/ivere27/volvoxgrid/adapters/bubbletea@v0.8.10
+go get github.com/ivere27/volvoxgrid/go@v0.8.11
+go get github.com/ivere27/volvoxgrid/adapters/bubbletea@v0.8.11
 ```
 
 ```go
@@ -225,8 +225,8 @@ Next: [go/README.md](go/README.md).
 The managed packages are `VolvoxGrid.DotNet` and `VolvoxGrid.DotNet.Lite`.
 
 ```bash
-dotnet add package VolvoxGrid.DotNet --version 0.8.10
-# or: dotnet add package VolvoxGrid.DotNet.Lite --version 0.8.10
+dotnet add package VolvoxGrid.DotNet --version 0.8.11
+# or: dotnet add package VolvoxGrid.DotNet.Lite --version 0.8.11
 ```
 
 The NuGet packages embed staged native libraries for supported RIDs. Project-reference or manual deployment flows still need the native `volvoxgrid` library beside your app or pointed at via `VOLVOXGRID_LIBRARY_PATH`. Full instructions in [dotnet/README.md](dotnet/README.md).
