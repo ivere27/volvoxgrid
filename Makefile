@@ -18,9 +18,10 @@
 # =============================================================================
 # Variables
 # =============================================================================
-SYNURANG_MODULE ?= github.com/ivere27/synurang
+SYNURANG_GIT ?= https://github.com/ivere27/synurang
+SYNURANG_REV ?= 6b76e9687be5469f68e0ac8eb221aa69b104d5a1
 SYNURANG_VERSION ?= v0.6.1
-PROTOC_GEN_SYNURANG_FFI ?= $(shell gobin=$$(go env GOBIN 2>/dev/null); if [ -n "$$gobin" ]; then printf '%s/protoc-gen-synurang-ffi' "$$gobin"; else printf '%s/bin/protoc-gen-synurang-ffi' "$$(go env GOPATH 2>/dev/null)"; fi)
+PROTOC_GEN_SYNURANG_FFI ?= $(shell cargo_home=$${CARGO_HOME:-$$HOME/.cargo}; printf '%s/bin/protoc-gen-synurang-ffi-rs' "$$cargo_home")
 PROTOC_GEN_SYNURANG_FFI_FLAG = --plugin=protoc-gen-synurang-ffi=$(PROTOC_GEN_SYNURANG_FFI)
 ANDROID_PROJECT_DIR := android
 ANDROID_GRADLEW := $(ANDROID_PROJECT_DIR)/gradlew
@@ -262,7 +263,7 @@ all: build
 help:
 	@echo "VolvoxGrid Makefile targets:"
 	@echo ""
-	@echo "  build_codegen_tool   Install protoc-gen-synurang-ffi from GitHub ($(SYNURANG_VERSION))"
+	@echo "  build_codegen_tool   Install protoc-gen-synurang-ffi-rs from GitHub ($(SYNURANG_REV))"
 	@echo "  build          Build engine + host-library (debug)"
 	@echo "  release        Build engine + host-library (release, optimized)"
 	@echo "  host-library    Build host (desktop) native library (debug)"
@@ -385,9 +386,9 @@ help:
 # Build the VolvoxGrid native library
 # =============================================================================
 build_codegen_tool:
-	@echo "Installing protoc-gen-synurang-ffi from $(SYNURANG_MODULE)@$(SYNURANG_VERSION)..."
-	@go install $(SYNURANG_MODULE)/cmd/protoc-gen-synurang-ffi@$(SYNURANG_VERSION)
-	@test -x "$(PROTOC_GEN_SYNURANG_FFI)" || { echo "Error: protoc-gen-synurang-ffi not found at $(PROTOC_GEN_SYNURANG_FFI)"; exit 1; }
+	@echo "Installing protoc-gen-synurang-ffi-rs from $(SYNURANG_GIT)@$(SYNURANG_REV)..."
+	@cargo install --git $(SYNURANG_GIT) --rev $(SYNURANG_REV) protoc-gen-synurang-ffi-rs
+	@test -x "$(PROTOC_GEN_SYNURANG_FFI)" || { echo "Error: protoc-gen-synurang-ffi-rs not found at $(PROTOC_GEN_SYNURANG_FFI)"; exit 1; }
 	@echo "Using protoc generator binary: $(PROTOC_GEN_SYNURANG_FFI)"
 
 # =============================================================================
@@ -808,7 +809,7 @@ PROTO_INCLUDES := -Iproto -I$(VSFLEXGRID_DIR)/proto
 PROTO3_OPT := --experimental_allow_proto3_optional
 
 codegen: build_codegen_tool
-	@test -x "$(PROTOC_GEN_SYNURANG_FFI)" || { echo "Error: protoc-gen-synurang-ffi not found at $(PROTOC_GEN_SYNURANG_FFI)"; exit 1; }
+	@test -x "$(PROTOC_GEN_SYNURANG_FFI)" || { echo "Error: protoc-gen-synurang-ffi-rs not found at $(PROTOC_GEN_SYNURANG_FFI)"; exit 1; }
 	@command -v protoc-gen-dart >/dev/null 2>&1 || { echo "Error: protoc-gen-dart not found in PATH."; exit 1; }
 	@command -v protoc-gen-go >/dev/null 2>&1 || { echo "Error: protoc-gen-go not found in PATH."; exit 1; }
 	@command -v protoc-gen-go-grpc >/dev/null 2>&1 || { echo "Error: protoc-gen-go-grpc not found in PATH."; exit 1; }
