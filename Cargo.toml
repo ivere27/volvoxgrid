@@ -4,12 +4,12 @@ members = [
     "engine",
     "runtime",
     "smoke-test",
-    "gtk-test",
+    "rust/gtk",
     "adapters/vsflexgrid/crate",
 ]
 
 [workspace.package]
-version = "0.8.10"
+version = "0.8.11"
 edition = "2021"
 license = "Apache-2.0"
 repository = "https://github.com/ivere27/volvoxgrid"

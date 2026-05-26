@@ -14,16 +14,14 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = ["standard", "demo"]
-wasm-default = ["regex", "demo"]
+wasm-default = ["demo"]
 standard = [
     "cosmic-text",
     "rayon",
-    "regex",
 ]
 demo = ["volvoxgrid-engine/demo"]
 cosmic-text = ["volvoxgrid-engine/cosmic-text"]
 rayon = ["volvoxgrid-engine/rayon"]
-regex = ["volvoxgrid-engine/regex"]
 gpu = ["cosmic-text", "volvoxgrid-engine/gpu", "dep:pollster", "dep:wgpu"]
 wasm-threads = ["dep:wasm-bindgen-rayon"]
 

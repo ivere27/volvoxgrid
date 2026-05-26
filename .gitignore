@@ -103,6 +103,8 @@ adapters/sheet/package-lock.json
 adapters/sheet/wasm/
 adapters/report/package-lock.json
 adapters/report/wasm/
+cpp/examples/gtk/build/
+cpp/examples/tui/build/
 
 # Temporary
 tmp/

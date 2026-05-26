@@ -15,7 +15,7 @@ Next: what your end users see.
 ## What your users see
 
 - In `make web`, open the `Barcodes` demo to see QR, Code 128, Code 39, EAN, UPC, 2-of-5, and Codabar examples.
-- In `make gtk-test`, open the `Barcodes` demo for the GTK/library-host version.
+- In `make rust-gtk-run`, open the `Barcodes` demo for the GTK/library-host version.
 - The `Barcode` column stores the barcode payload as normal cell text. Editing the cell edits the payload, and sorting sorts by that payload.
 - The visible barcode updates from the cell payload. If the payload is invalid for the selected symbology, the barcode isn't drawn.
 - TUI mode doesn't currently draw barcode graphics. It can still show and edit the payload text.

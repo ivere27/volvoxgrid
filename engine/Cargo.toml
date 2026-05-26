@@ -6,12 +6,11 @@ license.workspace = true
 repository.workspace = true
 
 [features]
-default = ["cosmic-text", "rayon", "regex"]
+default = ["cosmic-text", "rayon"]
 proto = []
 grpc = ["proto"]
 cosmic-text = ["dep:cosmic-text"]
 rayon = ["dep:rayon"]
-regex = ["dep:regex"]
 demo = []
 gpu = ["dep:wgpu", "dep:bytemuck", "dep:web-sys", "dep:raw-window-handle", "cosmic-text"]
 
@@ -23,7 +22,7 @@ tiny-skia = "0.11"
 qrcodegen = "1.8"
 barcoders = "2"
 cosmic-text = { version = "0.12", optional = true }
-regex = { version = "1.10", optional = true }
+regex = { version = "0.1", package = "regex-lite" }
 rayon = { version = "1.10", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }

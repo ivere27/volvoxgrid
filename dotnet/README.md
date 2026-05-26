@@ -77,7 +77,7 @@ Both speak to the same Rust engine and share most of the API surface. Difference
 Two NuGet packages ship from the same source:
 
 - `VolvoxGrid.DotNet` — full native runtime: built-in `cosmic-text` rendering, GPU backends via `wgpu`, regex search, rayon parallelism.
-- `VolvoxGrid.DotNet.Lite` — slim runtime: no `cosmic-text`, no `wgpu` GPU, no regex, no rayon. Text routes through GDI/GDI+. The Rust-owned external text mask cache shows up as `C:<used>/<cap>` in the debug overlay.
+- `VolvoxGrid.DotNet.Lite` — slim runtime: no `cosmic-text`, no `wgpu` GPU, no rayon. Text routes through GDI/GDI+. The Rust-owned external text mask cache shows up as `C:<used>/<cap>` in the debug overlay.
 
 The namespace is `VolvoxGrid.DotNet` in both packages. The main types you'll touch are `VolvoxGridControl`, `VolvoxGridClient`, `VolvoxGridTerminalSession`, `VolvoxGridTerminalFrame`, `VolvoxGridTerminalCapabilities`, `VolvoxGridColumn`, `VolvoxGridCellText`, `VolvoxGridSelectionState`, and `VolvoxGridCellRange`. The enums you'll reach for most are `VolvoxGridRendererMode`, `VolvoxGridSelectionMode`, `VolvoxGridHeaderFeatures`, `VolvoxGridResizePolicy`, `VolvoxGridColumnDataType`, and `VolvoxGridSortDirection`.
 

@@ -2,6 +2,12 @@
 
 All notable changes to VolvoxGrid are documented here. Per-package changelogs may have additional detail (e.g. [flutter/CHANGELOG.md](flutter/CHANGELOG.md)).
 
+## 0.8.11
+
+- Added a header-only C++ binding (`cpp/include/volvoxgrid.hpp`) with a vendored protobuf wire-format codec and an optional lite-codegen layer, usable from ATL/WTL/MFC/Qt/raw-Win32/POSIX C++ hosts with no libprotobuf or gRPC dependency.
+- Added a `cpp/examples/tui` Layer 1 sample that drives the engine's built-in `RENDERER_TUI` over a bidi `RenderSession` with row numbers, a right-aligned numeric column, and arrow-key navigation.
+- Switched `make codegen` to a Rust reimplementation of the synurang FFI generator (`protoc-gen-synurang-ffi-rs`) installed via `cargo install --git`. Output is byte-identical to the Go generator across every language and mode this repo emits.
+
 ## 0.8.10
 
 - Added a Swift package surface with the `VolvoxGrid` client, SwiftUI/UIKit/AppKit render views, Apple binary-target products, Linux support, and a Swift terminal TUI sample.

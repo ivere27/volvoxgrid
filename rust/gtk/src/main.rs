@@ -1979,7 +1979,6 @@ impl VolvoxServiceClient {
                     layout: Some(pb::LayoutConfig {
                         rows: Some(200),
                         cols: Some(12),
-                        fixed_rows: Some(1),
                         fixed_cols: Some(0),
                         default_row_height: Some(24),
                         default_col_width: Some(110),

@@ -101,7 +101,6 @@ pub fn find_row(
 ///
 /// Returns the matching row index, or -1 if not found or if the pattern
 /// is invalid.
-#[cfg(feature = "regex")]
 pub fn find_row_regex(grid: &VolvoxGrid, pattern: &str, start_row: i32, col: i32) -> i32 {
     let re = match regex::Regex::new(pattern) {
         Ok(r) => r,
@@ -120,11 +119,6 @@ pub fn find_row_regex(grid: &VolvoxGrid, pattern: &str, start_row: i32, col: i32
             return row;
         }
     }
-    -1
-}
-
-#[cfg(not(feature = "regex"))]
-pub fn find_row_regex(_grid: &VolvoxGrid, _pattern: &str, _start_row: i32, _col: i32) -> i32 {
     -1
 }
 

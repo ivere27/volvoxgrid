@@ -9,10 +9,9 @@ repository.workspace = true
 crate-type = ["staticlib"]
 
 [features]
-default = ["demo", "rayon", "regex"]
+default = ["demo", "rayon"]
 demo = ["volvoxgrid-engine/demo"]
 rayon = ["volvoxgrid-engine/rayon"]
-regex = ["volvoxgrid-engine/regex"]
 gpu = ["volvoxgrid-engine/gpu"]
 lite = []
 
