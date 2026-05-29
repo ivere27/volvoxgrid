@@ -2374,6 +2374,7 @@ impl VolvoxGrid {
                 reorder: Some(self.header_features & 2 != 0),
                 chooser: Some(self.header_features & 4 != 0),
             }),
+            gestures: None,
         }
     }
 

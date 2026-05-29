@@ -80,6 +80,7 @@ codegen/
 dist/
 public/
 .firebase/
+firebase-analytics.json
 
 # Native Build Artifacts (C++/ActiveX)
 *.o

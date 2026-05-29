@@ -36,6 +36,10 @@ copy_dir_clean() {
   cp -a "${src}/." "${dst}/"
 }
 
+inject_firebase_analytics() {
+  python3 "${REPO_ROOT}/scripts/inject_firebase_analytics.py" "$1"
+}
+
 snapshot_current_wasm() {
   local dst="$1"
   copy_dir_clean "${REPO_ROOT}/web/example/wasm" "${dst}"
@@ -187,6 +191,7 @@ build_web_dist() {
   if [[ -d "${REPO_ROOT}/web/example/public/doom" ]]; then
     copy_dir_clean "${REPO_ROOT}/web/example/public/doom" "${WEB_DIST_ROOT}/demos/web/doom"
   fi
+  inject_firebase_analytics "${WEB_DIST_ROOT}/demos/web/index.html"
   echo "Built web dist: ${WEB_DIST_ROOT}/demos/web"
 }
 
@@ -217,6 +222,7 @@ build_sheet_dist() {
   else
     write_sheet_demo_index "${out_dir}" "VolvoxSheet" "${CDN_BASE}" "${wasm_pkg}"
   fi
+  inject_firebase_analytics "${out_dir}/index.html"
   echo "Built sheet dist: ${out_dir}"
 }
 

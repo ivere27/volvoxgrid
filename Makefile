@@ -2043,8 +2043,15 @@ publish_web:
 	@echo "Syncing $(WEB_BUNDLE_DIR) -> $(FIREBASE_PUBLIC_DIR) (clean copy, keeping index.html)..."
 	@mkdir -p "$(FIREBASE_PUBLIC_DIR)"
 	@find "$(FIREBASE_PUBLIC_DIR)" -mindepth 1 -maxdepth 1 ! -name 'index.html' -exec rm -rf {} +
-	@cp -a "$(WEB_BUNDLE_DIR)/." "$(FIREBASE_PUBLIC_DIR)/"
-	@echo "Running Firebase deploy..."
+	@find "$(WEB_BUNDLE_DIR)" -mindepth 1 -maxdepth 1 ! -name 'index.html' -exec cp -a {} "$(FIREBASE_PUBLIC_DIR)/" \;
+	@set -e; \
+	trap 'python3 "$(ROOT_DIR)/scripts/inject_firebase_analytics.py" --strip "$(FIREBASE_PUBLIC_DIR)/index.html" >/dev/null 2>&1 || true' EXIT; \
+	python3 "$(ROOT_DIR)/scripts/inject_firebase_analytics.py" \
+		"$(FIREBASE_PUBLIC_DIR)/index.html" \
+		"$(FIREBASE_PUBLIC_DIR)/demos/web/index.html" \
+		"$(FIREBASE_PUBLIC_DIR)/demos/sheet/index.html" \
+		"$(FIREBASE_PUBLIC_DIR)/demos/sheet-lite/index.html"; \
+	echo "Running Firebase deploy..."; \
 	firebase deploy
 
 publish_npm:
