@@ -111,20 +111,24 @@ pub enum GridEventData {
     },
     BeforeEdit {
         row: i32,
+        row_id: i64,
         col: i32,
     },
     StartEdit {
         row: i32,
+        row_id: i64,
         col: i32,
     },
     AfterEdit {
         row: i32,
+        row_id: i64,
         col: i32,
         old_text: String,
         new_text: String,
     },
     CellEditValidate {
         row: i32,
+        row_id: i64,
         col: i32,
         edit_text: String,
     },

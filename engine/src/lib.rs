@@ -141,8 +141,32 @@ impl GridManager {
         fixed_cols: i32,
         scale: f32,
     ) -> i64 {
+        self.create_grid_with_row_ids(
+            viewport_width,
+            viewport_height,
+            rows,
+            cols,
+            fixed_rows,
+            fixed_cols,
+            scale,
+            false,
+        )
+    }
+
+    /// Create a grid with row identities explicitly enabled or disabled.
+    pub fn create_grid_with_row_ids(
+        &self,
+        viewport_width: i32,
+        viewport_height: i32,
+        rows: i32,
+        cols: i32,
+        fixed_rows: i32,
+        fixed_cols: i32,
+        scale: f32,
+        row_ids_enabled: bool,
+    ) -> i64 {
         let id = NEXT_GRID_ID.fetch_add(1, Ordering::Relaxed);
-        let mut grid = VolvoxGrid::new(
+        let mut grid = VolvoxGrid::new_with_row_ids(
             id,
             viewport_width,
             viewport_height,
@@ -150,6 +174,7 @@ impl GridManager {
             cols,
             fixed_rows,
             fixed_cols,
+            row_ids_enabled,
         );
         grid.scale = if scale > 0.01 { scale } else { 1.0 };
         let slot = Arc::new(GridSlot {
@@ -184,9 +209,12 @@ impl GridManager {
         };
         let (result, should_notify) = {
             let mut grid = slot.grid.lock().unwrap();
-            let events_before = grid.events.len();
             let result = f(&mut grid);
-            let should_notify = grid.events.len() > events_before;
+            // A push stream uses try_lock so it can service custom comparisons
+            // while sorting owns the grid. If it loses this lock to a reader
+            // after an event was published, it needs another wake on release,
+            // even when this closure did not append any new events.
+            let should_notify = !grid.events.is_empty();
             (result, should_notify)
         };
         if should_notify {
@@ -291,6 +319,40 @@ mod tests {
         let _ = release_tx.send(());
         with_grid_thread.join().expect("with_grid thread panicked");
         destroy_thread.join().expect("destroy thread panicked");
+    }
+
+    #[test]
+    fn read_only_grid_access_wakes_stream_when_events_are_still_pending() {
+        let manager = GridManager::new();
+        let id = manager.create_grid_with_row_ids(100, 100, 2, 2, 0, 0, 1.0, true);
+        let waker = manager.get_grid_waker(id).unwrap();
+        manager
+            .with_grid(id, |grid| {
+                grid.events.push(crate::event::GridEventData::AfterEdit {
+                    row: 0,
+                    row_id: grid.get_row_id(0).unwrap(),
+                    col: 0,
+                    old_text: "7".into(),
+                    new_text: "8".into(),
+                });
+            })
+            .unwrap();
+        let sequence = waker.current_seq();
+        // A stream may fail try_lock while a render/read owns the grid, after
+        // consuming the original publisher's wake. Releasing this unchanged
+        // grid must wake the stream again so AfterEdit cannot remain stranded.
+        manager
+            .with_grid(id, |grid| assert_eq!(grid.events.len(), 1))
+            .unwrap();
+        assert!(waker.current_seq() > sequence);
+        manager
+            .with_grid(id, |grid| {
+                grid.events.drain();
+            })
+            .unwrap();
+        let empty_sequence = waker.current_seq();
+        manager.with_grid(id, |_| {}).unwrap();
+        assert_eq!(waker.current_seq(), empty_sequence);
     }
 
     #[test]

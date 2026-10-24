@@ -2,6 +2,18 @@
 
 All notable changes to VolvoxGrid are documented here. Per-package changelogs may have additional detail (e.g. [flutter/CHANGELOG.md](flutter/CHANGELOG.md)).
 
+## Unreleased
+
+- Added native row IDs independent of row positions, with application-supplied or engine-generated positive `int64` IDs, lookup support and row identity in edit events. Zero is reserved; existing index-based APIs remain available. Generated bindings preserve the full ID range, including JavaScript `bigint` and Dart protobuf `Int64` values.
+- Made row ID tracking an explicit, creation-only `CreateRequest.row_ids_enabled` option, disabled by default. Disabled grids allocate no row ID storage, keep index-based editing and emit `row_id=0`; ID operations cannot enable tracking implicitly. Flutter's high-level `VolvoxDataGrid` enables tracking when it creates its grid. The typed C/WASM `volvox_grid_create` functions now take the option directly, replacing their previous signatures; callers must rebuild against the updated bindings.
+- Stored automatic IDs as compact slot/generation arrays, avoiding per-row strings and an automatic-ID hash index. Sorting reorders numeric slots directly, and table replacement avoids generating temporary identities. Supplied IDs add optional alias storage and a reverse index.
+- Rejected delayed edit validation after cancellation, a new editor session or subsequent input, including caller ID reuse. Fixed duplicate projected tree IDs after changing the fixed-row boundary.
+- Fixed numeric sorting to compare integer/decimal text without losing precision through double conversion.
+- Fixed row mappings after sorting followed by insertion/deletion, and reset mappings when replacing table data.
+- Enforced the opt-in `volvoxgrid.readOnly` editor property across native editing, checkbox toggles and clipboard mutations; programmatic data writes remain available.
+- Synchronized typed cell values after text edits and fixed an event-stream notification race during concurrent rendering/reads.
+- Hardened Flutter package-only native installation, edit identity/validation, asynchronous lifecycle handling and layout scaling. See [flutter/CHANGELOG.md](flutter/CHANGELOG.md) for API details and native engine requirements.
+
 ## 0.8.11
 
 - Added a header-only C++ binding (`cpp/include/volvoxgrid.hpp`) with a vendored protobuf wire-format codec and an optional lite-codegen layer, usable from ATL/WTL/MFC/Qt/raw-Win32/POSIX C++ hosts with no libprotobuf or gRPC dependency.

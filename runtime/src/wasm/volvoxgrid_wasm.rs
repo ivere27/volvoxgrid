@@ -300,6 +300,7 @@ pub trait VolvoxGridServiceRuntime: Send + Sync + 'static {
         request: EventStreamRequest,
         stream: &dyn RuntimeStreamSender<GridEvent>,
     ) -> Result<(), String>;
+    fn get_rows(&self, request: GetRowsRequest) -> Result<RowsResponse, String>;
 }
 
 static RUNTIME_VOLVOX_GRID_SERVICE: OnceLock<Box<dyn VolvoxGridServiceRuntime>> = OnceLock::new();
@@ -511,6 +512,7 @@ pub fn volvox_grid_create(
     viewport_height: i32,
     scale: f32,
     config: &[u8],
+    row_ids_enabled: bool,
 ) -> Vec<u8> {
     let runtime = match get_volvox_grid_service_runtime() {
         Some(p) => p,
@@ -530,6 +532,7 @@ pub fn volvox_grid_create(
                 return Vec::new();
             }
         },
+        row_ids_enabled,
         ..Default::default()
     };
     match runtime.create(req) {
@@ -2718,6 +2721,36 @@ pub fn volvox_grid_get_demo_data(demo: &str) -> Vec<u8> {
         ..Default::default()
     };
     match runtime.get_demo_data(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            let _ = r.encode(&mut buf);
+            buf
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
+    }
+}
+
+#[wasm_bindgen]
+pub fn volvox_grid_get_rows_pb(data: &[u8]) -> Vec<u8> {
+    let runtime = match get_volvox_grid_service_runtime() {
+        Some(p) => p,
+        None => {
+            set_last_error("runtime not registered".into());
+            return Vec::new();
+        }
+    };
+    let req = match GetRowsRequest::decode(data) {
+        Ok(r) => r,
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
+    };
+    match runtime.get_rows(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();

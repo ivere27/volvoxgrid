@@ -296,6 +296,7 @@ pub trait VolvoxGridServiceRuntime: Send + Sync + 'static {
         request: EventStreamRequest,
         stream: &dyn RuntimeStreamSender<GridEvent>,
     ) -> Result<(), FfiError>;
+    fn get_rows(&self, request: GetRowsRequest) -> Result<RowsResponse, FfiError>;
 }
 
 static RUNTIME_VOLVOX_GRID_SERVICE: std::sync::OnceLock<Box<dyn VolvoxGridServiceRuntime>> =
@@ -1175,6 +1176,22 @@ pub extern "C" fn Synurang_Invoke_VolvoxGridService(
         "/volvoxgrid.v1.VolvoxGridService/GetDemoData" => {
             match GetDemoDataRequest::decode(input.as_slice()) {
                 Ok(req) => match runtime.get_demo_data(req) {
+                    Ok(resp) => {
+                        let mut buf = Vec::new();
+                        if resp.encode(&mut buf).is_ok() {
+                            success_response(resp_len, &buf)
+                        } else {
+                            error_response(resp_len, "encode failed")
+                        }
+                    }
+                    Err(e) => error_response(resp_len, &e),
+                },
+                Err(e) => error_response(resp_len, &format!("decode failed: {}", e)),
+            }
+        }
+        "/volvoxgrid.v1.VolvoxGridService/GetRows" => {
+            match GetRowsRequest::decode(input.as_slice()) {
+                Ok(req) => match runtime.get_rows(req) {
                     Ok(resp) => {
                         let mut buf = Vec::new();
                         if resp.encode(&mut buf).is_ok() {

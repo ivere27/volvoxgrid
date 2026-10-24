@@ -243,6 +243,7 @@ fn reset_grid(grid: &mut VolvoxGrid) {
     grid.cells.clear_all();
     grid.clear_barcode_presence_tracking();
     grid.rows = 0;
+    grid.reset_row_ids();
     grid.cols = 0;
     grid.row_positions.clear();
     grid.col_positions.clear();

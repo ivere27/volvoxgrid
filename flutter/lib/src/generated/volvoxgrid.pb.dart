@@ -9648,6 +9648,7 @@ class RowDef extends $pb.GeneratedMessage {
     $core.bool? span,
     PinPosition? pin,
     StickyEdge? sticky,
+    $fixnum.Int64? rowId,
   }) {
     final result = create();
     if (index != null) result.index = index;
@@ -9661,6 +9662,7 @@ class RowDef extends $pb.GeneratedMessage {
     if (span != null) result.span = span;
     if (pin != null) result.pin = pin;
     if (sticky != null) result.sticky = sticky;
+    if (rowId != null) result.rowId = rowId;
     return result;
   }
 
@@ -9692,6 +9694,7 @@ class RowDef extends $pb.GeneratedMessage {
         enumValues: PinPosition.values)
     ..aE<StickyEdge>(11, _omitFieldNames ? '' : 'sticky',
         enumValues: StickyEdge.values)
+    ..aInt64(12, _omitFieldNames ? '' : 'rowId')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -9812,6 +9815,15 @@ class RowDef extends $pb.GeneratedMessage {
   $core.bool hasSticky() => $_has(10);
   @$pb.TagNumber(11)
   void clearSticky() => $_clearField(11);
+
+  @$pb.TagNumber(12)
+  $fixnum.Int64 get rowId => $_getI64(11);
+  @$pb.TagNumber(12)
+  set rowId($fixnum.Int64 value) => $_setInt64(11, value);
+  @$pb.TagNumber(12)
+  $core.bool hasRowId() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearRowId() => $_clearField(12);
 }
 
 /// Host-defined row status with an explicit namespace/discriminator.
@@ -9940,6 +9952,212 @@ class DefineRowsRequest extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(2)
   $pb.PbList<RowDef> get rows => $_getList(1);
+}
+
+/// Stable identity for a row at its current visual index. IDs are opaque positive
+/// signed 64-bit integers (1..INT64_MAX); 0 is invalid. Auto IDs last for the
+/// lifetime of the row. The engine generates them when the host supplies no ID.
+/// Hosts may supply positive numeric IDs to preserve identity across replacements.
+/// IDs are scoped to a grid; their values carry no application meaning.
+class RowIdentity extends $pb.GeneratedMessage {
+  factory RowIdentity({
+    $core.int? index,
+    $fixnum.Int64? rowId,
+  }) {
+    final result = create();
+    if (index != null) result.index = index;
+    if (rowId != null) result.rowId = rowId;
+    return result;
+  }
+
+  RowIdentity._();
+
+  factory RowIdentity.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory RowIdentity.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RowIdentity',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'index')
+    ..aInt64(2, _omitFieldNames ? '' : 'rowId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RowIdentity clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RowIdentity copyWith(void Function(RowIdentity) updates) =>
+      super.copyWith((message) => updates(message as RowIdentity))
+          as RowIdentity;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RowIdentity create() => RowIdentity._();
+  @$core.override
+  RowIdentity createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static RowIdentity getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RowIdentity>(create);
+  static RowIdentity? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get index => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set index($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasIndex() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearIndex() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $fixnum.Int64 get rowId => $_getI64(1);
+  @$pb.TagNumber(2)
+  set rowId($fixnum.Int64 value) => $_setInt64(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRowId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRowId() => $_clearField(2);
+}
+
+class GetRowsRequest extends $pb.GeneratedMessage {
+  factory GetRowsRequest({
+    $fixnum.Int64? gridId,
+    $core.int? startRow,
+    $core.int? rowCount,
+    $core.Iterable<$fixnum.Int64>? rowIds,
+  }) {
+    final result = create();
+    if (gridId != null) result.gridId = gridId;
+    if (startRow != null) result.startRow = startRow;
+    if (rowCount != null) result.rowCount = rowCount;
+    if (rowIds != null) result.rowIds.addAll(rowIds);
+    return result;
+  }
+
+  GetRowsRequest._();
+
+  factory GetRowsRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GetRowsRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetRowsRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aInt64(1, _omitFieldNames ? '' : 'gridId')
+    ..aI(2, _omitFieldNames ? '' : 'startRow')
+    ..aI(3, _omitFieldNames ? '' : 'rowCount')
+    ..p<$fixnum.Int64>(4, _omitFieldNames ? '' : 'rowIds', $pb.PbFieldType.K6)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetRowsRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetRowsRequest copyWith(void Function(GetRowsRequest) updates) =>
+      super.copyWith((message) => updates(message as GetRowsRequest))
+          as GetRowsRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GetRowsRequest create() => GetRowsRequest._();
+  @$core.override
+  GetRowsRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GetRowsRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetRowsRequest>(create);
+  static GetRowsRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get gridId => $_getI64(0);
+  @$pb.TagNumber(1)
+  set gridId($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasGridId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearGridId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get startRow => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set startRow($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasStartRow() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearStartRow() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get rowCount => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set rowCount($core.int value) => $_setSignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasRowCount() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearRowCount() => $_clearField(3);
+
+  /// Alternative selector: range fields must be zero. Returns existing IDs in
+  /// request order, omitting missing IDs. Nonpositive or duplicate IDs are invalid.
+  @$pb.TagNumber(4)
+  $pb.PbList<$fixnum.Int64> get rowIds => $_getList(3);
+}
+
+class RowsResponse extends $pb.GeneratedMessage {
+  factory RowsResponse({
+    $core.Iterable<RowIdentity>? rows,
+  }) {
+    final result = create();
+    if (rows != null) result.rows.addAll(rows);
+    return result;
+  }
+
+  RowsResponse._();
+
+  factory RowsResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory RowsResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RowsResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..pPM<RowIdentity>(1, _omitFieldNames ? '' : 'rows',
+        subBuilder: RowIdentity.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RowsResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RowsResponse copyWith(void Function(RowsResponse) updates) =>
+      super.copyWith((message) => updates(message as RowsResponse))
+          as RowsResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RowsResponse create() => RowsResponse._();
+  @$core.override
+  RowsResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static RowsResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RowsResponse>(create);
+  static RowsResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<RowIdentity> get rows => $_getList(0);
 }
 
 class CellUpdate extends $pb.GeneratedMessage {
@@ -10825,6 +11043,7 @@ class LoadTableRequest extends $pb.GeneratedMessage {
     $core.int? cols,
     $core.Iterable<CellValue>? values,
     $core.bool? atomic,
+    $core.Iterable<$fixnum.Int64>? rowIds,
   }) {
     final result = create();
     if (gridId != null) result.gridId = gridId;
@@ -10832,6 +11051,7 @@ class LoadTableRequest extends $pb.GeneratedMessage {
     if (cols != null) result.cols = cols;
     if (values != null) result.values.addAll(values);
     if (atomic != null) result.atomic = atomic;
+    if (rowIds != null) result.rowIds.addAll(rowIds);
     return result;
   }
 
@@ -10854,6 +11074,7 @@ class LoadTableRequest extends $pb.GeneratedMessage {
     ..pPM<CellValue>(4, _omitFieldNames ? '' : 'values',
         subBuilder: CellValue.create)
     ..aOB(5, _omitFieldNames ? '' : 'atomic')
+    ..p<$fixnum.Int64>(6, _omitFieldNames ? '' : 'rowIds', $pb.PbFieldType.K6)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -10913,6 +11134,11 @@ class LoadTableRequest extends $pb.GeneratedMessage {
   $core.bool hasAtomic() => $_has(4);
   @$pb.TagNumber(5)
   void clearAtomic() => $_clearField(5);
+
+  /// Empty generates fresh IDs. Otherwise must contain exactly `rows` positive,
+  /// unique IDs. Invalid IDs reject the entire request before changing data.
+  @$pb.TagNumber(6)
+  $pb.PbList<$fixnum.Int64> get rowIds => $_getList(5);
 }
 
 enum FieldMapping_Target { colIndex, colKey, notSet }
@@ -13309,6 +13535,7 @@ class EditorSession extends $pb.GeneratedMessage {
     $core.bool? composing,
     $core.String? preeditText,
     $core.Iterable<ValidationError>? validationErrors,
+    $fixnum.Int64? rowId,
   }) {
     final result = create();
     if (sessionId != null) result.sessionId = sessionId;
@@ -13326,6 +13553,7 @@ class EditorSession extends $pb.GeneratedMessage {
     if (preeditText != null) result.preeditText = preeditText;
     if (validationErrors != null)
       result.validationErrors.addAll(validationErrors);
+    if (rowId != null) result.rowId = rowId;
     return result;
   }
 
@@ -13366,6 +13594,7 @@ class EditorSession extends $pb.GeneratedMessage {
     ..aOS(13, _omitFieldNames ? '' : 'preeditText')
     ..pPM<ValidationError>(14, _omitFieldNames ? '' : 'validationErrors',
         subBuilder: ValidationError.create)
+    ..aInt64(15, _omitFieldNames ? '' : 'rowId')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -13516,6 +13745,15 @@ class EditorSession extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(14)
   $pb.PbList<ValidationError> get validationErrors => $_getList(13);
+
+  @$pb.TagNumber(15)
+  $fixnum.Int64 get rowId => $_getI64(14);
+  @$pb.TagNumber(15)
+  set rowId($fixnum.Int64 value) => $_setInt64(14, value);
+  @$pb.TagNumber(15)
+  $core.bool hasRowId() => $_has(14);
+  @$pb.TagNumber(15)
+  void clearRowId() => $_clearField(15);
 }
 
 /// Engine-declared editor capabilities. Derived once from
@@ -16375,12 +16613,14 @@ class CreateRequest extends $pb.GeneratedMessage {
     $core.int? viewportHeight,
     $core.double? scale,
     GridConfig? config,
+    $core.bool? rowIdsEnabled,
   }) {
     final result = create();
     if (viewportWidth != null) result.viewportWidth = viewportWidth;
     if (viewportHeight != null) result.viewportHeight = viewportHeight;
     if (scale != null) result.scale = scale;
     if (config != null) result.config = config;
+    if (rowIdsEnabled != null) result.rowIdsEnabled = rowIdsEnabled;
     return result;
   }
 
@@ -16402,6 +16642,7 @@ class CreateRequest extends $pb.GeneratedMessage {
     ..aD(3, _omitFieldNames ? '' : 'scale', fieldType: $pb.PbFieldType.OF)
     ..aOM<GridConfig>(4, _omitFieldNames ? '' : 'config',
         subBuilder: GridConfig.create)
+    ..aOB(5, _omitFieldNames ? '' : 'rowIdsEnabled')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -16460,6 +16701,19 @@ class CreateRequest extends $pb.GeneratedMessage {
   void clearConfig() => $_clearField(4);
   @$pb.TagNumber(4)
   GridConfig ensureConfig() => $_ensure(3);
+
+  /// Creation-only option. False (the default) allocates no per-row ID storage;
+  /// index-based APIs and editing remain available, with row_id=0 in events.
+  /// True issues stable numeric IDs eagerly during creation. ID lookup and
+  /// application-supplied IDs require true; no API silently enables tracking.
+  @$pb.TagNumber(5)
+  $core.bool get rowIdsEnabled => $_getBF(4);
+  @$pb.TagNumber(5)
+  set rowIdsEnabled($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasRowIdsEnabled() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearRowIdsEnabled() => $_clearField(5);
 }
 
 class CreateResponse extends $pb.GeneratedMessage {
@@ -23444,10 +23698,12 @@ class BeforeEditEvent extends $pb.GeneratedMessage {
   factory BeforeEditEvent({
     $core.int? row,
     $core.int? col,
+    $fixnum.Int64? rowId,
   }) {
     final result = create();
     if (row != null) result.row = row;
     if (col != null) result.col = col;
+    if (rowId != null) result.rowId = rowId;
     return result;
   }
 
@@ -23466,6 +23722,7 @@ class BeforeEditEvent extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aI(1, _omitFieldNames ? '' : 'row')
     ..aI(2, _omitFieldNames ? '' : 'col')
+    ..aInt64(3, _omitFieldNames ? '' : 'rowId')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -23504,16 +23761,27 @@ class BeforeEditEvent extends $pb.GeneratedMessage {
   $core.bool hasCol() => $_has(1);
   @$pb.TagNumber(2)
   void clearCol() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $fixnum.Int64 get rowId => $_getI64(2);
+  @$pb.TagNumber(3)
+  set rowId($fixnum.Int64 value) => $_setInt64(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasRowId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearRowId() => $_clearField(3);
 }
 
 class StartEditEvent extends $pb.GeneratedMessage {
   factory StartEditEvent({
     $core.int? row,
     $core.int? col,
+    $fixnum.Int64? rowId,
   }) {
     final result = create();
     if (row != null) result.row = row;
     if (col != null) result.col = col;
+    if (rowId != null) result.rowId = rowId;
     return result;
   }
 
@@ -23532,6 +23800,7 @@ class StartEditEvent extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aI(1, _omitFieldNames ? '' : 'row')
     ..aI(2, _omitFieldNames ? '' : 'col')
+    ..aInt64(3, _omitFieldNames ? '' : 'rowId')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -23570,6 +23839,15 @@ class StartEditEvent extends $pb.GeneratedMessage {
   $core.bool hasCol() => $_has(1);
   @$pb.TagNumber(2)
   void clearCol() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $fixnum.Int64 get rowId => $_getI64(2);
+  @$pb.TagNumber(3)
+  set rowId($fixnum.Int64 value) => $_setInt64(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasRowId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearRowId() => $_clearField(3);
 }
 
 class AfterEditEvent extends $pb.GeneratedMessage {
@@ -23578,12 +23856,14 @@ class AfterEditEvent extends $pb.GeneratedMessage {
     $core.int? col,
     $core.String? oldText,
     $core.String? newText,
+    $fixnum.Int64? rowId,
   }) {
     final result = create();
     if (row != null) result.row = row;
     if (col != null) result.col = col;
     if (oldText != null) result.oldText = oldText;
     if (newText != null) result.newText = newText;
+    if (rowId != null) result.rowId = rowId;
     return result;
   }
 
@@ -23604,6 +23884,7 @@ class AfterEditEvent extends $pb.GeneratedMessage {
     ..aI(2, _omitFieldNames ? '' : 'col')
     ..aOS(3, _omitFieldNames ? '' : 'oldText')
     ..aOS(4, _omitFieldNames ? '' : 'newText')
+    ..aInt64(5, _omitFieldNames ? '' : 'rowId')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -23660,6 +23941,15 @@ class AfterEditEvent extends $pb.GeneratedMessage {
   $core.bool hasNewText() => $_has(3);
   @$pb.TagNumber(4)
   void clearNewText() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $fixnum.Int64 get rowId => $_getI64(4);
+  @$pb.TagNumber(5)
+  set rowId($fixnum.Int64 value) => $_setInt64(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasRowId() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearRowId() => $_clearField(5);
 }
 
 class CellEditValidateEvent extends $pb.GeneratedMessage {
@@ -23667,11 +23957,13 @@ class CellEditValidateEvent extends $pb.GeneratedMessage {
     $core.int? row,
     $core.int? col,
     $core.String? editText,
+    $fixnum.Int64? rowId,
   }) {
     final result = create();
     if (row != null) result.row = row;
     if (col != null) result.col = col;
     if (editText != null) result.editText = editText;
+    if (rowId != null) result.rowId = rowId;
     return result;
   }
 
@@ -23691,6 +23983,7 @@ class CellEditValidateEvent extends $pb.GeneratedMessage {
     ..aI(1, _omitFieldNames ? '' : 'row')
     ..aI(2, _omitFieldNames ? '' : 'col')
     ..aOS(3, _omitFieldNames ? '' : 'editText')
+    ..aInt64(4, _omitFieldNames ? '' : 'rowId')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -23739,6 +24032,15 @@ class CellEditValidateEvent extends $pb.GeneratedMessage {
   $core.bool hasEditText() => $_has(2);
   @$pb.TagNumber(3)
   void clearEditText() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $fixnum.Int64 get rowId => $_getI64(3);
+  @$pb.TagNumber(4)
+  set rowId($fixnum.Int64 value) => $_setInt64(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasRowId() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearRowId() => $_clearField(4);
 }
 
 class CellEditChangeEvent extends $pb.GeneratedMessage {
@@ -27909,6 +28211,12 @@ class VolvoxGridServiceApi {
           $pb.ClientContext? ctx, EventStreamRequest request) =>
       _client.invoke<GridEvent>(
           ctx, 'VolvoxGridService', 'EventStream', request, GridEvent());
+
+  /// Appended to preserve all existing RPC ordinals and dispatch paths.
+  $async.Future<RowsResponse> getRows(
+          $pb.ClientContext? ctx, GetRowsRequest request) =>
+      _client.invoke<RowsResponse>(
+          ctx, 'VolvoxGridService', 'GetRows', request, RowsResponse());
 }
 
 const $core.bool _omitFieldNames =

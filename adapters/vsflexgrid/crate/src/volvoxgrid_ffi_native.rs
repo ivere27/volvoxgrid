@@ -87,6 +87,7 @@ pub trait VolvoxGridServiceRuntime: Send + Sync + 'static {
     fn refresh(&self, request: RefreshRequest) -> Result<RefreshResponse, String>;
     fn load_demo(&self, request: LoadDemoRequest) -> Result<LoadDemoResponse, String>;
     fn get_demo_data(&self, request: GetDemoDataRequest) -> Result<GetDemoDataResponse, String>;
+    fn get_rows(&self, request: GetRowsRequest) -> Result<RowsResponse, String>;
 }
 
 static RUNTIME_VOLVOX_GRID_SERVICE: OnceLock<Box<dyn VolvoxGridServiceRuntime>> = OnceLock::new();
@@ -153,6 +154,7 @@ pub unsafe extern "C" fn volvox_grid_create(
     scale: f32,
     config: *const u8,
     config_len: i32,
+    row_ids_enabled: i32,
     out_len: *mut i32,
 ) -> *mut u8 {
     let runtime = match get_volvox_grid_service_runtime() {
@@ -183,6 +185,7 @@ pub unsafe extern "C" fn volvox_grid_create(
         } else {
             None
         },
+        row_ids_enabled: row_ids_enabled != 0,
         ..Default::default()
     };
     match runtime.create(req) {
@@ -2595,6 +2598,64 @@ pub unsafe extern "C" fn volvox_grid_get_demo_data(
         ..Default::default()
     };
     match runtime.get_demo_data(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            if r.encode(&mut buf).is_ok() {
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
+                alloc_payload_with_header(buf)
+            } else {
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
+                std::ptr::null_mut()
+            }
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
+    }
+}
+
+/// GetRows (protobuf input — has repeated/oneof fields)
+#[no_mangle]
+pub unsafe extern "C" fn volvox_grid_get_rows_pb(
+    data: *const u8,
+    data_len: i32,
+    out_len: *mut i32,
+) -> *mut u8 {
+    let runtime = match get_volvox_grid_service_runtime() {
+        Some(p) => p,
+        None => {
+            set_last_error("runtime not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
+    };
+    let input = if data.is_null() || data_len <= 0 {
+        Vec::new()
+    } else {
+        std::slice::from_raw_parts(data, data_len as usize).to_vec()
+    };
+    let req = match GetRowsRequest::decode(input.as_slice()) {
+        Ok(r) => r,
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
+    };
+    match runtime.get_rows(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();

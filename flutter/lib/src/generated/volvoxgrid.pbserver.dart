@@ -115,6 +115,8 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
       $pb.ServerContext ctx, $0.RenderInput request);
   $async.Future<$0.GridEvent> eventStream(
       $pb.ServerContext ctx, $0.EventStreamRequest request);
+  $async.Future<$0.RowsResponse> getRows(
+      $pb.ServerContext ctx, $0.GetRowsRequest request);
 
   $pb.GeneratedMessage createRequest($core.String methodName) {
     switch (methodName) {
@@ -212,6 +214,8 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
         return $0.RenderInput();
       case 'EventStream':
         return $0.EventStreamRequest();
+      case 'GetRows':
+        return $0.GetRowsRequest();
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }
@@ -314,6 +318,8 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
         return renderSession(ctx, request as $0.RenderInput);
       case 'EventStream':
         return eventStream(ctx, request as $0.EventStreamRequest);
+      case 'GetRows':
+        return getRows(ctx, request as $0.GetRowsRequest);
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }

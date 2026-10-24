@@ -2374,7 +2374,6 @@ impl VolvoxGrid {
                 reorder: Some(self.header_features & 2 != 0),
                 chooser: Some(self.header_features & 4 != 0),
             }),
-            gestures: None,
         }
     }
 
@@ -2605,6 +2604,17 @@ impl VolvoxGrid {
 
     /// Batch-set row properties. Only set (Some) fields per entry are applied.
     pub fn define_rows(&mut self, defs: &[v1::RowDef]) {
+        let identities: Vec<(i32, i64)> = defs
+            .iter()
+            .filter_map(|def| def.row_id.map(|id| (def.index, id)))
+            .collect();
+        if let Err(message) = self.set_row_ids(&identities) {
+            self.events.push(crate::event::GridEventData::Error {
+                code: v1::ErrorCode::ErrorInvalidArgument as i32,
+                message,
+            });
+            return;
+        }
         for def in defs {
             let idx = def.index;
             if idx < 0 || idx >= self.rows {
@@ -3331,6 +3341,23 @@ impl VolvoxGrid {
         let _ = self.write_cells(updates, false);
     }
 
+    /// Keep typed readback in sync with committed editor/clipboard text.
+    /// Editor validation has already run; legacy allow-invalid values are kept
+    /// as text rather than leaving the previous typed value behind. Only
+    /// explicitly numeric columns convert to floating point.
+    pub fn set_edited_cell_text(&mut self, row: i32, col: i32, text: String) {
+        let expected = self.get_col_props(col).map_or(
+            v1::ColumnDataType::ColumnDataString as i32,
+            |column| column.data_type,
+        );
+        let inbound = v1::cell_value::Value::Text(text.clone());
+        let value = self
+            .coerce_value_for_column(expected, EffectiveCoercionMode::Flexible, &inbound)
+            .unwrap_or_else(|_| CellValueData::Text(text.clone()));
+        self.cells.set_text(row, col, text);
+        self.cells.set_value(row, col, value);
+    }
+
     /// Typed bulk ingestion path used by `LoadTable`.
     pub fn load_table(
         &mut self,
@@ -3339,6 +3366,23 @@ impl VolvoxGrid {
         values: &[v1::CellValue],
         atomic: bool,
     ) -> v1::WriteResult {
+        self.load_table_with_row_ids(rows, cols, values, atomic, &[])
+            .expect("empty replacement IDs are always valid")
+    }
+
+    /// Replace table data and identities together after validating the entire ID list.
+    pub fn load_table_with_row_ids(
+        &mut self,
+        rows: i32,
+        cols: i32,
+        values: &[v1::CellValue],
+        atomic: bool,
+        row_ids: &[i64],
+    ) -> Result<v1::WriteResult, String> {
+        if !row_ids.is_empty() {
+            self.row_ids.require_enabled()?;
+        }
+        Self::validate_replacement_row_ids(rows, row_ids)?;
         let rows = rows.max(1);
         let cols = cols.max(1);
         let max = (rows as usize).saturating_mul(cols as usize);
@@ -3369,16 +3413,23 @@ impl VolvoxGrid {
 
         let plan = self.plan_batch_write(&updates, rows, cols);
         if atomic && plan.has_hard_reject {
-            return v1::WriteResult {
+            return Ok(v1::WriteResult {
                 written_count: 0,
                 rejected_count: plan.rejected_count,
                 violations: plan.violations,
-            };
+            });
         }
 
-        self.set_rows(rows);
-        self.set_cols(cols);
+        // The complete write/ID plan is now accepted. Discard old storage before
+        // resizing so replacement never materializes a sorted table being removed.
+        self.cancel_edit();
         self.cells.clear_all();
+        self.set_rows_for_replacement(rows);
+        self.set_cols(cols);
+        self.row_ids.replace_validated(self.rows, row_ids);
+        self.row_positions = (0..self.rows).collect();
+        self.col_positions = (0..self.cols).collect();
+        self.sort_state.clear();
         self.clear_barcode_presence_tracking();
         for entry in &plan.entries {
             if entry.in_bounds {
@@ -3388,11 +3439,11 @@ impl VolvoxGrid {
         self.auto_resize_all();
         self.mark_dirty();
 
-        v1::WriteResult {
+        Ok(v1::WriteResult {
             written_count: plan.written_count,
             rejected_count: plan.rejected_count,
             violations: plan.violations,
-        }
+        })
     }
 
     /// Export effective column definitions as schema.

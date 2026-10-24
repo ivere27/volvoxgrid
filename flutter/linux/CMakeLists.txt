@@ -1,87 +1,19 @@
-# The Flutter tooling requires that developers have CMake 3.10 or later
-# installed. You should not increase this version, as doing so will cause
-# the runtime to fail to compile for some customers of the runtime.
 cmake_minimum_required(VERSION 3.10)
+project(volvoxgrid LANGUAGES C)
 
-set(PROJECT_NAME "volvoxgrid")
-project(${PROJECT_NAME} LANGUAGES C)
-
-# Resolve package root even when this file is accessed through .plugin_symlinks.
-get_filename_component(VOLVOXGRID_PACKAGE_ROOT "${CMAKE_CURRENT_LIST_DIR}/.." REALPATH)
-set(VOLVOXGRID_MAVEN_SO "${VOLVOXGRID_PACKAGE_ROOT}/linux/x64/libvolvoxgrid.so")
-set(VOLVOXGRID_PACKAGED_SO "${VOLVOXGRID_PACKAGE_ROOT}/linux/x64/libvolvoxgrid.so")
-set(VOLVOXGRID_RELEASE_SO "${VOLVOXGRID_PACKAGE_ROOT}/../target/release/libvolvoxgrid.so")
-set(VOLVOXGRID_DEBUG_SO "${VOLVOXGRID_PACKAGE_ROOT}/../target/debug/libvolvoxgrid.so")
-
-# Resolve source/version from env.
-# Default to Maven so pub.dev consumers work without monorepo-local binaries.
-set(VOLVOXGRID_SOURCE "maven")
-if(DEFINED ENV{VOLVOXGRID_SOURCE})
-  set(VOLVOXGRID_SOURCE "$ENV{VOLVOXGRID_SOURCE}")
-endif()
-set(VOLVOXGRID_VERSION "")
-if(EXISTS "${VOLVOXGRID_PACKAGE_ROOT}/pubspec.yaml")
-  file(STRINGS "${VOLVOXGRID_PACKAGE_ROOT}/pubspec.yaml" VOLVOXGRID_PUBSPEC_VERSION REGEX "^version:[ \t]*")
-  if(VOLVOXGRID_PUBSPEC_VERSION)
-    string(REGEX REPLACE "^version:[ \t]*([^ \t\r\n]+).*" "\\1" VOLVOXGRID_VERSION "${VOLVOXGRID_PUBSPEC_VERSION}")
-  endif()
-endif()
-if(DEFINED ENV{VOLVOXGRID_VERSION})
-  set(VOLVOXGRID_VERSION "$ENV{VOLVOXGRID_VERSION}")
-endif()
-if(VOLVOXGRID_VERSION STREQUAL "")
-  message(FATAL_ERROR "VolvoxGrid: Could not resolve package version from pubspec.yaml. Set VOLVOXGRID_VERSION.")
-endif()
-
-if(NOT VOLVOXGRID_SOURCE STREQUAL "maven" AND NOT VOLVOXGRID_SOURCE STREQUAL "local")
-  message(FATAL_ERROR "VolvoxGrid: Invalid VOLVOXGRID_SOURCE='${VOLVOXGRID_SOURCE}'. Expected 'maven' or 'local'.")
-endif()
-
-# Check if Maven source is requested.
-if(VOLVOXGRID_SOURCE STREQUAL "maven")
-  message(STATUS "VolvoxGrid: Resolving library from Maven (version=${VOLVOXGRID_VERSION})...")
-
-  # Prefer gradlew in repo checkout; fall back to system gradle for pub.dev use.
-  set(VOLVOXGRID_GRADLE_EXECUTABLE "${VOLVOXGRID_PACKAGE_ROOT}/../android/gradlew")
-  if(NOT EXISTS "${VOLVOXGRID_GRADLE_EXECUTABLE}")
-    find_program(VOLVOXGRID_GRADLE_EXECUTABLE gradle)
-  endif()
-
-  if(VOLVOXGRID_GRADLE_EXECUTABLE)
-    set(VOLVOXGRID_GRADLE_ARGS copyNative)
-    if(VOLVOXGRID_VERSION MATCHES "-SNAPSHOT$")
-      list(INSERT VOLVOXGRID_GRADLE_ARGS 0 "--refresh-dependencies")
-    endif()
-    execute_process(
-      COMMAND "${VOLVOXGRID_GRADLE_EXECUTABLE}" -p "${VOLVOXGRID_PACKAGE_ROOT}/linux"
-              -PvolvoxgridVersion=${VOLVOXGRID_VERSION}
-              ${VOLVOXGRID_GRADLE_ARGS}
-      RESULT_VARIABLE gradlew_result
-    )
-    if(NOT gradlew_result EQUAL 0)
-      message(WARNING "VolvoxGrid: Failed to download library from Maven via Gradle.")
-    endif()
-  else()
-    message(WARNING "VolvoxGrid: gradle not found. Skipping Maven resolution.")
-  endif()
-endif()
-
-# Prefer Maven/packaged pub artifact first, then local release/debug builds.
-if(EXISTS "${VOLVOXGRID_PACKAGED_SO}")
-  set(volvoxgrid_bundled_libraries
-    "${VOLVOXGRID_PACKAGED_SO}"
-    PARENT_SCOPE
-  )
-elseif(EXISTS "${VOLVOXGRID_RELEASE_SO}")
-  set(volvoxgrid_bundled_libraries
-    "${VOLVOXGRID_RELEASE_SO}"
-    PARENT_SCOPE
-  )
-elseif(EXISTS "${VOLVOXGRID_DEBUG_SO}")
-  set(volvoxgrid_bundled_libraries
-    "${VOLVOXGRID_DEBUG_SO}"
-    PARENT_SCOPE
-  )
+set(VOLVOXGRID_PLATFORM linux)
+set(VOLVOXGRID_NATIVE_NAME libvolvoxgrid.so)
+string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" _v_processor)
+if(_v_processor MATCHES "^(x86_64|amd64)$")
+  set(VOLVOXGRID_NATIVE_ARCH linux-x86_64)
+elseif(_v_processor MATCHES "^(aarch64|arm64)$")
+  set(VOLVOXGRID_NATIVE_ARCH linux-aarch64)
+elseif(_v_processor MATCHES "^(i[3-6]86|x86)$")
+  set(VOLVOXGRID_NATIVE_ARCH linux-x86)
+elseif(_v_processor MATCHES "^arm")
+  set(VOLVOXGRID_NATIVE_ARCH linux-armv7)
 else()
-  set(volvoxgrid_bundled_libraries "" PARENT_SCOPE)
+  message(FATAL_ERROR "VolvoxGrid: Unsupported Linux target architecture '${CMAKE_SYSTEM_PROCESSOR}'.")
 endif()
+include("${CMAKE_CURRENT_LIST_DIR}/../native/resolve.cmake")
+set(volvoxgrid_bundled_libraries "${VOLVOXGRID_RESOLVED_LIBRARY}" PARENT_SCOPE)

@@ -789,6 +789,7 @@ public struct AfterEditEvent: Sendable {
     public var col: Int32 = 0
     public var oldText: String = ""
     public var newText: String = ""
+    public var rowId: Int64 = 0
 
     public init() {}
 
@@ -810,6 +811,9 @@ public struct AfterEditEvent: Sendable {
         if !self.newText.isEmpty {
             w.writeString(fieldNumber: 4, value: self.newText)
         }
+        if self.rowId != 0 {
+            w.writeInt64(fieldNumber: 5, value: self.rowId)
+        }
     }
 
     public func serializedData() throws -> Data {
@@ -830,6 +834,7 @@ public struct AfterEditEvent: Sendable {
             case 2: self.col = try r.readInt32()
             case 3: self.oldText = try r.readString()
             case 4: self.newText = try r.readString()
+            case 5: self.rowId = try r.readInt64()
             default:
                 try r.skip(wire: tag.wire)
             }
@@ -1797,6 +1802,7 @@ public struct BarcodeRenderOptions: Sendable {
 public struct BeforeEditEvent: Sendable {
     public var row: Int32 = 0
     public var col: Int32 = 0
+    public var rowId: Int64 = 0
 
     public init() {}
 
@@ -1811,6 +1817,9 @@ public struct BeforeEditEvent: Sendable {
         }
         if self.col != 0 {
             w.writeInt32(fieldNumber: 2, value: self.col)
+        }
+        if self.rowId != 0 {
+            w.writeInt64(fieldNumber: 3, value: self.rowId)
         }
     }
 
@@ -1830,6 +1839,7 @@ public struct BeforeEditEvent: Sendable {
             switch tag.fieldNumber {
             case 1: self.row = try r.readInt32()
             case 2: self.col = try r.readInt32()
+            case 3: self.rowId = try r.readInt64()
             default:
                 try r.skip(wire: tag.wire)
             }
@@ -2594,6 +2604,7 @@ public struct CellEditValidateEvent: Sendable {
     public var row: Int32 = 0
     public var col: Int32 = 0
     public var editText: String = ""
+    public var rowId: Int64 = 0
 
     public init() {}
 
@@ -2611,6 +2622,9 @@ public struct CellEditValidateEvent: Sendable {
         }
         if !self.editText.isEmpty {
             w.writeString(fieldNumber: 3, value: self.editText)
+        }
+        if self.rowId != 0 {
+            w.writeInt64(fieldNumber: 4, value: self.rowId)
         }
     }
 
@@ -2631,6 +2645,7 @@ public struct CellEditValidateEvent: Sendable {
             case 1: self.row = try r.readInt32()
             case 2: self.col = try r.readInt32()
             case 3: self.editText = try r.readString()
+            case 4: self.rowId = try r.readInt64()
             default:
                 try r.skip(wire: tag.wire)
             }
@@ -4348,6 +4363,7 @@ public struct CreateRequest: Sendable {
     public var viewportHeight: Int32 = 0
     public var scale: Float = 0
     public var config: GridConfig?
+    public var rowIdsEnabled: Bool = false
 
     public init() {}
 
@@ -4368,6 +4384,9 @@ public struct CreateRequest: Sendable {
         }
         if let v = self.config {
             try w.writeMessage(fieldNumber: 4) { try v.encode(into: &$0) }
+        }
+        if self.rowIdsEnabled {
+            w.writeBool(fieldNumber: 5, value: self.rowIdsEnabled)
         }
     }
 
@@ -4391,6 +4410,7 @@ public struct CreateRequest: Sendable {
             case 4:
                 let body = try r.readLengthDelimited()
                 self.config = try GridConfig(serializedBytes: body)
+            case 5: self.rowIdsEnabled = try r.readBool()
             default:
                 try r.skip(wire: tag.wire)
             }
@@ -6145,6 +6165,7 @@ public struct EditorSession: Sendable {
     public var composing: Bool = false
     public var preeditText: String = ""
     public var validationErrors: [ValidationError] = []
+    public var rowId: Int64 = 0
 
     public init() {}
 
@@ -6196,6 +6217,9 @@ public struct EditorSession: Sendable {
         for item in self.validationErrors {
             try w.writeMessage(fieldNumber: 14) { try item.encode(into: &$0) }
         }
+        if self.rowId != 0 {
+            w.writeInt64(fieldNumber: 15, value: self.rowId)
+        }
     }
 
     public func serializedData() throws -> Data {
@@ -6242,6 +6266,7 @@ public struct EditorSession: Sendable {
             case 14:
                 let body = try r.readLengthDelimited()
                 self.validationErrors.append(try ValidationError(serializedBytes: body))
+            case 15: self.rowId = try r.readInt64()
             default:
                 try r.skip(wire: tag.wire)
             }
@@ -7919,6 +7944,66 @@ public struct GetNodeRequest: Sendable {
             case 3:
                 let raw = try r.readInt32()
                 self.relation = NodeRelation(rawValue: raw) ?? .nodeParent
+            default:
+                try r.skip(wire: tag.wire)
+            }
+        }
+    }
+}
+
+public struct GetRowsRequest: Sendable {
+    public var gridId: Int64 = 0
+    public var startRow: Int32 = 0
+    public var rowCount: Int32 = 0
+    public var rowIds: [Int64] = []
+
+    public init() {}
+
+    // MARK: serialization
+
+    /// Encodes this message's fields into `w`. Called from `serializedData()`
+    /// (the top-level path) and from the parent's `writeMessage` body when
+    /// this type appears as a nested message.
+    public func encode(into w: inout ProtoWriter) throws {
+        if self.gridId != 0 {
+            w.writeInt64(fieldNumber: 1, value: self.gridId)
+        }
+        if self.startRow != 0 {
+            w.writeInt32(fieldNumber: 2, value: self.startRow)
+        }
+        if self.rowCount != 0 {
+            w.writeInt32(fieldNumber: 3, value: self.rowCount)
+        }
+        for item in self.rowIds {
+            w.writeInt64(fieldNumber: 4, value: item)
+        }
+    }
+
+    public func serializedData() throws -> Data {
+        var w = ProtoWriter()
+        try encode(into: &w)
+        return w.data
+    }
+
+    // MARK: deserialization
+
+    public init(serializedBytes data: Data) throws {
+        self.init()
+        if data.isEmpty { return }
+        var r = ProtoReader(data: data)
+        while let tag = try r.readTag() {
+            switch tag.fieldNumber {
+            case 1: self.gridId = try r.readInt64()
+            case 2: self.startRow = try r.readInt32()
+            case 3: self.rowCount = try r.readInt32()
+            case 4:
+                if tag.wire == .lengthDelimited {
+                    let body = try r.readLengthDelimited()
+                    var pr = ProtoReader(data: body)
+                    while !pr.isEOF { self.rowIds.append(try pr.readInt64()) }
+                } else {
+                    self.rowIds.append(try r.readInt64())
+                }
             default:
                 try r.skip(wire: tag.wire)
             }
@@ -11275,6 +11360,7 @@ public struct LoadTableRequest: Sendable {
     public var cols: Int32 = 0
     public var values: [CellValue] = []
     public var atomic: Bool = false
+    public var rowIds: [Int64] = []
 
     public init() {}
 
@@ -11299,6 +11385,9 @@ public struct LoadTableRequest: Sendable {
         if self.atomic {
             w.writeBool(fieldNumber: 5, value: self.atomic)
         }
+        for item in self.rowIds {
+            w.writeInt64(fieldNumber: 6, value: item)
+        }
     }
 
     public func serializedData() throws -> Data {
@@ -11322,6 +11411,14 @@ public struct LoadTableRequest: Sendable {
                 let body = try r.readLengthDelimited()
                 self.values.append(try CellValue(serializedBytes: body))
             case 5: self.atomic = try r.readBool()
+            case 6:
+                if tag.wire == .lengthDelimited {
+                    let body = try r.readLengthDelimited()
+                    var pr = ProtoReader(data: body)
+                    while !pr.isEOF { self.rowIds.append(try pr.readInt64()) }
+                } else {
+                    self.rowIds.append(try r.readInt64())
+                }
             default:
                 try r.skip(wire: tag.wire)
             }
@@ -13434,6 +13531,7 @@ public struct RowDef: Sendable {
     public var span: Bool?
     public var pin: PinPosition?
     public var sticky: StickyEdge?
+    public var rowId: Int64?
 
     public init() {}
 
@@ -13476,6 +13574,9 @@ public struct RowDef: Sendable {
         if let v = self.sticky {
             w.writeInt32(fieldNumber: 11, value: v.rawValue)
         }
+        if let v = self.rowId {
+            w.writeInt64(fieldNumber: 12, value: v)
+        }
     }
 
     public func serializedData() throws -> Data {
@@ -13509,6 +13610,50 @@ public struct RowDef: Sendable {
             case 11:
                 let raw = try r.readInt32()
                 self.sticky = StickyEdge(rawValue: raw) ?? .stickyNone
+            case 12: self.rowId = try r.readInt64()
+            default:
+                try r.skip(wire: tag.wire)
+            }
+        }
+    }
+}
+
+public struct RowIdentity: Sendable {
+    public var index: Int32 = 0
+    public var rowId: Int64 = 0
+
+    public init() {}
+
+    // MARK: serialization
+
+    /// Encodes this message's fields into `w`. Called from `serializedData()`
+    /// (the top-level path) and from the parent's `writeMessage` body when
+    /// this type appears as a nested message.
+    public func encode(into w: inout ProtoWriter) throws {
+        if self.index != 0 {
+            w.writeInt32(fieldNumber: 1, value: self.index)
+        }
+        if self.rowId != 0 {
+            w.writeInt64(fieldNumber: 2, value: self.rowId)
+        }
+    }
+
+    public func serializedData() throws -> Data {
+        var w = ProtoWriter()
+        try encode(into: &w)
+        return w.data
+    }
+
+    // MARK: deserialization
+
+    public init(serializedBytes data: Data) throws {
+        self.init()
+        if data.isEmpty { return }
+        var r = ProtoReader(data: data)
+        while let tag = try r.readTag() {
+            switch tag.fieldNumber {
+            case 1: self.index = try r.readInt32()
+            case 2: self.rowId = try r.readInt64()
             default:
                 try r.skip(wire: tag.wire)
             }
@@ -13749,6 +13894,46 @@ public struct RowStatusChangeEvent: Sendable {
             case 2:
                 let body = try r.readLengthDelimited()
                 self.status = try RowStatus(serializedBytes: body)
+            default:
+                try r.skip(wire: tag.wire)
+            }
+        }
+    }
+}
+
+public struct RowsResponse: Sendable {
+    public var rows: [RowIdentity] = []
+
+    public init() {}
+
+    // MARK: serialization
+
+    /// Encodes this message's fields into `w`. Called from `serializedData()`
+    /// (the top-level path) and from the parent's `writeMessage` body when
+    /// this type appears as a nested message.
+    public func encode(into w: inout ProtoWriter) throws {
+        for item in self.rows {
+            try w.writeMessage(fieldNumber: 1) { try item.encode(into: &$0) }
+        }
+    }
+
+    public func serializedData() throws -> Data {
+        var w = ProtoWriter()
+        try encode(into: &w)
+        return w.data
+    }
+
+    // MARK: deserialization
+
+    public init(serializedBytes data: Data) throws {
+        self.init()
+        if data.isEmpty { return }
+        var r = ProtoReader(data: data)
+        while let tag = try r.readTag() {
+            switch tag.fieldNumber {
+            case 1:
+                let body = try r.readLengthDelimited()
+                self.rows.append(try RowIdentity(serializedBytes: body))
             default:
                 try r.skip(wire: tag.wire)
             }
@@ -15196,6 +15381,7 @@ public struct SpanConfig: Sendable {
 public struct StartEditEvent: Sendable {
     public var row: Int32 = 0
     public var col: Int32 = 0
+    public var rowId: Int64 = 0
 
     public init() {}
 
@@ -15210,6 +15396,9 @@ public struct StartEditEvent: Sendable {
         }
         if self.col != 0 {
             w.writeInt32(fieldNumber: 2, value: self.col)
+        }
+        if self.rowId != 0 {
+            w.writeInt64(fieldNumber: 3, value: self.rowId)
         }
     }
 
@@ -15229,6 +15418,7 @@ public struct StartEditEvent: Sendable {
             switch tag.fieldNumber {
             case 1: self.row = try r.readInt32()
             case 2: self.col = try r.readInt32()
+            case 3: self.rowId = try r.readInt64()
             default:
                 try r.skip(wire: tag.wire)
             }
@@ -17365,6 +17555,16 @@ public actor VolvoxGridServiceFfiLite {
             }
             continuation.onTermination = { _ in task.cancel() }
         }
+    }
+
+    public func getRows(_ request: GetRowsRequest) async throws -> RowsResponse {
+        let data = try request.serializedData()
+        let result = try await host.invoke(
+            service: "VolvoxGridService",
+            method: "/volvoxgrid.v1.VolvoxGridService/GetRows",
+            data: data
+        )
+        return try RowsResponse(serializedBytes: result)
     }
 
 }

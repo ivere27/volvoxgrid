@@ -225,6 +225,7 @@ fn load_binary(grid: &mut VolvoxGrid, data: &[u8], scope: i32) {
     grid.fixed_cols = fixed_cols;
 
     if export_includes_data(scope) {
+        grid.reset_row_ids();
         for r in 0..rows {
             for c in 0..cols {
                 if pos + 4 > data.len() {
@@ -473,6 +474,7 @@ fn load_text(grid: &mut VolvoxGrid, data: &[u8], separator: &str, scope: i32) {
         .max(1);
     grid.set_rows(rows.len() as i32);
     grid.set_cols(cols.max(grid.cols));
+    grid.reset_row_ids();
 
     for (r, row) in rows.iter().enumerate() {
         for (c, cell) in row.iter().enumerate() {

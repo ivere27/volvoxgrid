@@ -23,7 +23,7 @@ use crate::layout::LayoutCache;
 use crate::outline::OutlineState;
 use crate::proto::volvoxgrid::v1 as pb;
 use crate::rich_text::utf16_index_to_byte_index;
-use crate::row::RowProps;
+use crate::row::{RowIdentityStore, RowProps};
 use crate::scroll::ScrollState;
 use crate::scrollbar::{
     compute_scroll_viewport, reset_scrollbar_fade_state, scrollbar_fade_animating,
@@ -79,6 +79,17 @@ const MIN_ROWS: i32 = 1;
 
 /// Minimum allowed column count.
 const MIN_COLS: i32 = 1;
+
+/// A captured row target for work that may complete after the grid changes.
+/// Enabled identities follow the same row; otherwise any structural change
+/// invalidates the captured display index.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RowTarget {
+    pub row: i32,
+    pub row_id: i64,
+    pub identity_token: i64,
+    pub revision: u64,
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ActiveIndicatorTarget {
@@ -250,6 +261,8 @@ pub struct VolvoxGrid {
     // ── Position Mapping (logical → physical) ─────────────────────────────
     /// Maps display position to logical row index. `row_positions[display_pos] = logical_row`.
     pub row_positions: Vec<i32>,
+    /// Stable IDs and an O(1) reverse lookup, indexed by current display row.
+    pub row_ids: RowIdentityStore,
     /// Maps display position to logical column index. `col_positions[display_pos] = logical_col`.
     pub col_positions: Vec<i32>,
 
@@ -763,6 +776,30 @@ impl VolvoxGrid {
         fixed_rows: i32,
         fixed_cols: i32,
     ) -> Self {
+        Self::new_with_row_ids(
+            id,
+            viewport_width,
+            viewport_height,
+            rows,
+            cols,
+            fixed_rows,
+            fixed_cols,
+            false,
+        )
+    }
+
+    /// Create a grid with an immutable row identity option. The default
+    /// constructor leaves identities disabled and allocates no identity arrays.
+    pub fn new_with_row_ids(
+        id: i64,
+        viewport_width: i32,
+        viewport_height: i32,
+        rows: i32,
+        cols: i32,
+        fixed_rows: i32,
+        fixed_cols: i32,
+        row_ids_enabled: bool,
+    ) -> Self {
         let rows = rows.max(MIN_ROWS);
         let cols = cols.max(MIN_COLS);
         let fixed_rows = fixed_rows.max(0).min(rows);
@@ -808,6 +845,11 @@ impl VolvoxGrid {
 
             // Position mapping
             row_positions,
+            row_ids: if row_ids_enabled {
+                RowIdentityStore::new(id, rows)
+            } else {
+                RowIdentityStore::new_disabled(rows)
+            },
             col_positions,
 
             // Cell storage
@@ -1170,6 +1212,7 @@ impl VolvoxGrid {
         bytes += heap_hash_map_bytes(&self.resize_start_row_heights);
 
         bytes += heap_vec_bytes(&self.row_positions);
+        bytes += self.row_ids.heap_size_bytes();
         bytes += heap_vec_bytes(&self.col_positions);
 
         bytes += heap_vec_bytes(&self.pinned_rows_top);
@@ -1275,21 +1318,124 @@ impl VolvoxGrid {
         }
     }
 
+    /// Whether row identities were enabled when this grid was created.
+    pub fn row_ids_enabled(&self) -> bool {
+        self.row_ids.is_enabled()
+    }
+
+    /// Get the stable ID at a current display row, including fixed rows.
+    /// Returns None when row identities are disabled; this never enables them.
+    pub fn get_row_id(&self, row: i32) -> Option<i64> {
+        self.row_ids.get(row)
+    }
+
+    /// Find a current display row in O(1). Removed or collapsed rows return None.
+    pub fn find_row_by_id(&self, id: i64) -> Option<i32> {
+        self.row_ids.find(id)
+    }
+
+    /// Internal incarnation token for pending work; caller aliases cannot revive it.
+    pub fn row_identity_token(&self, row: i32) -> Option<i64> {
+        self.row_ids.identity_token(row)
+    }
+
+    pub fn find_row_by_identity_token(&self, token: i64) -> Option<i32> {
+        self.row_ids.find_identity_token(token)
+    }
+
+    pub fn capture_row_target(&self, row: i32) -> Option<RowTarget> {
+        if row < 0 || row >= self.rows {
+            return None;
+        }
+        Some(RowTarget {
+            row,
+            row_id: self.get_row_id(row).unwrap_or_default(),
+            identity_token: self.row_identity_token(row).unwrap_or_default(),
+            revision: self.row_ids.revision(),
+        })
+    }
+
+    pub fn resolve_row_target(&self, target: &RowTarget) -> Option<i32> {
+        if self.row_ids_enabled() {
+            let row = self.find_row_by_identity_token(target.identity_token)?;
+            (self.get_row_id(row) == Some(target.row_id)).then_some(row)
+        } else {
+            (target.row_id == 0
+                && target.identity_token == 0
+                && target.revision == self.row_ids.revision()
+                && target.row >= 0
+                && target.row < self.rows)
+                .then_some(target.row)
+        }
+    }
+
+    /// Check the captured target before committing an active edit.
+    pub fn is_edit_target_current(&self) -> bool {
+        self.edit.is_active()
+            && self.resolve_row_target(&RowTarget {
+                row: self.edit.edit_row,
+                row_id: self.edit.edit_row_id,
+                identity_token: self.edit.edit_row_identity_token,
+                revision: self.edit.edit_row_revision,
+            }) == Some(self.edit.edit_row)
+    }
+
+    /// Assign IDs atomically. IDs must be positive and unique across the grid.
+    pub fn set_row_ids(&mut self, assignments: &[(i32, i64)]) -> Result<(), String> {
+        if assignments.is_empty() {
+            return Ok(());
+        }
+        self.row_ids.assign(assignments)?;
+        if self.edit.is_active()
+            && self.get_row_id(self.edit.edit_row) != Some(self.edit.edit_row_id)
+        {
+            self.cancel_edit();
+        }
+        Ok(())
+    }
+
+    pub fn validate_replacement_row_ids(row_count: i32, ids: &[i64]) -> Result<(), String> {
+        RowIdentityStore::validate_replacement(row_count, ids)
+    }
+
+    /// Replace all identities; an empty list generates fresh engine IDs.
+    pub fn replace_row_ids(&mut self, ids: &[i64]) -> Result<(), String> {
+        self.row_ids.replace(self.rows, ids)?;
+        self.cancel_edit();
+        Ok(())
+    }
+
+    /// Generate fresh IDs without reusing IDs issued earlier by this grid.
+    pub fn reset_row_ids(&mut self) {
+        self.cancel_edit();
+        self.row_ids.reset(self.rows);
+    }
+
     // ── Row/Col Count ─────────────────────────────────────────────────────
 
     /// Sets the total number of rows. Adjusts the position mapping to match.
     ///
-    /// If the new row count is larger, new rows are appended to the position
-    /// mapping with identity indices. If smaller, excess entries are removed
+    /// If the new row count is larger, new rows receive fresh identities.
+    /// If smaller, the final display rows and their identities are removed
     /// and any custom row heights, hidden flags, row props, and cell data for
     /// removed rows remain in their maps (they become orphaned but harmless).
     /// Fixed rows are clamped if they would exceed the new count.
     pub fn set_rows(&mut self, rows: i32) {
+        self.set_rows_internal(rows, true);
+    }
+
+    /// Bulk replacement installs identities once after write/ID preflight succeeds.
+    pub(crate) fn set_rows_for_replacement(&mut self, rows: i32) {
+        self.set_rows_internal(rows, false);
+    }
+
+    fn set_rows_internal(&mut self, rows: i32, preserve_identities: bool) {
         let rows = rows.max(MIN_ROWS);
         let old_rows = self.rows;
         if rows == old_rows {
             return;
         }
+        self.cancel_edit();
         // Notify animation before changing state
         let h = self.default_row_height;
         if rows > old_rows {
@@ -1309,28 +1455,12 @@ impl VolvoxGrid {
             self.frozen_rows = (self.rows - self.fixed_rows).max(0);
         }
 
-        // Adjust position mapping
-        if rows > old_rows {
-            // Append new rows with identity mapping
-            for i in old_rows..rows {
-                self.row_positions.push(i);
-            }
-        } else if rows < old_rows {
-            // Truncate position mapping. Remove entries that reference rows >= new count,
-            // and also trim to length.
-            self.row_positions.retain(|&r| r < rows);
-            // Ensure we have exactly `rows` entries; pad if retain removed too many
-            while (self.row_positions.len() as i32) < rows {
-                // Find an index not yet in the vec
-                let existing: HashSet<i32> = self.row_positions.iter().cloned().collect();
-                for i in 0..rows {
-                    if !existing.contains(&i) {
-                        self.row_positions.push(i);
-                        break;
-                    }
-                }
-            }
-            self.row_positions.truncate(rows as usize);
+        // Keep the surviving display rows when shrinking a sorted grid. Materialize
+        // before resizing so newly appended rows cannot alias old storage indices.
+        self.cells.materialize_row_map();
+        self.row_positions = (0..rows).collect();
+        if preserve_identities {
+            self.row_ids.resize(rows);
         }
 
         // Clamp selection
@@ -2350,10 +2480,6 @@ impl VolvoxGrid {
         self.host_editor_capabilities = capabilities;
     }
 
-    /// Returns true when editing may begin at the given cell.
-    ///
-    /// Header rows and subtotal/grandtotal rows are always read-only.
-    /// `force=true` bypasses only the global `edit_trigger_mode` gate.
     pub fn resolved_cell_interaction(&self, row: i32, col: i32) -> i32 {
         if row < 0 || row >= self.rows || col < 0 || col >= self.cols {
             return pb::CellInteraction::None as i32;
@@ -2414,6 +2540,32 @@ impl VolvoxGrid {
         self.editor_button_visible_for_control(row, col, self.resolved_cell_control(row, col))
     }
 
+    /// Explicit user-input permission carried in the existing EditorSpec wire
+    /// extension map. Hosts may set `volvoxgrid.readOnly: true` on a default,
+    /// column, or cell editor without changing the protobuf/native ABI.
+    /// A cell cannot relax a read-only column/default. Programmatic data writes
+    /// remain allowed so applications can refresh data and revert failed saves.
+    pub fn is_cell_read_only(&self, row: i32, col: i32) -> bool {
+        fn read_only(editor: Option<&pb::EditorSpec>) -> bool {
+            editor
+                .and_then(|editor| editor.custom_props.as_ref())
+                .map_or(false, |props| {
+                    props.fields.iter().any(|field| {
+                        field.key == "volvoxgrid.readOnly"
+                            && matches!(
+                                field.value.as_ref().and_then(|value| value.value.as_ref()),
+                                Some(pb::scalar_value::Value::BoolValue(true))
+                            )
+                    })
+                })
+        }
+        read_only(self.default_editor.as_ref())
+            || read_only(self.get_col_props(col).and_then(|column| column.editor.as_ref()))
+            || read_only(self.cells.get(row, col).and_then(|cell| cell.editor()))
+    }
+
+    /// Header/subtotal rows and explicitly read-only cells cannot be edited.
+    /// `force` bypasses only the global trigger mode, never cell permissions.
     pub fn can_begin_edit(&self, row: i32, col: i32, force: bool) -> bool {
         if row < 0 || row >= self.rows || col < 0 || col >= self.cols {
             return false;
@@ -2422,6 +2574,9 @@ impl VolvoxGrid {
             return false;
         }
         if self.row_props.get(&row).map_or(false, |rp| rp.is_subtotal) {
+            return false;
+        }
+        if self.is_cell_read_only(row, col) {
             return false;
         }
         if self.resolved_cell_interaction(row, col) != pb::CellInteraction::None as i32 {
@@ -4553,26 +4708,17 @@ impl VolvoxGrid {
         };
 
         // Shift existing cell data down
+        self.cancel_edit();
+        self.row_ids.insert(insert_at);
         self.cells.insert_row(insert_at);
 
         // Increment row count
         self.rows += 1;
 
-        // Preserve existing display-to-logical mapping:
-        // 1. Bump all logical indices >= insert_at by 1
-        for pos in self.row_positions.iter_mut() {
-            if *pos >= insert_at {
-                *pos += 1;
-            }
-        }
-        // 2. Insert the new row's logical index at the appropriate display position.
-        //    Find the display position where insert_at was (or would be) shown.
-        let display_pos = self
-            .row_positions
-            .iter()
-            .position(|&r| r == insert_at + 1) // the row that was at insert_at (now bumped to insert_at+1)
-            .unwrap_or(self.row_positions.len());
-        self.row_positions.insert(display_pos, insert_at);
+        // insert_row materializes the CellStore map into display order. The
+        // next sort must start from that storage order, not the old permutation.
+        self.row_positions.clear();
+        self.row_positions.extend(0..self.rows);
 
         // Shift row heights, row_props, cell_styles for rows >= insert_at
         let old_heights = std::mem::take(&mut self.row_heights);
@@ -4630,19 +4776,15 @@ impl VolvoxGrid {
 
         let h = self.get_row_height(row);
         self.animation.notify_rows_removed(row, 1, h);
+        self.cancel_edit();
+        self.row_ids.remove(row);
         self.cells.remove_row(row);
         self.recompute_barcode_presence();
         self.rows -= 1;
 
-        // Preserve existing display-to-logical mapping:
-        // 1. Remove the entry for this logical row from position mapping
-        self.row_positions.retain(|&r| r != row);
-        // 2. Decrement all logical indices > row by 1
-        for pos in self.row_positions.iter_mut() {
-            if *pos > row {
-                *pos -= 1;
-            }
-        }
+        // remove_row materializes the CellStore map just like insert_row.
+        self.row_positions.clear();
+        self.row_positions.extend(0..self.rows);
 
         // Shift row heights and row_props for rows > row
         let old_heights = std::mem::take(&mut self.row_heights);
@@ -5206,6 +5348,11 @@ impl VolvoxGrid {
         self.edit.flush_preedit();
         let row = self.edit.edit_row;
         let col = self.edit.edit_col;
+        if self.is_cell_read_only(row, col) || !self.is_edit_target_current() {
+            self.cancel_edit();
+            return false;
+        }
+        let row_id = self.get_row_id(row).unwrap_or_default();
         let old_text = self.cells.get_text(row, col).to_string();
         let new_text = self.edit.edit_text.clone();
         let committed = match self.prepare_committed_edit_text(row, col, &old_text, &new_text) {
@@ -5226,7 +5373,7 @@ impl VolvoxGrid {
             }
             crate::edit::PreparedEditCommit::Revert(committed) => {
                 self.edit.cancel();
-                self.apply_committed_edit_text(row, col, old_text, committed, false);
+                self.apply_committed_edit_text(row, col, row_id, old_text, committed, false);
                 return true;
             }
         };
@@ -5235,7 +5382,7 @@ impl VolvoxGrid {
         else {
             return false;
         };
-        self.apply_committed_edit_text(row, col, old_text, committed, true);
+        self.apply_committed_edit_text(row, col, row_id, old_text, committed, true);
         true
     }
 
@@ -5243,6 +5390,7 @@ impl VolvoxGrid {
         &mut self,
         row: i32,
         col: i32,
+        row_id: i64,
         old_text: String,
         committed: String,
         emit_validate: bool,
@@ -5251,15 +5399,17 @@ impl VolvoxGrid {
             self.events
                 .push(crate::event::GridEventData::CellEditValidate {
                     row,
+                    row_id,
                     col,
                     edit_text: committed.clone(),
                 });
         }
-        self.cells.set_text(row, col, committed.clone());
+        self.set_edited_cell_text(row, col, committed.clone());
         self.sync_explicit_progress_from_text(row, col);
         if old_text != committed {
             self.events.push(crate::event::GridEventData::AfterEdit {
                 row,
+                row_id,
                 col,
                 old_text: old_text.clone(),
                 new_text: committed.clone(),
@@ -5436,12 +5586,18 @@ impl VolvoxGrid {
 
         let dropdown = self.active_dropdown(row, col);
         let has_dropdown = dropdown.as_ref().is_some_and(dropdown_has_items);
-        self.events
-            .push(crate::event::GridEventData::BeforeEdit { row, col });
+        self.events.push(crate::event::GridEventData::BeforeEdit {
+            row,
+            col,
+            row_id: self.get_row_id(row).unwrap_or_default(),
+        });
 
         let stored_text = self.cells.get_text(row, col).to_string();
         let display_text = self.get_display_text(row, col);
         self.edit.start_edit(row, col, reason, &display_text);
+        self.edit.edit_row_id = self.get_row_id(row).unwrap_or_default();
+        self.edit.edit_row_identity_token = self.row_identity_token(row).unwrap_or_default();
+        self.edit.edit_row_revision = self.row_ids.revision();
         if let Some(dropdown) = dropdown.as_ref() {
             self.edit.parse_dropdown(dropdown);
         } else {
@@ -5465,8 +5621,11 @@ impl VolvoxGrid {
                 .push(crate::event::GridEventData::DropdownOpened);
         }
 
-        self.events
-            .push(crate::event::GridEventData::StartEdit { row, col });
+        self.events.push(crate::event::GridEventData::StartEdit {
+            row,
+            col,
+            row_id: self.edit.edit_row_id,
+        });
         self.mark_dirty();
     }
 

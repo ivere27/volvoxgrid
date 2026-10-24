@@ -933,6 +933,7 @@ struct GetMemoryUsageRequest;
 struct GetMergedRangeRequest;
 struct GetMergedRegionsRequest;
 struct GetNodeRequest;
+struct GetRowsRequest;
 struct GetSchemaRequest;
 struct GetSelectionRequest;
 struct GpuFrameDone;
@@ -1021,10 +1022,12 @@ struct ResizeViewportRequest;
 struct ResizeViewportResponse;
 struct RichText;
 struct RowDef;
+struct RowIdentity;
 struct RowIndicatorConfig;
 struct RowIndicatorSlot;
 struct RowStatus;
 struct RowStatusChangeEvent;
+struct RowsResponse;
 struct ScalarValue;
 struct SchemaResponse;
 struct ScrollBarColors;
@@ -1094,6 +1097,7 @@ struct AfterEditEvent {
     int32_t col = 0;
     std::string old_text;
     std::string new_text;
+    int64_t row_id = 0;
 
     void encode(::synurang::lite::ProtoWriter& w) const;
     std::vector<uint8_t> serialize() const {
@@ -1617,6 +1621,7 @@ struct BarcodeRenderOptions {
 struct BeforeEditEvent {
     int32_t row = 0;
     int32_t col = 0;
+    int64_t row_id = 0;
 
     void encode(::synurang::lite::ProtoWriter& w) const;
     std::vector<uint8_t> serialize() const {
@@ -2034,6 +2039,7 @@ struct CellEditValidateEvent {
     int32_t row = 0;
     int32_t col = 0;
     std::string edit_text;
+    int64_t row_id = 0;
 
     void encode(::synurang::lite::ProtoWriter& w) const;
     std::vector<uint8_t> serialize() const {
@@ -2854,6 +2860,7 @@ struct CreateRequest {
     int32_t viewport_height = 0;
     float scale = 0.0f;
     std::shared_ptr<GridConfig> config;
+    bool row_ids_enabled = false;
 
     void encode(::synurang::lite::ProtoWriter& w) const;
     std::vector<uint8_t> serialize() const {
@@ -3823,6 +3830,7 @@ struct EditorSession {
     bool composing = false;
     std::string preedit_text;
     std::vector<ValidationError> validation_errors;
+    int64_t row_id = 0;
 
     void encode(::synurang::lite::ProtoWriter& w) const;
     std::vector<uint8_t> serialize() const {
@@ -4667,6 +4675,33 @@ struct GetNodeRequest {
     static GetNodeRequest parse(const uint8_t* data, size_t n) {
         ::synurang::lite::ProtoReader r(data, n);
         GetNodeRequest m;
+        m.parse_from(r);
+        return m;
+    }
+};
+
+struct GetRowsRequest {
+    int64_t grid_id = 0;
+    int32_t start_row = 0;
+    int32_t row_count = 0;
+    std::vector<int64_t> row_ids;
+
+    void encode(::synurang::lite::ProtoWriter& w) const;
+    std::vector<uint8_t> serialize() const {
+        ::synurang::lite::ProtoWriter w;
+        encode(w);
+        return w.data();
+    }
+    void parse_from(::synurang::lite::ProtoReader& r);
+    static GetRowsRequest parse(const std::vector<uint8_t>& bytes) {
+        ::synurang::lite::ProtoReader r(bytes);
+        GetRowsRequest m;
+        m.parse_from(r);
+        return m;
+    }
+    static GetRowsRequest parse(const uint8_t* data, size_t n) {
+        ::synurang::lite::ProtoReader r(data, n);
+        GetRowsRequest m;
         m.parse_from(r);
         return m;
     }
@@ -6160,6 +6195,7 @@ struct LoadTableRequest {
     int32_t cols = 0;
     std::vector<CellValue> values;
     bool atomic = false;
+    std::vector<int64_t> row_ids;
 
     void encode(::synurang::lite::ProtoWriter& w) const;
     std::vector<uint8_t> serialize() const {
@@ -7251,6 +7287,7 @@ struct RowDef {
     ::synurang::lite::Optional<bool> span;
     ::synurang::lite::Optional<PinPosition> pin;
     ::synurang::lite::Optional<StickyEdge> sticky;
+    ::synurang::lite::Optional<int64_t> row_id;
 
     void encode(::synurang::lite::ProtoWriter& w) const;
     std::vector<uint8_t> serialize() const {
@@ -7268,6 +7305,31 @@ struct RowDef {
     static RowDef parse(const uint8_t* data, size_t n) {
         ::synurang::lite::ProtoReader r(data, n);
         RowDef m;
+        m.parse_from(r);
+        return m;
+    }
+};
+
+struct RowIdentity {
+    int32_t index = 0;
+    int64_t row_id = 0;
+
+    void encode(::synurang::lite::ProtoWriter& w) const;
+    std::vector<uint8_t> serialize() const {
+        ::synurang::lite::ProtoWriter w;
+        encode(w);
+        return w.data();
+    }
+    void parse_from(::synurang::lite::ProtoReader& r);
+    static RowIdentity parse(const std::vector<uint8_t>& bytes) {
+        ::synurang::lite::ProtoReader r(bytes);
+        RowIdentity m;
+        m.parse_from(r);
+        return m;
+    }
+    static RowIdentity parse(const uint8_t* data, size_t n) {
+        ::synurang::lite::ProtoReader r(data, n);
+        RowIdentity m;
         m.parse_from(r);
         return m;
     }
@@ -7380,6 +7442,30 @@ struct RowStatusChangeEvent {
     static RowStatusChangeEvent parse(const uint8_t* data, size_t n) {
         ::synurang::lite::ProtoReader r(data, n);
         RowStatusChangeEvent m;
+        m.parse_from(r);
+        return m;
+    }
+};
+
+struct RowsResponse {
+    std::vector<RowIdentity> rows;
+
+    void encode(::synurang::lite::ProtoWriter& w) const;
+    std::vector<uint8_t> serialize() const {
+        ::synurang::lite::ProtoWriter w;
+        encode(w);
+        return w.data();
+    }
+    void parse_from(::synurang::lite::ProtoReader& r);
+    static RowsResponse parse(const std::vector<uint8_t>& bytes) {
+        ::synurang::lite::ProtoReader r(bytes);
+        RowsResponse m;
+        m.parse_from(r);
+        return m;
+    }
+    static RowsResponse parse(const uint8_t* data, size_t n) {
+        ::synurang::lite::ProtoReader r(data, n);
+        RowsResponse m;
         m.parse_from(r);
         return m;
     }
@@ -8112,6 +8198,7 @@ struct SpanConfig {
 struct StartEditEvent {
     int32_t row = 0;
     int32_t col = 0;
+    int64_t row_id = 0;
 
     void encode(::synurang::lite::ProtoWriter& w) const;
     std::vector<uint8_t> serialize() const {
@@ -8965,6 +9052,7 @@ inline void AfterEditEvent::encode(::synurang::lite::ProtoWriter& w) const {
     if (col != 0) w.write_int32(2, col);
     if (!old_text.empty()) w.write_string(3, old_text);
     if (!new_text.empty()) w.write_string(4, new_text);
+    if (row_id != 0) w.write_int64(5, row_id);
 }
 
 inline void AfterEditEvent::parse_from(::synurang::lite::ProtoReader& r) {
@@ -8976,6 +9064,7 @@ inline void AfterEditEvent::parse_from(::synurang::lite::ProtoReader& r) {
             case 2: col = r.read_int32(); break;
             case 3: old_text = r.read_string(); break;
             case 4: new_text = r.read_string(); break;
+            case 5: row_id = r.read_int64(); break;
             default: r.skip(_pb_wire_); break;
         }
     }
@@ -9415,6 +9504,7 @@ inline void BarcodeRenderOptions::parse_from(::synurang::lite::ProtoReader& r) {
 inline void BeforeEditEvent::encode(::synurang::lite::ProtoWriter& w) const {
     if (row != 0) w.write_int32(1, row);
     if (col != 0) w.write_int32(2, col);
+    if (row_id != 0) w.write_int64(3, row_id);
 }
 
 inline void BeforeEditEvent::parse_from(::synurang::lite::ProtoReader& r) {
@@ -9424,6 +9514,7 @@ inline void BeforeEditEvent::parse_from(::synurang::lite::ProtoReader& r) {
         switch (_pb_field_) {
             case 1: row = r.read_int32(); break;
             case 2: col = r.read_int32(); break;
+            case 3: row_id = r.read_int64(); break;
             default: r.skip(_pb_wire_); break;
         }
     }
@@ -9828,6 +9919,7 @@ inline void CellEditValidateEvent::encode(::synurang::lite::ProtoWriter& w) cons
     if (row != 0) w.write_int32(1, row);
     if (col != 0) w.write_int32(2, col);
     if (!edit_text.empty()) w.write_string(3, edit_text);
+    if (row_id != 0) w.write_int64(4, row_id);
 }
 
 inline void CellEditValidateEvent::parse_from(::synurang::lite::ProtoReader& r) {
@@ -9838,6 +9930,7 @@ inline void CellEditValidateEvent::parse_from(::synurang::lite::ProtoReader& r) 
             case 1: row = r.read_int32(); break;
             case 2: col = r.read_int32(); break;
             case 3: edit_text = r.read_string(); break;
+            case 4: row_id = r.read_int64(); break;
             default: r.skip(_pb_wire_); break;
         }
     }
@@ -10926,6 +11019,7 @@ inline void CreateRequest::encode(::synurang::lite::ProtoWriter& w) const {
         config->encode(inner);
         w.write_message_bytes(4, inner.data());
     }
+    if (row_ids_enabled) w.write_bool(5, row_ids_enabled);
 }
 
 inline void CreateRequest::parse_from(::synurang::lite::ProtoReader& r) {
@@ -10943,6 +11037,7 @@ inline void CreateRequest::parse_from(::synurang::lite::ProtoReader& r) {
                 config->parse_from(pr);
                 break;
             }
+            case 5: row_ids_enabled = r.read_bool(); break;
             default: r.skip(_pb_wire_); break;
         }
     }
@@ -11894,6 +11989,7 @@ inline void EditorSession::encode(::synurang::lite::ProtoWriter& w) const {
         item.encode(inner);
         w.write_message_bytes(14, inner.data());
     }
+    if (row_id != 0) w.write_int64(15, row_id);
 }
 
 inline void EditorSession::parse_from(::synurang::lite::ProtoReader& r) {
@@ -11952,6 +12048,7 @@ inline void EditorSession::parse_from(::synurang::lite::ProtoReader& r) {
                 validation_errors.push_back(std::move(elem));
                 break;
             }
+            case 15: row_id = r.read_int64(); break;
             default: r.skip(_pb_wire_); break;
         }
     }
@@ -12929,6 +13026,37 @@ inline void GetNodeRequest::parse_from(::synurang::lite::ProtoReader& r) {
             case 1: grid_id = r.read_int64(); break;
             case 2: row = r.read_int32(); break;
             case 3: relation = static_cast<NodeRelation>(r.read_int32()); break;
+            default: r.skip(_pb_wire_); break;
+        }
+    }
+}
+
+inline void GetRowsRequest::encode(::synurang::lite::ProtoWriter& w) const {
+    if (grid_id != 0) w.write_int64(1, grid_id);
+    if (start_row != 0) w.write_int32(2, start_row);
+    if (row_count != 0) w.write_int32(3, row_count);
+    for (const auto& item : row_ids) {
+        w.write_int64(4, item);
+    }
+}
+
+inline void GetRowsRequest::parse_from(::synurang::lite::ProtoReader& r) {
+    int32_t _pb_field_;
+    ::synurang::lite::WireType _pb_wire_;
+    while (r.read_tag(_pb_field_, _pb_wire_)) {
+        switch (_pb_field_) {
+            case 1: grid_id = r.read_int64(); break;
+            case 2: start_row = r.read_int32(); break;
+            case 3: row_count = r.read_int32(); break;
+            case 4:
+                if (_pb_wire_ == ::synurang::lite::WireType::LengthDelimited && true) {
+                    auto body = r.read_length_delimited();
+                    ::synurang::lite::ProtoReader pr(body.data(), body.size());
+                    while (!pr.eof()) row_ids.push_back(pr.read_int64());
+                } else {
+                    row_ids.push_back(r.read_int64());
+                }
+                break;
             default: r.skip(_pb_wire_); break;
         }
     }
@@ -15903,6 +16031,9 @@ inline void LoadTableRequest::encode(::synurang::lite::ProtoWriter& w) const {
         w.write_message_bytes(4, inner.data());
     }
     if (atomic) w.write_bool(5, atomic);
+    for (const auto& item : row_ids) {
+        w.write_int64(6, item);
+    }
 }
 
 inline void LoadTableRequest::parse_from(::synurang::lite::ProtoReader& r) {
@@ -15922,6 +16053,15 @@ inline void LoadTableRequest::parse_from(::synurang::lite::ProtoReader& r) {
                 break;
             }
             case 5: atomic = r.read_bool(); break;
+            case 6:
+                if (_pb_wire_ == ::synurang::lite::WireType::LengthDelimited && true) {
+                    auto body = r.read_length_delimited();
+                    ::synurang::lite::ProtoReader pr(body.data(), body.size());
+                    while (!pr.eof()) row_ids.push_back(pr.read_int64());
+                } else {
+                    row_ids.push_back(r.read_int64());
+                }
+                break;
             default: r.skip(_pb_wire_); break;
         }
     }
@@ -17259,6 +17399,9 @@ inline void RowDef::encode(::synurang::lite::ProtoWriter& w) const {
     if (sticky.has_value()) {
         w.write_int32(11, static_cast<int32_t>(*sticky));
     }
+    if (row_id.has_value()) {
+        w.write_int64(12, *row_id);
+    }
 }
 
 inline void RowDef::parse_from(::synurang::lite::ProtoReader& r) {
@@ -17283,6 +17426,24 @@ inline void RowDef::parse_from(::synurang::lite::ProtoReader& r) {
             case 9: span = r.read_bool(); break;
             case 10: pin = static_cast<PinPosition>(r.read_int32()); break;
             case 11: sticky = static_cast<StickyEdge>(r.read_int32()); break;
+            case 12: row_id = r.read_int64(); break;
+            default: r.skip(_pb_wire_); break;
+        }
+    }
+}
+
+inline void RowIdentity::encode(::synurang::lite::ProtoWriter& w) const {
+    if (index != 0) w.write_int32(1, index);
+    if (row_id != 0) w.write_int64(2, row_id);
+}
+
+inline void RowIdentity::parse_from(::synurang::lite::ProtoReader& r) {
+    int32_t _pb_field_;
+    ::synurang::lite::WireType _pb_wire_;
+    while (r.read_tag(_pb_field_, _pb_wire_)) {
+        switch (_pb_field_) {
+            case 1: index = r.read_int32(); break;
+            case 2: row_id = r.read_int64(); break;
             default: r.skip(_pb_wire_); break;
         }
     }
@@ -17424,6 +17585,32 @@ inline void RowStatusChangeEvent::parse_from(::synurang::lite::ProtoReader& r) {
                 status = std::make_shared<RowStatus>();
                 ::synurang::lite::ProtoReader pr(body.data(), body.size());
                 status->parse_from(pr);
+                break;
+            }
+            default: r.skip(_pb_wire_); break;
+        }
+    }
+}
+
+inline void RowsResponse::encode(::synurang::lite::ProtoWriter& w) const {
+    for (const auto& item : rows) {
+        ::synurang::lite::ProtoWriter inner;
+        item.encode(inner);
+        w.write_message_bytes(1, inner.data());
+    }
+}
+
+inline void RowsResponse::parse_from(::synurang::lite::ProtoReader& r) {
+    int32_t _pb_field_;
+    ::synurang::lite::WireType _pb_wire_;
+    while (r.read_tag(_pb_field_, _pb_wire_)) {
+        switch (_pb_field_) {
+            case 1: {
+                auto body = r.read_length_delimited();
+                RowIdentity elem;
+                ::synurang::lite::ProtoReader pr(body.data(), body.size());
+                elem.parse_from(pr);
+                rows.push_back(std::move(elem));
                 break;
             }
             default: r.skip(_pb_wire_); break;
@@ -18263,6 +18450,7 @@ inline void SpanConfig::parse_from(::synurang::lite::ProtoReader& r) {
 inline void StartEditEvent::encode(::synurang::lite::ProtoWriter& w) const {
     if (row != 0) w.write_int32(1, row);
     if (col != 0) w.write_int32(2, col);
+    if (row_id != 0) w.write_int64(3, row_id);
 }
 
 inline void StartEditEvent::parse_from(::synurang::lite::ProtoReader& r) {
@@ -18272,6 +18460,7 @@ inline void StartEditEvent::parse_from(::synurang::lite::ProtoReader& r) {
         switch (_pb_field_) {
             case 1: row = r.read_int32(); break;
             case 2: col = r.read_int32(); break;
+            case 3: row_id = r.read_int64(); break;
             default: r.skip(_pb_wire_); break;
         }
     }
@@ -19447,6 +19636,12 @@ public:
         stream->send(request.serialize());
         stream->close_send();
         return SynurangLiteBidiStream<EventStreamRequest, GridEvent>(std::move(stream));
+    }
+
+    RowsResponse GetRows(const GetRowsRequest& request) {
+        auto bytes = request.serialize();
+        auto resp = transport_->invoke("/volvoxgrid.v1.VolvoxGridService/GetRows", bytes);
+        return RowsResponse::parse(resp);
     }
 
 private:

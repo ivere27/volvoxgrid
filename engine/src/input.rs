@@ -399,6 +399,19 @@ pub fn apply_move_row_after_before(grid: &mut VolvoxGrid, row: i32, new_position
         grid.row_positions = (0..grid.rows).collect();
     }
 
+    grid.cancel_edit();
+    let mut remap = std::collections::HashMap::new();
+    remap.insert(row, new_position);
+    if row < new_position {
+        for index in row + 1..=new_position {
+            remap.insert(index, index - 1);
+        }
+    } else {
+        for index in new_position..row {
+            remap.insert(index, index + 1);
+        }
+    }
+    crate::sort::apply_row_remap(grid, &remap);
     let moving = grid.row_positions.remove(row as usize);
     grid.row_positions.insert(new_position as usize, moving);
     grid.cells.set_row_map(grid.row_positions.clone());
@@ -455,7 +468,11 @@ fn begin_edit_from_input(grid: &mut VolvoxGrid, row: i32, col: i32, reason: pb::
 
     let dropdown = grid.active_dropdown(row, col);
     let has_dropdown = dropdown.is_some();
-    grid.events.push(GridEventData::BeforeEdit { row, col });
+    grid.events.push(GridEventData::BeforeEdit {
+        row,
+        col,
+        row_id: grid.get_row_id(row).unwrap_or_default(),
+    });
 
     let stored_text = grid.cells.get_text(row, col).to_string();
     let display_text = grid.get_display_text(row, col);
@@ -469,6 +486,9 @@ fn begin_edit_from_input(grid: &mut VolvoxGrid, row: i32, col: i32, reason: pb::
     };
     grid.edit
         .start_edit(row, col, effective_reason, &display_text);
+    grid.edit.edit_row_id = grid.get_row_id(row).unwrap_or_default();
+    grid.edit.edit_row_identity_token = grid.row_identity_token(row).unwrap_or_default();
+    grid.edit.edit_row_revision = grid.row_ids.revision();
     if grid.is_tui_mode() && !matches!(reason, pb::EditStartReason::EditStartF2) {
         grid.edit.select_all();
     }
@@ -499,7 +519,11 @@ fn begin_edit_from_input(grid: &mut VolvoxGrid, row: i32, col: i32, reason: pb::
         }
         grid.events.push(GridEventData::DropdownOpened);
     }
-    grid.events.push(GridEventData::StartEdit { row, col });
+    grid.events.push(GridEventData::StartEdit {
+        row,
+        col,
+        row_id: grid.edit.edit_row_id,
+    });
     grid.mark_dirty();
 }
 
@@ -2597,6 +2621,7 @@ pub fn apply_checkbox_toggle_after_before_edit(grid: &mut VolvoxGrid, row: i32, 
 
     grid.events.push(GridEventData::AfterEdit {
         row,
+        row_id: grid.get_row_id(row).unwrap_or_default(),
         col,
         old_text: old_text.clone(),
         new_text: next_text.clone(),
@@ -2616,7 +2641,11 @@ fn toggle_checkbox_cell(grid: &mut VolvoxGrid, row: i32, col: i32) -> bool {
         return false;
     }
 
-    grid.events.push(GridEventData::BeforeEdit { row, col });
+    grid.events.push(GridEventData::BeforeEdit {
+        row,
+        col,
+        row_id: grid.get_row_id(row).unwrap_or_default(),
+    });
     apply_checkbox_toggle_after_before_edit(grid, row, col)
 }
 
@@ -4350,10 +4379,12 @@ pub fn handle_key_down_with_behavior(
                 // Escape: cancel edit.
                 let row = grid.edit.edit_row;
                 let col = grid.edit.edit_col;
+                let row_id = grid.edit.edit_row_id;
                 let original_text = grid.edit.original_text.clone();
                 if grid.cancel_edit() {
                     grid.events.push(GridEventData::AfterEdit {
                         row,
+                        row_id,
                         col,
                         old_text: original_text.clone(),
                         new_text: original_text,
@@ -6593,7 +6624,7 @@ mod tests {
         let events = grid.events.drain();
         assert!(events
             .iter()
-            .any(|e| matches!(e.data, GridEventData::BeforeEdit { row: 1, col: 0 })));
+            .any(|e| matches!(e.data, GridEventData::BeforeEdit { row: 1, col: 0, .. })));
         assert!(events.iter().any(|e| matches!(
             &e.data,
             GridEventData::AfterEdit {
@@ -6601,6 +6632,7 @@ mod tests {
                 col: 0,
                 old_text,
                 new_text,
+                ..
             } if old_text.as_str() == "No" && new_text.as_str() == "Yes"
         )));
         assert!(events.iter().any(|e| matches!(
@@ -6921,7 +6953,7 @@ mod tests {
             .any(|evt| matches!(evt.data, GridEventData::DropdownOpened)));
         assert!(events
             .iter()
-            .any(|evt| matches!(evt.data, GridEventData::StartEdit { row: 1, col: 0 })));
+            .any(|evt| matches!(evt.data, GridEventData::StartEdit { row: 1, col: 0, .. })));
     }
 
     #[test]
@@ -6946,7 +6978,7 @@ mod tests {
             .any(|evt| matches!(evt.data, GridEventData::DropdownOpened)));
         assert!(events
             .iter()
-            .any(|evt| matches!(evt.data, GridEventData::StartEdit { row: 1, col: 0 })));
+            .any(|evt| matches!(evt.data, GridEventData::StartEdit { row: 1, col: 0, .. })));
     }
 
     #[test]

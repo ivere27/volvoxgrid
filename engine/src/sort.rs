@@ -338,12 +338,10 @@ fn sort_range_impl(
     // Sort each group independently and build the combined remap.
     // Also update row_positions to track the source row for each
     // display position (needed for lazy re-materialisation).
+    grid.cancel_edit();
     let old_positions = grid.row_positions.clone();
-    let mut row_remap = if has_row_metadata_in_range(grid, row_lo, row_hi) {
-        Some(HashMap::new())
-    } else {
-        None
-    };
+    let mut row_remap = has_row_metadata_in_range(grid, row_lo, row_hi)
+        .then(HashMap::new);
     for group in &groups {
         if group.len() < 2 {
             continue;
@@ -383,11 +381,12 @@ fn sort_range_impl(
             });
         }
 
+        grid.row_ids.reorder_rows(group, &indices);
         for (dest_idx, &src_idx) in indices.iter().enumerate() {
             let dest_row = group[dest_idx];
             let src_row = group[src_idx];
-            if let Some(remap) = row_remap.as_mut() {
-                if src_row != dest_row {
+            if src_row != dest_row {
+                if let Some(remap) = row_remap.as_mut() {
                     remap.insert(src_row, dest_row);
                 }
             }
@@ -396,7 +395,7 @@ fn sort_range_impl(
     }
 
     if let Some(remap) = row_remap.as_ref() {
-        apply_row_remap(grid, remap);
+        apply_row_metadata_remap(grid, remap);
     }
 
     // Install the row indirection so CellStore translates display rows
@@ -470,11 +469,6 @@ fn apply_sort_direction(cmp: std::cmp::Ordering, order: i32) -> std::cmp::Orderi
     }
 }
 
-#[inline]
-fn compare_f64(a: f64, b: f64) -> std::cmp::Ordering {
-    a.partial_cmp(&b).unwrap_or(std::cmp::Ordering::Equal)
-}
-
 fn auto_compare_for_data_type(a: &str, b: &str, data_type: i32) -> std::cmp::Ordering {
     if data_type == pb::ColumnDataType::ColumnDataDate as i32 {
         date_compare(a, b)
@@ -518,13 +512,15 @@ fn sort_auto_single_key_texts(
     } else {
         // Generic path: if both values parse as numbers compare numerically,
         // otherwise compare case-insensitive text.
-        let parsed: Vec<Option<f64>> = texts.iter().map(|s| parse_number(s)).collect();
+        let parsed: Vec<Option<ExactNumber>> =
+            texts.iter().map(|s| ExactNumber::parse(s)).collect();
         let all_numeric = parsed.iter().all(|v| v.is_some());
 
         if all_numeric {
-            let keys: Vec<f64> = parsed.into_iter().map(|v| v.unwrap_or(0.0)).collect();
+            let keys: Vec<ExactNumber> =
+                parsed.into_iter().map(Option::unwrap_or_default).collect();
             sort_indices!(indices, |&ia, &ib| {
-                apply_sort_direction(compare_f64(keys[ia], keys[ib]), order)
+                apply_sort_direction(keys[ia].compare(&keys[ib]), order)
             });
         } else {
             let lower: Vec<Box<str>> = texts
@@ -532,8 +528,8 @@ fn sort_auto_single_key_texts(
                 .map(|s| s.to_lowercase().into_boxed_str())
                 .collect();
             sort_indices!(indices, |&ia, &ib| {
-                let cmp = match (parsed[ia], parsed[ib]) {
-                    (Some(a), Some(b)) => compare_f64(a, b),
+                let cmp = match (&parsed[ia], &parsed[ib]) {
+                    (Some(a), Some(b)) => a.compare(b),
                     (Some(_), None) => std::cmp::Ordering::Less,
                     (None, Some(_)) => std::cmp::Ordering::Greater,
                     (None, None) => lower[ia].cmp(&lower[ib]),
@@ -555,13 +551,13 @@ fn sort_single_key_indices(
     match order {
         // Numeric
         o if o == SORT_ASCENDING_NUMERIC || o == SORT_DESCENDING_NUMERIC => {
-            let keys: Vec<f64> = group
+            let keys: Vec<ExactNumber> = group
                 .iter()
-                .map(|&row| parse_number(grid.cells.get_text(row, col)).unwrap_or(0.0))
+                .map(|&row| ExactNumber::parse(grid.cells.get_text(row, col)).unwrap_or_default())
                 .collect();
 
             sort_indices!(indices, |&ia, &ib| {
-                apply_sort_direction(compare_f64(keys[ia], keys[ib]), order)
+                apply_sort_direction(keys[ia].compare(&keys[ib]), order)
             });
         }
         // String no-case
@@ -725,8 +721,8 @@ fn sort_multi_key_indices_with_custom(
 
 fn generic_compare(a: &str, b: &str) -> std::cmp::Ordering {
     // Try numeric first, fall back to string
-    match (parse_number(a), parse_number(b)) {
-        (Some(na), Some(nb)) => na.partial_cmp(&nb).unwrap_or(std::cmp::Ordering::Equal),
+    match (ExactNumber::parse(a), ExactNumber::parse(b)) {
+        (Some(na), Some(nb)) => na.compare(&nb),
         (Some(_), None) => std::cmp::Ordering::Less,
         (None, Some(_)) => std::cmp::Ordering::Greater,
         (None, None) => a.to_lowercase().cmp(&b.to_lowercase()),
@@ -766,9 +762,109 @@ fn parse_number(s: &str) -> Option<f64> {
 }
 
 fn numeric_compare(a: &str, b: &str) -> std::cmp::Ordering {
-    let na = parse_number(a).unwrap_or(0.0);
-    let nb = parse_number(b).unwrap_or(0.0);
-    na.partial_cmp(&nb).unwrap_or(std::cmp::Ordering::Equal)
+    let na = ExactNumber::parse(a).unwrap_or_default();
+    let nb = ExactNumber::parse(b).unwrap_or_default();
+    na.compare(&nb)
+}
+
+/// Decimal sort keys retain every input digit. Cell values stay as text; large
+/// IDs, money and arbitrary decimal fractions never pass through binary floats.
+/// The exponent is bounded by i64, while comparisons use i128 to avoid overflow.
+#[derive(Default)]
+struct ExactNumber {
+    negative: bool,
+    digits: Vec<u8>,
+    exponent: i64,
+}
+
+impl ExactNumber {
+    fn parse(text: &str) -> Option<Self> {
+        let mut text = text.trim();
+        let parentheses = text.starts_with('(') && text.ends_with(')') && text.len() > 2;
+        if parentheses {
+            text = &text[1..text.len() - 1];
+        }
+        // Preserve legacy support for grouping, dollar and percent decoration.
+        let cleaned;
+        if text.bytes().any(|b| matches!(b, b',' | b'$' | b' ' | b'%')) {
+            cleaned = text
+                .chars()
+                .filter(|c| !matches!(c, ',' | '$' | ' ' | '%'))
+                .collect::<String>();
+            text = &cleaned;
+        }
+        let mut negative = parentheses;
+        if let Some(rest) = text.strip_prefix('-') {
+            negative = !negative;
+            text = rest;
+        } else if let Some(rest) = text.strip_prefix('+') {
+            text = rest;
+        }
+        let (mantissa, exponent) = match text.find(['e', 'E']) {
+            Some(index) => (&text[..index], text[index + 1..].parse::<i64>().ok()?),
+            None => (text, 0),
+        };
+        let mut digits = Vec::with_capacity(mantissa.len());
+        let mut fraction_digits = 0i64;
+        let mut seen_dot = false;
+        for byte in mantissa.bytes() {
+            match byte {
+                b'0'..=b'9' => {
+                    digits.push(byte - b'0');
+                    if seen_dot {
+                        fraction_digits = fraction_digits.checked_add(1)?;
+                    }
+                }
+                b'.' if !seen_dot => seen_dot = true,
+                _ => return None,
+            }
+        }
+        if digits.is_empty() {
+            return None;
+        }
+        let Some(first) = digits.iter().position(|&digit| digit != 0) else {
+            return Some(Self::default());
+        };
+        digits.drain(..first);
+        let mut exponent = exponent.checked_sub(fraction_digits)?;
+        while digits.last() == Some(&0) {
+            digits.pop();
+            exponent = exponent.checked_add(1)?;
+        }
+        Some(Self {
+            negative,
+            digits,
+            exponent,
+        })
+    }
+
+    fn compare(&self, other: &Self) -> std::cmp::Ordering {
+        use std::cmp::Ordering;
+        if self.negative != other.negative {
+            return if self.negative {
+                Ordering::Less
+            } else {
+                Ordering::Greater
+            };
+        }
+        let magnitude = if self.digits.is_empty() || other.digits.is_empty() {
+            self.digits.len().cmp(&other.digits.len())
+        } else {
+            let places = self.digits.len() as i128 + self.exponent as i128;
+            let other_places = other.digits.len() as i128 + other.exponent as i128;
+            places.cmp(&other_places).then_with(|| {
+                let len = self.digits.len().max(other.digits.len());
+                (0..len)
+                    .map(|i| *self.digits.get(i).unwrap_or(&0))
+                    .cmp((0..len).map(|i| *other.digits.get(i).unwrap_or(&0)))
+            })
+        };
+        if self.negative {
+            magnitude.reverse()
+        } else {
+            magnitude
+        }
+    }
 }
 
 fn parse_date_key(s: &str) -> Option<i64> {
@@ -833,21 +929,25 @@ fn remap_row_index(row: i32, row_remap: &HashMap<i32, i32>) -> i32 {
 
 fn has_row_metadata_in_range(grid: &VolvoxGrid, row_lo: i32, row_hi: i32) -> bool {
     let in_range = |row: i32| row >= row_lo && row <= row_hi;
-
     grid.row_heights.keys().any(|&row| in_range(row))
         || grid.rows_hidden.iter().any(|&row| in_range(row))
         || grid.row_props.keys().any(|&row| in_range(row))
-        || grid
-            .span
-            .span_rows
-            .keys()
-            .any(|&row| row != -1 && in_range(row))
+        || grid.span.span_rows.keys().any(|&row| row != -1 && in_range(row))
         || grid.sticky_rows.keys().any(|&row| in_range(row))
         || grid.pinned_rows_top.iter().any(|&row| in_range(row))
         || grid.pinned_rows_bottom.iter().any(|&row| in_range(row))
 }
 
-fn apply_row_remap(grid: &mut VolvoxGrid, row_remap: &HashMap<i32, i32>) {
+pub(crate) fn apply_row_remap(grid: &mut VolvoxGrid, row_remap: &HashMap<i32, i32>) {
+    if row_remap.is_empty() {
+        return;
+    }
+
+    grid.row_ids.remap(row_remap);
+    apply_row_metadata_remap(grid, row_remap);
+}
+
+fn apply_row_metadata_remap(grid: &mut VolvoxGrid, row_remap: &HashMap<i32, i32>) {
     if row_remap.is_empty() {
         return;
     }

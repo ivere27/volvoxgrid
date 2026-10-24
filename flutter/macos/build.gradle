@@ -1,73 +1,62 @@
+apply from: new File(projectDir, "../native/config.gradle")
+
 repositories {
-    mavenLocal()
-    mavenCentral()
+    def repository = System.getenv("VOLVOXGRID_MAVEN_REPOSITORY")
+    if (repository) maven { url = uri(repository) }
+    else mavenCentral()
 }
-
-configurations {
-    volvoxgrid
-}
-
-def findVolvoxgridVersionFile = { File startDir ->
-    File current = startDir.canonicalFile
-    while (current != null) {
-        File candidate = new File(current, "VERSION")
-        if (candidate.isFile()) {
-            return candidate
-        }
-        current = current.parentFile
-    }
-    return null
-}
-def versionFile = findVolvoxgridVersionFile(projectDir)
-if (versionFile == null) {
-    throw new GradleException("VERSION file not found from ${projectDir}")
-}
-def defaultVolvoxgridVersion = versionFile.getText("UTF-8").trim()
-if (defaultVolvoxgridVersion.isEmpty()) {
-    throw new GradleException("VERSION file is empty: ${versionFile}")
-}
-
+configurations { volvoxgrid }
 def vGroup = System.getenv("VOLVOXGRID_GROUP") ?: "io.github.ivere27"
 def vVariant = System.getenv("VOLVOXGRID_VARIANT") ?: ""
-def defaultArtifact = vVariant == "lite" ? "volvoxgrid-desktop-lite" : "volvoxgrid-desktop"
-def vArtifact = System.getenv("VOLVOXGRID_ARTIFACT") ?: defaultArtifact
-def vVersion = System.getenv("VOLVOXGRID_VERSION") ?: project.findProperty("volvoxgridVersion") ?: defaultVolvoxgridVersion
-def isSnapshot = vVersion.endsWith("-SNAPSHOT")
+def vArtifact = System.getenv("VOLVOXGRID_ARTIFACT") ?: (vVariant == "lite" ? "volvoxgrid-desktop-lite" : "volvoxgrid-desktop")
+def vVersion = volvoxgridNativeVersion
 def hostArch = (System.getProperty("os.arch") ?: "").toLowerCase(Locale.ROOT)
-def macosArchDir = null
-if (hostArch.contains("x86_64") || hostArch.contains("amd64")) {
-    macosArchDir = "macos-x86_64"
-} else if (hostArch.contains("aarch64") || hostArch.contains("arm64")) {
-    macosArchDir = "macos-aarch64"
+def nativeArch = ["x86_64": "macos-x86_64", "amd64": "macos-x86_64", "aarch64": "macos-aarch64", "arm64": "macos-aarch64"][hostArch]
+if (nativeArch == null) {
+    throw new GradleException("VolvoxGrid: Unsupported macos architecture: ${hostArch}")
 }
-if (macosArchDir == null) {
-    throw new GradleException("Unsupported macOS architecture for VolvoxGrid native extraction: ${hostArch}")
-}
-
-configurations.configureEach {
-    if (isSnapshot) {
-        resolutionStrategy.cacheChangingModulesFor(0, "seconds")
-    }
+def nativeName = "libvolvoxgrid.dylib"
+def outputDir = project.findProperty("volvoxgridOutputDir") ?: "x64"
+if (volvoxgridNativeSource == "maven") {
+    dependencies { volvoxgrid("${vGroup}:${vArtifact}:${vVersion}") { changing = vVersion.endsWith("-SNAPSHOT") } }
 }
 
-dependencies {
-    volvoxgrid("${vGroup}:${vArtifact}:${vVersion}") {
-        changing = isSnapshot
+tasks.register("copyNative") {
+    doLast {
+        File destination = project.file("${outputDir}/${nativeName}")
+        // A direct Gradle copy invalidates any Apple resolver source stamp.
+        project.delete(new File(destination.toString() + ".source"))
+        if (volvoxgridNativeSource == "maven") {
+            // Remove stale output before resolving a different version/arch.
+            project.delete(destination)
+            try {
+                project.copy {
+                    duplicatesStrategy = DuplicatesStrategy.FAIL
+                    from configurations.volvoxgrid.collect { zipTree(it) }
+                    include "native/${nativeArch}/${nativeName}"
+                    eachFile { it.path = it.name }
+                    includeEmptyDirs = false
+                    into outputDir
+                }
+            } catch (Exception error) {
+                throw new GradleException("VolvoxGrid: Cannot obtain ${vGroup}:${vArtifact}:${vVersion}. Check Maven access and VOLVOXGRID_VERSION; for offline builds set VOLVOXGRID_SOURCE=local and VOLVOXGRID_LIBRARY. Cause: ${error.message}", error)
+            }
+        } else {
+            def explicit = System.getenv("VOLVOXGRID_LIBRARY")
+            if (vVariant == "lite" && !explicit) throw new GradleException("VolvoxGrid: Local lite builds require VOLVOXGRID_LIBRARY pointing to the lite native binary.")
+            def candidates = explicit ? [new File(explicit)] : [new File(projectDir, "x64/${nativeName}")]
+            if (!explicit && volvoxgridRepositoryRoot != null) {
+                candidates.add(new File(volvoxgridRepositoryRoot, "target/release/${nativeName}"))
+                candidates.add(new File(volvoxgridRepositoryRoot, "target/debug/${nativeName}"))
+            }
+            def localLibrary = candidates.find { it.isFile() }
+            if (localLibrary == null) throw new GradleException("VolvoxGrid: No local ${nativeName}. Build the engine or set VOLVOXGRID_LIBRARY; use VOLVOXGRID_SOURCE=maven for published binaries.")
+            if (localLibrary.canonicalFile != destination.canonicalFile) {
+                project.copy { from localLibrary; into outputDir }
+            }
+        }
+        if (!destination.isFile()) {
+            throw new GradleException("VolvoxGrid: ${vGroup}:${vArtifact}:${vVersion} contains no native/${nativeArch}/${nativeName}. Check version, architecture, and Maven availability.")
+        }
     }
-}
-
-task copyNative(type: Copy) {
-    duplicatesStrategy = DuplicatesStrategy.FAIL
-    doFirst {
-        def files = configurations.volvoxgrid.resolve().collect { it.absolutePath }
-        logger.lifecycle("VolvoxGrid copyNative: ${vGroup}:${vArtifact}:${vVersion} variant=${vVariant ?: 'full'} arch=${macosArchDir}")
-        files.each { logger.lifecycle("VolvoxGrid copyNative source: ${it}") }
-    }
-    from configurations.volvoxgrid.collect { zipTree(it) }
-    include "native/${macosArchDir}/*.dylib"
-    eachFile { fcd ->
-        fcd.path = fcd.name
-    }
-    includeEmptyDirs = false
-    into "x64"
 }

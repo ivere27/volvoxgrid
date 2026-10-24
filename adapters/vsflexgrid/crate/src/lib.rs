@@ -200,7 +200,7 @@ const DECISION_TIMEOUT: Duration = Duration::from_millis(250);
 #[derive(Clone, Debug)]
 enum PendingAction {
     BeginEdit {
-        row: i32,
+        target: volvoxgrid_engine::grid::RowTarget,
         col: i32,
         force: bool,
         seed_text: Option<String>,
@@ -208,7 +208,7 @@ enum PendingAction {
         caret_end: Option<bool>,
     },
     ToggleCheckbox {
-        row: i32,
+        target: volvoxgrid_engine::grid::RowTarget,
         col: i32,
     },
     BeforeSort {
@@ -358,7 +358,9 @@ fn editor_session_command_is_current(
         return false;
     }
     let current_session_id = grid.edit.session_serial as i64;
-    session.session_id == current_session_id && session.state_version == grid.edit.state_version
+    session.session_id == current_session_id
+        && session.state_version == grid.edit.state_version
+        && grid.is_edit_target_current()
 }
 
 fn editor_spec_from_list(list: ListEditorParams) -> EditorSpec {
@@ -427,7 +429,11 @@ fn apply_array_data_to_grid(
     let cols = cols.max(1);
     grid.set_rows(rows);
     grid.set_cols(cols);
+    grid.reset_row_ids();
     grid.cells.clear_all();
+    grid.row_positions = (0..grid.rows).collect();
+    grid.col_positions = (0..grid.cols).collect();
+    grid.sort_state.clear();
     let max = (rows as usize).saturating_mul(cols as usize);
     for (idx, value) in values.iter().take(max).enumerate() {
         let idx = idx as i32;
@@ -452,6 +458,7 @@ fn demo_scale_px(scale: f32, px: i32) -> i32 {
 fn reset_local_demo_grid(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) {
     grid.cells.clear_all();
     grid.rows = 0;
+    grid.reset_row_ids();
     grid.cols = 0;
     grid.row_positions.clear();
     grid.col_positions.clear();
@@ -1889,7 +1896,11 @@ fn begin_edit_session_core(
     let has_dropdown = dropdown.is_some();
     if emit_before_event {
         grid.events
-            .push(volvoxgrid_engine::event::GridEventData::BeforeEdit { row, col });
+            .push(volvoxgrid_engine::event::GridEventData::BeforeEdit {
+                row,
+                col,
+                row_id: grid.get_row_id(row).unwrap_or_default(),
+            });
     }
     let stored_text = grid.cells.get_text(row, col).to_string();
     let display_text = grid.get_display_text(row, col);
@@ -1901,6 +1912,9 @@ fn begin_edit_session_core(
         EditStartReason::EditStartUnspecified
     };
     grid.edit.start_edit(row, col, reason, &display_text);
+    grid.edit.edit_row_id = grid.get_row_id(row).unwrap_or_default();
+    grid.edit.edit_row_identity_token = grid.row_identity_token(row).unwrap_or_default();
+    grid.edit.edit_row_revision = grid.row_ids.revision();
     if let Some(dropdown) = dropdown.as_ref() {
         grid.edit.parse_dropdown(dropdown);
     } else {
@@ -1945,7 +1959,11 @@ fn begin_edit_session_core(
         }
     }
     grid.events
-        .push(volvoxgrid_engine::event::GridEventData::StartEdit { row, col });
+        .push(volvoxgrid_engine::event::GridEventData::StartEdit {
+            row,
+            col,
+            row_id: grid.edit.edit_row_id,
+        });
     grid.mark_dirty();
 }
 
@@ -2010,9 +2028,14 @@ fn apply_committed_edit_text(
     grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
     row: i32,
     col: i32,
+    target: volvoxgrid_engine::grid::RowTarget,
     old_text: String,
     committed: String,
 ) {
+    if grid.resolve_row_target(&target) != Some(row) || grid.is_cell_read_only(row, col) {
+        grid.cancel_edit();
+        return;
+    }
     grid.cells.set_text(row, col, committed.clone());
     if old_text != committed {
         grid.events
@@ -2027,6 +2050,7 @@ fn apply_committed_edit_text(
         .push(volvoxgrid_engine::event::GridEventData::AfterEdit {
             row,
             col,
+            row_id: target.row_id,
             old_text,
             new_text: committed,
         });
@@ -2089,7 +2113,9 @@ fn request_before_edit(
         PendingActionEntry {
             created_at: Instant::now(),
             action: PendingAction::BeginEdit {
-                row,
+                target: grid
+                    .capture_row_target(row)
+                    .expect("pending action has a live row"),
                 col,
                 force,
                 seed_text,
@@ -2100,7 +2126,11 @@ fn request_before_edit(
     );
     grid.events.push_with_id(
         event_id,
-        volvoxgrid_engine::event::GridEventData::BeforeEdit { row, col },
+        volvoxgrid_engine::event::GridEventData::BeforeEdit {
+            row,
+            col,
+            row_id: grid.get_row_id(row).unwrap_or_default(),
+        },
     );
 }
 
@@ -2116,7 +2146,11 @@ fn request_before_checkbox_toggle(
 
     if !decision_channel_enabled(grid_id) {
         grid.events
-            .push(volvoxgrid_engine::event::GridEventData::BeforeEdit { row, col });
+            .push(volvoxgrid_engine::event::GridEventData::BeforeEdit {
+                row,
+                col,
+                row_id: grid.get_row_id(row).unwrap_or_default(),
+            });
         input::apply_checkbox_toggle_after_before_edit(grid, row, col);
         return true;
     }
@@ -2126,12 +2160,21 @@ fn request_before_checkbox_toggle(
         (grid_id, event_id),
         PendingActionEntry {
             created_at: Instant::now(),
-            action: PendingAction::ToggleCheckbox { row, col },
+            action: PendingAction::ToggleCheckbox {
+                target: grid
+                    .capture_row_target(row)
+                    .expect("pending action has a live row"),
+                col,
+            },
         },
     );
     grid.events.push_with_id(
         event_id,
-        volvoxgrid_engine::event::GridEventData::BeforeEdit { row, col },
+        volvoxgrid_engine::event::GridEventData::BeforeEdit {
+            row,
+            col,
+            row_id: grid.get_row_id(row).unwrap_or_default(),
+        },
     );
     true
 }
@@ -2365,7 +2408,7 @@ fn request_before_scroll(
 fn apply_pending_action(grid_id: i64, action: PendingAction, cancel: bool) {
     let _ = GRID_MANAGER.with_grid(grid_id, |grid| match action {
         PendingAction::BeginEdit {
-            row,
+            target,
             col,
             force,
             seed_text,
@@ -2375,6 +2418,9 @@ fn apply_pending_action(grid_id: i64, action: PendingAction, cancel: bool) {
             if cancel {
                 return;
             }
+            let Some(row) = grid.resolve_row_target(&target) else {
+                return;
+            };
             begin_edit_session_after_before(
                 grid,
                 row,
@@ -2385,10 +2431,13 @@ fn apply_pending_action(grid_id: i64, action: PendingAction, cancel: bool) {
                 caret_end,
             );
         }
-        PendingAction::ToggleCheckbox { row, col } => {
+        PendingAction::ToggleCheckbox { target, col } => {
             if cancel {
                 return;
             }
+            let Some(row) = grid.resolve_row_target(&target) else {
+                return;
+            };
             input::apply_checkbox_toggle_after_before_edit(grid, row, col);
         }
         PendingAction::BeforeSort { col } => {
@@ -3403,9 +3452,15 @@ impl VolvoxGridServiceRuntime for ActiveXRuntime {
     }
     fn finish_editing(&self, r: GridHandle) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.id, |g| {
+            let target = volvoxgrid_engine::grid::RowTarget {
+                row: g.edit.edit_row,
+                row_id: g.edit.edit_row_id,
+                identity_token: g.edit.edit_row_identity_token,
+                revision: g.edit.edit_row_revision,
+            };
             if let Some((row, col, old_text, new_text)) = g.edit.commit() {
                 let committed = normalize_committed_edit_text(g, row, col, &new_text);
-                apply_committed_edit_text(g, row, col, old_text, committed);
+                apply_committed_edit_text(g, row, col, target, old_text, committed);
             }
         })?;
         Ok(Empty {})
@@ -3492,9 +3547,15 @@ impl VolvoxGridServiceRuntime for ActiveXRuntime {
                 }
             } else {
                 g.edit.update_text(r.text.clone());
+                let target = volvoxgrid_engine::grid::RowTarget {
+                    row: g.edit.edit_row,
+                    row_id: g.edit.edit_row_id,
+                    identity_token: g.edit.edit_row_identity_token,
+                    revision: g.edit.edit_row_revision,
+                };
                 if let Some((row, col, old_text, new_text)) = g.edit.commit() {
                     let committed = normalize_committed_edit_text(g, row, col, &new_text);
-                    apply_committed_edit_text(g, row, col, old_text, committed);
+                    apply_committed_edit_text(g, row, col, target, old_text, committed);
                 }
             }
         })?;
@@ -4677,7 +4738,7 @@ impl VolvoxGridServiceRuntime for ActiveXRuntime {
             1.0
         };
 
-        let id = self.manager().create_grid(
+        let id = self.manager().create_grid_with_row_ids(
             request.viewport_width,
             request.viewport_height,
             rows,
@@ -4685,6 +4746,7 @@ impl VolvoxGridServiceRuntime for ActiveXRuntime {
             fixed_rows,
             fixed_cols,
             scale,
+            request.row_ids_enabled,
         );
 
         // Preserve ActiveX-friendly defaults.
@@ -4776,9 +4838,15 @@ impl VolvoxGridServiceRuntime for ActiveXRuntime {
 
     fn define_rows(&self, request: DefineRowsRequest) -> Result<DefineRowsResponse, String> {
         self.manager().with_grid(request.grid_id, |grid| {
+            let assignments: Vec<_> = request
+                .rows
+                .iter()
+                .filter_map(|row| row.row_id.map(|id| (row.index, id)))
+                .collect();
+            grid.set_row_ids(&assignments)?;
             grid.define_rows(&request.rows);
-        })?;
-        Ok(DefineRowsResponse {})
+            Ok(DefineRowsResponse {})
+        })?
     }
 
     fn insert_rows(&self, request: InsertRowsRequest) -> Result<InsertRowsResponse, String> {
@@ -4871,8 +4939,62 @@ impl VolvoxGridServiceRuntime for ActiveXRuntime {
 
     fn load_table(&self, request: LoadTableRequest) -> Result<WriteResult, String> {
         self.manager().with_grid(request.grid_id, |grid| {
-            grid.load_table(request.rows, request.cols, &request.values, request.atomic)
-        })
+            grid.load_table_with_row_ids(
+                request.rows,
+                request.cols,
+                &request.values,
+                request.atomic,
+                &request.row_ids,
+            )
+        })?
+    }
+
+    fn get_rows(&self, request: GetRowsRequest) -> Result<RowsResponse, String> {
+        self.manager().with_grid(request.grid_id, |grid| {
+            if !grid.row_ids_enabled() {
+                return Err(
+                    "row IDs are disabled; create the grid with row_ids_enabled=true".into(),
+                );
+            }
+            if !request.row_ids.is_empty() {
+                if request.start_row != 0 || request.row_count != 0 {
+                    return Err("GetRows: row_ids cannot be combined with a row range".into());
+                }
+                let mut seen = std::collections::HashSet::new();
+                for id in &request.row_ids {
+                    if *id <= 0 || !seen.insert(id) {
+                        return Err("GetRows: row_ids must be positive and unique".into());
+                    }
+                }
+                return Ok(RowsResponse {
+                    rows: request
+                        .row_ids
+                        .iter()
+                        .filter_map(|id| {
+                            grid.find_row_by_id(*id)
+                                .map(|index| RowIdentity { index, row_id: *id })
+                        })
+                        .collect(),
+                });
+            }
+            let start = request.start_row;
+            let count = request.row_count;
+            if start < 0 || start > grid.rows || count < 0 || count > grid.rows - start {
+                return Err(format!(
+                    "GetRows: invalid range start_row={start}, row_count={count} for {} rows",
+                    grid.rows
+                ));
+            }
+            let end = if count == 0 { grid.rows } else { start + count };
+            Ok(RowsResponse {
+                rows: (start..end)
+                    .map(|index| RowIdentity {
+                        index,
+                        row_id: grid.get_row_id(index).expect("every live row has an ID"),
+                    })
+                    .collect(),
+            })
+        })?
     }
 
     fn clear(&self, request: ClearRequest) -> Result<ClearResponse, String> {
@@ -4979,6 +5101,12 @@ impl VolvoxGridServiceRuntime for ActiveXRuntime {
                                     grid.edit.flush_preedit();
                                     let row = grid.edit.edit_row;
                                     let col = grid.edit.edit_col;
+                                    let target = volvoxgrid_engine::grid::RowTarget {
+                                        row: grid.edit.edit_row,
+                                        row_id: grid.edit.edit_row_id,
+                                        identity_token: grid.edit.edit_row_identity_token,
+                                        revision: grid.edit.edit_row_revision,
+                                    };
                                     let old_text = grid.cells.get_text(row, col).to_string();
                                     let new_text = commit
                                         .value
@@ -4992,10 +5120,13 @@ impl VolvoxGridServiceRuntime for ActiveXRuntime {
                                         volvoxgrid_engine::event::GridEventData::CellEditValidate {
                                             row,
                                             col,
+                                            row_id: target.row_id,
                                             edit_text: committed.clone(),
                                         },
                                     );
-                                    apply_committed_edit_text(grid, row, col, old_text, committed);
+                                    apply_committed_edit_text(
+                                        grid, row, col, target, old_text, committed,
+                                    );
                                 }
                             }
                             Some(editor_session_command::Command::Cancel(_)) => {
@@ -5089,6 +5220,7 @@ impl VolvoxGridServiceRuntime for ActiveXRuntime {
                     session: Some(EditorSession {
                         session_id: grid.edit.session_serial as i64,
                         row: grid.edit.edit_row,
+                        row_id: grid.edit.edit_row_id,
                         col: grid.edit.edit_col,
                         viewport_rect: Some(Rect::default()),
                         editor: Some(EditorSpec {
@@ -5690,30 +5822,40 @@ fn engine_event_to_proto(
             col,
             target: Some(target.to_proto()),
         })),
-        E::BeforeEdit { row, col } => {
-            Some(grid_event::Event::BeforeEdit(BeforeEditEvent { row, col }))
+        E::BeforeEdit { row, col, row_id } => {
+            Some(grid_event::Event::BeforeEdit(BeforeEditEvent {
+                row,
+                col,
+                row_id,
+            }))
         }
-        E::StartEdit { row, col } => {
-            Some(grid_event::Event::StartEdit(StartEditEvent { row, col }))
-        }
+        E::StartEdit { row, col, row_id } => Some(grid_event::Event::StartEdit(StartEditEvent {
+            row,
+            col,
+            row_id,
+        })),
         E::AfterEdit {
             row,
             col,
+            row_id,
             old_text,
             new_text,
         } => Some(grid_event::Event::AfterEdit(AfterEditEvent {
             row,
             col,
+            row_id,
             old_text,
             new_text,
         })),
         E::CellEditValidate {
             row,
             col,
+            row_id,
             edit_text,
         } => Some(grid_event::Event::CellEditValidate(CellEditValidateEvent {
             row,
             col,
+            row_id,
             edit_text,
         })),
         E::CellEditChange { text } => {
@@ -6224,7 +6366,6 @@ pub extern "C" fn volvox_grid_set_rows(grid_id: i64, rows: i32, out_len: *mut i3
                 g.sticky_cells.retain(|&(row, _), _| row < rows);
             }
             g.set_rows(rows);
-            g.row_positions = (0..g.rows).collect();
             g.row_props.clear();
             g.rows_hidden.clear();
             g.layout.invalidate();
@@ -6696,8 +6837,22 @@ pub extern "C" fn volvox_grid_set_row_position(
             {
                 return;
             }
+            g.cancel_edit();
+            let mut remap = HashMap::new();
+            remap.insert(source_pos, position);
+            if source_pos < position {
+                for row in source_pos + 1..=position {
+                    remap.insert(row, row - 1);
+                }
+            } else {
+                for row in position..source_pos {
+                    remap.insert(row, row + 1);
+                }
+            }
+            g.row_ids.remap(&remap);
             let moving = g.row_positions.remove(source_pos as usize);
             g.row_positions.insert(position as usize, moving);
+            g.cells.set_row_map(g.row_positions.clone());
             g.layout.invalidate();
             g.mark_dirty();
         }),
@@ -9371,9 +9526,15 @@ pub extern "C" fn volvox_grid_get_clip_separators_native(
 pub extern "C" fn volvox_grid_finish_editing(id: i64, out_len: *mut i32) -> *mut u8 {
     compat_status(
         GRID_MANAGER.with_grid(id, |g| {
+            let target = volvoxgrid_engine::grid::RowTarget {
+                row: g.edit.edit_row,
+                row_id: g.edit.edit_row_id,
+                identity_token: g.edit.edit_row_identity_token,
+                revision: g.edit.edit_row_revision,
+            };
             if let Some((row, col, old_text, new_text)) = g.edit.commit() {
                 let committed = normalize_committed_edit_text(g, row, col, &new_text);
-                apply_committed_edit_text(g, row, col, old_text, committed);
+                apply_committed_edit_text(g, row, col, target, old_text, committed);
             }
         }),
         out_len,
@@ -10065,6 +10226,196 @@ mod tests {
     use super::*;
     use std::sync::Mutex;
     use volvoxgrid_engine::text::TextRenderer;
+
+    #[test]
+    fn typed_create_accepts_explicit_row_id_option() {
+        volvox_grid_init();
+        for enabled in [false, true] {
+            let mut length = 0;
+            let output = unsafe {
+                volvox_grid_create(
+                    240,
+                    120,
+                    1.0,
+                    std::ptr::null(),
+                    0,
+                    i32::from(enabled),
+                    &mut length,
+                )
+            };
+            assert!(!output.is_null());
+            let response = unsafe {
+                let response =
+                    CreateResponse::decode(std::slice::from_raw_parts(output, length as usize))
+                        .unwrap();
+                volvox_grid_free(output);
+                response
+            };
+            let id = response.grid_id;
+            GRID_MANAGER
+                .with_grid(id, |grid| {
+                    assert_eq!(grid.row_ids_enabled(), enabled);
+                    assert_eq!(grid.get_row_id(1).is_some(), enabled);
+                    if !enabled {
+                        assert_eq!(grid.row_ids.heap_size_bytes(), 0);
+                        grid.edit_trigger_mode = 2;
+                        grid.cells.set_text(1, 0, "original".into());
+                        begin_edit_session(grid, 1, 0, true);
+                        grid.edit.update_text("index edit".into());
+                    }
+                })
+                .unwrap();
+            if !enabled {
+                let output = volvox_grid_finish_editing(id, &mut length);
+                assert!(!output.is_null());
+                unsafe {
+                    volvox_grid_free(output);
+                }
+                GRID_MANAGER
+                    .with_grid(id, |grid| {
+                        assert_eq!(grid.cells.get_text(1, 0), "index edit");
+                        assert_eq!(grid.row_ids.heap_size_bytes(), 0);
+                    })
+                    .unwrap();
+            }
+            GRID_MANAGER.destroy_grid(id);
+        }
+    }
+
+    fn row_id_fixture() -> i64 {
+        let id = GRID_MANAGER.create_grid_with_row_ids(240, 120, 3, 1, 1, 0, 1.0, true);
+        GRID_MANAGER
+            .with_grid(id, |grid| {
+                grid.edit_trigger_mode = 2;
+                grid.cells.set_text(1, 0, "A".into());
+                grid.cells.set_text(2, 0, "B".into());
+                grid.set_row_ids(&[(1, 9_007_199_254_740_993), (2, i64::MAX)])
+                    .unwrap();
+            })
+            .unwrap();
+        id
+    }
+
+    #[test]
+    fn row_id_adapter_session_and_queued_edit_events_capture_source_identity() {
+        let grid_id = row_id_fixture();
+        let runtime = ActiveXRuntime;
+        let state = runtime
+            .edit(EditCommand {
+                grid_id,
+                command: Some(edit_command::Command::Start(EditStart {
+                    row: 2,
+                    col: 0,
+                    reason: EditStartReason::EditStartProgrammatic as i32,
+                    ..Default::default()
+                })),
+            })
+            .unwrap();
+        let session = state.session.unwrap();
+        assert_eq!(session.row_id, i64::MAX);
+        runtime
+            .edit(EditCommand {
+                grid_id,
+                command: Some(edit_command::Command::Session(EditorSessionCommand {
+                    session_id: session.session_id,
+                    state_version: session.state_version,
+                    command: Some(editor_session_command::Command::Commit(EditCommit {
+                        value: Some(EditorValue {
+                            edit_text: Some("edited B".into()),
+                            ..Default::default()
+                        }),
+                    })),
+                })),
+            })
+            .unwrap();
+        let output = volvox_grid_set_row_position(grid_id, 2, 1, std::ptr::null_mut());
+        if !output.is_null() {
+            unsafe {
+                volvox_grid_free(output);
+            }
+        }
+        GRID_MANAGER
+            .with_grid(grid_id, |grid| {
+                assert_eq!(grid.get_row_id(1), Some(i64::MAX));
+                assert_eq!(grid.cells.get_text(1, 0), "edited B");
+                let events = grid.events.drain();
+                let identities: Vec<_> = events
+                    .iter()
+                    .filter_map(|event| match &event.data {
+                        volvoxgrid_engine::event::GridEventData::BeforeEdit { row_id, .. }
+                        | volvoxgrid_engine::event::GridEventData::StartEdit { row_id, .. }
+                        | volvoxgrid_engine::event::GridEventData::CellEditValidate {
+                            row_id,
+                            ..
+                        }
+                        | volvoxgrid_engine::event::GridEventData::AfterEdit { row_id, .. } => {
+                            Some(*row_id)
+                        }
+                        _ => None,
+                    })
+                    .collect();
+                assert_eq!(identities, [i64::MAX; 4]);
+            })
+            .unwrap();
+        GRID_MANAGER.destroy_grid(grid_id);
+    }
+
+    #[test]
+    fn row_id_pending_adapter_edit_follows_move_and_ignores_removed_target() {
+        let grid_id = row_id_fixture();
+        let pending = PendingAction::BeginEdit {
+            target: GRID_MANAGER
+                .with_grid(grid_id, |grid| grid.capture_row_target(1).unwrap())
+                .unwrap(),
+            col: 0,
+            force: true,
+            seed_text: None,
+            click_caret: None,
+            caret_end: None,
+        };
+        GRID_MANAGER
+            .with_grid(grid_id, |grid| {
+                input::apply_move_row_after_before(grid, 1, 2);
+            })
+            .unwrap();
+        apply_pending_action(grid_id, pending.clone(), false);
+        GRID_MANAGER
+            .with_grid(grid_id, |grid| {
+                assert_eq!(grid.edit.edit_row, 2);
+                assert_eq!(grid.edit.edit_row_id, 9_007_199_254_740_993);
+                grid.remove_item(2);
+            })
+            .unwrap();
+        apply_pending_action(grid_id, pending, false);
+        GRID_MANAGER
+            .with_grid(grid_id, |grid| assert!(!grid.edit.is_active()))
+            .unwrap();
+        GRID_MANAGER.destroy_grid(grid_id);
+    }
+
+    #[test]
+    fn row_id_compat_array_replacement_refreshes_ids_and_resets_sorted_storage() {
+        let mut grid =
+            volvoxgrid_engine::grid::VolvoxGrid::new_with_row_ids(1, 240, 120, 3, 1, 1, 0, true);
+        grid.cells.set_text(1, 0, "A".into());
+        grid.cells.set_text(2, 0, "B".into());
+        let original = grid.get_row_id(1).unwrap();
+        volvoxgrid_engine::sort::sort_grid_all(
+            &mut grid,
+            volvoxgrid_engine::sort::SORT_DESCENDING_STRING,
+            0,
+        );
+        apply_array_data_to_grid(&mut grid, 3, 1, &["Name".into(), "C".into(), "D".into()]);
+        assert_eq!(grid.find_row_by_id(original), None);
+        let c = grid.get_row_id(1).unwrap();
+        volvoxgrid_engine::sort::sort_grid_all(
+            &mut grid,
+            volvoxgrid_engine::sort::SORT_DESCENDING_STRING,
+            0,
+        );
+        assert_eq!(grid.cells.get_text(2, 0), "C");
+        assert_eq!(grid.get_row_id(2), Some(c));
+    }
 
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     struct RecordedRenderArgs {

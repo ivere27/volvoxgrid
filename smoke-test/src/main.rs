@@ -58,6 +58,7 @@ fn main() {
 
     // 1. Create — returns CreateResponse with grid_id
     let req = CreateRequest {
+        row_ids_enabled: false,
         viewport_width: 800,
         viewport_height: 600,
         scale: 0.0,

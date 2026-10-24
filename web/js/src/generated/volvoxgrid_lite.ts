@@ -1348,6 +1348,7 @@ export const AfterEditEventFields = {
   "col": 2,
   "old_text": 3,
   "new_text": 4,
+  "row_id": 5,
 } as const;
 export const AfterMoveColumnEventFields = {
   "col": 1,
@@ -1451,6 +1452,7 @@ export const BarcodeRenderOptionsFields = {
 export const BeforeEditEventFields = {
   "row": 1,
   "col": 2,
+  "row_id": 3,
 } as const;
 export const BeforeMouseDownEventFields = {
   "row": 1,
@@ -1532,6 +1534,7 @@ export const CellEditValidateEventFields = {
   "row": 1,
   "col": 2,
   "edit_text": 3,
+  "row_id": 4,
 } as const;
 export const CellFocusChangedEventFields = {
   "old_row": 1,
@@ -1726,6 +1729,7 @@ export const CreateRequestFields = {
   "viewport_height": 2,
   "scale": 3,
   "config": 4,
+  "row_ids_enabled": 5,
 } as const;
 export const CreateResponseFields = {
   "grid_id": 1,
@@ -1911,6 +1915,7 @@ export const EditorSessionFields = {
   "composing": 12,
   "preedit_text": 13,
   "validation_errors": 14,
+  "row_id": 15,
 } as const;
 export const EditorSessionCommandFields = {
   "session_id": 1,
@@ -2086,6 +2091,12 @@ export const GetNodeRequestFields = {
   "grid_id": 1,
   "row": 2,
   "relation": 3,
+} as const;
+export const GetRowsRequestFields = {
+  "grid_id": 1,
+  "start_row": 2,
+  "row_count": 3,
+  "row_ids": 4,
 } as const;
 export const GetSchemaRequestFields = {
   "grid_id": 1,
@@ -2487,6 +2498,7 @@ export const LoadTableRequestFields = {
   "cols": 3,
   "values": 4,
   "atomic": 5,
+  "row_ids": 6,
 } as const;
 export const MemoryUsageResponseFields = {
   "total_bytes": 1,
@@ -2728,6 +2740,11 @@ export const RowDefFields = {
   "span": 9,
   "pin": 10,
   "sticky": 11,
+  "row_id": 12,
+} as const;
+export const RowIdentityFields = {
+  "index": 1,
+  "row_id": 2,
 } as const;
 export const RowIndicatorConfigFields = {
   "visible": 1,
@@ -2756,6 +2773,9 @@ export const RowStatusFields = {
 export const RowStatusChangeEventFields = {
   "row": 1,
   "status": 2,
+} as const;
+export const RowsResponseFields = {
+  "rows": 1,
 } as const;
 export const ScalarValueFields = {
   "string_value": 1,
@@ -2909,6 +2929,7 @@ export const SpanConfigFields = {
 export const StartEditEventFields = {
   "row": 1,
   "col": 2,
+  "row_id": 3,
 } as const;
 export const StartPageEventFields = {
   "page": 1,
@@ -3112,11 +3133,19 @@ export class AfterEditEvent implements LiteMessage {
       prop: "newText",
       kind: "string" as ProtoKind,
     },
+    {
+      no: 5,
+      name: "row_id",
+      jsonName: "rowId",
+      prop: "rowId",
+      kind: "int64" as ProtoKind,
+    },
   ];
   row: number = 0;
   col: number = 0;
   oldText: string = "";
   newText: string = "";
+  rowId: bigint = 0n;
 
   constructor(init?: Partial<AfterEditEvent>) {
     initMessage(this, AfterEditEvent.fields, init as Record<string, unknown> | undefined);
@@ -4242,9 +4271,17 @@ export class BeforeEditEvent implements LiteMessage {
       prop: "col",
       kind: "int32" as ProtoKind,
     },
+    {
+      no: 3,
+      name: "row_id",
+      jsonName: "rowId",
+      prop: "rowId",
+      kind: "int64" as ProtoKind,
+    },
   ];
   row: number = 0;
   col: number = 0;
+  rowId: bigint = 0n;
 
   constructor(init?: Partial<BeforeEditEvent>) {
     initMessage(this, BeforeEditEvent.fields, init as Record<string, unknown> | undefined);
@@ -5133,10 +5170,18 @@ export class CellEditValidateEvent implements LiteMessage {
       prop: "editText",
       kind: "string" as ProtoKind,
     },
+    {
+      no: 4,
+      name: "row_id",
+      jsonName: "rowId",
+      prop: "rowId",
+      kind: "int64" as ProtoKind,
+    },
   ];
   row: number = 0;
   col: number = 0;
   editText: string = "";
+  rowId: bigint = 0n;
 
   constructor(init?: Partial<CellEditValidateEvent>) {
     initMessage(this, CellEditValidateEvent.fields, init as Record<string, unknown> | undefined);
@@ -7249,11 +7294,19 @@ export class CreateRequest implements LiteMessage {
       kind: "message" as ProtoKind,
       messageType: "GridConfig",
     },
+    {
+      no: 5,
+      name: "row_ids_enabled",
+      jsonName: "rowIdsEnabled",
+      prop: "rowIdsEnabled",
+      kind: "bool" as ProtoKind,
+    },
   ];
   viewportWidth: number = 0;
   viewportHeight: number = 0;
   scale: number = 0;
   config?: GridConfig;
+  rowIdsEnabled: boolean = false;
 
   constructor(init?: Partial<CreateRequest>) {
     initMessage(this, CreateRequest.fields, init as Record<string, unknown> | undefined);
@@ -9306,6 +9359,13 @@ export class EditorSession implements LiteMessage {
       repeated: true,
       messageType: "ValidationError",
     },
+    {
+      no: 15,
+      name: "row_id",
+      jsonName: "rowId",
+      prop: "rowId",
+      kind: "int64" as ProtoKind,
+    },
   ];
   sessionId: bigint = 0n;
   row: number = 0;
@@ -9321,6 +9381,7 @@ export class EditorSession implements LiteMessage {
   composing: boolean = false;
   preeditText: string = "";
   validationErrors: ValidationError[] = [];
+  rowId: bigint = 0n;
 
   constructor(init?: Partial<EditorSession>) {
     initMessage(this, EditorSession.fields, init as Record<string, unknown> | undefined);
@@ -11271,6 +11332,69 @@ export class GetNodeRequest implements LiteMessage {
   }
 }
 registerMessage(GetNodeRequest);
+export class GetRowsRequest implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.GetRowsRequest" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "grid_id",
+      jsonName: "gridId",
+      prop: "gridId",
+      kind: "int64" as ProtoKind,
+    },
+    {
+      no: 2,
+      name: "start_row",
+      jsonName: "startRow",
+      prop: "startRow",
+      kind: "int32" as ProtoKind,
+    },
+    {
+      no: 3,
+      name: "row_count",
+      jsonName: "rowCount",
+      prop: "rowCount",
+      kind: "int32" as ProtoKind,
+    },
+    {
+      no: 4,
+      name: "row_ids",
+      jsonName: "rowIds",
+      prop: "rowIds",
+      kind: "int64" as ProtoKind,
+      repeated: true,
+    },
+  ];
+  gridId: bigint = 0n;
+  startRow: number = 0;
+  rowCount: number = 0;
+  rowIds: bigint[] = [];
+
+  constructor(init?: Partial<GetRowsRequest>) {
+    initMessage(this, GetRowsRequest.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): GetRowsRequest {
+    return decodeMessage(GetRowsRequest, data);
+  }
+
+  static parseFrom(data: Uint8Array): GetRowsRequest {
+    return GetRowsRequest.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, GetRowsRequest.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, GetRowsRequest.fields);
+  }
+}
+registerMessage(GetRowsRequest);
 export class GetSchemaRequest implements LiteMessage {
   static readonly typeName = "volvoxgrid.v1.GetSchemaRequest" as const;
   static readonly fields: readonly ProtoFieldInfo[] = [
@@ -15602,12 +15726,21 @@ export class LoadTableRequest implements LiteMessage {
       prop: "atomic",
       kind: "bool" as ProtoKind,
     },
+    {
+      no: 6,
+      name: "row_ids",
+      jsonName: "rowIds",
+      prop: "rowIds",
+      kind: "int64" as ProtoKind,
+      repeated: true,
+    },
   ];
   gridId: bigint = 0n;
   rows: number = 0;
   cols: number = 0;
   values: CellValue[] = [];
   atomic: boolean = false;
+  rowIds: bigint[] = [];
 
   constructor(init?: Partial<LoadTableRequest>) {
     initMessage(this, LoadTableRequest.fields, init as Record<string, unknown> | undefined);
@@ -18250,6 +18383,14 @@ export class RowDef implements LiteMessage {
       optional: true,
       enumType: StickyEdge,
     },
+    {
+      no: 12,
+      name: "row_id",
+      jsonName: "rowId",
+      prop: "rowId",
+      kind: "int64" as ProtoKind,
+      optional: true,
+    },
   ];
   index: number = 0;
   height: number = 0;
@@ -18262,6 +18403,7 @@ export class RowDef implements LiteMessage {
   span: boolean = false;
   pin: PinPosition = 0;
   sticky: StickyEdge = 0;
+  rowId: bigint = 0n;
 
   constructor(init?: Partial<RowDef>) {
     initMessage(this, RowDef.fields, init as Record<string, unknown> | undefined);
@@ -18288,6 +18430,52 @@ export class RowDef implements LiteMessage {
   }
 }
 registerMessage(RowDef);
+export class RowIdentity implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.RowIdentity" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "index",
+      jsonName: "index",
+      prop: "index",
+      kind: "int32" as ProtoKind,
+    },
+    {
+      no: 2,
+      name: "row_id",
+      jsonName: "rowId",
+      prop: "rowId",
+      kind: "int64" as ProtoKind,
+    },
+  ];
+  index: number = 0;
+  rowId: bigint = 0n;
+
+  constructor(init?: Partial<RowIdentity>) {
+    initMessage(this, RowIdentity.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): RowIdentity {
+    return decodeMessage(RowIdentity, data);
+  }
+
+  static parseFrom(data: Uint8Array): RowIdentity {
+    return RowIdentity.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, RowIdentity.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, RowIdentity.fields);
+  }
+}
+registerMessage(RowIdentity);
 export class RowIndicatorConfig implements LiteMessage {
   static readonly typeName = "volvoxgrid.v1.RowIndicatorConfig" as const;
   static readonly fields: readonly ProtoFieldInfo[] = [
@@ -18588,6 +18776,46 @@ export class RowStatusChangeEvent implements LiteMessage {
   }
 }
 registerMessage(RowStatusChangeEvent);
+export class RowsResponse implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.RowsResponse" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "rows",
+      jsonName: "rows",
+      prop: "rows",
+      kind: "message" as ProtoKind,
+      repeated: true,
+      messageType: "RowIdentity",
+    },
+  ];
+  rows: RowIdentity[] = [];
+
+  constructor(init?: Partial<RowsResponse>) {
+    initMessage(this, RowsResponse.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): RowsResponse {
+    return decodeMessage(RowsResponse, data);
+  }
+
+  static parseFrom(data: Uint8Array): RowsResponse {
+    return RowsResponse.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, RowsResponse.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, RowsResponse.fields);
+  }
+}
+registerMessage(RowsResponse);
 export enum ScalarValueValueOneofCase {
   None = 0,
   StringValue = 1,
@@ -20269,9 +20497,17 @@ export class StartEditEvent implements LiteMessage {
       prop: "col",
       kind: "int32" as ProtoKind,
     },
+    {
+      no: 3,
+      name: "row_id",
+      jsonName: "rowId",
+      prop: "rowId",
+      kind: "int64" as ProtoKind,
+    },
   ];
   row: number = 0;
   col: number = 0;
+  rowId: bigint = 0n;
 
   constructor(init?: Partial<StartEditEvent>) {
     initMessage(this, StartEditEvent.fields, init as Record<string, unknown> | undefined);
@@ -22208,5 +22444,6 @@ export const VolvoxGridServiceMethods = {
   GetDemoData: "/volvoxgrid.v1.VolvoxGridService/GetDemoData",
   RenderSession: "/volvoxgrid.v1.VolvoxGridService/RenderSession",
   EventStream: "/volvoxgrid.v1.VolvoxGridService/EventStream",
+  GetRows: "/volvoxgrid.v1.VolvoxGridService/GetRows",
 } as const;
 

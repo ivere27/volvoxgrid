@@ -17,6 +17,16 @@ import 'package:flutter/services.dart';
 
 import 'volvoxgrid_ffi.dart';
 
+/// A native row's current display position and stable numeric identity.
+/// IDs are positive signed 64-bit values, represented exactly by Dart [int]
+/// on the supported native Flutter platforms. They are independent of indices.
+@immutable
+class VolvoxRowIdentity {
+  final int index;
+  final int rowId;
+  const VolvoxRowIdentity({required this.index, required this.rowId});
+}
+
 /// Resolved style properties for the edit overlay.
 class EditCellStyle {
   final String? fontFamily;
@@ -247,6 +257,22 @@ class VolvoxGridController extends ChangeNotifier {
 
   Int64 _gridId = Int64.ZERO;
   bool _disposed = false;
+  Future<void>? _creating;
+  bool? _creatingRowIdsEnabled;
+  bool _rowIdsEnabled = false;
+
+  /// Whether this controller has been disposed. Do not start new work after this.
+  bool get isDisposed => _disposed;
+
+  /// Disable range clipboard mutations when a data binding owns validation.
+  /// Text editing inside the Flutter editor is unaffected. Programmatic cell
+  /// writes remain available for authoritative data/rollback.
+  bool clipboardMutationsEnabled = true;
+
+  /// Optional data-binding permission gate for programmatic editor starts.
+  /// VolvoxDataGrid owns this while attached and authorizes the source object's
+  /// editability before starting its editor.
+  Future<bool> Function(int row, int col)? editAuthorization;
 
   int? _gpuTextureId;
   int? _gpuSurfaceHandle;
@@ -258,6 +284,12 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Whether the grid has been created successfully.
   bool get isCreated => _gridId != Int64.ZERO;
+
+  /// Whether this native grid was created with row identities enabled.
+  /// False before creation and after destruction. This is a creation-only
+  /// option: destroy and recreate the grid to change it. ID APIs never enable
+  /// it implicitly.
+  bool get rowIdsEnabled => isCreated && _rowIdsEnabled;
 
   /// Active GPU texture ID (if created via [createGpuTexture]).
   int? get gpuTextureId => _gpuTextureId;
@@ -289,14 +321,49 @@ class VolvoxGridController extends ChangeNotifier {
   /// [rows] and [cols] include the data body plus any true frozen panes.
   /// Column headers live in the top column-indicator band by default.
   /// [viewportWidth] and [viewportHeight] set the initial pixel dimensions.
+  /// [rowIdsEnabled] defaults to false, avoiding native identity allocation.
+  /// Enable it for ID queries/assignments or binding to VolvoxDataGrid. The
+  /// choice cannot change while creation is pending or the grid exists.
   Future<void> create({
     int rows = 50,
     int cols = 10,
     int viewportWidth = 800,
     int viewportHeight = 600,
     double scale = 1.0,
+    bool rowIdsEnabled = false,
+  }) {
+    if (_disposed) return Future.error(StateError('Controller is disposed'));
+    if ((_creating != null && _creatingRowIdsEnabled != rowIdsEnabled) ||
+        (isCreated && this.rowIdsEnabled != rowIdsEnabled)) {
+      return Future.error(StateError('rowIdsEnabled is a creation-only option; '
+          'destroyGrid() and create(rowIdsEnabled: $rowIdsEnabled) to change it'));
+    }
+    if (_creating != null) return _creating!;
+    if (isCreated) return Future.value();
+    _creatingRowIdsEnabled = rowIdsEnabled;
+    return _creating = _create(
+      rows: rows,
+      cols: cols,
+      viewportWidth: viewportWidth,
+      viewportHeight: viewportHeight,
+      scale: scale,
+      rowIdsEnabled: rowIdsEnabled,
+    ).whenComplete(() {
+      _creating = null;
+      _creatingRowIdsEnabled = null;
+    });
+  }
+
+  Future<void> _create({
+    required int rows,
+    required int cols,
+    required int viewportWidth,
+    required int viewportHeight,
+    required double scale,
+    required bool rowIdsEnabled,
   }) async {
     final req = CreateRequest()
+      ..rowIdsEnabled = rowIdsEnabled
       ..viewportWidth = viewportWidth
       ..viewportHeight = viewportHeight
       ..scale = scale
@@ -324,24 +391,45 @@ class VolvoxGridController extends ChangeNotifier {
             ..chooser = false))
         ..indicators = _defaultIndicatorsConfig());
     final response = await VolvoxGridService.Create(req);
+    if (_disposed) {
+      await VolvoxGridService.Destroy(
+          DestroyRequest()..gridId = response.gridId);
+      return;
+    }
     _gridId = response.gridId;
+    _rowIdsEnabled = rowIdsEnabled;
     notifyListeners();
   }
 
   /// Destroy the native grid and release resources.
   Future<void> destroyGrid() async {
     if (!isCreated) return;
-    await VolvoxGridService.Destroy(_destroyRequest);
+    final request = _destroyRequest;
     _gridId = Int64.ZERO;
+    _rowIdsEnabled = false;
+    await VolvoxGridService.Destroy(request);
   }
 
   @override
   void dispose() {
-    if (!_disposed) {
-      _disposed = true;
-      releaseGpuTexture(graceful: true).whenComplete(() => destroyGrid());
-    }
+    if (_disposed) return;
+    _disposed = true;
+    unawaited(releaseGpuTexture(graceful: true)
+        .whenComplete(destroyGrid)
+        .catchError((Object error, StackTrace stack) {
+      FlutterError.reportError(FlutterErrorDetails(
+        exception: error,
+        stack: stack,
+        library: 'volvoxgrid',
+        context: ErrorDescription('while disposing the native controller'),
+      ));
+    }));
     super.dispose();
+  }
+
+  @override
+  void notifyListeners() {
+    if (!_disposed) super.notifyListeners();
   }
 
   // ── Internal helpers ────────────────────────────────────────────────────────
@@ -362,6 +450,62 @@ class VolvoxGridController extends ChangeNotifier {
 
   Future<SchemaResponse> getSchema() {
     return VolvoxGridService.GetSchema(GetSchemaRequest()..gridId = _gridId);
+  }
+
+  /// Native row identities at current display positions. With no selector,
+  /// returns all rows; [rowCount] zero means all remaining rows. Alternatively,
+  /// [rowIds] looks up IDs in request order, omitting unknown IDs. Do not mix
+  /// IDs with range arguments. IDs survive sorting and row movement.
+  /// Requires create(rowIdsEnabled: true). Calling this never allocates IDs for
+  /// a grid created without them.
+  Future<List<VolvoxRowIdentity>> getRows({
+    int startRow = 0,
+    int rowCount = 0,
+    List<int> rowIds = const [],
+  }) async {
+    _requireRowIdsEnabled();
+    if (rowIds.any((id) => id <= 0 || id > 0x7fffffffffffffff)) {
+      throw ArgumentError('Row IDs must be positive signed 64-bit integers');
+    }
+    final result = await VolvoxGridService.GetRows(GetRowsRequest(
+      gridId: _gridId,
+      startRow: startRow,
+      rowCount: rowCount,
+      rowIds: rowIds.map(Int64.new),
+    ));
+    final identities = <VolvoxRowIdentity>[];
+    for (final row in result.rows) {
+      final rowId = row.rowId.toInt();
+      if (rowId <= 0) {
+        throw StateError('Native engine returned an invalid row ID: $rowId');
+      }
+      identities.add(VolvoxRowIdentity(index: row.index, rowId: rowId));
+    }
+    return identities;
+  }
+
+  void _requireRowIdsEnabled() {
+    if (_disposed) throw StateError('Controller is disposed');
+    if (!rowIdsEnabled) {
+      throw StateError('Row IDs are disabled. Use create(rowIdsEnabled: true) '
+          'before using row-ID APIs or VolvoxDataGrid. For an existing grid, '
+          'destroyGrid() and recreate it; row IDs cannot be enabled at runtime.');
+    }
+  }
+
+  /// ID at a current display position. An out-of-range row throws.
+  Future<int> getRowId(int row) async {
+    final result = await getRows(startRow: row, rowCount: 1);
+    if (result.length != 1 || result.single.rowId <= 0) {
+      throw StateError('Native engine did not return an identity for row $row');
+    }
+    return result.single.rowId;
+  }
+
+  /// Current display position for [rowId], or null if that row was removed.
+  Future<int?> findRowById(int rowId) async {
+    final result = await getRows(rowIds: [rowId]);
+    return result.isEmpty ? null : result.single.index;
   }
 
   Future<Set<int>> _columnsWithExistingEditors() async {
@@ -554,11 +698,15 @@ class VolvoxGridController extends ChangeNotifier {
     final prepared = _applyDefaultEditorsForColumns(
         request, await _columnsWithExistingEditors())
       ..gridId = _gridId;
+    if (_disposed) return;
     await VolvoxGridService.DefineColumns(prepared);
     notifyListeners();
   }
 
   Future<void> defineRows(DefineRowsRequest request) async {
+    if (request.rows.any((row) => row.hasRowId())) {
+      _requireRowIdsEnabled();
+    }
     await VolvoxGridService.DefineRows(request..gridId = _gridId);
     notifyListeners();
   }
@@ -755,19 +903,38 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Load a row-major typed matrix in one RPC.
   ///
-  /// [values] should be `rows * cols` long in row-major order.
+  /// [values] should be `rows * cols` long in row-major order. Optional [rowIds]
+  /// supplies one unique, positive signed 64-bit native ID per row, requiring
+  /// create(rowIdsEnabled: true). When enabled and IDs are omitted, the engine
+  /// generates new IDs for this replacement; query them with [getRows]. With
+  /// identities disabled, an ordinary load creates no row IDs.
   Future<void> loadTable(
     int rows,
     int cols,
     List<CellValue> values, {
     bool atomic = false,
+    List<int>? rowIds,
   }) async {
-    await VolvoxGridService.LoadTable(LoadTableRequest()
+    if (rowIds != null) {
+      _requireRowIdsEnabled();
+      if (rowIds.length != rows ||
+          rowIds.any((id) => id <= 0 || id > 0x7fffffffffffffff)) {
+        throw ArgumentError(
+            'rowIds must contain one positive signed 64-bit ID per row');
+      }
+    }
+    final result = await VolvoxGridService.LoadTable(LoadTableRequest()
       ..gridId = _gridId
       ..rows = rows
       ..cols = cols
       ..values.addAll(values)
+      ..rowIds.addAll((rowIds ?? const <int>[]).map(Int64.new))
       ..atomic = atomic);
+    if (result.rejectedCount > 0) {
+      throw StateError(
+          'Native table load rejected ${result.rejectedCount} cells: '
+          '${result.violations}');
+    }
     notifyListeners();
   }
 
@@ -1204,6 +1371,7 @@ class VolvoxGridController extends ChangeNotifier {
   /// Enable or disable editing.
   Future<void> setEditable(bool enabled) async {
     final current = await editTrigger();
+    if (_disposed) return;
     final target = enabled
         ? (current == EditTrigger.EDIT_TRIGGER_NONE
             ? EditTrigger.EDIT_TRIGGER_KEY_CLICK
@@ -1239,6 +1407,14 @@ class VolvoxGridController extends ChangeNotifier {
     int? caretPosition,
     bool? formulaMode,
   }) async {
+    final id = _gridId;
+    final authorize = editAuthorization;
+    if (_disposed ||
+        (authorize != null && !await authorize(row, col)) ||
+        _disposed ||
+        id != _gridId) {
+      return EditState(active: false);
+    }
     final start = EditStart()
       ..row = row
       ..col = col
@@ -1309,6 +1485,8 @@ class VolvoxGridController extends ChangeNotifier {
     Int64? sessionId,
     Int64? stateVersion,
   }) async {
+    final id = _gridId;
+    if (_disposed) return EditState(active: false);
     final EditState state;
     if (cancel) {
       final session = await _prepareSessionCommand(
@@ -1316,6 +1494,7 @@ class VolvoxGridController extends ChangeNotifier {
         sessionId: sessionId,
         stateVersion: stateVersion,
       );
+      if (_disposed || id != _gridId) return EditState(active: false);
       state = await VolvoxGridService.Edit(EditCommand()
         ..gridId = _gridId
         ..session = session);
@@ -1326,6 +1505,7 @@ class VolvoxGridController extends ChangeNotifier {
         sessionId: sessionId,
         stateVersion: stateVersion,
       );
+      if (_disposed || id != _gridId) return EditState(active: false);
       state = await VolvoxGridService.Edit(EditCommand()
         ..gridId = _gridId
         ..session = session);
@@ -1691,6 +1871,7 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Cut current selection to clipboard payload.
   Future<ClipboardResponse> cut() async {
+    _checkClipboardMutation();
     final data = await VolvoxGridService.Clipboard(ClipboardCommand()
       ..gridId = _gridId
       ..cut = ClipboardCut());
@@ -1700,6 +1881,7 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Paste provided clipboard text into current selection.
   Future<void> paste(String text) async {
+    _checkClipboardMutation();
     await VolvoxGridService.Clipboard(ClipboardCommand()
       ..gridId = _gridId
       ..paste = (ClipboardPaste()..text = text));
@@ -1708,10 +1890,19 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Delete current selection contents.
   Future<void> deleteSelection() async {
+    _checkClipboardMutation();
     await VolvoxGridService.Clipboard(ClipboardCommand()
       ..gridId = _gridId
       ..delete = ClipboardDelete());
     notifyListeners();
+  }
+
+  void _checkClipboardMutation() {
+    if (!clipboardMutationsEnabled) {
+      throw StateError('Range paste/cut/delete is disabled by VolvoxDataGrid. '
+          'Edit one cell through its editor so permissions and validation run, '
+          'or replace the bound rows with authoritative application data.');
+    }
   }
 
   // ── Pin & Sticky ──────────────────────────────────────────────────────────
