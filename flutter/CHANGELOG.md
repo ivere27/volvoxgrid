@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.8.12
 
 - Fixed native version resolution for package-only installs. Explicit overrides take priority over the package version, with a recognized monorepo `VERSION` as a fallback. Source selection consistently honors `VOLVOXGRID_SOURCE=local/maven`.
 - Removed the Linux/Windows CMake dependency on a Gradle wrapper; missing downloads, libraries and requested Android ABIs now fail the build with recovery instructions. Shared Ruby configuration applies version/source selection to the iOS/macOS podspecs.

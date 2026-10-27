@@ -9,6 +9,7 @@
 #   make wasm         — build WASM crate
 #   make web          — build WASM + start web dev server
 #   make codegen      — regenerate FFI bindings for all languages
+#   make bump-version NEW_VERSION=x.y.z — synchronize release versions
 #   make sheet        — build WASM + start Sheet adapter dev server
 #   make sheet-lite   — build WASM lite + start Sheet adapter dev server
 #   make doom-deps    — download optional DOOM assets for web demo mode
@@ -252,7 +253,7 @@ endif
         publish_local publish_github publish_web publish_npm publish_nuget \
         publish_go publish_go_bubbletea \
         rust-gtk-run rust-gtk-run-release rust-gtk-bench \
-        cpp-build cpp-tui-run cpp-gtk-run clean clean-all help
+        cpp-build cpp-tui-run cpp-gtk-run clean clean-all help bump-version check-version
 
 # =============================================================================
 # Default
@@ -281,6 +282,8 @@ help:
 	@echo "  web-lite       Build WASM lite + start Vite dev server"
 	@echo "    web options: WEB_SCALE=<value>, WEB_HOVER={true|false} (default false)"
 	@echo "  codegen        Regenerate all FFI bindings"
+	@echo "  bump-version   Sync release metadata (NEW_VERSION=x.y.z; defaults to VERSION)"
+	@echo "  check-version  Check release metadata against VERSION without writing"
 	@echo "  activex        Build ActiveX OCX (debug)"
 	@echo "  activex-run    Build and run ActiveX demo shell (debug, default x86_64)"
 	@echo "  activex-run-release  Build and run ActiveX demo shell (release, default x86_64)"
@@ -381,6 +384,15 @@ help:
 	@echo ""
 	@echo "  clean          Remove build artifacts"
 	@echo "  clean-all      Remove all artifacts including WASM/node_modules"
+
+# =============================================================================
+# Release version metadata
+# =============================================================================
+bump-version:
+	@python3 "$(ROOT_DIR)/scripts/bump_version.py" --version "$(NEW_VERSION)"
+
+check-version:
+	@python3 "$(ROOT_DIR)/scripts/bump_version.py" --check
 
 # =============================================================================
 # Build the VolvoxGrid native library

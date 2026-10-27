@@ -2,7 +2,7 @@
 
 All notable changes to VolvoxGrid are documented here. Per-package changelogs may have additional detail (e.g. [flutter/CHANGELOG.md](flutter/CHANGELOG.md)).
 
-## Unreleased
+## 0.8.12
 
 - Added native row IDs independent of row positions, with application-supplied or engine-generated positive `int64` IDs, lookup support and row identity in edit events. Zero is reserved; existing index-based APIs remain available. Generated bindings preserve the full ID range, including JavaScript `bigint` and Dart protobuf `Int64` values.
 - Made row ID tracking an explicit, creation-only `CreateRequest.row_ids_enabled` option, disabled by default. Disabled grids allocate no row ID storage, keep index-based editing and emit `row_id=0`; ID operations cannot enable tracking implicitly. Flutter's high-level `VolvoxDataGrid` enables tracking when it creates its grid. The typed C/WASM `volvox_grid_create` functions now take the option directly, replacing their previous signatures; callers must rebuild against the updated bindings.
