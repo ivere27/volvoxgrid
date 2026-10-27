@@ -18,6 +18,7 @@ export WASM_PACK_OPT_FLAGS="${WASM_PACK_OPT_FLAGS-}"
 WASM_DIST_ROOT="${REPO_ROOT}/dist/wasm"
 WASM_LITE_DIST_ROOT="${REPO_ROOT}/dist/wasm-lite"
 WEB_DIST_ROOT="${REPO_ROOT}/dist/web"
+PAGES_BASE_PATH="${PAGES_BASE_PATH:-/volvoxgrid/}"
 CDN_BASE="https://cdn.jsdelivr.net/npm"
 WASM_CDN_URL="${CDN_BASE}/volvoxgrid@${VERSION}/wasm/volvoxgrid_wasm.js"
 WASM_LITE_CDN_URL="${CDN_BASE}/volvoxgrid-lite@${VERSION}/wasm/volvoxgrid_wasm.js"
@@ -195,6 +196,45 @@ build_web_dist() {
   echo "Built web dist: ${WEB_DIST_ROOT}/demos/web"
 }
 
+build_pages_dist() {
+  # Bundle the JS and WASM from this checkout so the released demo does not
+  # depend on the corresponding npm packages having propagated to a CDN.
+  make wasm
+  (
+    cd "${REPO_ROOT}/web/example"
+    npm ci
+    VITE_WASM_URL="${PAGES_BASE_PATH%/}/demos/web/wasm/volvoxgrid_wasm.js" \
+      VITE_VG_INITIAL_SCALE="${WEB_SCALE:-1.0}" \
+      VITE_VG_EXTERNAL=0 \
+      npm run build -- --base "${PAGES_BASE_PATH%/}/demos/web/"
+  )
+  local pages_dir="${TMP_ROOT}/pages"
+  local demo_dir="${pages_dir}/demos/web"
+  local zip_path="${WEB_DIST_ROOT}/volvoxgrid-demo-${VERSION}.zip"
+  mkdir -p "${demo_dir}/wasm"
+  cp -RL "${REPO_ROOT}/web/example/dist/." "${demo_dir}/"
+  cp -RL "${REPO_ROOT}/web/example/wasm/." "${demo_dir}/wasm/"
+  inject_firebase_analytics "${demo_dir}/index.html"
+  cat > "${pages_dir}/index.html" <<'EOF'
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="refresh" content="0;url=./demos/web/">
+  <title>VolvoxGrid Demo</title>
+</head>
+<body><a href="./demos/web/">Open the VolvoxGrid demo</a></body>
+</html>
+EOF
+  printf '%s\n' "${VERSION}" > "${pages_dir}/VERSION"
+  touch "${pages_dir}/.nojekyll"
+  ensure_dir "${WEB_DIST_ROOT}"
+  rm -f "${zip_path}"
+  (cd "${pages_dir}" && zip -qr "${zip_path}" .)
+  echo "Built Pages release demo: ${zip_path}"
+}
+
 build_sheet_dist() {
   local mode="${1:-gpu}" # gpu|lite
   local out_dir="${WEB_DIST_ROOT}/demos/sheet"
@@ -241,11 +281,11 @@ build_report_dist() {
 }
 
 case "${TARGET}" in
-  all|bundle|web|sheet|sheet-lite|report|wasm|wasm-lite|wasm-threaded)
+  all|bundle|web|pages|sheet|sheet-lite|report|wasm|wasm-lite|wasm-threaded)
     ;;
   *)
     echo "Error: unsupported WEB_DOCKER_TARGET='${TARGET}'." >&2
-    echo "Valid values: all, bundle, web, sheet, sheet-lite, report, wasm, wasm-lite, wasm-threaded" >&2
+    echo "Valid values: all, bundle, web, pages, sheet, sheet-lite, report, wasm, wasm-lite, wasm-threaded" >&2
     exit 1
     ;;
 esac
@@ -265,6 +305,9 @@ case "${TARGET}" in
   web)
     build_web_dist
     ;;
+  pages)
+    build_pages_dist
+    ;;
   sheet)
     build_sheet_dist gpu
     ;;
@@ -283,5 +326,6 @@ case "${TARGET}" in
     build_sheet_dist gpu
     build_sheet_dist lite
     build_report_dist
+    build_pages_dist
     ;;
 esac

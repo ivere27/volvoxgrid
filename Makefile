@@ -14,6 +14,7 @@
 #   make sheet-lite   — build WASM lite + start Sheet adapter dev server
 #   make doom-deps    — download optional DOOM assets for web demo mode
 #   make publish_web  — copy dist/web into public and deploy to Firebase
+#   make publish_pages — deploy a released demo ZIP to GitHub Pages
 #   make clean        — remove build artifacts
 
 # =============================================================================
@@ -196,6 +197,9 @@ IOS_GITHUB_REPO ?= ivere27/volvoxgrid
 WEB_BUNDLE_DIR := dist/web
 WEB_BUNDLE_ZIP := $(WEB_BUNDLE_DIR)/volvoxgrid-web-$(VOLVOXGRID_VERSION).zip
 WEB_BUNDLE_LITE_ZIP := $(WEB_BUNDLE_DIR)/volvoxgrid-web-lite-$(VOLVOXGRID_VERSION).zip
+WEB_DEMO_ZIP := $(WEB_BUNDLE_DIR)/volvoxgrid-demo-$(VOLVOXGRID_VERSION).zip
+PAGES_BASE_PATH ?= /volvoxgrid/
+PAGES_REF ?= main
 FIREBASE_PUBLIC_DIR ?= public
 
 ifeq ($(VOLVOXGRID_SOURCE_RESOLVED),maven)
@@ -249,8 +253,8 @@ endif
         vsflexgrid vsflexgrid-release \
         docker_android_aar_image docker_android docker_desktop_image docker_desktop docker_desktop_lite \
         docker_web_image docker_web \
-        docker_ios_image docker_ios docker_ios_lite update_swift_package_checksums docker_all_image docker_all publish_maven \
-        publish_local publish_github publish_web publish_npm publish_nuget \
+        docker_ios_image docker_ios docker_ios_lite update_swift_package_checksums verify_swift_package_checksums docker_all_image docker_all publish_maven \
+        publish_local publish_github publish_web publish_pages publish_npm publish_nuget \
         publish_go publish_go_bubbletea \
         rust-gtk-run rust-gtk-run-release rust-gtk-bench \
         cpp-build cpp-tui-run cpp-gtk-run clean clean-all help bump-version check-version
@@ -355,16 +359,18 @@ help:
 	@echo "  docker_desktop            Build desktop JAR + desktop lite JAR + .NET WinForms full+lite x64+x86 artifacts via Docker (+ ActiveX OCX release/release-lite)"
 	@echo "  docker_desktop_lite       Build desktop lite JAR via Docker"
 	@echo "  docker_web_image          Build Docker image for web dist/bundle tasks"
-	@echo "  docker_web                Build in Docker (default WEB_DOCKER_TARGET=all): WEB_DOCKER_TARGET={all|bundle|web|sheet|sheet-lite|report|wasm|wasm-lite|wasm-threaded}"
+	@echo "  docker_web                Build in Docker (default WEB_DOCKER_TARGET=all): WEB_DOCKER_TARGET={all|bundle|web|pages|sheet|sheet-lite|report|wasm|wasm-lite|wasm-threaded}"
 	@echo "  docker_ios_image          Build Docker image for iOS"
 	@echo "  docker_ios                Build iOS XCFramework via Docker (set IOS_LIBRARY_BUILD_MODE=lite for lite)"
 	@echo "  docker_ios_lite           Build iOS lite XCFramework via Docker"
+	@echo "  verify_swift_package_checksums  Check existing ZIPs against Package.swift without rebuilding"
 	@echo "  docker_all_image          Build unified Docker image (all toolchains)"
 	@echo "  docker_all                Build all platform artifacts via unified Docker image (Android full+lite, desktop full+lite, iOS full+lite, .NET WinForms full+lite x64+x86)"
 	@echo "  publish_maven             Upload Android, Android lite, Compose, Compose lite AARs + desktop JARs to Maven Central"
 	@echo "  publish_github            Upload all artifacts (xcframework, AAR, JAR, .NET, ActiveX, web zips, debug symbols) to GitHub release"
 	@echo "  publish_local             Install built internal snapshot artifacts from dist/maven into ~/.m2/repository"
 	@echo "  publish_web               Copy dist/web -> public (clean), then run firebase deploy"
+	@echo "  publish_pages             Deploy the released demo ZIP to GitHub Pages (after publish_github)"
 	@echo "  publish_npm               Publish volvoxgrid + adapter npm packages from dist/web zip"
 	@echo "  publish_nuget             Publish VolvoxGrid.DotNet + VolvoxGrid.DotNet.Lite NuGet packages to nuget.org"
 	@echo "  publish_go                Tag + push 'go/vX.Y.Z' so the core Go module is fetchable via go get"
@@ -1597,6 +1603,7 @@ docker_web: docker_web_image
 		-e VOLVOXGRID_GIT_COMMIT="$(WEB_GIT_COMMIT)" \
 		-e VOLVOXGRID_BUILD_DATE="$(WEB_BUILD_DATE)" \
 		-e WEB_SCALE="$(WEB_SCALE)" \
+		-e PAGES_BASE_PATH="$(PAGES_BASE_PATH)" \
 		-e WEB_DOCKER_TARGET="$(WEB_DOCKER_TARGET)" \
 		"$(WEB_DOCKER_IMAGE)"
 
@@ -1681,6 +1688,11 @@ update_swift_package_checksums:
 	update_target "VolvoxGridXCFramework" "VolvoxGrid.xcframework" "VolvoxGrid.xcframework.zip" || exit 1; \
 	update_target "VolvoxGridLiteXCFramework" "VolvoxGridLite.xcframework" "VolvoxGridLite.xcframework.zip" || exit 1
 
+verify_swift_package_checksums:
+	@python3 "$(CURRENT_DIR)/scripts/verify_swift_binary_targets.py" \
+		--manifest "$(CURRENT_DIR)/Package.swift" \
+		--full "$(IOS_XCFRAMEWORK_ZIP)" --lite "$(IOS_XCFRAMEWORK_LITE_ZIP)" \
+		--repository "$(IOS_GITHUB_REPO)" --tag "$(SWIFT_PACKAGE_RELEASE_TAG)"
 
 docker_all_image:
 	@echo "Building unified Docker image (all toolchains)..."
@@ -1712,6 +1724,7 @@ docker_all: docker_all_image
 		-e GIT_COMMIT="$(ALL_GIT_COMMIT)" \
 		-e BUILD_DATE="$(ALL_BUILD_DATE)" \
 		-e WEB_BUNDLE_VERSION="$(VOLVOXGRID_VERSION)" \
+		-e PAGES_BASE_PATH="$(PAGES_BASE_PATH)" \
 		-e BUILD_OCX="$(ALL_BUILD_OCX)" \
 		-e BUILD_DOTNET="$(DESKTOP_BUILD_DOTNET)" \
 		-e AAR_BUILD_DEBUG_SYMBOLS="$(AAR_BUILD_DEBUG_SYMBOLS)" \
@@ -1891,6 +1904,10 @@ publish_local:
 
 publish_github:
 	@command -v gh >/dev/null 2>&1 || { echo "Error: gh (GitHub CLI) not found in PATH."; exit 1; }
+	@python3 "$(CURRENT_DIR)/scripts/verify_swift_binary_targets.py" \
+		--manifest "$(CURRENT_DIR)/Package.swift" \
+		--full "$(IOS_XCFRAMEWORK_ZIP)" --lite "$(IOS_XCFRAMEWORK_LITE_ZIP)" \
+		--repository "$(IOS_GITHUB_REPO)" --tag "v$(VOLVOXGRID_VERSION)" --check-remote
 	@TAG="v$(VOLVOXGRID_VERSION)"; \
 	VERIFY_SCRIPT="$(CURRENT_DIR)/scripts/verify_embedded_version.sh"; \
 	PRERELEASE_FLAG=""; \
@@ -1901,32 +1918,24 @@ publish_github:
 		echo "Error: version verification script not found: $$VERIFY_SCRIPT"; \
 		exit 1; \
 	fi; \
+	for archive in "$(IOS_XCFRAMEWORK_ZIP)" "$(IOS_XCFRAMEWORK_LITE_ZIP)"; do \
+		if [ -f "$$archive" ]; then \
+			bash "$$VERIFY_SCRIPT" "$(IOS_VERSION)" "$$archive" || exit 1; \
+		fi; \
+	done; \
 	echo "Creating/updating GitHub release $$TAG..."; \
 	gh release view "$$TAG" --repo "$(IOS_GITHUB_REPO)" >/dev/null 2>&1 || \
-		gh release create "$$TAG" $$PRERELEASE_FLAG --repo "$(IOS_GITHUB_REPO)" --title "$$TAG" --notes "Release $$TAG" || exit 1; \
-	$(MAKE) update_swift_package_checksums SWIFT_PACKAGE_RELEASE_TAG="$$TAG" || exit 1; \
-		if [ -d "$(IOS_XCFRAMEWORK_DIR)" ]; then \
-			echo "Verifying embedded version for XCFramework (expected $(IOS_VERSION))..."; \
-			bash "$$VERIFY_SCRIPT" "$(IOS_VERSION)" "$(IOS_XCFRAMEWORK_DIR)" || exit 1; \
-		if [ ! -f "$(IOS_XCFRAMEWORK_ZIP)" ]; then \
-			echo "Error: Swift package zip not found: $(IOS_XCFRAMEWORK_ZIP)" >&2; \
-			exit 1; \
-		fi; \
+		gh release create "$$TAG" $$PRERELEASE_FLAG --verify-tag --repo "$(IOS_GITHUB_REPO)" --title "$$TAG" --notes "Release $$TAG" || exit 1; \
+	if [ -f "$(IOS_XCFRAMEWORK_ZIP)" ]; then \
 		gh release upload "$$TAG" "$(IOS_XCFRAMEWORK_ZIP)" --repo "$(IOS_GITHUB_REPO)" --clobber || exit 1; \
 		echo "XCFramework uploaded."; \
 	else \
-		echo "Skip iOS: $(IOS_XCFRAMEWORK_DIR) not found."; \
+		echo "Skip iOS: $(IOS_XCFRAMEWORK_ZIP) not found."; \
 	fi; \
-	if [ -d "$(IOS_XCFRAMEWORK_LITE_DIR)" ]; then \
-		echo "Verifying embedded version for lite XCFramework (expected $(IOS_VERSION))..."; \
-		bash "$$VERIFY_SCRIPT" "$(IOS_VERSION)" "$(IOS_XCFRAMEWORK_LITE_DIR)" || exit 1; \
-		if [ ! -f "$(IOS_XCFRAMEWORK_LITE_ZIP)" ]; then \
-			echo "Error: Swift package zip not found: $(IOS_XCFRAMEWORK_LITE_ZIP)" >&2; \
-			exit 1; \
-		fi; \
+	if [ -f "$(IOS_XCFRAMEWORK_LITE_ZIP)" ]; then \
 		gh release upload "$$TAG" "$(IOS_XCFRAMEWORK_LITE_ZIP)" --repo "$(IOS_GITHUB_REPO)" --clobber || exit 1; \
 	else \
-		echo "Skip iOS lite: $(IOS_XCFRAMEWORK_LITE_DIR) not found."; \
+		echo "Skip iOS lite: $(IOS_XCFRAMEWORK_LITE_ZIP) not found."; \
 	fi; \
 	DIST="$(CURRENT_DIR)/dist/maven"; \
 	for entry in \
@@ -1952,7 +1961,7 @@ publish_github:
 	    gh release upload "$$TAG" "$$f" --repo "$(IOS_GITHUB_REPO)" --clobber || exit 1; \
 	  fi; \
 	done; \
-	for f in "$(WEB_BUNDLE_ZIP)" "$(WEB_BUNDLE_LITE_ZIP)"; \
+	for f in "$(WEB_BUNDLE_ZIP)" "$(WEB_BUNDLE_LITE_ZIP)" "$(WEB_DEMO_ZIP)"; \
 	do \
 	  if [ -f "$$f" ]; then \
 	    echo "Uploading $$(basename "$$f") to $$TAG..."; \
@@ -2044,6 +2053,16 @@ publish_github:
 	  echo "Skip ActiveX OCX: no OCX output directory found."; \
 	fi; \
 	echo "All artifacts uploaded to $$TAG"
+
+publish_pages:
+	@command -v gh >/dev/null 2>&1 || { echo "Error: gh (GitHub CLI) not found in PATH."; exit 1; }
+	@gh release view "v$(VOLVOXGRID_VERSION)" --repo "$(IOS_GITHUB_REPO)" \
+		--json assets --jq '.assets[].name' | \
+		grep -Fx "volvoxgrid-demo-$(VOLVOXGRID_VERSION).zip" >/dev/null || \
+		{ echo "Error: release demo ZIP missing. Run make docker_all (or make docker_web WEB_DOCKER_TARGET=pages), then make publish_github."; exit 1; }
+	@gh workflow run pages.yml --repo "$(IOS_GITHUB_REPO)" --ref "$(PAGES_REF)" \
+		-f tag="v$(VOLVOXGRID_VERSION)"
+	@echo "Pages deployment queued. View progress: gh run list --repo $(IOS_GITHUB_REPO) --workflow pages.yml"
 
 publish_web:
 	@command -v firebase >/dev/null 2>&1 || { echo "Error: firebase CLI not found in PATH."; echo "Install with: npm install -g firebase-tools"; exit 1; }

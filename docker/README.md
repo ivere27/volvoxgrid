@@ -23,6 +23,7 @@ Use this when you want to know what just landed in `dist/` after the quick start
 - Java desktop JAR full and lite
 - iOS full and lite XCFrameworks
 - Web package zips full and lite
+- A self-contained web demo ZIP for GitHub Pages
 - `.NET` full and lite WinForms native output, when invoked with `DESKTOP_BUILD_DOTNET=1`
 
 The Maven set covers Android, Android lite, Compose, Compose lite, Java desktop, and Java desktop lite. The iOS XCFrameworks ship both the full engine and the lite cut. The web zips contain the minified bundles and a release-demo directory.
@@ -77,7 +78,9 @@ WEB_DOCKER_TARGET=web make docker_web
 WEB_DOCKER_TARGET=bundle make docker_web
 ```
 
-Supported values for `WEB_DOCKER_TARGET` are `all`, `bundle`, `web`, `sheet`, `sheet-lite`, `report`, `wasm`, `wasm-lite`, and `wasm-threaded`. The default is `all`.
+Supported values for `WEB_DOCKER_TARGET` are `all`, `bundle`, `web`, `pages`, `sheet`, `sheet-lite`, `report`, `wasm`, `wasm-lite`, and `wasm-threaded`. The default is `all`.
+
+`make docker_web WEB_DOCKER_TARGET=pages` builds only the GitHub Pages demo ZIP.
 
 ### Flutter native
 
@@ -109,14 +112,57 @@ Once `dist/` is populated, the `publish_*` targets push the artifacts to their r
 
 - `make publish_maven` — uploads Android, Android lite, Compose, Compose lite, Java desktop, and Java desktop lite.
 - `make publish_github` — uploads release artifacts, including debug-symbol zips from `dist/symbols/` when present.
+- `make publish_pages` — deploys the demo ZIP already uploaded to the matching GitHub release.
 - `make publish_nuget` — publishes both `VolvoxGrid.DotNet` and `VolvoxGrid.DotNet.Lite`.
 - `make publish_npm` — publishes `volvoxgrid`, `volvoxgrid-lite`, and adapter packages when their artifacts are present.
 
-A typical release is `make docker_all` followed by all four `publish_*` commands. If `.NET` was excluded (no `DESKTOP_BUILD_DOTNET=1`), skip `make publish_nuget`.
+A typical release is `make docker_all` followed by `publish_maven`, `publish_github`, `publish_nuget` and `publish_npm`. Run `publish_pages` after `publish_github` completes. If `.NET` was excluded (no `DESKTOP_BUILD_DOTNET=1`), skip `make publish_nuget`.
+
+## GitHub Pages release demo
+
+The Pages site is deployed from `volvoxgrid-demo-VERSION.zip` attached to a
+GitHub release. The ZIP contains the demo HTML, bundled JavaScript and matching
+WASM; the workflow downloads and deploys it without rebuilding or committing
+generated files. The root URL redirects to `demos/web/`.
+
+One-time setup: add `.github/workflows/pages.yml` to the repository's default
+branch (`main`) and select **GitHub Actions** under **Settings → Pages → Source**.
+Then run:
+
+```bash
+make docker_all
+make publish_github
+make publish_pages
+```
+
+Before `publish_github`, push the release tag to GitHub. If the build changed
+`Package.swift` checksums, commit them and finalize the release tag first;
+`publish_github` requires the remote tag to exist.
+
+`docker_all` creates the XCFramework ZIPs and records their checksums. The
+checksum-only commit may follow the source commit recorded in the binaries;
+tag that final manifest commit without rebuilding merely to change the build
+SHA. `publish_github` uploads the existing ZIPs without regenerating them or
+editing `Package.swift`. Before creating or updating a release, it checks the
+ZIP hashes and URLs against both the working manifest and `Package.swift` at
+the remote release tag, and checks the version embedded in each archived
+native library. A mismatch stops publication. Local checksum validation is
+also available with `make verify_swift_package_checksums`.
+
+The upload must finish before `publish_pages` runs. The workflow deliberately
+does not trigger on release creation, because `publish_github` creates the
+release before uploading its assets. Deployment progress appears in the
+**Deploy release demo to Pages** Actions workflow.
+
+The default URL is <https://ivere27.github.io/volvoxgrid/demos/web/>.
+For a different repository path or custom domain, set `PAGES_BASE_PATH` when
+building (for example `PAGES_BASE_PATH=/` for a site at the domain root).
+The regular non-threaded WASM build is used; no custom response headers are
+needed. Optional remote DOOM assets and fonts retain their existing fetch paths.
 
 ## Web and sheet release demos
 
-This is worth knowing before you publish — the small demo directories generated under `dist/web/` are wired to the public CDN, not to local files. They load package JavaScript from jsDelivr import maps using `volvoxgrid@VERSION/dist/volvoxgrid.min.js`, adapter minified bundles, and the published `wasm/volvoxgrid_wasm.js` package path. That means the demos only work end-to-end after `make publish_npm` lands the matching `VERSION`.
+The Firebase demo directories under `dist/web/demos/` load package JavaScript from jsDelivr import maps using `volvoxgrid@VERSION/dist/volvoxgrid.min.js`, adapter minified bundles, and the published `wasm/volvoxgrid_wasm.js` package path. These demos require `make publish_npm` for the matching `VERSION`. The separate Pages demo ZIP bundles its own JavaScript and WASM and can be deployed as soon as its release upload completes.
 
 ## Environment variables
 
