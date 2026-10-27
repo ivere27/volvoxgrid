@@ -1,10 +1,13 @@
+require_relative '../native/resolve'
+VolvoxGridNative.macos_library
+
 #
 # To learn more about a Podspec see http://guides.cocoapods.org/syntax/podspec.html.
 # Run `pod lib lint volvoxgrid.podspec` to validate before publishing.
 #
 Pod::Spec.new do |s|
   s.name             = 'volvoxgrid'
-  s.version          = '0.8.11'
+  s.version          = VolvoxGridNative.package_version
   s.summary          = 'VolvoxGrid pixel-rendering grid widget for Flutter.'
   s.description      = <<-DESC
 VolvoxGrid pixel-rendering grid widget for Flutter.
@@ -25,34 +28,4 @@ VolvoxGrid pixel-rendering grid widget for Flutter.
   }
   s.swift_version = '5.0'
 
-  s.script_phase = {
-    :name => 'VolvoxGrid Resolve Native',
-    :execution_position => :before_compile,
-    :script => <<-SCRIPT
-set -eu
-PACKAGE_ROOT="${PODS_TARGET_SRCROOT}"
-REPO_ROOT="${PACKAGE_ROOT}/.."
-VOLVOXGRID_SOURCE="${VOLVOXGRID_SOURCE:-maven}"
-VOLVOXGRID_VERSION="${VOLVOXGRID_VERSION:-#{s.version}}"
-
-if [ "${VOLVOXGRID_SOURCE}" != "maven" ]; then
-  exit 0
-fi
-
-GRADLE_DIR="${PACKAGE_ROOT}"
-EXTRA_ARGS=""
-case "${VOLVOXGRID_VERSION}" in
-  *-SNAPSHOT) EXTRA_ARGS="--refresh-dependencies" ;;
-esac
-
-if [ -x "${REPO_ROOT}/android/gradlew" ]; then
-  "${REPO_ROOT}/android/gradlew" -p "${GRADLE_DIR}" -PvolvoxgridVersion="${VOLVOXGRID_VERSION}" ${EXTRA_ARGS} copyNative
-elif command -v gradle >/dev/null 2>&1; then
-  gradle -p "${GRADLE_DIR}" -PvolvoxgridVersion="${VOLVOXGRID_VERSION}" ${EXTRA_ARGS} copyNative
-else
-  echo "error: VolvoxGrid requires gradle (or android/gradlew) to resolve desktop binaries from Maven."
-  exit 1
-fi
-SCRIPT
-  }
 end

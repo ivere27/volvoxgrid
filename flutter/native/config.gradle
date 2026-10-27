@@ -1,0 +1,28 @@
+// Native versions are resolved within the package, never by walking arbitrary
+// ancestors (a pub cache or consuming application's VERSION is unrelated).
+def packageRoot = new File(projectDir, '..').canonicalFile
+def repoRoot = packageRoot.parentFile
+def isRepository = new File(repoRoot, 'Cargo.toml').isFile() &&
+    new File(repoRoot, 'engine').isDirectory()
+def nonEmpty = { value -> value == null ? null : value.toString().trim() ?: null }
+def packageVersion = null
+def pubspec = new File(packageRoot, 'pubspec.yaml')
+if (pubspec.isFile()) {
+    def match = pubspec.getText('UTF-8') =~ /(?m)^version:\s*['"]?([^\s'"#]+)/
+    if (match.find()) packageVersion = match.group(1).split(/\+/)[0]
+}
+def repositoryVersion = null
+def versionFile = new File(repoRoot, 'VERSION')
+if (isRepository && versionFile.isFile()) repositoryVersion = nonEmpty(versionFile.getText('UTF-8'))
+
+ext.volvoxgridNativeVersion = nonEmpty(System.getenv('VOLVOXGRID_VERSION')) ?:
+    nonEmpty(project.findProperty('volvoxgridVersion')) ?: packageVersion ?: repositoryVersion
+ext.volvoxgridNativeSource = nonEmpty(System.getenv('VOLVOXGRID_SOURCE')) ?:
+    nonEmpty(project.findProperty('volvoxgridSource')) ?: 'maven'
+if (!(volvoxgridNativeSource in ['local', 'maven'])) {
+    throw new GradleException("VolvoxGrid: Invalid source '${volvoxgridNativeSource}'. Set VOLVOXGRID_SOURCE to local or maven.")
+}
+if (!volvoxgridNativeVersion || !(volvoxgridNativeVersion ==~ /[0-9][A-Za-z0-9._+\-]*/)) {
+    throw new GradleException('VolvoxGrid: Cannot resolve native version. Set VOLVOXGRID_VERSION (or -PvolvoxgridVersion), or restore the package pubspec.yaml version.')
+}
+ext.volvoxgridRepositoryRoot = isRepository ? repoRoot : null

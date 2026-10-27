@@ -69,12 +69,17 @@ class VolvoxGridBeforeEditDetails {
   final pb.GridEvent rawEvent;
   final int row;
   final int col;
+
+  /// Native identity captured when this event was emitted. Zero means no
+  /// identity: the low-level grid was created with row IDs disabled.
+  final int rowId;
   bool cancel;
 
   VolvoxGridBeforeEditDetails({
     required this.rawEvent,
     required this.row,
     required this.col,
+    this.rowId = 0,
     this.cancel = false,
   });
 }
@@ -114,6 +119,10 @@ class VolvoxGridCellEditValidatingDetails {
   final pb.GridEvent rawEvent;
   final int row;
   final int col;
+
+  /// Native identity captured when this edit session started. Zero means no
+  /// identity: the low-level grid was created with row IDs disabled.
+  final int rowId;
   final String editText;
   bool cancel;
 
@@ -122,6 +131,7 @@ class VolvoxGridCellEditValidatingDetails {
     required this.row,
     required this.col,
     required this.editText,
+    this.rowId = 0,
     this.cancel = false,
   });
 }
@@ -161,11 +171,13 @@ class VolvoxGridBeforeSortDetails {
 class _CellEditValidatingPayload {
   final int row;
   final int col;
+  final int rowId;
   final String editText;
 
   const _CellEditValidatingPayload({
     required this.row,
     required this.col,
+    required this.rowId,
     required this.editText,
   });
 }
@@ -217,6 +229,19 @@ class VolvoxGridWidget extends StatefulWidget {
   /// Controller that owns the native grid id.
   final VolvoxGridController controller;
 
+  /// Whether this view renders and accepts input/events.
+  ///
+  /// Set false for an inactive tab kept in an IndexedStack. A disabled
+  /// [TickerMode] also suspends the view. Pending local editing is cancelled
+  /// when suspended; data and controller lifetime remain owned by the caller.
+  final bool active;
+
+  /// Enables native selection-wide delete, cut and paste shortcuts.
+  ///
+  /// Disable when the application validates writes one cell at a time. Text
+  /// editing shortcuts inside an active editor remain available.
+  final bool allowBulkEdits;
+
   /// Optional callback invoked whenever the active cell selection changes.
   final ValueChanged<pb.SelectionUpdate>? onSelectionChanged;
 
@@ -228,7 +253,7 @@ class VolvoxGridWidget extends StatefulWidget {
   /// Set [VolvoxGridBeforeEditDetails.cancel] to true to cancel the edit.
   ///
   /// This is one of the currently supported cancelable widget hooks.
-  final ValueChanged<VolvoxGridBeforeEditDetails>? onBeforeEdit;
+  final FutureOr<void> Function(VolvoxGridBeforeEditDetails)? onBeforeEdit;
 
   /// Deprecated source-compatible callback. Dropdown-open cancellation is no
   /// longer emitted by the native engine.
@@ -243,7 +268,8 @@ class VolvoxGridWidget extends StatefulWidget {
   /// pending edit.
   ///
   /// This is one of the currently supported cancelable widget hooks.
-  final ValueChanged<VolvoxGridCellEditValidatingDetails>? onCellEditValidating;
+  final FutureOr<void> Function(VolvoxGridCellEditValidatingDetails)?
+      onCellEditValidating;
 
   /// Optional callback fired before header-click sorting is applied.
   ///
@@ -283,6 +309,8 @@ class VolvoxGridWidget extends StatefulWidget {
 
   const VolvoxGridWidget({
     required this.controller,
+    this.active = true,
+    this.allowBulkEdits = true,
     this.onSelectionChanged,
     this.onGridEvent,
     this.onBeforeEdit,
@@ -304,6 +332,19 @@ class VolvoxGridWidget extends StatefulWidget {
 class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
     with WidgetsBindingObserver {
   late final AppLifecycleListener _lifecycleListener;
+  bool _tickerModeEnabled = true;
+  bool _appActive = true;
+  bool _viewActive = false;
+  int _controllerEpoch = 0;
+  int _renderEpoch = 0;
+  int _eventEpoch = 0;
+
+  bool _isCurrentController(VolvoxGridController controller, int epoch) =>
+      mounted &&
+      _viewActive &&
+      epoch == _controllerEpoch &&
+      identical(widget.controller, controller) &&
+      controller.isCreated;
 
   static const bool _flingOverrideEnabled = bool.fromEnvironment(
     'VG_ENABLE_FLING',
@@ -468,7 +509,6 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
     _imeProxyFocusNode.onKeyEvent = _onImeProxyFocusKeyEvent;
     _imeProxyController.addListener(_handleImeProxyChanged);
     widget.controller.addListener(_onControllerChanged);
-    _syncEventStreamSubscription();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;
@@ -477,7 +517,44 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
     });
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _tickerModeEnabled = TickerMode.of(context);
+    _syncViewActivity();
+  }
+
+  void _syncViewActivity() {
+    final active = widget.active && _tickerModeEnabled && _appActive;
+    if (_viewActive == active) return;
+    _viewActive = active;
+    if (active) {
+      _syncEventStreamSubscription();
+      _requestRender();
+      return;
+    }
+    _controllerEpoch += 1;
+    _fallbackLoading = false;
+    _longPressTimer?.cancel();
+    // Do not leave a hidden native editor or keyboard active behind another tab.
+    final controller = widget.controller;
+    if (_hasActiveEditSession && controller.isCreated) {
+      unawaited(controller.cancelEdit().catchError((Object _) {}));
+    }
+    _editing = false;
+    _editSessionToken += 1;
+    _editSessionId = Int64.ZERO;
+    _editStateVersion = Int64.ZERO;
+    _editFocusNode.unfocus();
+    _imeProxyFocusNode.unfocus();
+    _gridFocusNode.unfocus();
+    _closeRenderSession(controller: controller);
+    _closeEventStream();
+  }
+
   void _onPause() {
+    _appActive = false;
+    _syncViewActivity();
     unawaited(_setFlingEnabledBestEffort(widget.controller, false));
 
     // Reset render gating so resume can always submit a fresh frame.
@@ -501,56 +578,57 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
   }
 
   void _onResume() {
+    final controller = widget.controller;
+    final controllerEpoch = _controllerEpoch;
+    _appActive = true;
+    _syncViewActivity();
+    if (!_viewActive) return;
     unawaited(_setFlingEnabledBestEffort(
-        widget.controller, _isMobilePlatform || _flingOverrideEnabled));
+        controller, _isMobilePlatform || _flingOverrideEnabled));
 
     if (defaultTargetPlatform != TargetPlatform.android) {
       _ensureRenderSession();
       _requestRender();
       return;
     }
-    if (!_wasUsingGpuTexture && widget.controller.gpuTextureId == null) {
+    if (!_wasUsingGpuTexture && controller.gpuTextureId == null) {
       _ensureRenderSession();
       _requestRender();
       return;
     }
 
     _wasUsingGpuTexture = false;
-    final backendToRestore = widget.controller.gpuBackend ?? 'gles';
+    final backendToRestore = controller.gpuBackend ?? 'gles';
     // Backgrounding invalidates the native texture/surface on many devices.
     // Recreate the texture and force a guaranteed redraw into the new surface.
     unawaited(() async {
       try {
-        await widget.controller.releaseGpuTexture(graceful: true);
-        if (!mounted) {
-          return;
-        }
-        await widget.controller.createGpuTexture(
+        await controller.releaseGpuTexture(graceful: true);
+        if (!_isCurrentController(controller, controllerEpoch)) return;
+        await controller.createGpuTexture(
           backend: backendToRestore,
           width: _viewportWidth > 0 ? _viewportWidth : 1,
           height: _viewportHeight > 0 ? _viewportHeight : 1,
         );
-        if (!mounted) {
-          return;
-        }
+        if (!_isCurrentController(controller, controllerEpoch)) return;
         _pendingFrame = false;
         _needsFollowupRender = false;
         if (_viewportWidth > 0 && _viewportHeight > 0) {
-          await widget.controller
-              .setGpuTextureSize(_viewportWidth, _viewportHeight);
+          await controller.setGpuTextureSize(_viewportWidth, _viewportHeight);
+          if (!_isCurrentController(controller, controllerEpoch)) return;
         }
         // Force a fresh frame for the newly attached surface even if the grid
         // was previously clean.
-        if (widget.controller.gpuTextureId != null &&
-            widget.controller.isCreated) {
-          await widget.controller.refresh();
+        if (controller.gpuTextureId != null && controller.isCreated) {
+          await controller.refresh();
+          if (!_isCurrentController(controller, controllerEpoch)) return;
         }
-        if (!mounted) {
+        if (!_isCurrentController(controller, controllerEpoch)) {
           return;
         }
         _requestRender();
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) {
+          if (!_isCurrentController(controller, controllerEpoch)) {
             return;
           }
           _pendingFrame = false;
@@ -558,7 +636,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
           _requestRender();
         });
       } finally {
-        if (mounted) {
+        if (_isCurrentController(controller, controllerEpoch)) {
           _ensureRenderSession();
           setState(() {});
         }
@@ -568,6 +646,8 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
 
   @override
   void dispose() {
+    _controllerEpoch += 1;
+    _viewActive = false;
     WidgetsBinding.instance.removeObserver(this);
     _lifecycleListener.dispose();
     _longPressTimer?.cancel();
@@ -622,6 +702,21 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
   void didUpdateWidget(covariant VolvoxGridWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.controller != widget.controller) {
+      _controllerEpoch += 1;
+      _editing = false;
+      _editSessionToken += 1;
+      _editSessionId = Int64.ZERO;
+      _editStateVersion = Int64.ZERO;
+      _editFocusNode.unfocus();
+      _imeProxyFocusNode.unfocus();
+      _selRow = -1;
+      _selCol = -1;
+      _selRangesHash = -1;
+      _fallbackLoading = false;
+      _fallbackCells = const <List<String>>[];
+      _fallbackError = null;
+      _safeDisposeImage(_currentImage);
+      _currentImage = null;
       _debugLog(
         () =>
             'VolvoxGrid controller swap: oldGrid=${oldWidget.controller.gridId} '
@@ -647,6 +742,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
         _requestRender();
       }
     }
+    _syncViewActivity();
     if (oldWidget.onGridEvent != widget.onGridEvent ||
         oldWidget.onBeforeEdit != widget.onBeforeEdit ||
         oldWidget.onCellEditValidating != widget.onCellEditValidating ||
@@ -660,10 +756,12 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
   }
 
   void _onControllerChanged() {
-    if (!mounted) {
+    if (!mounted || !_viewActive) {
       return;
     }
     final gpuTextureId = widget.controller.gpuTextureId;
+    final controller = widget.controller;
+    final controllerEpoch = _controllerEpoch;
     if (gpuTextureId != _lastGpuTextureId) {
       _lastGpuTextureId = gpuTextureId;
       // Backend/texture transitions can invalidate a pending frame signal.
@@ -675,7 +773,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
           widget.controller
               .setGpuTextureSize(_viewportWidth, _viewportHeight)
               .then((_) {
-            if (!mounted) {
+            if (!_isCurrentController(controller, controllerEpoch)) {
               return;
             }
             _requestRender();
@@ -695,6 +793,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
   // ── Render session management ─────────────────────────────────────────────
 
   void _ensureRenderSession() {
+    if (!_viewActive) return;
     if (_inputController != null) return;
     if (!widget.controller.isCreated) return;
     _debugLog(
@@ -712,9 +811,18 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
     final outputStream = widget.controller.renderSession(
       _inputController!.stream,
     );
+    final renderEpoch = _renderEpoch;
+    final controller = widget.controller;
+    final controllerEpoch = _controllerEpoch;
+    bool isCurrent() =>
+        _isCurrentController(controller, controllerEpoch) &&
+        renderEpoch == _renderEpoch;
     _outputSubscription = outputStream.listen(
-      _handleRenderOutput,
+      (output) {
+        if (isCurrent()) _handleRenderOutput(output);
+      },
       onError: (Object e) {
+        if (!isCurrent()) return;
         _debugLog(
           () =>
               'VolvoxGrid render session error: grid=${widget.controller.gridId} '
@@ -723,6 +831,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
         _resetRenderFlowState();
       },
       onDone: () {
+        if (!isCurrent()) return;
         _debugLog(
           () =>
               'VolvoxGrid render session done: grid=${widget.controller.gridId}',
@@ -746,6 +855,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
   }
 
   void _closeRenderSession({VolvoxGridController? controller}) {
+    _renderEpoch += 1;
     if (_outputSubscription != null || _inputController != null) {
       _debugLog(
         () => 'VolvoxGrid render session close: '
@@ -773,6 +883,9 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
     _imeProxyOverlayVisible = false;
     _imeProxyOverlayRect = Rect.zero;
     _imeProxyEditEpoch += 1;
+    _queuedEditCommand = Future<void>.value();
+    _editCommitReplayActive = false;
+    _deferredPointerCompletionAfterEditCommit = null;
     _imeProxySessionId = Int64.ZERO;
     _imeProxyStateVersion = Int64.ZERO;
     _editOverlayPendingReveal = false;
@@ -851,7 +964,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
       widget.onCancelableEvent != null;
 
   void _syncEventStreamSubscription() {
-    if (!_wantsGridEvents || !widget.controller.isCreated) {
+    if (!_viewActive || !_wantsGridEvents || !widget.controller.isCreated) {
       _closeEventStream();
       return;
     }
@@ -868,15 +981,25 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
     _debugLog(
       () => 'VolvoxGrid event stream open: grid=${widget.controller.gridId}',
     );
-    _eventSubscription = widget.controller.eventStream().listen(
-      _handleGridEvent,
+    final eventEpoch = _eventEpoch;
+    final controller = widget.controller;
+    final controllerEpoch = _controllerEpoch;
+    bool isCurrent() =>
+        _isCurrentController(controller, controllerEpoch) &&
+        eventEpoch == _eventEpoch;
+    _eventSubscription = controller.eventStream().listen(
+      (event) {
+        if (isCurrent()) unawaited(_handleGridEvent(event));
+      },
       onError: (Object e) {
+        if (!isCurrent()) return;
         _debugLog(
           () =>
               'VolvoxGrid event stream error: grid=${widget.controller.gridId} $e',
         );
       },
       onDone: () {
+        if (!isCurrent()) return;
         _debugLog(
           () =>
               'VolvoxGrid event stream done: grid=${widget.controller.gridId}',
@@ -888,6 +1011,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
   }
 
   void _closeEventStream() {
+    _eventEpoch += 1;
     if (_eventSubscription != null) {
       _debugLog(
         () => 'VolvoxGrid event stream close: grid=${widget.controller.gridId}',
@@ -921,6 +1045,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
         return _CellEditValidatingPayload(
           row: payload.row as int,
           col: payload.col as int,
+          rowId: (payload.rowId as Int64?)?.toInt() ?? 0,
           editText: (payload.editText as String?) ?? '',
         );
       }
@@ -933,6 +1058,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
         return _CellEditValidatingPayload(
           row: payload.row as int,
           col: payload.col as int,
+          rowId: (payload.rowId as Int64?)?.toInt() ?? 0,
           editText: (payload.editText as String?) ?? '',
         );
       }
@@ -991,7 +1117,11 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
     _decisionChannelEnabled = true;
   }
 
-  void _handleGridEvent(pb.GridEvent event) {
+  Future<void> _handleGridEvent(pb.GridEvent event) async {
+    final controller = widget.controller;
+    final controllerEpoch = _controllerEpoch;
+    final eventEpoch = _eventEpoch;
+    final renderEpoch = _renderEpoch;
     widget.onGridEvent?.call(event);
     _dispatchCustomRenderCell(event);
 
@@ -1009,7 +1139,21 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
       return;
     }
 
-    final cancel = _dispatchCancelableGridEvent(event);
+    var cancel = true;
+    try {
+      cancel = await _dispatchCancelableGridEvent(event);
+    } catch (error, stackTrace) {
+      // A failed permission/validation callback must never authorize a write.
+      FlutterError.reportError(FlutterErrorDetails(
+        exception: error,
+        stack: stackTrace,
+        library: 'volvoxgrid',
+        context: ErrorDescription('while deciding a cancelable grid event'),
+      ));
+    }
+    if (!_isCurrentController(controller, controllerEpoch) ||
+        eventEpoch != _eventEpoch ||
+        renderEpoch != _renderEpoch) return;
     _sendInput(
       pb.RenderInput()
         ..eventDecision = (pb.EventDecision()
@@ -1020,16 +1164,21 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
     _requestRender();
   }
 
-  bool _dispatchCancelableGridEvent(pb.GridEvent event) {
+  Future<bool> _dispatchCancelableGridEvent(pb.GridEvent event) async {
     var cancel = false;
+    final onBeforeEdit = widget.onBeforeEdit;
+    final onCellEditValidating = widget.onCellEditValidating;
+    final onBeforeSort = widget.onBeforeSort;
+    final onCancelableEvent = widget.onCancelableEvent;
 
     if (event.hasBeforeEdit()) {
       final details = VolvoxGridBeforeEditDetails(
         rawEvent: event,
         row: event.beforeEdit.row,
         col: event.beforeEdit.col,
+        rowId: event.beforeEdit.rowId.toInt(),
       );
-      widget.onBeforeEdit?.call(details);
+      await onBeforeEdit?.call(details);
       cancel = cancel || details.cancel;
     }
 
@@ -1039,9 +1188,10 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
         rawEvent: event,
         row: validate.row,
         col: validate.col,
+        rowId: validate.rowId,
         editText: validate.editText,
       );
-      widget.onCellEditValidating?.call(details);
+      await onCellEditValidating?.call(details);
       cancel = cancel || details.cancel;
     }
 
@@ -1050,11 +1200,10 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
         rawEvent: event,
         col: event.beforeSort.col,
       );
-      widget.onBeforeSort?.call(details);
+      onBeforeSort?.call(details);
       cancel = cancel || details.cancel;
     }
 
-    final onCancelableEvent = widget.onCancelableEvent;
     if (onCancelableEvent != null) {
       cancel = onCancelableEvent(event) || cancel;
     }
@@ -1063,6 +1212,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
   }
 
   void _sendInput(pb.RenderInput input, {bool tracksBufferReady = false}) {
+    if (!_viewActive || !mounted || !widget.controller.isCreated) return;
     input.gridId = widget.controller.gridId;
     if (tracksBufferReady) {
       _pendingFrame = true;
@@ -1100,7 +1250,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
   }
 
   void _flushQueuedViewportResize() {
-    if (!mounted) {
+    if (!mounted || !_viewActive) {
       _pendingViewportWidth = 0;
       _pendingViewportHeight = 0;
       return;
@@ -1272,7 +1422,8 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
   }
 
   void _requestRender() {
-    if (!widget.controller.isCreated ||
+    if (!_viewActive ||
+        !widget.controller.isCreated ||
         _viewportWidth <= 0 ||
         _viewportHeight <= 0) {
       return;
@@ -1694,16 +1845,18 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
             : (_decodeScratch = Uint8List(_bufferSize));
     snapshot.setAll(0, source);
     _decodeInFlight = true;
+    final controller = widget.controller;
+    final controllerEpoch = _controllerEpoch;
+    final renderEpoch = _renderEpoch;
     ui.decodeImageFromPixels(snapshot, w, h, ui.PixelFormat.rgba8888, (
       ui.Image image,
     ) {
-      final oldImage = _currentImage;
-      if (!mounted) {
-        _safeDisposeImage(oldImage);
+      if (!_isCurrentController(controller, controllerEpoch) ||
+          renderEpoch != _renderEpoch) {
         _safeDisposeImage(image);
-        _decodeInFlight = false;
         return;
       }
+      final oldImage = _currentImage;
       setState(() {
         _currentImage = image;
         _fallbackCells = const <List<String>>[];
@@ -1722,21 +1875,25 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
   }
 
   Future<void> _refreshFallbackSnapshot() async {
+    final controller = widget.controller;
+    final controllerEpoch = _controllerEpoch;
     if (!mounted ||
         _fallbackLoading ||
-        !widget.controller.isCreated ||
+        !controller.isCreated ||
         _currentImage != null) {
       return;
     }
     _fallbackLoading = true;
 
     try {
-      final rows = await widget.controller.rowCount();
-      final cols = await widget.controller.colCount();
+      final rows = await controller.rowCount();
+      if (!_isCurrentController(controller, controllerEpoch)) return;
+      final cols = await controller.colCount();
+      if (!_isCurrentController(controller, controllerEpoch)) return;
       final maxRows = math.max(0, math.min(rows, 200));
       final maxCols = math.max(0, math.min(cols, 16));
       if (maxRows == 0 || maxCols == 0) {
-        if (!mounted) {
+        if (!_isCurrentController(controller, controllerEpoch)) {
           return;
         }
         setState(() {
@@ -1747,7 +1904,8 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
       }
 
       final resp =
-          await widget.controller.getCellsRange(0, 0, maxRows - 1, maxCols - 1);
+          await controller.getCellsRange(0, 0, maxRows - 1, maxCols - 1);
+      if (!_isCurrentController(controller, controllerEpoch)) return;
       final snapshot = <List<String>>[];
       for (var r = 0; r < maxRows; r++) {
         snapshot.add(List<String>.filled(maxCols, ''));
@@ -1765,7 +1923,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
         snapshot[cell.row][cell.col] = cell.value.text;
       }
 
-      if (!mounted) {
+      if (!_isCurrentController(controller, controllerEpoch)) {
         return;
       }
       setState(() {
@@ -1773,14 +1931,15 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
         _fallbackError = null;
       });
     } catch (error) {
-      if (!mounted) {
+      if (!_isCurrentController(controller, controllerEpoch)) {
         return;
       }
       setState(() {
         _fallbackError = error;
       });
     } finally {
-      _fallbackLoading = false;
+      if (_isCurrentController(controller, controllerEpoch))
+        _fallbackLoading = false;
     }
   }
 
@@ -1824,8 +1983,10 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
   // ── Edit overlay ──────────────────────────────────────────────────────────
 
   void _queueEditCommand(Future<void> Function() op) {
+    final controller = widget.controller;
+    final controllerEpoch = _controllerEpoch;
     _queuedEditCommand = _queuedEditCommand.then((_) async {
-      if (!mounted || !widget.controller.isCreated) {
+      if (!_isCurrentController(controller, controllerEpoch)) {
         return;
       }
       await op();
@@ -1942,7 +2103,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
   }
 
   void _requestIdleInputFocus() {
-    if (_editing) {
+    if (!_viewActive || _editing) {
       return;
     }
     // On mobile (Android/iOS), focusing the hidden imeProxy TextField would
@@ -1954,7 +2115,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
     }
     _imeProxyFocusNode.requestFocus();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _editing) {
+      if (!mounted || !_viewActive || _editing) {
         return;
       }
       if (!_imeProxyFocusNode.hasFocus) {
@@ -2059,8 +2220,12 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
       );
     });
     _resolveEditCellStyle(session.row, session.col);
+    final controller = widget.controller;
+    final controllerEpoch = _controllerEpoch;
+    final sessionToken = _editSessionToken;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted ||
+      if (!_isCurrentController(controller, controllerEpoch) ||
+          sessionToken != _editSessionToken ||
           !_editing ||
           _editRow != session.row ||
           _editCol != session.col) {
@@ -2069,7 +2234,8 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
       _editFocusNode.requestFocus();
       _applyEditorSessionStartSelection(req);
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted ||
+        if (!_isCurrentController(controller, controllerEpoch) ||
+            sessionToken != _editSessionToken ||
             !_editing ||
             _editRow != session.row ||
             _editCol != session.col) {
@@ -2081,8 +2247,15 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
   }
 
   void _resolveEditCellStyle(int row, int col) {
-    widget.controller.getEditCellStyle(row, col).then((style) {
-      if (!mounted || !_editing || _editRow != row || _editCol != col) return;
+    final controller = widget.controller;
+    final controllerEpoch = _controllerEpoch;
+    final sessionToken = _editSessionToken;
+    controller.getEditCellStyle(row, col).then((style) {
+      if (!_isCurrentController(controller, controllerEpoch) ||
+          sessionToken != _editSessionToken ||
+          !_editing ||
+          _editRow != row ||
+          _editCol != col) return;
       if (style == null) return;
       // Engine values are in physical pixels; convert to logical.
       final dpr = _devicePixelRatio <= 0 ? 1.0 : _devicePixelRatio;
@@ -2172,11 +2345,14 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
   }
 
   Future<List<int>?> _resolveImeProxyEditCell(int row, int col) async {
+    final controller = widget.controller;
+    final controllerEpoch = _controllerEpoch;
     if (row >= 0 && col >= 0) {
       return <int>[row, col];
     }
     try {
-      final selection = await widget.controller.getSelection();
+      final selection = await controller.getSelection();
+      if (!_isCurrentController(controller, controllerEpoch)) return null;
       if (selection.activeRow >= 0 && selection.activeCol >= 0) {
         return <int>[selection.activeRow, selection.activeCol];
       }
@@ -2260,6 +2436,8 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
   }
 
   void _handleImeProxyChanged() {
+    final controller = widget.controller;
+    final controllerEpoch = _controllerEpoch;
     if (_suppressImeProxyChanges) {
       return;
     }
@@ -2283,21 +2461,25 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
         final initialCol = _selCol;
         _queueEditCommand(() async {
           final cell = await _resolveImeProxyEditCell(initialRow, initialCol);
+          if (!_isCurrentController(controller, controllerEpoch)) return;
           if (cell == null) {
-            if (mounted && _imeProxySessionActive) {
+            if (_isCurrentController(controller, controllerEpoch) &&
+                _imeProxySessionActive) {
               _finishImeProxySession();
               _clearImeProxyValue();
             }
             return;
           }
-          final state = await widget.controller.beginEditState(
+          final state = await controller.beginEditState(
             cell[0],
             cell[1],
             reason: pb.EditStartReason.EDIT_START_IME_COMPOSITION,
             seedText: '',
           );
+          if (!_isCurrentController(controller, controllerEpoch)) return;
           _rememberImeProxyEditState(state);
-          if (mounted && _imeProxySessionActive) {
+          if (_isCurrentController(controller, controllerEpoch) &&
+              _imeProxySessionActive) {
             _showImeProxyOverlayForEditState(state);
             _requestRender();
           }
@@ -2319,21 +2501,23 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
         if (opEpoch != _imeProxyEditEpoch) {
           return;
         }
-        final textState = await widget.controller.setEditText(
+        final textState = await controller.setEditText(
           committedText,
           sessionId: _imeProxySessionId,
           stateVersion: _imeProxyStateVersion,
         );
+        if (!_isCurrentController(controller, controllerEpoch)) return;
         _rememberImeProxyEditState(textState);
         if (opEpoch != _imeProxyEditEpoch) {
           return;
         }
-        final preeditState = await widget.controller.setEditPreedit(
+        final preeditState = await controller.setEditPreedit(
           preedit,
           cursor: cursor,
           sessionId: _imeProxySessionId,
           stateVersion: _imeProxyStateVersion,
         );
+        if (!_isCurrentController(controller, controllerEpoch)) return;
         _rememberImeProxyEditState(preeditState);
         _requestRender();
       });
@@ -2347,21 +2531,23 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
         if (opEpoch != _imeProxyEditEpoch) {
           return;
         }
-        final textState = await widget.controller.setEditText(
+        final textState = await controller.setEditText(
           committedText,
           sessionId: _imeProxySessionId,
           stateVersion: _imeProxyStateVersion,
         );
+        if (!_isCurrentController(controller, controllerEpoch)) return;
         _rememberImeProxyEditState(textState);
         if (opEpoch != _imeProxyEditEpoch) {
           return;
         }
-        final preeditState = await widget.controller.setEditPreedit(
+        final preeditState = await controller.setEditPreedit(
           '',
           cursor: 0,
           sessionId: _imeProxySessionId,
           stateVersion: _imeProxyStateVersion,
         );
+        if (!_isCurrentController(controller, controllerEpoch)) return;
         _rememberImeProxyEditState(preeditState);
         _requestRender();
       });
@@ -2388,27 +2574,32 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
     }
     _queueEditCommand(() async {
       final cell = await _resolveImeProxyEditCell(row, col);
+      if (!_isCurrentController(controller, controllerEpoch)) return;
       if (cell == null) {
-        if (mounted && _imeProxySessionActive) {
+        if (_isCurrentController(controller, controllerEpoch) &&
+            _imeProxySessionActive) {
           _finishImeProxySession();
           _clearImeProxyValue();
         }
         return;
       }
-      final state = await widget.controller.beginEditState(
+      final state = await controller.beginEditState(
         cell[0],
         cell[1],
         reason: startReason,
         seedText: seedText,
       );
+      if (!_isCurrentController(controller, controllerEpoch)) return;
       if (compositionLikeText) {
         _rememberImeProxyEditState(state);
-        if (mounted && _imeProxySessionActive) {
+        if (_isCurrentController(controller, controllerEpoch) &&
+            _imeProxySessionActive) {
           _showImeProxyOverlayForEditState(state);
           _requestRender();
         }
       } else {
-        if (mounted && _imeProxySessionActive) {
+        if (_isCurrentController(controller, controllerEpoch) &&
+            _imeProxySessionActive) {
           _finishImeProxySession();
         }
       }
@@ -2693,14 +2884,17 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
   }
 
   void _commitImeProxyEditAndSendKey(int navigateKeyCode, int modifier) {
+    final controller = widget.controller;
+    final controllerEpoch = _controllerEpoch;
     final text = _imeProxyController.value.text;
     _closeImeProxyForKeyCommit(clearSessionRef: false);
     _queueEditCommand(() async {
-      final state = await widget.controller.commitEditState(
+      final state = await controller.commitEditState(
         text,
         sessionId: _imeProxySessionId,
         stateVersion: _imeProxyStateVersion,
       );
+      if (!_isCurrentController(controller, controllerEpoch)) return;
       if (state.active && state.hasSession()) {
         // Commit was blocked (e.g. validation rejected the value). The engine
         // keeps the edit alive; reattach the IME proxy to the still-active
@@ -2714,7 +2908,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
       if (_applyPostCommitEditState(state)) {
         return;
       }
-      if (!mounted) {
+      if (!_isCurrentController(controller, controllerEpoch)) {
         return;
       }
       _sendSyntheticKey(navigateKeyCode, modifier);
@@ -2727,8 +2921,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
       return;
     }
     final session = state.session;
-    final seedText =
-        session.hasValue() ? _editorValueText(session.value) : '';
+    final seedText = session.hasValue() ? _editorValueText(session.value) : '';
     final isCanvas = session.hasEditor() &&
         session.editor.presentation == pb.EditorPresentation.EDITOR_CANVAS;
     setState(() {
@@ -2750,14 +2943,17 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
   }
 
   void _cancelImeProxyEdit() {
+    final controller = widget.controller;
+    final controllerEpoch = _controllerEpoch;
     _closeImeProxyForKeyCommit(clearSessionRef: false);
     _queueEditCommand(() async {
-      await widget.controller.cancelEdit(
+      await controller.cancelEdit(
         sessionId: _imeProxySessionId,
         stateVersion: _imeProxyStateVersion,
       );
+      if (!_isCurrentController(controller, controllerEpoch)) return;
       _clearImeProxySessionRef();
-      if (!mounted) {
+      if (!_isCurrentController(controller, controllerEpoch)) {
         return;
       }
       _requestIdleInputFocus();
@@ -2799,9 +2995,10 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
   }
 
   KeyEventResult _onImeProxyFocusKeyEvent(FocusNode node, KeyEvent event) {
-    if (!mounted) {
+    if (!mounted || !_viewActive) {
       return KeyEventResult.ignored;
     }
+    if (_blocksBulkEditKey(event)) return KeyEventResult.handled;
     if (_editing || !_imeProxyFocusNode.hasFocus) {
       return KeyEventResult.ignored;
     }
@@ -2827,6 +3024,8 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
   }
 
   KeyEventResult _onGridFocusKeyEvent(FocusNode node, KeyEvent event) {
+    if (!_viewActive) return KeyEventResult.ignored;
+    if (_blocksBulkEditKey(event)) return KeyEventResult.handled;
     if (_editing) {
       return KeyEventResult.ignored;
     }
@@ -2864,6 +3063,17 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
       sendPrintableKeyPress: directPrintable,
     );
     return KeyEventResult.ignored;
+  }
+
+  bool _blocksBulkEditKey(KeyEvent event) {
+    if (widget.allowBulkEdits || _hasActiveEditSession) return false;
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.delete || key == LogicalKeyboardKey.backspace)
+      return true;
+    final shortcut = HardwareKeyboard.instance.isControlPressed ||
+        HardwareKeyboard.instance.isMetaPressed;
+    return shortcut &&
+        (key == LogicalKeyboardKey.keyX || key == LogicalKeyboardKey.keyV);
   }
 
   void _moveEditCaretToEdge({required bool end}) {
@@ -2938,29 +3148,35 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
   }
 
   Future<void> _commitEditAndMove(int rowDelta) async {
+    final controller = widget.controller;
+    final controllerEpoch = _controllerEpoch;
     final currentRow = _editRow >= 0 ? _editRow : _selRow;
     final currentCol = _editCol >= 0 ? _editCol : _selCol;
-    final state = await widget.controller.commitEditState(
+    final state = await controller.commitEditState(
       _editTextController.text,
       sessionId: _editSessionId,
       stateVersion: _editStateVersion,
     );
+    if (!_isCurrentController(controller, controllerEpoch)) return;
     if (_applyPostCommitEditState(state)) {
       return;
     }
 
     if (currentRow >= 0 && currentCol >= 0) {
       try {
-        final rowCount = await widget.controller.rowCount();
+        final rowCount = await controller.rowCount();
+        if (!_isCurrentController(controller, controllerEpoch)) return;
         final maxRow = rowCount > 0 ? rowCount - 1 : 0;
         final targetRow = (currentRow + rowDelta).clamp(0, maxRow);
-        await widget.controller.selectRange(
+        await controller.selectRange(
           targetRow,
           currentCol,
           targetRow,
           currentCol,
         );
-        await widget.controller.showCell(targetRow, currentCol);
+        if (!_isCurrentController(controller, controllerEpoch)) return;
+        await controller.showCell(targetRow, currentCol);
+        if (!_isCurrentController(controller, controllerEpoch)) return;
         _selRow = targetRow;
         _selCol = currentCol;
       } catch (_) {
@@ -2968,7 +3184,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
       }
     }
 
-    if (!mounted) {
+    if (!_isCurrentController(controller, controllerEpoch)) {
       return;
     }
     _closeLocalEditOverlay();
@@ -2976,15 +3192,18 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
   }
 
   Future<void> _commitActiveEdit() async {
-    final state = await widget.controller.commitEditState(
+    final controller = widget.controller;
+    final controllerEpoch = _controllerEpoch;
+    final state = await controller.commitEditState(
       _editTextController.text,
       sessionId: _editSessionId,
       stateVersion: _editStateVersion,
     );
+    if (!_isCurrentController(controller, controllerEpoch)) return;
     if (_applyPostCommitEditState(state)) {
       return;
     }
-    if (!mounted) {
+    if (!_isCurrentController(controller, controllerEpoch)) {
       return;
     }
     _closeLocalEditOverlay();
@@ -3005,6 +3224,8 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
   Future<void> _cancelActiveEditInternal({
     bool requestIdleInputFocus = true,
   }) async {
+    final controller = widget.controller;
+    final controllerEpoch = _controllerEpoch;
     final pending = _deferredEditorSessionStart;
     final sessionId = pending?.hasSession() == true
         ? pending!.session.sessionId
@@ -3024,13 +3245,11 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
     _imeProxyEditEpoch += 1;
     _clearImeProxySessionRef();
     _clearImeProxyValue();
-    await widget.controller.cancelEdit(
+    await controller.cancelEdit(
       sessionId: sessionId,
       stateVersion: stateVersion,
     );
-    if (!mounted) {
-      return;
-    }
+    if (!_isCurrentController(controller, controllerEpoch)) return;
     if (_editing) {
       _closeLocalEditOverlay(requestIdleInputFocus: requestIdleInputFocus);
     } else {
@@ -3102,6 +3321,8 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
     PointerDownEvent event,
     bool isDoubleClick,
   ) async {
+    final controller = widget.controller;
+    final controllerEpoch = _controllerEpoch;
     if (_editCommitReplayActive) {
       return;
     }
@@ -3112,14 +3333,12 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
     final col = _editCol;
     final textValue = _editTextController.text;
     try {
-      final state = await widget.controller.commitEditState(
+      final state = await controller.commitEditState(
         textValue,
         sessionId: _editSessionId,
         stateVersion: _editStateVersion,
       );
-      if (!mounted) {
-        return;
-      }
+      if (!_isCurrentController(controller, controllerEpoch)) return;
       if (state.active) {
         _applyActiveEditState(state);
         _requestRender();
@@ -3139,11 +3358,13 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
         _dispatchPointerCompletion(deferred);
       }
     } catch (_) {
-      if (mounted) {
+      if (_isCurrentController(controller, controllerEpoch)) {
         _requestRender();
       }
     } finally {
-      _editCommitReplayActive = false;
+      if (_isCurrentController(controller, controllerEpoch)) {
+        _editCommitReplayActive = false;
+      }
     }
   }
 
@@ -3193,6 +3414,8 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
   }
 
   void _dispatchPointerDown(PointerDownEvent event, bool isDoubleClick) {
+    final controller = widget.controller;
+    final controllerEpoch = _controllerEpoch;
     _requestIdleInputFocus();
     if (event.kind == PointerDeviceKind.touch) {
       _syncTouchScrollUnitBestEffort();
@@ -3215,7 +3438,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
       _requestRender();
       if (widget.onContextMenuRequest != null) {
         Future.delayed(const Duration(milliseconds: 50), () {
-          if (!mounted) {
+          if (!_isCurrentController(controller, controllerEpoch)) {
             return;
           }
           unawaited(_dispatchContextMenuRequest(
@@ -3252,7 +3475,9 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
         _longPressPosition = event.position;
         _longPressLocalPosition = event.localPosition;
         _longPressTimer = Timer(_longPressDuration, () {
-          if (!mounted || _isTouchScrolling || _isTouchPinching) {
+          if (!_isCurrentController(controller, controllerEpoch) ||
+              _isTouchScrolling ||
+              _isTouchPinching) {
             return;
           }
           unawaited(_dispatchContextMenuRequest(
@@ -3611,14 +3836,14 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
     required Offset localPosition,
     required Offset globalPosition,
   }) async {
+    final controller = widget.controller;
+    final controllerEpoch = _controllerEpoch;
     final onContextMenuRequest = widget.onContextMenuRequest;
     if (onContextMenuRequest == null) {
       return;
     }
-    final selection = await widget.controller.getSelection();
-    if (!mounted) {
-      return;
-    }
+    final selection = await controller.getSelection();
+    if (!_isCurrentController(controller, controllerEpoch)) return;
     final row =
         selection.mouseRow >= 0 ? selection.mouseRow : selection.activeRow;
     final col =
@@ -3677,6 +3902,8 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
   }
 
   Future<void> _refreshKnownRows() async {
+    final controller = widget.controller;
+    final controllerEpoch = _controllerEpoch;
     if (!widget.controller.isCreated) {
       if (_knownRowsGridId != Int64.ZERO || _knownRows != 0) {
         setState(() {
@@ -3692,8 +3919,9 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
     }
     _knownRowsGridId = gridId;
     try {
-      final rows = await widget.controller.rowCount();
-      if (!mounted || widget.controller.gridId != gridId) {
+      final rows = await controller.rowCount();
+      if (!_isCurrentController(controller, controllerEpoch) ||
+          controller.gridId != gridId) {
         return;
       }
       if (_knownRows != rows) {
@@ -3722,14 +3950,14 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
   }
 
   Future<void> _loadTouchScrollUnit() async {
-    if (!widget.controller.isCreated) {
+    final controller = widget.controller;
+    final controllerEpoch = _controllerEpoch;
+    if (!controller.isCreated) {
       return;
     }
     try {
-      final rowHeight = await widget.controller.getRowHeight(0);
-      if (!mounted) {
-        return;
-      }
+      final rowHeight = await controller.getRowHeight(0);
+      if (!_isCurrentController(controller, controllerEpoch)) return;
       if (rowHeight > 0) {
         _touchScrollUnitPx = rowHeight.toDouble();
       }
@@ -3798,6 +4026,14 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
 
     final grid = LayoutBuilder(
       builder: (context, constraints) {
+        if (!constraints.hasBoundedWidth || !constraints.hasBoundedHeight) {
+          throw FlutterError.fromParts([
+            ErrorSummary('VolvoxGridWidget requires a finite viewport.'),
+            ErrorDescription('Both width and height must be bounded.'),
+            ErrorHint('Use Expanded in a bounded Flex, or a SizedBox with an '
+                'explicit height inside a vertical ScrollView.'),
+          ]);
+        }
         final mediaDpr = MediaQuery.maybeOf(context)?.devicePixelRatio;
         final dpr = (mediaDpr != null && mediaDpr.isFinite && mediaDpr > 0)
             ? mediaDpr
@@ -3818,7 +4054,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
 
         return Focus(
           focusNode: _gridFocusNode,
-          autofocus: true,
+          autofocus: _viewActive,
           onKeyEvent: _onGridFocusKeyEvent,
           child: SizedBox(
             width: constraints.maxWidth,
@@ -3911,7 +4147,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
                                 child: TextField(
                                   controller: _imeProxyController,
                                   focusNode: _imeProxyFocusNode,
-                                  autofocus: !_isMobilePlatform,
+                                  autofocus: _viewActive && !_isMobilePlatform,
                                   decoration: const InputDecoration.collapsed(
                                     hintText: '',
                                   ),
@@ -4007,7 +4243,22 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget>
     // ignore: deprecated_member_use
     return WillPopScope(
       onWillPop: _handleRouteWillPop,
-      child: grid,
+      // Native font metrics already include the app's selected scale. Applying
+      // the platform text scale again only to the editor would clip its text.
+      child: MediaQuery(
+        data: (MediaQuery.maybeOf(context) ?? const MediaQueryData()).copyWith(
+          // Retains compatibility with the package's minimum Flutter SDK.
+          // ignore: deprecated_member_use
+          textScaleFactor: 1.0,
+        ),
+        child: ExcludeFocus(
+          excluding: !_viewActive,
+          child: ExcludeSemantics(
+            excluding: !_viewActive,
+            child: IgnorePointer(ignoring: !_viewActive, child: grid),
+          ),
+        ),
+      ),
     );
   }
 }

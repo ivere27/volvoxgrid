@@ -22,6 +22,7 @@ uint8_t* volvox_grid_create(
     int32_t viewport_height,
     float scale,
     const uint8_t* config, int32_t config_len,
+    int32_t row_ids_enabled,
     int32_t* out_len
 );
 
@@ -339,6 +340,12 @@ uint8_t* volvox_grid_load_demo(
 /* GetDemoData */
 uint8_t* volvox_grid_get_demo_data(
     const uint8_t* demo, int32_t demo_len,
+    int32_t* out_len
+);
+
+/* GetRows (protobuf input — has repeated/oneof fields) */
+uint8_t* volvox_grid_get_rows_pb(
+    const uint8_t* data, int32_t data_len,
     int32_t* out_len
 );
 

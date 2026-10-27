@@ -826,6 +826,11 @@ const ENDED_EDIT_SESSION_HISTORY_CAP: usize = 8;
 pub struct EditState {
     pub editing: bool,
     pub edit_row: i32,
+    /// Captured stable target identity; never reconstructed from a delayed event.
+    pub edit_row_id: i64,
+    pub edit_row_identity_token: i64,
+    /// Structural revision captured for grids created without row identities.
+    pub edit_row_revision: u64,
     pub edit_col: i32,
     pub session_serial: u64,
     pub state_version: u64,
@@ -880,6 +885,9 @@ impl Default for EditState {
         Self {
             editing: false,
             edit_row: -1,
+            edit_row_id: 0,
+            edit_row_identity_token: 0,
+            edit_row_revision: 0,
             edit_col: -1,
             session_serial: 0,
             state_version: 0,
@@ -1138,6 +1146,9 @@ impl EditState {
         self.compose.reset();
         self.editing = true;
         self.edit_row = row;
+        self.edit_row_id = 0;
+        self.edit_row_identity_token = 0;
+        self.edit_row_revision = 0;
         self.edit_col = col;
         self.session_serial = self.session_serial.wrapping_add(1);
         self.reset_session_version();
@@ -1219,6 +1230,9 @@ impl EditState {
             self.edit_text.clone(),
         );
         self.edit_row = -1;
+        self.edit_row_id = 0;
+        self.edit_row_identity_token = 0;
+        self.edit_row_revision = 0;
         self.edit_col = -1;
         self.formula_mode = false;
         self.formula_highlights.clear();
@@ -1246,6 +1260,9 @@ impl EditState {
         self.editing = false;
         let result = (self.edit_row, self.edit_col, self.original_text.clone());
         self.edit_row = -1;
+        self.edit_row_id = 0;
+        self.edit_row_identity_token = 0;
+        self.edit_row_revision = 0;
         self.edit_col = -1;
         self.formula_mode = false;
         self.formula_highlights.clear();
@@ -1270,6 +1287,9 @@ impl EditState {
         self.editing = false;
         let result = (self.edit_row, self.edit_col);
         self.edit_row = -1;
+        self.edit_row_id = 0;
+        self.edit_row_identity_token = 0;
+        self.edit_row_revision = 0;
         self.edit_col = -1;
         self.formula_mode = false;
         self.formula_highlights.clear();

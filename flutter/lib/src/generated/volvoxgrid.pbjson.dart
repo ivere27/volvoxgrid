@@ -6670,6 +6670,7 @@ const RowDef$json = {
       '10': 'sticky',
       '17': true
     },
+    {'1': 'row_id', '3': 12, '4': 1, '5': 3, '9': 9, '10': 'rowId', '17': true},
   ],
   '8': [
     {'1': '_height'},
@@ -6681,6 +6682,7 @@ const RowDef$json = {
     {'1': '_span'},
     {'1': '_pin'},
     {'1': '_sticky'},
+    {'1': '_row_id'},
   ],
 };
 
@@ -6693,9 +6695,10 @@ final $typed_data.Uint8List rowDefDescriptor = $convert.base64Decode(
     'SAVSBGRhdGGIAQESMAoGc3RhdHVzGAggASgLMhgudm9sdm94Z3JpZC52MS5Sb3dTdGF0dXNSBn'
     'N0YXR1cxIXCgRzcGFuGAkgASgISAZSBHNwYW6IAQESMQoDcGluGAogASgOMhoudm9sdm94Z3Jp'
     'ZC52MS5QaW5Qb3NpdGlvbkgHUgNwaW6IAQESNgoGc3RpY2t5GAsgASgOMhkudm9sdm94Z3JpZC'
-    '52MS5TdGlja3lFZGdlSAhSBnN0aWNreYgBAUIJCgdfaGVpZ2h0QgkKB19oaWRkZW5CDgoMX2lz'
-    'X3N1YnRvdGFsQhAKDl9vdXRsaW5lX2xldmVsQg8KDV9pc19jb2xsYXBzZWRCBwoFX2RhdGFCBw'
-    'oFX3NwYW5CBgoEX3BpbkIJCgdfc3RpY2t5');
+    '52MS5TdGlja3lFZGdlSAhSBnN0aWNreYgBARIaCgZyb3dfaWQYDCABKANICVIFcm93SWSIAQFC'
+    'CQoHX2hlaWdodEIJCgdfaGlkZGVuQg4KDF9pc19zdWJ0b3RhbEIQCg5fb3V0bGluZV9sZXZlbE'
+    'IPCg1faXNfY29sbGFwc2VkQgcKBV9kYXRhQgcKBV9zcGFuQgYKBF9waW5CCQoHX3N0aWNreUIJ'
+    'Cgdfcm93X2lk');
 
 @$core.Deprecated('Use rowStatusDescriptor instead')
 const RowStatus$json = {
@@ -6731,6 +6734,57 @@ const DefineRowsRequest$json = {
 final $typed_data.Uint8List defineRowsRequestDescriptor = $convert.base64Decode(
     'ChFEZWZpbmVSb3dzUmVxdWVzdBIXCgdncmlkX2lkGAEgASgDUgZncmlkSWQSKQoEcm93cxgCIA'
     'MoCzIVLnZvbHZveGdyaWQudjEuUm93RGVmUgRyb3dz');
+
+@$core.Deprecated('Use rowIdentityDescriptor instead')
+const RowIdentity$json = {
+  '1': 'RowIdentity',
+  '2': [
+    {'1': 'index', '3': 1, '4': 1, '5': 5, '10': 'index'},
+    {'1': 'row_id', '3': 2, '4': 1, '5': 3, '10': 'rowId'},
+  ],
+};
+
+/// Descriptor for `RowIdentity`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List rowIdentityDescriptor = $convert.base64Decode(
+    'CgtSb3dJZGVudGl0eRIUCgVpbmRleBgBIAEoBVIFaW5kZXgSFQoGcm93X2lkGAIgASgDUgVyb3'
+    'dJZA==');
+
+@$core.Deprecated('Use getRowsRequestDescriptor instead')
+const GetRowsRequest$json = {
+  '1': 'GetRowsRequest',
+  '2': [
+    {'1': 'grid_id', '3': 1, '4': 1, '5': 3, '10': 'gridId'},
+    {'1': 'start_row', '3': 2, '4': 1, '5': 5, '10': 'startRow'},
+    {'1': 'row_count', '3': 3, '4': 1, '5': 5, '10': 'rowCount'},
+    {'1': 'row_ids', '3': 4, '4': 3, '5': 3, '10': 'rowIds'},
+  ],
+};
+
+/// Descriptor for `GetRowsRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getRowsRequestDescriptor = $convert.base64Decode(
+    'Cg5HZXRSb3dzUmVxdWVzdBIXCgdncmlkX2lkGAEgASgDUgZncmlkSWQSGwoJc3RhcnRfcm93GA'
+    'IgASgFUghzdGFydFJvdxIbCglyb3dfY291bnQYAyABKAVSCHJvd0NvdW50EhcKB3Jvd19pZHMY'
+    'BCADKANSBnJvd0lkcw==');
+
+@$core.Deprecated('Use rowsResponseDescriptor instead')
+const RowsResponse$json = {
+  '1': 'RowsResponse',
+  '2': [
+    {
+      '1': 'rows',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.volvoxgrid.v1.RowIdentity',
+      '10': 'rows'
+    },
+  ],
+};
+
+/// Descriptor for `RowsResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List rowsResponseDescriptor = $convert.base64Decode(
+    'CgxSb3dzUmVzcG9uc2USLgoEcm93cxgBIAMoCzIaLnZvbHZveGdyaWQudjEuUm93SWRlbnRpdH'
+    'lSBHJvd3M=');
 
 @$core.Deprecated('Use cellUpdateDescriptor instead')
 const CellUpdate$json = {
@@ -7125,6 +7179,7 @@ const LoadTableRequest$json = {
       '10': 'values'
     },
     {'1': 'atomic', '3': 5, '4': 1, '5': 8, '10': 'atomic'},
+    {'1': 'row_ids', '3': 6, '4': 3, '5': 3, '10': 'rowIds'},
   ],
 };
 
@@ -7132,7 +7187,8 @@ const LoadTableRequest$json = {
 final $typed_data.Uint8List loadTableRequestDescriptor = $convert.base64Decode(
     'ChBMb2FkVGFibGVSZXF1ZXN0EhcKB2dyaWRfaWQYASABKANSBmdyaWRJZBISCgRyb3dzGAIgAS'
     'gFUgRyb3dzEhIKBGNvbHMYAyABKAVSBGNvbHMSMAoGdmFsdWVzGAQgAygLMhgudm9sdm94Z3Jp'
-    'ZC52MS5DZWxsVmFsdWVSBnZhbHVlcxIWCgZhdG9taWMYBSABKAhSBmF0b21pYw==');
+    'ZC52MS5DZWxsVmFsdWVSBnZhbHVlcxIWCgZhdG9taWMYBSABKAhSBmF0b21pYxIXCgdyb3dfaW'
+    'RzGAYgAygDUgZyb3dJZHM=');
 
 @$core.Deprecated('Use fieldMappingDescriptor instead')
 const FieldMapping$json = {
@@ -8070,6 +8126,7 @@ const EditorSession$json = {
       '6': '.volvoxgrid.v1.ValidationError',
       '10': 'validationErrors'
     },
+    {'1': 'row_id', '3': 15, '4': 1, '5': 3, '10': 'rowId'},
   ],
 };
 
@@ -8086,7 +8143,8 @@ final $typed_data.Uint8List editorSessionDescriptor = $convert.base64Decode(
     'b2x2b3hncmlkLnYxLkVkaXRTdGFydFJlYXNvblIGcmVhc29uEiMKDXN0YXRlX3ZlcnNpb24YCy'
     'ABKARSDHN0YXRlVmVyc2lvbhIcCgljb21wb3NpbmcYDCABKAhSCWNvbXBvc2luZxIhCgxwcmVl'
     'ZGl0X3RleHQYDSABKAlSC3ByZWVkaXRUZXh0EksKEXZhbGlkYXRpb25fZXJyb3JzGA4gAygLMh'
-    '4udm9sdm94Z3JpZC52MS5WYWxpZGF0aW9uRXJyb3JSEHZhbGlkYXRpb25FcnJvcnM=');
+    '4udm9sdm94Z3JpZC52MS5WYWxpZGF0aW9uRXJyb3JSEHZhbGlkYXRpb25FcnJvcnMSFQoGcm93'
+    'X2lkGA8gASgDUgVyb3dJZA==');
 
 @$core.Deprecated('Use editorCapabilitiesDescriptor instead')
 const EditorCapabilities$json = {
@@ -8912,6 +8970,7 @@ const CreateRequest$json = {
       '6': '.volvoxgrid.v1.GridConfig',
       '10': 'config'
     },
+    {'1': 'row_ids_enabled', '3': 5, '4': 1, '5': 8, '10': 'rowIdsEnabled'},
   ],
 };
 
@@ -8920,7 +8979,7 @@ final $typed_data.Uint8List createRequestDescriptor = $convert.base64Decode(
     'Cg1DcmVhdGVSZXF1ZXN0EiUKDnZpZXdwb3J0X3dpZHRoGAEgASgFUg12aWV3cG9ydFdpZHRoEi'
     'cKD3ZpZXdwb3J0X2hlaWdodBgCIAEoBVIOdmlld3BvcnRIZWlnaHQSFAoFc2NhbGUYAyABKAJS'
     'BXNjYWxlEjEKBmNvbmZpZxgEIAEoCzIZLnZvbHZveGdyaWQudjEuR3JpZENvbmZpZ1IGY29uZm'
-    'ln');
+    'lnEiYKD3Jvd19pZHNfZW5hYmxlZBgFIAEoCFINcm93SWRzRW5hYmxlZA==');
 
 @$core.Deprecated('Use createResponseDescriptor instead')
 const CreateResponse$json = {
@@ -11213,12 +11272,14 @@ const BeforeEditEvent$json = {
   '2': [
     {'1': 'row', '3': 1, '4': 1, '5': 5, '10': 'row'},
     {'1': 'col', '3': 2, '4': 1, '5': 5, '10': 'col'},
+    {'1': 'row_id', '3': 3, '4': 1, '5': 3, '10': 'rowId'},
   ],
 };
 
 /// Descriptor for `BeforeEditEvent`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List beforeEditEventDescriptor = $convert.base64Decode(
-    'Cg9CZWZvcmVFZGl0RXZlbnQSEAoDcm93GAEgASgFUgNyb3cSEAoDY29sGAIgASgFUgNjb2w=');
+    'Cg9CZWZvcmVFZGl0RXZlbnQSEAoDcm93GAEgASgFUgNyb3cSEAoDY29sGAIgASgFUgNjb2wSFQ'
+    'oGcm93X2lkGAMgASgDUgVyb3dJZA==');
 
 @$core.Deprecated('Use startEditEventDescriptor instead')
 const StartEditEvent$json = {
@@ -11226,12 +11287,14 @@ const StartEditEvent$json = {
   '2': [
     {'1': 'row', '3': 1, '4': 1, '5': 5, '10': 'row'},
     {'1': 'col', '3': 2, '4': 1, '5': 5, '10': 'col'},
+    {'1': 'row_id', '3': 3, '4': 1, '5': 3, '10': 'rowId'},
   ],
 };
 
 /// Descriptor for `StartEditEvent`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List startEditEventDescriptor = $convert.base64Decode(
-    'Cg5TdGFydEVkaXRFdmVudBIQCgNyb3cYASABKAVSA3JvdxIQCgNjb2wYAiABKAVSA2NvbA==');
+    'Cg5TdGFydEVkaXRFdmVudBIQCgNyb3cYASABKAVSA3JvdxIQCgNjb2wYAiABKAVSA2NvbBIVCg'
+    'Zyb3dfaWQYAyABKANSBXJvd0lk');
 
 @$core.Deprecated('Use afterEditEventDescriptor instead')
 const AfterEditEvent$json = {
@@ -11241,13 +11304,15 @@ const AfterEditEvent$json = {
     {'1': 'col', '3': 2, '4': 1, '5': 5, '10': 'col'},
     {'1': 'old_text', '3': 3, '4': 1, '5': 9, '10': 'oldText'},
     {'1': 'new_text', '3': 4, '4': 1, '5': 9, '10': 'newText'},
+    {'1': 'row_id', '3': 5, '4': 1, '5': 3, '10': 'rowId'},
   ],
 };
 
 /// Descriptor for `AfterEditEvent`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List afterEditEventDescriptor = $convert.base64Decode(
     'Cg5BZnRlckVkaXRFdmVudBIQCgNyb3cYASABKAVSA3JvdxIQCgNjb2wYAiABKAVSA2NvbBIZCg'
-    'hvbGRfdGV4dBgDIAEoCVIHb2xkVGV4dBIZCghuZXdfdGV4dBgEIAEoCVIHbmV3VGV4dA==');
+    'hvbGRfdGV4dBgDIAEoCVIHb2xkVGV4dBIZCghuZXdfdGV4dBgEIAEoCVIHbmV3VGV4dBIVCgZy'
+    'b3dfaWQYBSABKANSBXJvd0lk');
 
 @$core.Deprecated('Use cellEditValidateEventDescriptor instead')
 const CellEditValidateEvent$json = {
@@ -11256,13 +11321,14 @@ const CellEditValidateEvent$json = {
     {'1': 'row', '3': 1, '4': 1, '5': 5, '10': 'row'},
     {'1': 'col', '3': 2, '4': 1, '5': 5, '10': 'col'},
     {'1': 'edit_text', '3': 3, '4': 1, '5': 9, '10': 'editText'},
+    {'1': 'row_id', '3': 4, '4': 1, '5': 3, '10': 'rowId'},
   ],
 };
 
 /// Descriptor for `CellEditValidateEvent`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List cellEditValidateEventDescriptor = $convert.base64Decode(
     'ChVDZWxsRWRpdFZhbGlkYXRlRXZlbnQSEAoDcm93GAEgASgFUgNyb3cSEAoDY29sGAIgASgFUg'
-    'Njb2wSGwoJZWRpdF90ZXh0GAMgASgJUghlZGl0VGV4dA==');
+    'Njb2wSGwoJZWRpdF90ZXh0GAMgASgJUghlZGl0VGV4dBIVCgZyb3dfaWQYBCABKANSBXJvd0lk');
 
 @$core.Deprecated('Use cellEditChangeEventDescriptor instead')
 const CellEditChangeEvent$json = {
@@ -12352,6 +12418,11 @@ const $core.Map<$core.String, $core.dynamic> VolvoxGridServiceBase$json = {
       '3': '.volvoxgrid.v1.GridEvent',
       '6': true
     },
+    {
+      '1': 'GetRows',
+      '2': '.volvoxgrid.v1.GetRowsRequest',
+      '3': '.volvoxgrid.v1.RowsResponse'
+    },
   ],
 };
 
@@ -12641,6 +12712,9 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.volvoxgrid.v1.AfterTreeNodeToggleEvent': AfterTreeNodeToggleEvent$json,
   '.volvoxgrid.v1.TreeNodeActivateEvent': TreeNodeActivateEvent$json,
   '.volvoxgrid.v1.TreeNodeContextMenuEvent': TreeNodeContextMenuEvent$json,
+  '.volvoxgrid.v1.GetRowsRequest': GetRowsRequest$json,
+  '.volvoxgrid.v1.RowsResponse': RowsResponse$json,
+  '.volvoxgrid.v1.RowIdentity': RowIdentity$json,
 };
 
 /// Descriptor for `VolvoxGridService`. Decode as a `google.protobuf.ServiceDescriptorProto`.
@@ -12711,4 +12785,5 @@ final $typed_data.Uint8List volvoxGridServiceDescriptor = $convert.base64Decode(
     '52b2x2b3hncmlkLnYxLkdldERlbW9EYXRhUmVzcG9uc2USTAoNUmVuZGVyU2Vzc2lvbhIaLnZv'
     'bHZveGdyaWQudjEuUmVuZGVySW5wdXQaGy52b2x2b3hncmlkLnYxLlJlbmRlck91dHB1dCgBMA'
     'ESTAoLRXZlbnRTdHJlYW0SIS52b2x2b3hncmlkLnYxLkV2ZW50U3RyZWFtUmVxdWVzdBoYLnZv'
-    'bHZveGdyaWQudjEuR3JpZEV2ZW50MAE=');
+    'bHZveGdyaWQudjEuR3JpZEV2ZW50MAESRQoHR2V0Um93cxIdLnZvbHZveGdyaWQudjEuR2V0Um'
+    '93c1JlcXVlc3QaGy52b2x2b3hncmlkLnYxLlJvd3NSZXNwb25zZQ==');

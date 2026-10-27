@@ -1863,6 +1863,7 @@ message RowDef {
   optional bool        span          = 9;   // enable spanning for this row
   optional PinPosition pin           = 10;  // pin to TOP or BOTTOM of viewport
   optional StickyEdge  sticky        = 11;  // stick to edge during scroll
+  optional int64      row_id        = 12;  // positive, unique within the grid; survives reordering; 0 is invalid
 }
 
 // Host-defined row status with an explicit namespace/discriminator.
@@ -1876,6 +1877,29 @@ message RowStatus {
 message DefineRowsRequest {
   int64           grid_id = 1;
   repeated RowDef rows    = 2;
+}
+
+// Stable identity for a row at its current visual index. IDs are opaque positive
+// signed 64-bit integers (1..INT64_MAX); 0 is invalid. Auto IDs last for the
+// lifetime of the row. The engine generates them when the host supplies no ID.
+// Hosts may supply positive numeric IDs to preserve identity across replacements.
+// IDs are scoped to a grid; their values carry no application meaning.
+message RowIdentity {
+  int32  index  = 1;
+  int64 row_id = 2;
+}
+
+message GetRowsRequest {
+  int64 grid_id   = 1;
+  int32 start_row = 2;  // inclusive; may equal the row count for an empty range
+  int32 row_count = 3;  // zero means all remaining rows
+  // Alternative selector: range fields must be zero. Returns existing IDs in
+  // request order, omitting missing IDs. Nonpositive or duplicate IDs are invalid.
+  repeated int64 row_ids = 4;
+}
+
+message RowsResponse {
+  repeated RowIdentity rows = 1;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1976,6 +2000,9 @@ message LoadTableRequest {
   int32              cols    = 3;
   repeated CellValue values  = 4;  // length must equal rows × cols
   bool               atomic  = 5;
+  // Empty generates fresh IDs. Otherwise must contain exactly `rows` positive,
+  // unique IDs. Invalid IDs reject the entire request before changing data.
+  repeated int64    row_ids = 6;
 }
 
 message FieldMapping {
@@ -2253,6 +2280,7 @@ message EditorSession {
   bool                     composing         = 12;
   string                   preedit_text      = 13;
   repeated ValidationError validation_errors = 14;
+  int64                   row_id            = 15; // captured when the session starts
 }
 
 // Engine-declared editor capabilities. Derived once from
@@ -2540,6 +2568,11 @@ message CreateRequest {
   int32      viewport_height = 2;  // pixels
   float      scale           = 3;  // DPI scale factor (1.0 = no scaling)
   GridConfig config          = 4;  // optional initial configuration
+  // Creation-only option. False (the default) allocates no per-row ID storage;
+  // index-based APIs and editing remain available, with row_id=0 in events.
+  // True issues stable numeric IDs eagerly during creation. ID lookup and
+  // application-supplied IDs require true; no API silently enables tracking.
+  bool row_ids_enabled       = 5;
 }
 
 message CreateResponse {
@@ -3190,10 +3223,10 @@ message EnterCellEvent { int32 row = 1; int32 col = 2; GridEventTarget target = 
 message LeaveCellEvent { int32 row = 1; int32 col = 2; GridEventTarget target = 3; }
 
 // ── Edit Events ──
-message BeforeEditEvent   { int32 row = 1; int32 col = 2; }  // cancelable
-message StartEditEvent    { int32 row = 1; int32 col = 2; }  // informational
-message AfterEditEvent    { int32 row = 1; int32 col = 2; string old_text = 3; string new_text = 4; }  // informational; old_text==new_text on cancel
-message CellEditValidateEvent { int32 row = 1; int32 col = 2; string edit_text = 3; }  // cancelable: cancel keeps editor open
+message BeforeEditEvent   { int32 row = 1; int32 col = 2; int64 row_id = 3; }  // cancelable
+message StartEditEvent    { int32 row = 1; int32 col = 2; int64 row_id = 3; }  // informational
+message AfterEditEvent    { int32 row = 1; int32 col = 2; string old_text = 3; string new_text = 4; int64 row_id = 5; }  // informational; old_text==new_text on cancel
+message CellEditValidateEvent { int32 row = 1; int32 col = 2; string edit_text = 3; int64 row_id = 4; }  // cancelable: cancel keeps editor open
 message CellEditChangeEvent   { string text = 1; }  // fired on every character insert
 message KeyDownEditEvent  { int64 session_id = 1; int32 key_code = 2; int32 modifier = 3; }
 message KeyPressEditEvent { int64 session_id = 1; int32 key_ascii = 2; }
@@ -3429,4 +3462,7 @@ service VolvoxGridService {
   // Delivery is fully event-driven — every enqueue/destroy/cancel
   // wakes a per-grid condvar; no polling, no idle CPU cost.
   rpc EventStream(EventStreamRequest)     returns (stream GridEvent);
+
+  // Appended to preserve all existing RPC ordinals and dispatch paths.
+  rpc GetRows(GetRowsRequest)             returns (RowsResponse);
 }

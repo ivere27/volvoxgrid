@@ -52,15 +52,6 @@ pub fn drag_row(grid: &mut crate::grid::VolvoxGrid, row: i32, position: i32) {
         return;
     }
 
-    // Reorder row_positions
-    let moving = grid.row_positions.remove(row as usize);
-    let insert_at = if position > row {
-        position - 1
-    } else {
-        position
-    };
-    grid.row_positions.insert(insert_at as usize, moving);
-
-    grid.layout.invalidate();
-    grid.mark_dirty();
+    let insert_at = if position > row { position - 1 } else { position };
+    crate::input::apply_move_row_after_before(grid, row, insert_at);
 }

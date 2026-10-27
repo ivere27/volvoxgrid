@@ -129,6 +129,7 @@ const (
 	VolvoxGridService_GetDemoData_FullMethodName      = "/volvoxgrid.v1.VolvoxGridService/GetDemoData"
 	VolvoxGridService_RenderSession_FullMethodName    = "/volvoxgrid.v1.VolvoxGridService/RenderSession"
 	VolvoxGridService_EventStream_FullMethodName      = "/volvoxgrid.v1.VolvoxGridService/EventStream"
+	VolvoxGridService_GetRows_FullMethodName          = "/volvoxgrid.v1.VolvoxGridService/GetRows"
 )
 
 // VolvoxGridServiceClient is the client API for VolvoxGridService service.
@@ -199,6 +200,8 @@ type VolvoxGridServiceClient interface {
 	// Delivery is fully event-driven — every enqueue/destroy/cancel
 	// wakes a per-grid condvar; no polling, no idle CPU cost.
 	EventStream(ctx context.Context, in *EventStreamRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GridEvent], error)
+	// Appended to preserve all existing RPC ordinals and dispatch paths.
+	GetRows(ctx context.Context, in *GetRowsRequest, opts ...grpc.CallOption) (*RowsResponse, error)
 }
 
 type volvoxGridServiceClient struct {
@@ -691,6 +694,16 @@ func (c *volvoxGridServiceClient) EventStream(ctx context.Context, in *EventStre
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type VolvoxGridService_EventStreamClient = grpc.ServerStreamingClient[GridEvent]
 
+func (c *volvoxGridServiceClient) GetRows(ctx context.Context, in *GetRowsRequest, opts ...grpc.CallOption) (*RowsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RowsResponse)
+	err := c.cc.Invoke(ctx, VolvoxGridService_GetRows_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // VolvoxGridServiceServer is the server API for VolvoxGridService service.
 // All implementations must embed UnimplementedVolvoxGridServiceServer
 // for forward compatibility.
@@ -759,6 +772,8 @@ type VolvoxGridServiceServer interface {
 	// Delivery is fully event-driven — every enqueue/destroy/cancel
 	// wakes a per-grid condvar; no polling, no idle CPU cost.
 	EventStream(*EventStreamRequest, grpc.ServerStreamingServer[GridEvent]) error
+	// Appended to preserve all existing RPC ordinals and dispatch paths.
+	GetRows(context.Context, *GetRowsRequest) (*RowsResponse, error)
 	mustEmbedUnimplementedVolvoxGridServiceServer()
 }
 
@@ -909,6 +924,9 @@ func (UnimplementedVolvoxGridServiceServer) RenderSession(grpc.BidiStreamingServ
 }
 func (UnimplementedVolvoxGridServiceServer) EventStream(*EventStreamRequest, grpc.ServerStreamingServer[GridEvent]) error {
 	return status.Error(codes.Unimplemented, "method EventStream not implemented")
+}
+func (UnimplementedVolvoxGridServiceServer) GetRows(context.Context, *GetRowsRequest) (*RowsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetRows not implemented")
 }
 func (UnimplementedVolvoxGridServiceServer) mustEmbedUnimplementedVolvoxGridServiceServer() {}
 func (UnimplementedVolvoxGridServiceServer) testEmbeddedByValue()                           {}
@@ -1759,6 +1777,24 @@ func _VolvoxGridService_EventStream_Handler(srv interface{}, stream grpc.ServerS
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type VolvoxGridService_EventStreamServer = grpc.ServerStreamingServer[GridEvent]
 
+func _VolvoxGridService_GetRows_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetRowsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VolvoxGridServiceServer).GetRows(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: VolvoxGridService_GetRows_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VolvoxGridServiceServer).GetRows(ctx, req.(*GetRowsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // VolvoxGridService_ServiceDesc is the grpc.ServiceDesc for VolvoxGridService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1945,6 +1981,10 @@ var VolvoxGridService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetDemoData",
 			Handler:    _VolvoxGridService_GetDemoData_Handler,
+		},
+		{
+			MethodName: "GetRows",
+			Handler:    _VolvoxGridService_GetRows_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

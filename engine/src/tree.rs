@@ -1437,6 +1437,9 @@ pub fn load_tree(
     } else {
         next.insert_nodes("", -1, request.nodes, request.collapse_initial)?;
     }
+    if request.replace || grid.tree.is_empty() {
+        grid.row_ids.clear_tree_ids();
+    }
     let warnings = project_tree_state(grid, &next);
     let response = pb::LoadTreeResponse {
         node_count: usize_to_i32_saturating(next.node_count()),
@@ -1955,10 +1958,23 @@ fn project_tree_state_with_write_result(
     tree: &TreeState,
     atomic: bool,
 ) -> pb::WriteResult {
+    grid.cancel_edit();
+    grid.cells.materialize_row_map();
     clear_projected_tree_rows(grid);
     let visible_count = usize_to_i32_saturating(tree.visible_count());
     let fixed_rows = grid.fixed_rows.max(0);
     let new_rows = fixed_rows.saturating_add(visible_count).max(1);
+    if grid.row_ids_enabled() {
+        let all_ids: Vec<&str> = tree.nodes.iter().map(|node| node.id.as_str()).collect();
+        let visible_ids: Vec<&str> = tree
+            .visible
+            .iter()
+            .map(|&idx| tree.nodes[idx].id.as_str())
+            .collect();
+        grid.row_ids.project_tree(fixed_rows, &all_ids, &visible_ids);
+    } else {
+        grid.row_ids.reset(new_rows);
+    }
     grid.rows = new_rows;
     grid.row_positions.clear();
     grid.row_positions.extend(0..grid.rows);

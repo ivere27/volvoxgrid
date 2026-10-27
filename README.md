@@ -1,7 +1,7 @@
 # VolvoxGrid
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.8.11-blue.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-0.8.12-blue.svg)](VERSION)
 
 You're shipping a datagrid that has to handle million-row datasets, work across mobile, desktop, web, and terminal, and look the same on every platform. VolvoxGrid is one Rust engine that does that — you bring the host, it brings the pixels.
 
@@ -80,7 +80,7 @@ One pub package, one widget, one controller. Native binaries are resolved at bui
 
 ```yaml
 dependencies:
-  volvoxgrid: ^0.8.11
+  volvoxgrid: ^0.8.12
 ```
 
 Initialize the native runtime once before creating grids:
@@ -126,7 +126,7 @@ Drop a Swing panel into your frame, get a controller back, drive the grid from K
 
 ```kotlin
 dependencies {
-    implementation("io.github.ivere27:volvoxgrid-desktop:0.8.11")
+    implementation("io.github.ivere27:volvoxgrid-desktop:0.8.12")
 }
 ```
 
@@ -146,24 +146,24 @@ Next: [java/README.md](java/README.md).
 
 ## Install
 
-Everything in this section uses `0.8.11`. Swap the version for whichever release you're consuming.
+Everything in this section uses `0.8.12`. Swap the version for whichever release you're consuming.
 
 ### Maven / Gradle (Android, Java desktop)
 
 ```kotlin
 // Android
 dependencies {
-    implementation("io.github.ivere27:volvoxgrid-android:0.8.11")
-    // or: implementation("io.github.ivere27:volvoxgrid-android-lite:0.8.11")
-    // Compose:      implementation("io.github.ivere27:volvoxgrid-android-compose:0.8.11")
-    // Compose lite: implementation("io.github.ivere27:volvoxgrid-android-compose-lite:0.8.11")
+    implementation("io.github.ivere27:volvoxgrid-android:0.8.12")
+    // or: implementation("io.github.ivere27:volvoxgrid-android-lite:0.8.12")
+    // Compose:      implementation("io.github.ivere27:volvoxgrid-android-compose:0.8.12")
+    // Compose lite: implementation("io.github.ivere27:volvoxgrid-android-compose-lite:0.8.12")
 }
 
 // Java desktop
 repositories { mavenCentral() }
 dependencies {
-    implementation("io.github.ivere27:volvoxgrid-desktop:0.8.11")
-    // or: implementation("io.github.ivere27:volvoxgrid-desktop-lite:0.8.11")
+    implementation("io.github.ivere27:volvoxgrid-desktop:0.8.12")
+    // or: implementation("io.github.ivere27:volvoxgrid-desktop-lite:0.8.12")
 }
 ```
 
@@ -173,14 +173,14 @@ Platform-specific notes live in [android/README.md](android/README.md) and [java
 
 ```yaml
 dependencies:
-  volvoxgrid: ^0.8.11
+  volvoxgrid: ^0.8.12
 ```
 
 ### Swift (SwiftPM)
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/ivere27/volvoxgrid", from: "0.8.11"),
+    .package(url: "https://github.com/ivere27/volvoxgrid", from: "0.8.12"),
 ],
 targets: [
     .target(name: "MyApp", dependencies: [
@@ -207,8 +207,8 @@ The web and adapter packages publish minified `dist/*.min.js` browser bundles fo
 The Go modules are versioned with path-prefixed tags for the Go module proxy. The core module gives you a typed client over the native library; the Bubble Tea adapter adds a typed TUI component.
 
 ```bash
-go get github.com/ivere27/volvoxgrid/go@v0.8.11
-go get github.com/ivere27/volvoxgrid/adapters/bubbletea@v0.8.11
+go get github.com/ivere27/volvoxgrid/go@v0.8.12
+go get github.com/ivere27/volvoxgrid/adapters/bubbletea@v0.8.12
 ```
 
 ```go
@@ -225,8 +225,8 @@ Next: [go/README.md](go/README.md).
 The managed packages are `VolvoxGrid.DotNet` and `VolvoxGrid.DotNet.Lite`.
 
 ```bash
-dotnet add package VolvoxGrid.DotNet --version 0.8.11
-# or: dotnet add package VolvoxGrid.DotNet.Lite --version 0.8.11
+dotnet add package VolvoxGrid.DotNet --version 0.8.12
+# or: dotnet add package VolvoxGrid.DotNet.Lite --version 0.8.12
 ```
 
 The NuGet packages embed staged native libraries for supported RIDs. Project-reference or manual deployment flows still need the native `volvoxgrid` library beside your app or pointed at via `VOLVOXGRID_LIBRARY_PATH`. Full instructions in [dotnet/README.md](dotnet/README.md).
@@ -242,6 +242,26 @@ host or adapter  ->  wrapper  ->  runtime or wasm binding  ->  engine
 The engine in `engine/` is the source of truth. The native runtime in `runtime/` exposes it over Synurang FFI to non-web hosts; `wasm-pack` builds the same engine for the browser. Platform wrappers (`flutter/`, `android/`, `java/`, `dotnet/`, `go/`, `swift/`, `web/js/`) translate native events and surfaces into the shared protobuf contract defined in `proto/`.
 
 If you're changing internals, read [ARCHITECTURE.md](ARCHITECTURE.md). If you're evaluating the rendering paths, read [GUI.md](GUI.md), [TUI.md](TUI.md), and [TEXT_RENDERING.md](TEXT_RENDERING.md).
+
+## Updating the release version
+
+`VERSION` is the release version shared by the build and publishing commands.
+Update it together with package manifests, lock files, installation examples and
+release notes using Python 3 and Make:
+
+```bash
+make bump-version NEW_VERSION=0.8.13
+make check-version
+```
+
+If you edit `VERSION` directly, run `make bump-version` to synchronize the other
+files. To preview a bump, use
+`python3 scripts/bump_version.py --version 0.8.13 --dry-run`.
+The command promotes an `Unreleased` changelog section when present, preserves
+previous release notes and historical size measurements, and validates all
+inputs before writing. Run it as a separate step before building artifacts.
+The release build's `make update_swift_package_checksums` step computes the
+Swift binary checksums from the resulting XCFramework archives.
 
 ## Adapters
 

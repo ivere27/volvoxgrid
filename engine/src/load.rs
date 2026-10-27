@@ -306,9 +306,14 @@ fn load_data_impl(
         grid.set_cols(final_cols);
         grid.set_rows(final_rows);
     } else {
-        grid.set_rows(final_rows);
-        grid.set_cols(final_cols);
+        grid.cancel_edit();
         grid.cells.clear_all();
+        grid.set_rows_for_replacement(final_rows);
+        grid.set_cols(final_cols);
+        grid.reset_row_ids();
+        grid.row_positions = (0..grid.rows).collect();
+        grid.col_positions = (0..grid.cols).collect();
+        grid.sort_state.clear();
         grid.clear_barcode_presence_tracking();
     }
     apply_created_columns(grid, &created_defs);

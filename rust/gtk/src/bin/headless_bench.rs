@@ -735,6 +735,7 @@ impl VolvoxServiceClient {
         self.invoke(
             "/volvoxgrid.v1.VolvoxGridService/Create",
             &pb::CreateRequest {
+                row_ids_enabled: false,
                 viewport_width: width,
                 viewport_height: height,
                 scale: 1.0,

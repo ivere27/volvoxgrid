@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.8.12
+
+- Fixed native version resolution for package-only installs. Explicit overrides take priority over the package version, with a recognized monorepo `VERSION` as a fallback. Source selection consistently honors `VOLVOXGRID_SOURCE=local/maven`.
+- Removed the Linux/Windows CMake dependency on a Gradle wrapper; missing downloads, libraries and requested Android ABIs now fail the build with recovery instructions. Shared Ruby configuration applies version/source selection to the iOS/macOS podspecs.
+- Added optional `getRowId: int Function(T)` and numeric native row IDs. `VolvoxCellEdit.rowId`, controller ID helpers and `VolvoxRowIdentity` use positive signed 64-bit Dart integers without double conversion; generated protobuf messages use `Int64`. Engine-generated IDs are used when omitted. Business keys remain on source objects. Replaced the unpublished string-ID/Flutter-only hidden-column approaches while retaining source-snapshot indices, separate display coordinates and field-based column mapping.
+- Made native row identities an explicit creation-only option: low-level `create(rowIdsEnabled: false)` is the default and allocates no identity arrays; ID APIs fail rather than enabling them implicitly. `VolvoxDataGrid` always creates with IDs enabled and rejects an existing disabled controller before changing its data. Changing the option requires destruction/recreation; disabled low-level edit events use ID zero.
+- Use the current native API directly without version-specific capability probes or fallback paths. Reuse supplied IDs without querying them back, and discard obsolete queued requests before allocating snapshot arrays.
+- Used compact numeric engine identities and rejected delayed validation for canceled or superseded edit sessions, including supplied-ID reuse.
+- Enabled editing automatically for editable columns; added explicit column types, formatting/editor options, synchronous validation and error callbacks. Integer/decimal values retain string precision. Grid-range mutations are disabled while bound to avoid bypassing per-cell validation.
+- Serialized asynchronous reloads, guarded controller replacement/disposal and avoided reloads for equivalent column configurations. Added `dataVersion` for intentional same-list updates.
+- Added `active`/`TickerMode` suspension, system text/density scaling and finite viewport diagnostics. Protected asynchronous editor/event work across controller changes.
+- Added package-only consumer verification, native edit/mapping regressions, lifecycle/scaling/input tests and a runnable business-table example. Documented app-owned server persistence and rollback, layout constraints and remaining mobile accessibility work.
+
+Use the Flutter package with the matching current native engine, including its row-ID API, exact numeric ordering, typed readback and native read-only enforcement. Per-cell Semantics/TalkBack navigation remains unimplemented, and real-device Korean IME/touch acceptance is incomplete.
+
 ## 0.8.11
 
 - Bumped iOS, macOS, Linux, and Windows artifact resolution to the v0.8.11 release: podspecs pull the matching `VolvoxGrid.xcframework` / `VolvoxGridLite.xcframework` from the GitHub v0.8.11 release, and the Linux/Windows CMake glue resolves `volvoxgrid-desktop-0.8.11.jar` from Maven Central.

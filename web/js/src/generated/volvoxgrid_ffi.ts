@@ -687,6 +687,7 @@ export const AfterEditEventFields = {
   "col": 2,
   "old_text": 3,
   "new_text": 4,
+  "row_id": 5,
 } as const;
 export const AfterMoveColumnEventFields = {
   "col": 1,
@@ -790,6 +791,7 @@ export const BarcodeRenderOptionsFields = {
 export const BeforeEditEventFields = {
   "row": 1,
   "col": 2,
+  "row_id": 3,
 } as const;
 export const BeforeMouseDownEventFields = {
   "row": 1,
@@ -871,6 +873,7 @@ export const CellEditValidateEventFields = {
   "row": 1,
   "col": 2,
   "edit_text": 3,
+  "row_id": 4,
 } as const;
 export const CellFocusChangedEventFields = {
   "old_row": 1,
@@ -1065,6 +1068,7 @@ export const CreateRequestFields = {
   "viewport_height": 2,
   "scale": 3,
   "config": 4,
+  "row_ids_enabled": 5,
 } as const;
 export const CreateResponseFields = {
   "grid_id": 1,
@@ -1250,6 +1254,7 @@ export const EditorSessionFields = {
   "composing": 12,
   "preedit_text": 13,
   "validation_errors": 14,
+  "row_id": 15,
 } as const;
 export const EditorSessionCommandFields = {
   "session_id": 1,
@@ -1425,6 +1430,12 @@ export const GetNodeRequestFields = {
   "grid_id": 1,
   "row": 2,
   "relation": 3,
+} as const;
+export const GetRowsRequestFields = {
+  "grid_id": 1,
+  "start_row": 2,
+  "row_count": 3,
+  "row_ids": 4,
 } as const;
 export const GetSchemaRequestFields = {
   "grid_id": 1,
@@ -1826,6 +1837,7 @@ export const LoadTableRequestFields = {
   "cols": 3,
   "values": 4,
   "atomic": 5,
+  "row_ids": 6,
 } as const;
 export const MemoryUsageResponseFields = {
   "total_bytes": 1,
@@ -2067,6 +2079,11 @@ export const RowDefFields = {
   "span": 9,
   "pin": 10,
   "sticky": 11,
+  "row_id": 12,
+} as const;
+export const RowIdentityFields = {
+  "index": 1,
+  "row_id": 2,
 } as const;
 export const RowIndicatorConfigFields = {
   "visible": 1,
@@ -2095,6 +2112,9 @@ export const RowStatusFields = {
 export const RowStatusChangeEventFields = {
   "row": 1,
   "status": 2,
+} as const;
+export const RowsResponseFields = {
+  "rows": 1,
 } as const;
 export const ScalarValueFields = {
   "string_value": 1,
@@ -2248,6 +2268,7 @@ export const SpanConfigFields = {
 export const StartEditEventFields = {
   "row": 1,
   "col": 2,
+  "row_id": 3,
 } as const;
 export const StartPageEventFields = {
   "page": 1,
@@ -2468,6 +2489,7 @@ export const VolvoxGridServiceMethods = {
   GetDemoData: "/volvoxgrid.v1.VolvoxGridService/GetDemoData",
   RenderSession: "/volvoxgrid.v1.VolvoxGridService/RenderSession",
   EventStream: "/volvoxgrid.v1.VolvoxGridService/EventStream",
+  GetRows: "/volvoxgrid.v1.VolvoxGridService/GetRows",
 } as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2936,6 +2958,15 @@ export class VolvoxGridServiceFfi {
     } finally {
       stream.close();
     }
+  }
+
+  getRows(request: pb.GetRowsRequest): pb.RowsResponse {
+    const result = this.host.invoke(
+      "VolvoxGridService",
+      "/volvoxgrid.v1.VolvoxGridService/GetRows",
+      request.toBinary(),
+    );
+    return pb.RowsResponse.fromBinary(result);
   }
 
 }

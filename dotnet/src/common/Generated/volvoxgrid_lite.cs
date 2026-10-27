@@ -925,6 +925,7 @@ namespace Volvoxgrid.V1
         public int Col { get; set; }
         public string OldText { get; set; } = "";
         public string NewText { get; set; } = "";
+        public long RowId { get; set; }
 
         // ── Serialization ──
 
@@ -935,6 +936,7 @@ namespace Volvoxgrid.V1
             if (Col != 0) w.WriteInt32(2, Col);
             if (OldText != null && OldText.Length > 0) w.WriteString(3, OldText);
             if (NewText != null && NewText.Length > 0) w.WriteString(4, NewText);
+            if (RowId != 0L) w.WriteInt64(5, RowId);
             return w.ToArray();
         }
 
@@ -956,6 +958,7 @@ namespace Volvoxgrid.V1
                     case 2: msg.Col = r.ReadInt32(); break;
                     case 3: msg.OldText = r.ReadString(); break;
                     case 4: msg.NewText = r.ReadString(); break;
+                    case 5: msg.RowId = r.ReadInt64(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -1792,6 +1795,7 @@ namespace Volvoxgrid.V1
     {
         public int Row { get; set; }
         public int Col { get; set; }
+        public long RowId { get; set; }
 
         // ── Serialization ──
 
@@ -1800,6 +1804,7 @@ namespace Volvoxgrid.V1
             var w = new ProtoWriter();
             if (Row != 0) w.WriteInt32(1, Row);
             if (Col != 0) w.WriteInt32(2, Col);
+            if (RowId != 0L) w.WriteInt64(3, RowId);
             return w.ToArray();
         }
 
@@ -1819,6 +1824,7 @@ namespace Volvoxgrid.V1
                 {
                     case 1: msg.Row = r.ReadInt32(); break;
                     case 2: msg.Col = r.ReadInt32(); break;
+                    case 3: msg.RowId = r.ReadInt64(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -2467,6 +2473,7 @@ namespace Volvoxgrid.V1
         public int Row { get; set; }
         public int Col { get; set; }
         public string EditText { get; set; } = "";
+        public long RowId { get; set; }
 
         // ── Serialization ──
 
@@ -2476,6 +2483,7 @@ namespace Volvoxgrid.V1
             if (Row != 0) w.WriteInt32(1, Row);
             if (Col != 0) w.WriteInt32(2, Col);
             if (EditText != null && EditText.Length > 0) w.WriteString(3, EditText);
+            if (RowId != 0L) w.WriteInt64(4, RowId);
             return w.ToArray();
         }
 
@@ -2496,6 +2504,7 @@ namespace Volvoxgrid.V1
                     case 1: msg.Row = r.ReadInt32(); break;
                     case 2: msg.Col = r.ReadInt32(); break;
                     case 3: msg.EditText = r.ReadString(); break;
+                    case 4: msg.RowId = r.ReadInt64(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -4076,6 +4085,7 @@ namespace Volvoxgrid.V1
         public int ViewportHeight { get; set; }
         public float Scale { get; set; }
         public GridConfig Config { get; set; }
+        public bool RowIdsEnabled { get; set; }
 
         // ── Serialization ──
 
@@ -4086,6 +4096,7 @@ namespace Volvoxgrid.V1
             if (ViewportHeight != 0) w.WriteInt32(2, ViewportHeight);
             if (Scale != 0f) w.WriteFloat(3, Scale);
             if (Config != null) w.WriteMessageBytes(4, Config.ToByteArray());
+            if (RowIdsEnabled) w.WriteBool(5, RowIdsEnabled);
             return w.ToArray();
         }
 
@@ -4107,6 +4118,7 @@ namespace Volvoxgrid.V1
                     case 2: msg.ViewportHeight = r.ReadInt32(); break;
                     case 3: msg.Scale = r.ReadFloat(); break;
                     case 4: msg.Config = GridConfig.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 5: msg.RowIdsEnabled = r.ReadBool(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -5645,6 +5657,7 @@ namespace Volvoxgrid.V1
         public bool Composing { get; set; }
         public string PreeditText { get; set; } = "";
         public List<ValidationError> ValidationErrors { get; private set; } = new List<ValidationError>();
+        public long RowId { get; set; }
 
         // ── Serialization ──
 
@@ -5665,6 +5678,7 @@ namespace Volvoxgrid.V1
             if (PreeditText != null && PreeditText.Length > 0) w.WriteString(13, PreeditText);
             foreach (var item in ValidationErrors)
                 w.WriteMessageBytes(14, item.ToByteArray());
+            if (RowId != 0L) w.WriteInt64(15, RowId);
             return w.ToArray();
         }
 
@@ -5695,6 +5709,7 @@ namespace Volvoxgrid.V1
                     case 12: msg.Composing = r.ReadBool(); break;
                     case 13: msg.PreeditText = r.ReadString(); break;
                     case 14: msg.ValidationErrors.Add(ValidationError.ParseFrom(r.ReadLengthDelimited())); break;
+                    case 15: msg.RowId = r.ReadInt64(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -7142,6 +7157,62 @@ namespace Volvoxgrid.V1
                     case 1: msg.GridId = r.ReadInt64(); break;
                     case 2: msg.Row = r.ReadInt32(); break;
                     case 3: msg.Relation = (NodeRelation)r.ReadInt32(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class GetRowsRequest
+    {
+        public long GridId { get; set; }
+        public int StartRow { get; set; }
+        public int RowCount { get; set; }
+        public List<long> RowIds { get; private set; } = new List<long>();
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (GridId != 0L) w.WriteInt64(1, GridId);
+            if (StartRow != 0) w.WriteInt32(2, StartRow);
+            if (RowCount != 0) w.WriteInt32(3, RowCount);
+            foreach (var item in RowIds)
+                w.WriteInt64(4, item);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<GetRowsRequest> Parser = new MessageParser<GetRowsRequest>(data => ParseFrom(data));
+
+        public static GetRowsRequest ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new GetRowsRequest();
+            var r = new ProtoReader(data);
+            var msg = new GetRowsRequest();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.GridId = r.ReadInt64(); break;
+                    case 2: msg.StartRow = r.ReadInt32(); break;
+                    case 3: msg.RowCount = r.ReadInt32(); break;
+                    case 4:
+                        if (wire == ProtoWireType.LengthDelimited)
+                        {
+                            var packed = new ProtoReader(r.ReadLengthDelimited());
+                            while (!packed.IsEof)
+                                msg.RowIds.Add(packed.ReadInt64());
+                        }
+                        else
+                        {
+                            msg.RowIds.Add(r.ReadInt64());
+                        }
+                        break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -10166,6 +10237,7 @@ namespace Volvoxgrid.V1
         public int Cols { get; set; }
         public List<CellValue> Values { get; private set; } = new List<CellValue>();
         public bool Atomic { get; set; }
+        public List<long> RowIds { get; private set; } = new List<long>();
 
         // ── Serialization ──
 
@@ -10178,6 +10250,8 @@ namespace Volvoxgrid.V1
             foreach (var item in Values)
                 w.WriteMessageBytes(4, item.ToByteArray());
             if (Atomic) w.WriteBool(5, Atomic);
+            foreach (var item in RowIds)
+                w.WriteInt64(6, item);
             return w.ToArray();
         }
 
@@ -10200,6 +10274,18 @@ namespace Volvoxgrid.V1
                     case 3: msg.Cols = r.ReadInt32(); break;
                     case 4: msg.Values.Add(CellValue.ParseFrom(r.ReadLengthDelimited())); break;
                     case 5: msg.Atomic = r.ReadBool(); break;
+                    case 6:
+                        if (wire == ProtoWireType.LengthDelimited)
+                        {
+                            var packed = new ProtoReader(r.ReadLengthDelimited());
+                            while (!packed.IsEof)
+                                msg.RowIds.Add(packed.ReadInt64());
+                        }
+                        else
+                        {
+                            msg.RowIds.Add(r.ReadInt64());
+                        }
+                        break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -12161,6 +12247,9 @@ namespace Volvoxgrid.V1
         private StickyEdge? _sticky;
         public StickyEdge Sticky { get { return _sticky.GetValueOrDefault(); } set { _sticky = value; } }
         public bool HasSticky { get { return _sticky.HasValue; } }
+        private long? _rowId;
+        public long RowId { get { return _rowId.GetValueOrDefault(); } set { _rowId = value; } }
+        public bool HasRowId { get { return _rowId.HasValue; } }
 
         // ── Serialization ──
 
@@ -12187,6 +12276,8 @@ namespace Volvoxgrid.V1
                 w.WriteInt32(10, (int)_pin.Value);
             if (_sticky.HasValue)
                 w.WriteInt32(11, (int)_sticky.Value);
+            if (_rowId.HasValue)
+                w.WriteInt64(12, _rowId.Value);
             return w.ToArray();
         }
 
@@ -12215,6 +12306,45 @@ namespace Volvoxgrid.V1
                     case 9: msg.Span = r.ReadBool(); break;
                     case 10: msg.Pin = (PinPosition)r.ReadInt32(); break;
                     case 11: msg.Sticky = (StickyEdge)r.ReadInt32(); break;
+                    case 12: msg.RowId = r.ReadInt64(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class RowIdentity
+    {
+        public int Index { get; set; }
+        public long RowId { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (Index != 0) w.WriteInt32(1, Index);
+            if (RowId != 0L) w.WriteInt64(2, RowId);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<RowIdentity> Parser = new MessageParser<RowIdentity>(data => ParseFrom(data));
+
+        public static RowIdentity ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new RowIdentity();
+            var r = new ProtoReader(data);
+            var msg = new RowIdentity();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.Index = r.ReadInt32(); break;
+                    case 2: msg.RowId = r.ReadInt64(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -12449,6 +12579,42 @@ namespace Volvoxgrid.V1
                 {
                     case 1: msg.Row = r.ReadInt32(); break;
                     case 2: msg.Status = RowStatus.ParseFrom(r.ReadLengthDelimited()); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class RowsResponse
+    {
+        public List<RowIdentity> Rows { get; private set; } = new List<RowIdentity>();
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            foreach (var item in Rows)
+                w.WriteMessageBytes(1, item.ToByteArray());
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<RowsResponse> Parser = new MessageParser<RowsResponse>(data => ParseFrom(data));
+
+        public static RowsResponse ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new RowsResponse();
+            var r = new ProtoReader(data);
+            var msg = new RowsResponse();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.Rows.Add(RowIdentity.ParseFrom(r.ReadLengthDelimited())); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -13757,6 +13923,7 @@ namespace Volvoxgrid.V1
     {
         public int Row { get; set; }
         public int Col { get; set; }
+        public long RowId { get; set; }
 
         // ── Serialization ──
 
@@ -13765,6 +13932,7 @@ namespace Volvoxgrid.V1
             var w = new ProtoWriter();
             if (Row != 0) w.WriteInt32(1, Row);
             if (Col != 0) w.WriteInt32(2, Col);
+            if (RowId != 0L) w.WriteInt64(3, RowId);
             return w.ToArray();
         }
 
@@ -13784,6 +13952,7 @@ namespace Volvoxgrid.V1
                 {
                     case 1: msg.Row = r.ReadInt32(); break;
                     case 2: msg.Col = r.ReadInt32(); break;
+                    case 3: msg.RowId = r.ReadInt64(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -15545,6 +15714,13 @@ namespace Volvoxgrid.V1
                 if (recv == null) yield break;
                 yield return GridEvent.ParseFrom(recv);
             }
+        }
+
+        public RowsResponse GetRows(GetRowsRequest request)
+        {
+            byte[] data = request.ToByteArray();
+            byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/GetRows", data);
+            return RowsResponse.ParseFrom(result);
         }
 
     }

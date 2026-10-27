@@ -495,6 +495,8 @@ fn subtotal_ex_with_font(
         shift_tracked_rows_down(&mut auto_resize_rows, insert_row);
 
         // Insert row
+        grid.cancel_edit();
+        grid.row_ids.insert(insert_row);
         grid.cells.insert_row(insert_row);
         shift_row_metadata_down(grid, insert_row);
         grid.rows += 1;
@@ -669,6 +671,8 @@ fn clear_subtotals(grid: &mut VolvoxGrid) {
     subtotal_rows.sort_unstable();
 
     for row in subtotal_rows.into_iter().rev() {
+        grid.cancel_edit();
+        grid.row_ids.remove(row);
         grid.cells.remove_row(row);
         shift_row_metadata_up(grid, row);
         grid.rows -= 1;

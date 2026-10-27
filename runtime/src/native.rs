@@ -1216,6 +1216,7 @@ struct HeaderSortSnapshot {
     compare: Box<volvoxgrid_engine::grid::CustomCompareFn>,
     old_sort_state: volvoxgrid_engine::sort::SortState,
     old_row_positions: Vec<i32>,
+    old_row_ids: volvoxgrid_engine::row::RowIdentityStore,
     groups: Vec<Vec<i32>>,
 }
 
@@ -1327,7 +1328,7 @@ impl CompareChannel {
 #[derive(Clone, Debug)]
 enum PendingAction {
     BeginEdit {
-        row: i32,
+        target: volvoxgrid_engine::grid::RowTarget,
         col: i32,
         force: bool,
         prefer_combo: bool,
@@ -1336,13 +1337,15 @@ enum PendingAction {
         reason: EditStartReason,
     },
     ValidateEdit {
-        row: i32,
+        target: volvoxgrid_engine::grid::RowTarget,
+        session_serial: u64,
+        state_version: u64,
         col: i32,
         old_text: String,
         committed_text: String,
     },
     ToggleCheckbox {
-        row: i32,
+        target: volvoxgrid_engine::grid::RowTarget,
         col: i32,
     },
     BeforeSort {
@@ -1944,6 +1947,924 @@ mod tests {
     use volvoxgrid_engine::input::{HitArea, HitTestResult};
     use volvoxgrid_engine::proto::volvoxgrid::v1 as pb;
     use volvoxgrid_engine::style::{CellStylePatch, Padding};
+
+    fn row_id_rpc_fixture() -> (VolvoxGridRuntime, i64) {
+        let runtime = VolvoxGridRuntime::new();
+        let grid_id = runtime
+            .create(pb::CreateRequest {
+                row_ids_enabled: true,
+                viewport_width: 320,
+                viewport_height: 200,
+                scale: 1.0,
+                config: Some(pb::GridConfig {
+                    layout: Some(pb::LayoutConfig {
+                        rows: Some(2),
+                        cols: Some(1),
+                        fixed_rows: Some(0),
+                        fixed_cols: Some(0),
+                        ..Default::default()
+                    }),
+                    editing: Some(pb::EditConfig {
+                        activation: Some(pb::EditActivation {
+                            trigger: Some(2),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
+            })
+            .unwrap()
+            .grid_id;
+        runtime
+            .load_table(pb::LoadTableRequest {
+                grid_id,
+                rows: 2,
+                cols: 1,
+                atomic: true,
+                values: ["A", "B"]
+                    .iter()
+                    .map(|text| pb::CellValue {
+                        value: Some(pb::cell_value::Value::Text((*text).to_owned())),
+                    })
+                    .collect(),
+                row_ids: vec![9_007_199_254_740_993, 9_223_372_036_854_775_806],
+            })
+            .unwrap();
+        (runtime, grid_id)
+    }
+
+    fn row_id_rpc_rows(runtime: &VolvoxGridRuntime, grid_id: i64) -> Vec<pb::RowIdentity> {
+        runtime
+            .get_rows(pb::GetRowsRequest {
+                grid_id,
+                ..Default::default()
+            })
+            .unwrap()
+            .rows
+    }
+
+    fn index_only_rpc_fixture(rows: i32) -> (VolvoxGridRuntime, i64) {
+        let runtime = VolvoxGridRuntime::new();
+        let grid_id = runtime
+            .create(pb::CreateRequest {
+                viewport_width: 320,
+                viewport_height: 200,
+                config: Some(pb::GridConfig {
+                    layout: Some(pb::LayoutConfig {
+                        rows: Some(rows),
+                        cols: Some(1),
+                        fixed_rows: Some(0),
+                        fixed_cols: Some(0),
+                        ..Default::default()
+                    }),
+                    editing: Some(pb::EditConfig {
+                        activation: Some(pb::EditActivation {
+                            trigger: Some(2),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            })
+            .unwrap()
+            .grid_id;
+        runtime
+            .with_grid(grid_id, |grid| {
+                grid.auto_resize = false;
+                grid.cells.set_text(0, 0, "A".into());
+                grid.cells.set_text(1, 0, "B".into());
+            })
+            .unwrap();
+        (runtime, grid_id)
+    }
+
+    #[test]
+    fn default_off_identity_apis_reject_without_allocation_or_partial_writes() {
+        let (runtime, grid_id) = index_only_rpc_fixture(1_000_000);
+        assert_eq!(
+            runtime
+                .get_rows(pb::GetRowsRequest {
+                    grid_id,
+                    ..Default::default()
+                })
+                .unwrap_err()
+                .grpc_code,
+            super::GRPC_FAILED_PRECONDITION
+        );
+        assert_eq!(
+            runtime
+                .define_rows(pb::DefineRowsRequest {
+                    grid_id,
+                    rows: vec![pb::RowDef {
+                        index: 0,
+                        height: Some(123),
+                        row_id: Some(42),
+                        ..Default::default()
+                    }],
+                })
+                .unwrap_err()
+                .grpc_code,
+            super::GRPC_FAILED_PRECONDITION
+        );
+        assert_eq!(
+            runtime
+                .load_table(pb::LoadTableRequest {
+                    grid_id,
+                    rows: 1,
+                    cols: 1,
+                    row_ids: vec![42],
+                    values: vec![pb::CellValue {
+                        value: Some(pb::cell_value::Value::Text("overwrite".into()))
+                    }],
+                    ..Default::default()
+                })
+                .unwrap_err()
+                .grpc_code,
+            super::GRPC_FAILED_PRECONDITION
+        );
+        runtime
+            .with_grid(grid_id, |grid| {
+                assert!(!grid.row_ids_enabled());
+                assert_eq!(grid.rows, 1_000_000);
+                assert_eq!(grid.cells.get_text(0, 0), "A");
+                assert_ne!(grid.get_row_height(0), 123);
+                assert_eq!(grid.row_ids.heap_size_bytes(), 0);
+                assert_eq!(grid.get_row_id(0), None);
+            })
+            .unwrap();
+        // The index-based editor remains usable without enabling IDs.
+        let state = runtime
+            .edit(pb::EditCommand {
+                grid_id,
+                command: Some(pb::edit_command::Command::Start(pb::EditStart {
+                    row: 0,
+                    col: 0,
+                    reason: pb::EditStartReason::EditStartProgrammatic as i32,
+                    ..Default::default()
+                })),
+            })
+            .unwrap();
+        let session = state.session.unwrap();
+        assert_eq!(session.row_id, 0);
+        runtime
+            .edit(pb::EditCommand {
+                grid_id,
+                command: Some(pb::edit_command::Command::Session(
+                    pb::EditorSessionCommand {
+                        session_id: session.session_id,
+                        state_version: session.state_version,
+                        command: Some(pb::editor_session_command::Command::Commit(
+                            pb::EditCommit {
+                                value: Some(pb::EditorValue {
+                                    edit_text: Some("edited without IDs".into()),
+                                    ..Default::default()
+                                }),
+                            },
+                        )),
+                    },
+                )),
+            })
+            .unwrap();
+        runtime
+            .with_grid(grid_id, |grid| {
+                assert_eq!(grid.cells.get_text(0, 0), "edited without IDs");
+                assert_eq!(grid.row_ids.heap_size_bytes(), 0);
+                assert!(grid
+                    .events
+                    .drain()
+                    .iter()
+                    .any(|event| matches!(event.data, GridEventData::AfterEdit { row_id: 0, .. })));
+            })
+            .unwrap();
+        runtime.destroy(pb::DestroyRequest { grid_id }).unwrap();
+    }
+
+    #[test]
+    fn index_only_pending_validation_accepts_unchanged_rows_and_rejects_structural_changes() {
+        for scenario in ["unchanged", "sort", "insert", "remove", "replace"] {
+            let (runtime, grid_id) = index_only_rpc_fixture(2);
+            let (event_id, session) =
+                row_id_pending_from_edit_rpc(&runtime, grid_id, "pending edit");
+            assert_eq!(session.row_id, 0);
+            match scenario {
+                "sort" => {
+                    runtime
+                        .sort(pb::SortRequest {
+                            grid_id,
+                            sort_columns: vec![pb::SortColumn {
+                                col: 0,
+                                order: Some(2),
+                                r#type: Some(2),
+                            }],
+                        })
+                        .unwrap();
+                }
+                "insert" => {
+                    runtime
+                        .insert_rows(pb::InsertRowsRequest {
+                            grid_id,
+                            index: 0,
+                            count: 1,
+                            text: vec!["new".into()],
+                        })
+                        .unwrap();
+                }
+                "remove" => {
+                    runtime
+                        .remove_rows(pb::RemoveRowsRequest {
+                            grid_id,
+                            index: 1,
+                            count: 1,
+                        })
+                        .unwrap();
+                }
+                "replace" => {
+                    runtime
+                        .load_table(pb::LoadTableRequest {
+                            grid_id,
+                            rows: 2,
+                            cols: 1,
+                            values: ["replacement A", "replacement B"]
+                                .into_iter()
+                                .map(|text| pb::CellValue {
+                                    value: Some(pb::cell_value::Value::Text(text.into())),
+                                })
+                                .collect(),
+                            ..Default::default()
+                        })
+                        .unwrap();
+                }
+                _ => {}
+            }
+            runtime.resolve_event_decision(grid_id, event_id, false);
+            runtime
+                .with_grid(grid_id, |grid| {
+                    assert!(!grid.row_ids_enabled());
+                    assert_eq!(grid.row_ids.heap_size_bytes(), 0);
+                    let committed =
+                        (0..grid.rows).any(|row| grid.cells.get_text(row, 0) == "pending edit");
+                    assert_eq!(committed, scenario == "unchanged", "{scenario}");
+                })
+                .unwrap();
+            runtime.destroy(pb::DestroyRequest { grid_id }).unwrap();
+        }
+    }
+
+    #[test]
+    fn row_id_rpc_sort_edit_and_queued_events_keep_identity() {
+        let (runtime, grid_id) = row_id_rpc_fixture();
+        runtime
+            .sort(pb::SortRequest {
+                grid_id,
+                sort_columns: vec![pb::SortColumn {
+                    col: 0,
+                    order: Some(2),
+                    r#type: Some(2),
+                }],
+            })
+            .unwrap();
+        assert_eq!(
+            row_id_rpc_rows(&runtime, grid_id)[0].row_id,
+            9_223_372_036_854_775_806
+        );
+        let edit = runtime
+            .edit(pb::EditCommand {
+                grid_id,
+                command: Some(pb::edit_command::Command::Start(pb::EditStart {
+                    row: 0,
+                    col: 0,
+                    reason: pb::EditStartReason::EditStartProgrammatic as i32,
+                    ..Default::default()
+                })),
+            })
+            .unwrap();
+        assert!(edit.active);
+        let session = edit.session.unwrap();
+        assert_eq!(session.row_id, 9_223_372_036_854_775_806);
+        runtime
+            .edit(pb::EditCommand {
+                grid_id,
+                command: Some(pb::edit_command::Command::Session(
+                    pb::EditorSessionCommand {
+                        session_id: session.session_id,
+                        state_version: session.state_version,
+                        command: Some(pb::editor_session_command::Command::Commit(
+                            pb::EditCommit {
+                                value: Some(pb::EditorValue {
+                                    edit_text: Some("B edited".into()),
+                                    ..Default::default()
+                                }),
+                            },
+                        )),
+                    },
+                )),
+            })
+            .unwrap();
+        let events = runtime
+            .with_grid(grid_id, |grid| grid.events.drain())
+            .unwrap();
+        runtime
+            .move_row(pb::MoveRowRequest {
+                grid_id,
+                row: 0,
+                position: 1,
+            })
+            .unwrap();
+        let reverse = runtime
+            .get_rows(pb::GetRowsRequest {
+                grid_id,
+                row_ids: vec![
+                    9_223_372_036_854_775_806,
+                    9_223_372_036_854_775_804,
+                    9_007_199_254_740_993,
+                ],
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(
+            reverse.rows.iter().map(|row| row.index).collect::<Vec<_>>(),
+            vec![1, 0]
+        );
+        let cells = runtime
+            .get_cells(pb::GetCellsRequest {
+                grid_id,
+                row1: 1,
+                row2: 1,
+                col1: 0,
+                col2: 0,
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(
+            cells.cells[0].value.as_ref().and_then(|v| v.value.as_ref()),
+            Some(&pb::cell_value::Value::Text("B edited".into()))
+        );
+        let mut edit_events = 0;
+        for event in events {
+            match super::engine_event_to_proto(grid_id, event.event_id, event.data).event {
+                Some(pb::grid_event::Event::BeforeEdit(event)) => {
+                    assert_eq!(event.row_id, 9_223_372_036_854_775_806);
+                    edit_events += 1;
+                }
+                Some(pb::grid_event::Event::StartEdit(event)) => {
+                    assert_eq!(event.row_id, 9_223_372_036_854_775_806);
+                    edit_events += 1;
+                }
+                Some(pb::grid_event::Event::CellEditValidate(event)) => {
+                    assert_eq!(event.row_id, 9_223_372_036_854_775_806);
+                    edit_events += 1;
+                }
+                Some(pb::grid_event::Event::AfterEdit(event)) => {
+                    assert_eq!(event.row_id, 9_223_372_036_854_775_806);
+                    edit_events += 1;
+                }
+                _ => {}
+            }
+        }
+        assert_eq!(edit_events, 4);
+        runtime.destroy(pb::DestroyRequest { grid_id }).unwrap();
+    }
+
+    #[test]
+    fn row_id_rpc_invalid_requests_reject_before_mutating_table_or_rows() {
+        let (runtime, grid_id) = row_id_rpc_fixture();
+        let original = row_id_rpc_rows(&runtime, grid_id);
+        for ids in [vec![11, 11], vec![0, 12], vec![-1, 12], vec![12]] {
+            let error = runtime
+                .load_table(pb::LoadTableRequest {
+                    grid_id,
+                    rows: 2,
+                    cols: 1,
+                    atomic: false,
+                    values: vec![pb::CellValue {
+                        value: Some(pb::cell_value::Value::Text("overwrite".into())),
+                    }],
+                    row_ids: ids,
+                })
+                .unwrap_err();
+            assert_eq!(error.grpc_code, 3);
+            assert_eq!(row_id_rpc_rows(&runtime, grid_id), original);
+        }
+        let error = runtime
+            .define_rows(pb::DefineRowsRequest {
+                grid_id,
+                rows: vec![pb::RowDef {
+                    index: 0,
+                    height: Some(99),
+                    row_id: Some(9_223_372_036_854_775_806),
+                    ..Default::default()
+                }],
+            })
+            .unwrap_err();
+        assert_eq!(error.grpc_code, 3);
+        runtime
+            .with_grid(grid_id, |grid| {
+                assert_eq!(grid.cells.get_text(0, 0), "A");
+                assert_ne!(grid.get_row_height(0), 99);
+            })
+            .unwrap();
+        assert_eq!(row_id_rpc_rows(&runtime, grid_id), original);
+        for request in [
+            pb::GetRowsRequest {
+                grid_id,
+                start_row: -1,
+                ..Default::default()
+            },
+            pb::GetRowsRequest {
+                grid_id,
+                start_row: 1,
+                row_count: 2,
+                ..Default::default()
+            },
+            pb::GetRowsRequest {
+                grid_id,
+                row_ids: vec![9_007_199_254_740_993, 9_007_199_254_740_993],
+                ..Default::default()
+            },
+            pb::GetRowsRequest {
+                grid_id,
+                row_ids: vec![0],
+                ..Default::default()
+            },
+            pb::GetRowsRequest {
+                grid_id,
+                row_ids: vec![-1],
+                ..Default::default()
+            },
+            pb::GetRowsRequest {
+                grid_id,
+                start_row: 1,
+                row_ids: vec![9_007_199_254_740_993],
+                ..Default::default()
+            },
+        ] {
+            assert_eq!(runtime.get_rows(request).unwrap_err().grpc_code, 3);
+        }
+        assert!(runtime
+            .get_rows(pb::GetRowsRequest {
+                grid_id,
+                start_row: 2,
+                ..Default::default()
+            })
+            .unwrap()
+            .rows
+            .is_empty());
+        runtime.destroy(pb::DestroyRequest { grid_id }).unwrap();
+    }
+
+    #[test]
+    fn row_id_rpc_insert_remove_assign_and_reload_update_reverse_lookup() {
+        let (runtime, grid_id) = row_id_rpc_fixture();
+        runtime
+            .insert_rows(pb::InsertRowsRequest {
+                grid_id,
+                index: 1,
+                count: 1,
+                text: vec!["new".into()],
+            })
+            .unwrap();
+        let inserted = row_id_rpc_rows(&runtime, grid_id);
+        assert_eq!(inserted[0].row_id, 9_007_199_254_740_993);
+        assert_eq!(inserted[2].row_id, 9_223_372_036_854_775_806);
+        assert!(inserted[1].row_id > 0);
+        runtime
+            .define_rows(pb::DefineRowsRequest {
+                grid_id,
+                rows: vec![pb::RowDef {
+                    index: 1,
+                    row_id: Some(9_223_372_036_854_775_805),
+                    ..Default::default()
+                }],
+            })
+            .unwrap();
+        runtime
+            .remove_rows(pb::RemoveRowsRequest {
+                grid_id,
+                index: 0,
+                count: 1,
+            })
+            .unwrap();
+        let current = row_id_rpc_rows(&runtime, grid_id);
+        assert_eq!(
+            current.iter().map(|row| row.row_id).collect::<Vec<_>>(),
+            [9_223_372_036_854_775_805, 9_223_372_036_854_775_806]
+        );
+        runtime
+            .load_table(pb::LoadTableRequest {
+                grid_id,
+                rows: 2,
+                cols: 1,
+                ..Default::default()
+            })
+            .unwrap();
+        let refreshed = row_id_rpc_rows(&runtime, grid_id);
+        assert!(refreshed
+            .iter()
+            .all(|row| !current.iter().any(|old| old.row_id == row.row_id)));
+        assert!(runtime
+            .get_rows(pb::GetRowsRequest {
+                grid_id,
+                row_ids: vec![9_223_372_036_854_775_805, 9_223_372_036_854_775_806],
+                ..Default::default()
+            })
+            .unwrap()
+            .rows
+            .is_empty());
+        runtime.destroy(pb::DestroyRequest { grid_id }).unwrap();
+    }
+
+    #[test]
+    fn row_id_pending_edit_follows_reordered_record_and_drops_removed_record() {
+        let (runtime, grid_id) = row_id_rpc_fixture();
+        let action = super::PendingAction::BeginEdit {
+            target: runtime
+                .with_grid(grid_id, |grid| grid.capture_row_target(0).unwrap())
+                .unwrap(),
+            col: 0,
+            force: true,
+            prefer_combo: false,
+            seed_text: None,
+            click_caret: None,
+            reason: pb::EditStartReason::EditStartProgrammatic,
+        };
+        runtime
+            .move_row(pb::MoveRowRequest {
+                grid_id,
+                row: 0,
+                position: 1,
+            })
+            .unwrap();
+        runtime.apply_pending_action(grid_id, action.clone(), false);
+        let state = runtime
+            .edit(pb::EditCommand {
+                grid_id,
+                command: Some(pb::edit_command::Command::GetState(pb::EditGetState {})),
+            })
+            .unwrap();
+        let session = state.session.unwrap();
+        assert_eq!((session.row, session.row_id), (1, 9_007_199_254_740_993));
+        runtime
+            .remove_rows(pb::RemoveRowsRequest {
+                grid_id,
+                index: 1,
+                count: 1,
+            })
+            .unwrap();
+        runtime.apply_pending_action(grid_id, action, false);
+        let state = runtime
+            .edit(pb::EditCommand {
+                grid_id,
+                command: Some(pb::edit_command::Command::GetState(pb::EditGetState {})),
+            })
+            .unwrap();
+        assert!(!state.active);
+        runtime.destroy(pb::DestroyRequest { grid_id }).unwrap();
+    }
+
+    #[test]
+    fn numeric_row_ids_roundtrip_protobuf_without_float_conversion() {
+        use prost::Message;
+        let (runtime, grid_id) = row_id_rpc_fixture();
+        let ids = [9_007_199_254_740_993_i64, i64::MAX];
+        let request = pb::LoadTableRequest {
+            grid_id,
+            rows: 2,
+            cols: 1,
+            atomic: true,
+            row_ids: ids.to_vec(),
+            ..Default::default()
+        };
+        let decoded = pb::LoadTableRequest::decode(request.encode_to_vec().as_slice()).unwrap();
+        assert_eq!(decoded.row_ids, ids);
+        runtime.load_table(decoded).unwrap();
+        let response = runtime
+            .get_rows(pb::GetRowsRequest {
+                grid_id,
+                row_ids: ids.iter().rev().copied().collect(),
+                ..Default::default()
+            })
+            .unwrap();
+        let decoded = pb::RowsResponse::decode(response.encode_to_vec().as_slice()).unwrap();
+        assert_eq!(decoded.rows[0].row_id, i64::MAX);
+        assert_eq!(decoded.rows[1].row_id, ids[0]);
+        runtime.destroy(pb::DestroyRequest { grid_id }).unwrap();
+    }
+
+    #[test]
+    fn pending_edits_reject_replacement_or_reassignment_with_reused_numeric_ids() {
+        let (runtime, grid_id) = row_id_rpc_fixture();
+        let first_id = 9_007_199_254_740_993;
+        let second_id = 9_223_372_036_854_775_806;
+        let token = runtime
+            .with_grid(grid_id, |grid| grid.row_identity_token(0).unwrap())
+            .unwrap();
+        let begin = super::PendingAction::BeginEdit {
+            target: volvoxgrid_engine::grid::RowTarget {
+                row: 0,
+                row_id: first_id,
+                identity_token: token,
+                revision: 0,
+            },
+            col: 0,
+            force: true,
+            prefer_combo: false,
+            seed_text: None,
+            click_caret: None,
+            reason: pb::EditStartReason::EditStartProgrammatic,
+        };
+        let commit = super::PendingAction::ValidateEdit {
+            session_serial: 0,
+            state_version: 0,
+            target: volvoxgrid_engine::grid::RowTarget {
+                row: 0,
+                row_id: first_id,
+                identity_token: token,
+                revision: 0,
+            },
+            col: 0,
+            old_text: "A".into(),
+            committed_text: "stale edit".into(),
+        };
+        // Swapping aliases must not redirect a pending action to the other row.
+        runtime
+            .define_rows(pb::DefineRowsRequest {
+                grid_id,
+                rows: vec![
+                    pb::RowDef {
+                        index: 0,
+                        row_id: Some(second_id),
+                        ..Default::default()
+                    },
+                    pb::RowDef {
+                        index: 1,
+                        row_id: Some(first_id),
+                        ..Default::default()
+                    },
+                ],
+            })
+            .unwrap();
+        runtime.apply_pending_action(grid_id, begin.clone(), false);
+        runtime.apply_pending_action(grid_id, commit.clone(), false);
+        runtime
+            .with_grid(grid_id, |grid| {
+                assert!(!grid.edit.is_active());
+                assert_eq!(grid.cells.get_text(0, 0), "A");
+                assert_eq!(grid.cells.get_text(1, 0), "B");
+            })
+            .unwrap();
+        // Identical caller IDs in a new table still identify new row instances.
+        runtime
+            .load_table(pb::LoadTableRequest {
+                grid_id,
+                rows: 2,
+                cols: 1,
+                row_ids: vec![first_id, second_id],
+                values: ["replacement A", "replacement B"]
+                    .into_iter()
+                    .map(|text| pb::CellValue {
+                        value: Some(pb::cell_value::Value::Text(text.into())),
+                    })
+                    .collect(),
+                ..Default::default()
+            })
+            .unwrap();
+        runtime.apply_pending_action(grid_id, begin, false);
+        runtime.apply_pending_action(grid_id, commit, false);
+        runtime
+            .with_grid(grid_id, |grid| {
+                assert!(!grid.edit.is_active());
+                assert_eq!(grid.cells.get_text(0, 0), "replacement A");
+                assert_eq!(grid.cells.get_text(1, 0), "replacement B");
+            })
+            .unwrap();
+        runtime.destroy(pb::DestroyRequest { grid_id }).unwrap();
+    }
+
+    fn row_id_pending_from_edit_rpc(
+        runtime: &VolvoxGridRuntime,
+        grid_id: i64,
+        text: &str,
+    ) -> (i64, pb::EditorSession) {
+        let started = runtime
+            .edit(pb::EditCommand {
+                grid_id,
+                command: Some(pb::edit_command::Command::Start(pb::EditStart {
+                    row: 0,
+                    col: 0,
+                    reason: pb::EditStartReason::EditStartProgrammatic as i32,
+                    ..Default::default()
+                })),
+            })
+            .unwrap();
+        assert!(started.active);
+        let session = started.session.unwrap();
+        runtime.mark_decision_channel_enabled(grid_id);
+        let pending = runtime
+            .edit(pb::EditCommand {
+                grid_id,
+                command: Some(pb::edit_command::Command::Session(
+                    pb::EditorSessionCommand {
+                        session_id: session.session_id,
+                        state_version: session.state_version,
+                        command: Some(pb::editor_session_command::Command::Commit(
+                            pb::EditCommit {
+                                value: Some(pb::EditorValue {
+                                    edit_text: Some(text.to_owned()),
+                                    ..Default::default()
+                                }),
+                            },
+                        )),
+                    },
+                )),
+            })
+            .unwrap();
+        assert!(pending.active, "validation must leave its session pending");
+        let event_id = runtime
+            .with_grid(grid_id, |grid| {
+                assert_eq!(grid.cells.get_text(0, 0), "A");
+                take_pending_event_id(grid, |event| {
+                    matches!(
+                        event,
+                        GridEventData::CellEditValidate { row: 0, col: 0, .. }
+                    )
+                })
+            })
+            .unwrap();
+        (event_id, pending.session.unwrap())
+    }
+
+    fn row_id_cancel_pending_session_rpc(
+        runtime: &VolvoxGridRuntime,
+        grid_id: i64,
+        session: &pb::EditorSession,
+    ) {
+        let cancelled = runtime
+            .edit(pb::EditCommand {
+                grid_id,
+                command: Some(pb::edit_command::Command::Session(
+                    pb::EditorSessionCommand {
+                        session_id: session.session_id,
+                        state_version: session.state_version,
+                        command: Some(pb::editor_session_command::Command::Cancel(
+                            pb::EditCancel {},
+                        )),
+                    },
+                )),
+            })
+            .unwrap();
+        assert!(!cancelled.active);
+    }
+
+    #[test]
+    fn pending_validation_accepts_the_unchanged_rpc_edit_session() {
+        let (runtime, grid_id) = row_id_rpc_fixture();
+        let (event_id, _) = row_id_pending_from_edit_rpc(&runtime, grid_id, "allowed");
+        runtime.resolve_event_decision(grid_id, event_id, false);
+        runtime
+            .with_grid(grid_id, |grid| {
+                assert_eq!(grid.cells.get_text(0, 0), "allowed");
+                assert_eq!(grid.cells.get_text(1, 0), "B");
+                assert!(!grid.edit.is_active());
+                assert!(grid.events.drain().iter().any(|event| matches!(
+                    &event.data,
+                    GridEventData::AfterEdit { row_id: 9_007_199_254_740_993, new_text, .. }
+                        if new_text == "allowed"
+                )));
+            })
+            .unwrap();
+        runtime.destroy(pb::DestroyRequest { grid_id }).unwrap();
+    }
+
+    #[test]
+    fn pending_validation_rejects_cancel_restart_version_change_and_alias_round_trip() {
+        for scenario in ["cancel", "restart", "new_value", "alias_round_trip"] {
+            let (runtime, grid_id) = row_id_rpc_fixture();
+            let (event_id, session) =
+                row_id_pending_from_edit_rpc(&runtime, grid_id, "stale write");
+            let token = runtime
+                .with_grid(grid_id, |grid| grid.row_identity_token(0))
+                .unwrap();
+            let mut expected_live_session = None;
+            match scenario {
+                "cancel" | "restart" => {
+                    row_id_cancel_pending_session_rpc(&runtime, grid_id, &session);
+                    if scenario == "restart" {
+                        let fresh = runtime
+                            .edit(pb::EditCommand {
+                                grid_id,
+                                command: Some(pb::edit_command::Command::Start(pb::EditStart {
+                                    row: 0,
+                                    col: 0,
+                                    reason: pb::EditStartReason::EditStartProgrammatic as i32,
+                                    seed_value: Some(pb::EditorValue {
+                                        edit_text: Some("fresh buffer".to_owned()),
+                                        ..Default::default()
+                                    }),
+                                    ..Default::default()
+                                })),
+                            })
+                            .unwrap();
+                        assert!(fresh.active);
+                        let fresh = fresh.session.unwrap();
+                        assert_ne!(fresh.session_id, session.session_id);
+                        expected_live_session = Some(fresh);
+                    }
+                }
+                "new_value" => {
+                    let changed = runtime
+                        .edit(pb::EditCommand {
+                            grid_id,
+                            command: Some(pb::edit_command::Command::Session(
+                                pb::EditorSessionCommand {
+                                    session_id: session.session_id,
+                                    state_version: session.state_version,
+                                    command: Some(
+                                        pb::editor_session_command::Command::ValueChanged(
+                                            pb::EditorValueChanged {
+                                                value: Some(pb::EditorValue {
+                                                    edit_text: Some("fresh buffer".to_owned()),
+                                                    ..Default::default()
+                                                }),
+                                            },
+                                        ),
+                                    ),
+                                },
+                            )),
+                        })
+                        .unwrap();
+                    assert!(changed.active);
+                    let changed = changed.session.unwrap();
+                    assert_eq!(changed.session_id, session.session_id);
+                    assert_ne!(changed.state_version, session.state_version);
+                    expected_live_session = Some(changed);
+                }
+                "alias_round_trip" => {
+                    let first = 9_007_199_254_740_993;
+                    let second = 9_223_372_036_854_775_806;
+                    for ids in [[second, first], [first, second]] {
+                        runtime
+                            .define_rows(pb::DefineRowsRequest {
+                                grid_id,
+                                rows: ids
+                                    .iter()
+                                    .enumerate()
+                                    .map(|(row, &id)| pb::RowDef {
+                                        index: row as i32,
+                                        row_id: Some(id),
+                                        ..Default::default()
+                                    })
+                                    .collect(),
+                            })
+                            .unwrap();
+                    }
+                }
+                _ => unreachable!(),
+            }
+            // These cases keep the same row incarnation and restore/preserve its
+            // public ID. A row-token-only guard cannot reject this stale commit.
+            runtime
+                .with_grid(grid_id, |grid| {
+                    assert_eq!(grid.row_identity_token(0), token);
+                    assert_eq!(grid.get_row_id(0), Some(9_007_199_254_740_993));
+                })
+                .unwrap();
+            runtime.resolve_event_decision(grid_id, event_id, false);
+            runtime
+                .with_grid(grid_id, |grid| {
+                    assert_eq!(grid.cells.get_text(0, 0), "A", "{scenario}");
+                    assert_eq!(grid.cells.get_text(1, 0), "B", "{scenario}");
+                    assert!(
+                        !grid
+                            .events
+                            .drain()
+                            .iter()
+                            .any(|event| matches!(event.data, GridEventData::AfterEdit { .. })),
+                        "{scenario}"
+                    );
+                })
+                .unwrap();
+            let current = runtime
+                .edit(pb::EditCommand {
+                    grid_id,
+                    command: Some(pb::edit_command::Command::GetState(pb::EditGetState {})),
+                })
+                .unwrap();
+            match expected_live_session {
+                Some(expected) => {
+                    assert!(current.active, "{scenario}");
+                    let current = current.session.unwrap();
+                    assert_eq!(current.session_id, expected.session_id, "{scenario}");
+                    assert_eq!(current.state_version, expected.state_version, "{scenario}");
+                    assert_eq!(current.value, expected.value, "{scenario}");
+                }
+                None => assert!(!current.active, "{scenario}"),
+            }
+            runtime.destroy(pb::DestroyRequest { grid_id }).unwrap();
+        }
+    }
 
     struct AutoCompareEventStream {
         runtime: Arc<VolvoxGridRuntime>,
@@ -2619,7 +3540,9 @@ mod tests {
     #[test]
     fn header_sort_snapshot_matches_engine_for_clean_custom_grid() {
         let runtime = VolvoxGridRuntime::new();
-        let grid_id = runtime.manager().create_grid(320, 160, 6, 1, 1, 0, 1.0);
+        let grid_id = runtime
+            .manager()
+            .create_grid_with_row_ids(320, 160, 6, 1, 1, 0, 1.0, true);
         let values = ["dddd", "a", "ccc", "bb", "eeeee"];
         let mut lengths = HashMap::new();
         runtime
@@ -2631,6 +3554,7 @@ mod tests {
                 for (i, value) in values.iter().enumerate() {
                     let row = (i as i32) + 1;
                     grid.cells.set_text(row, 0, (*value).to_string());
+                    grid.set_row_ids(&[(row, value.len() as i64)]).unwrap();
                     lengths.insert(row, value.len());
                 }
             })
@@ -2662,6 +3586,9 @@ mod tests {
             }),
             old_sort_state,
             old_row_positions,
+            old_row_ids: runtime
+                .with_grid(grid_id, |grid| grid.row_ids.clone())
+                .unwrap(),
             groups: vec![(1..=5).collect::<Vec<i32>>()],
         };
 
@@ -2703,6 +3630,20 @@ mod tests {
             .collect::<Vec<_>>();
 
         assert_eq!(snapshot_order, engine_order);
+        let ids = runtime
+            .get_rows(pb::GetRowsRequest {
+                grid_id,
+                start_row: 1,
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(
+            ids.rows.iter().map(|row| row.row_id).collect::<Vec<_>>(),
+            snapshot_order
+                .iter()
+                .map(|value| value.len() as i64)
+                .collect::<Vec<_>>()
+        );
         assert_eq!(snapshot_keys, engine_grid.sort_state.sort_keys);
         destroy_test_grid(&runtime, grid_id);
     }
@@ -3019,7 +3960,7 @@ mod tests {
                 events
                     .iter()
                     .find_map(|event| {
-                        matches!(event.data, GridEventData::BeforeEdit { row: 1, col: 1 })
+                        matches!(event.data, GridEventData::BeforeEdit { row: 1, col: 1, .. })
                             .then_some(event.event_id)
                     })
                     .expect("visible cell Enter should request BeforeEdit")
@@ -3062,7 +4003,7 @@ mod tests {
                     pb::EditStartReason::EditStartUnspecified,
                 );
             },
-            |event| matches!(event, GridEventData::BeforeEdit { row: 1, col: 0 }),
+            |event| matches!(event, GridEventData::BeforeEdit { row: 1, col: 0, .. }),
         );
         let _ = runtime.resolve_event_decision(grid_id, cancel_id, true);
         runtime
@@ -3085,7 +4026,7 @@ mod tests {
                     pb::EditStartReason::EditStartUnspecified,
                 );
             },
-            |event| matches!(event, GridEventData::BeforeEdit { row: 1, col: 0 }),
+            |event| matches!(event, GridEventData::BeforeEdit { row: 1, col: 0, .. }),
         );
         let _ = runtime.resolve_event_decision(grid_id, allow_id, false);
         runtime
@@ -3121,7 +4062,7 @@ mod tests {
                     pb::EditStartReason::EditStartUnspecified,
                 );
             },
-            |event| matches!(event, GridEventData::BeforeEdit { row: 1, col: 0 }),
+            |event| matches!(event, GridEventData::BeforeEdit { row: 1, col: 0, .. }),
         );
 
         let _ = runtime.resolve_event_decision(grid_id, event_id, false);
@@ -3316,7 +4257,7 @@ mod tests {
             |runtime, grid_id, grid| {
                 runtime.request_before_checkbox_toggle(grid_id, grid, 1, 0);
             },
-            |event| matches!(event, GridEventData::BeforeEdit { row: 1, col: 0 }),
+            |event| matches!(event, GridEventData::BeforeEdit { row: 1, col: 0, .. }),
         );
         let _ = runtime.resolve_event_decision(grid_id, cancel_id, true);
         runtime
@@ -3340,7 +4281,7 @@ mod tests {
             |runtime, grid_id, grid| {
                 runtime.request_before_checkbox_toggle(grid_id, grid, 1, 0);
             },
-            |event| matches!(event, GridEventData::BeforeEdit { row: 1, col: 0 }),
+            |event| matches!(event, GridEventData::BeforeEdit { row: 1, col: 0, .. }),
         );
         let _ = runtime.resolve_event_decision(grid_id, allow_id, false);
         runtime
@@ -3359,6 +4300,7 @@ mod tests {
                         col: 0,
                         old_text,
                         new_text,
+                        ..
                     } if old_text.as_str() == "No" && new_text.as_str() == "Yes"
                 )));
                 assert!(events.iter().any(|event| matches!(
@@ -3400,7 +4342,7 @@ mod tests {
                     grid_id, grid, click_x, click_y, 0, 0, true,
                 );
                 take_pending_event_id(grid, |event| {
-                    matches!(event, GridEventData::BeforeEdit { row: 1, col: 0 })
+                    matches!(event, GridEventData::BeforeEdit { row: 1, col: 0, .. })
                 })
             })
             .expect("grid exists");
@@ -3440,7 +4382,7 @@ mod tests {
                     pb::EditStartReason::EditStartUnspecified,
                 );
             },
-            |event| matches!(event, GridEventData::BeforeEdit { row: 1, col: 0 }),
+            |event| matches!(event, GridEventData::BeforeEdit { row: 1, col: 0, .. }),
         );
         {
             let mut pending = runtime
@@ -3491,7 +4433,7 @@ mod tests {
                     pb::EditStartReason::EditStartUnspecified,
                 );
             },
-            |event| matches!(event, GridEventData::BeforeEdit { row: 1, col: 0 }),
+            |event| matches!(event, GridEventData::BeforeEdit { row: 1, col: 0, .. }),
         );
         {
             let mut pending = runtime
@@ -3894,31 +4836,41 @@ fn engine_event_to_proto(
             col,
             target: Some(target.to_proto()),
         })),
-        E::BeforeEdit { row, col } => {
-            Some(grid_event::Event::BeforeEdit(BeforeEditEvent { row, col }))
+        E::BeforeEdit { row, col, row_id } => {
+            Some(grid_event::Event::BeforeEdit(BeforeEditEvent {
+                row,
+                col,
+                row_id,
+            }))
         }
-        E::StartEdit { row, col } => {
-            Some(grid_event::Event::StartEdit(StartEditEvent { row, col }))
-        }
+        E::StartEdit { row, col, row_id } => Some(grid_event::Event::StartEdit(StartEditEvent {
+            row,
+            col,
+            row_id,
+        })),
         E::AfterEdit {
             row,
             col,
             old_text,
             new_text,
+            row_id,
         } => Some(grid_event::Event::AfterEdit(AfterEditEvent {
             row,
             col,
             old_text,
             new_text,
+            row_id,
         })),
         E::CellEditValidate {
             row,
             col,
             edit_text,
+            row_id,
         } => Some(grid_event::Event::CellEditValidate(CellEditValidateEvent {
             row,
             col,
             edit_text,
+            row_id,
         })),
         E::CellEditChange { text } => {
             Some(grid_event::Event::CellEditChange(CellEditChangeEvent {
@@ -4687,9 +5639,11 @@ impl VolvoxGridRuntime {
         grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
         sort_state: volvoxgrid_engine::sort::SortState,
         row_positions: Vec<i32>,
+        row_ids: volvoxgrid_engine::row::RowIdentityStore,
     ) {
         grid.sort_state = sort_state;
         grid.row_positions = row_positions;
+        grid.row_ids = row_ids;
         grid.cells.set_row_map(grid.row_positions.clone());
         grid.layout.invalidate();
         grid.mark_dirty();
@@ -4762,6 +5716,7 @@ impl VolvoxGridRuntime {
             compare,
             old_sort_state: grid.sort_state.clone(),
             old_row_positions: grid.row_positions.clone(),
+            old_row_ids: grid.row_ids.clone(),
             groups: vec![rows],
         })
     }
@@ -4807,6 +5762,7 @@ impl VolvoxGridRuntime {
         let started_at = Instant::now();
         let sort_result = panic::catch_unwind(AssertUnwindSafe(|| {
             let mut row_positions = snapshot.old_row_positions.clone();
+            let mut row_remap = HashMap::new();
             let ascending = volvoxgrid_engine::sort::sort_order_is_ascending(snapshot.order);
             for group in &snapshot.groups {
                 let mut indices: Vec<usize> = (0..group.len()).collect();
@@ -4820,28 +5776,32 @@ impl VolvoxGridRuntime {
                     if dest_row < row_positions.len() && src_row < snapshot.old_row_positions.len()
                     {
                         row_positions[dest_row] = snapshot.old_row_positions[src_row];
+                        row_remap.insert(src_row as i32, dest_row as i32);
                     }
                 }
             }
-            row_positions
+            (row_positions, row_remap)
         }));
         Self::clear_compare_channel(grid_id);
 
         match sort_result {
-            Ok(row_positions) => {
+            Ok((row_positions, row_remap)) => {
                 let elapsed_ms = started_at.elapsed().as_secs_f64() * 1000.0;
                 let _ = SHARED_GRID_MANAGER.with_grid(grid_id, |grid| {
                     // Last mutation wins. We only commit if the row order and
                     // active sort keys still match the snapshot. Cell edits and
                     // column metadata changes during the sort are not rejected;
                     // their rows can be ordered by the pre-edit compare values.
-                    if grid.row_positions != snapshot.old_row_positions
+                    if grid.row_ids.revision() != snapshot.old_row_ids.revision()
+                        || grid.row_positions != snapshot.old_row_positions
                         || grid.sort_state.sort_keys != snapshot.old_sort_state.sort_keys
                     {
                         return;
                     }
+                    grid.cancel_edit();
                     let old_sort_keys = grid.sort_state.sort_keys.clone();
                     grid.row_positions = row_positions;
+                    grid.row_ids.remap(&row_remap);
                     grid.cells.set_row_map(grid.row_positions.clone());
                     grid.sort_state = snapshot.old_sort_state;
                     grid.sort_state.sort_keys = vec![(snapshot.col, snapshot.order)];
@@ -4875,6 +5835,7 @@ impl VolvoxGridRuntime {
     ) {
         let old_sort_state = grid.sort_state.clone();
         let old_row_positions = grid.row_positions.clone();
+        let old_row_ids = grid.row_ids.clone();
         let old_sort_keys = old_sort_state.sort_keys.clone();
         let next_order = volvoxgrid_engine::sort::header_click_next_sort_order(grid, col);
         Self::clear_compare_channel(grid_id);
@@ -4895,7 +5856,7 @@ impl VolvoxGridRuntime {
         Self::clear_compare_channel(grid_id);
 
         if let Err(err) = sort_result {
-            Self::restore_sort_snapshot(grid, old_sort_state, old_row_positions);
+            Self::restore_sort_snapshot(grid, old_sort_state, old_row_positions, old_row_ids);
             match Self::compare_abort_from_panic(err.as_ref()) {
                 Some(CompareAbort::Timeout) => Self::push_compare_timeout_error(grid, col),
                 Some(CompareAbort::Cancelled) => {}
@@ -4946,6 +5907,7 @@ impl VolvoxGridRuntime {
     ) {
         let old_sort_state = grid.sort_state.clone();
         let old_row_positions = grid.row_positions.clone();
+        let old_row_ids = grid.row_ids.clone();
         let timeout_col = sort_keys.first().map_or(-1, |(col, _)| *col);
         let has_custom = sort_keys
             .iter()
@@ -4961,7 +5923,7 @@ impl VolvoxGridRuntime {
         grid.custom_compare = None;
 
         if let Err(err) = sort_result {
-            Self::restore_sort_snapshot(grid, old_sort_state, old_row_positions);
+            Self::restore_sort_snapshot(grid, old_sort_state, old_row_positions, old_row_ids);
             match Self::compare_abort_from_panic(err.as_ref()) {
                 Some(CompareAbort::Timeout) => {
                     Self::push_compare_timeout_error(grid, timeout_col);
@@ -5073,7 +6035,9 @@ impl VolvoxGridRuntime {
                 PendingActionEntry {
                     created_at: Instant::now(),
                     action: PendingAction::BeginEdit {
-                        row,
+                        target: grid
+                            .capture_row_target(row)
+                            .expect("pending action has a live row"),
                         col,
                         force,
                         prefer_combo,
@@ -5085,7 +6049,11 @@ impl VolvoxGridRuntime {
             );
         grid.events.push_with_id(
             event_id,
-            volvoxgrid_engine::event::GridEventData::BeforeEdit { row, col },
+            volvoxgrid_engine::event::GridEventData::BeforeEdit {
+                row,
+                col,
+                row_id: grid.get_row_id(row).unwrap_or_default(),
+            },
         );
         None
     }
@@ -5103,7 +6071,11 @@ impl VolvoxGridRuntime {
 
         if !self.decision_channel_enabled(grid_id) {
             grid.events
-                .push(volvoxgrid_engine::event::GridEventData::BeforeEdit { row, col });
+                .push(volvoxgrid_engine::event::GridEventData::BeforeEdit {
+                    row,
+                    col,
+                    row_id: grid.get_row_id(row).unwrap_or_default(),
+                });
             volvoxgrid_engine::input::apply_checkbox_toggle_after_before_edit(grid, row, col);
             return true;
         }
@@ -5116,12 +6088,21 @@ impl VolvoxGridRuntime {
                 (grid_id, event_id),
                 PendingActionEntry {
                     created_at: Instant::now(),
-                    action: PendingAction::ToggleCheckbox { row, col },
+                    action: PendingAction::ToggleCheckbox {
+                        target: grid
+                            .capture_row_target(row)
+                            .expect("pending action has a live row"),
+                        col,
+                    },
                 },
             );
         grid.events.push_with_id(
             event_id,
-            volvoxgrid_engine::event::GridEventData::BeforeEdit { row, col },
+            volvoxgrid_engine::event::GridEventData::BeforeEdit {
+                row,
+                col,
+                row_id: grid.get_row_id(row).unwrap_or_default(),
+            },
         );
         true
     }
@@ -5161,6 +6142,7 @@ impl VolvoxGridRuntime {
         if !self.decision_channel_enabled(grid_id) {
             grid.events
                 .push(volvoxgrid_engine::event::GridEventData::CellEditValidate {
+                    row_id: grid.get_row_id(row).unwrap_or_default(),
                     row,
                     col,
                     edit_text: committed_text.clone(),
@@ -5178,7 +6160,11 @@ impl VolvoxGridRuntime {
                 PendingActionEntry {
                     created_at: Instant::now(),
                     action: PendingAction::ValidateEdit {
-                        row,
+                        session_serial: grid.edit.session_serial,
+                        state_version: grid.edit.state_version,
+                        target: grid
+                            .capture_row_target(row)
+                            .expect("pending action has a live row"),
                         col,
                         old_text,
                         committed_text: committed_text.clone(),
@@ -5188,6 +6174,7 @@ impl VolvoxGridRuntime {
         grid.events.push_with_id(
             event_id,
             volvoxgrid_engine::event::GridEventData::CellEditValidate {
+                row_id: grid.get_row_id(row).unwrap_or_default(),
                 row,
                 col,
                 edit_text: committed_text,
@@ -5590,7 +6577,7 @@ impl VolvoxGridRuntime {
     ) -> Option<RenderOutput> {
         match action {
             PendingAction::BeginEdit {
-                row,
+                target,
                 col,
                 force,
                 prefer_combo,
@@ -5603,6 +6590,9 @@ impl VolvoxGridRuntime {
                 }
                 self.manager()
                     .with_grid(grid_id, |grid| {
+                        let Some(row) = grid.resolve_row_target(&target) else {
+                            return None;
+                        };
                         shared::begin_edit_session_core_opts(
                             grid,
                             row,
@@ -5633,38 +6623,48 @@ impl VolvoxGridRuntime {
                     .flatten()
             }
             PendingAction::ValidateEdit {
-                row,
+                target,
+                session_serial,
+                state_version,
                 col,
                 old_text,
                 committed_text,
             } => self
                 .manager()
                 .with_grid(grid_id, |grid| {
+                    let Some(row) = grid.resolve_row_target(&target) else {
+                        return None;
+                    };
                     let edit_matches = grid.edit.is_active()
+                        && grid.edit.session_serial == session_serial
+                        && grid.edit.state_version == state_version
                         && grid.edit.edit_row == row
                         && grid.edit.edit_col == col;
-
-                    if cancel {
-                        if edit_matches {
-                            let prefer_combo = grid.edit.dropdown_count() > 0;
-                            return maybe_render_editor_output(grid, prefer_combo);
-                        }
+                    // Cancellation, a new editor, or subsequent text input supersedes
+                    // this validation decision even when the numeric row ID is reused.
+                    if !edit_matches {
                         return None;
                     }
 
-                    if edit_matches {
-                        grid.edit.cancel();
+                    if cancel {
+                        let prefer_combo = grid.edit.dropdown_count() > 0;
+                        return maybe_render_editor_output(grid, prefer_combo);
                     }
+
+                    grid.edit.cancel();
                     shared::apply_committed_edit_text(grid, row, col, old_text, committed_text);
                     None
                 })
                 .ok()
                 .flatten(),
-            PendingAction::ToggleCheckbox { row, col } => {
+            PendingAction::ToggleCheckbox { target, col } => {
                 if cancel {
                     return None;
                 }
                 let _ = self.manager().with_grid(grid_id, |grid| {
+                    let Some(row) = grid.resolve_row_target(&target) else {
+                        return;
+                    };
                     volvoxgrid_engine::input::apply_checkbox_toggle_after_before_edit(
                         grid, row, col,
                     );
@@ -6056,7 +7056,7 @@ impl VolvoxGridServiceRuntime for VolvoxGridRuntime {
 
     fn create(&self, request: CreateRequest) -> RuntimeResult<CreateResponse> {
         let spec = shared::create_grid_spec(&request);
-        let id = self.manager().create_grid(
+        let id = self.manager().create_grid_with_row_ids(
             request.viewport_width,
             request.viewport_height,
             spec.rows,
@@ -6064,6 +7064,7 @@ impl VolvoxGridServiceRuntime for VolvoxGridRuntime {
             spec.fixed_rows,
             spec.fixed_cols,
             spec.scale,
+            request.row_ids_enabled,
         );
         self.set_current_zoom_scale(id, 1.0);
 
@@ -6140,8 +7141,26 @@ impl VolvoxGridServiceRuntime for VolvoxGridRuntime {
         self.with_grid(request.grid_id, |grid| grid.get_schema())
     }
 
+    fn get_rows(&self, request: GetRowsRequest) -> RuntimeResult<RowsResponse> {
+        self.with_grid(request.grid_id, |grid| {
+            if !grid.row_ids_enabled() {
+                return Err(invalid_state(
+                    "row IDs are disabled; create the grid with row_ids_enabled=true",
+                ));
+            }
+            shared::get_rows(grid, &request).map_err(invalid_argument)
+        })?
+    }
+
     fn define_rows(&self, request: DefineRowsRequest) -> RuntimeResult<DefineRowsResponse> {
-        self.with_grid(request.grid_id, |grid| shared::define_rows(grid, &request))
+        self.with_grid(request.grid_id, |grid| {
+            if !grid.row_ids_enabled() && request.rows.iter().any(|row| row.row_id.is_some()) {
+                return Err(invalid_state(
+                    "row IDs are disabled; create the grid with row_ids_enabled=true",
+                ));
+            }
+            shared::define_rows(grid, &request).map_err(invalid_argument)
+        })?
     }
 
     fn insert_rows(&self, request: InsertRowsRequest) -> RuntimeResult<InsertRowsResponse> {
@@ -6174,7 +7193,14 @@ impl VolvoxGridServiceRuntime for VolvoxGridRuntime {
     }
 
     fn load_table(&self, request: LoadTableRequest) -> RuntimeResult<WriteResult> {
-        self.with_grid(request.grid_id, |grid| shared::load_table(grid, &request))
+        self.with_grid(request.grid_id, |grid| {
+            if !grid.row_ids_enabled() && !request.row_ids.is_empty() {
+                return Err(invalid_state(
+                    "row IDs are disabled; create the grid with row_ids_enabled=true",
+                ));
+            }
+            shared::load_table(grid, &request).map_err(invalid_argument)
+        })?
     }
 
     fn load_data(&self, request: LoadDataRequest) -> RuntimeResult<LoadDataResult> {
@@ -6290,6 +7316,7 @@ impl VolvoxGridServiceRuntime for VolvoxGridRuntime {
                                             grid.edit.cancel();
                                             grid.events.push(
                                                 volvoxgrid_engine::event::GridEventData::CellEditValidate {
+                                                    row_id: grid.get_row_id(row).unwrap_or_default(),
                                                     row,
                                                     col,
                                                     edit_text: committed.clone(),
@@ -6309,6 +7336,7 @@ impl VolvoxGridServiceRuntime for VolvoxGridRuntime {
                                             grid.edit.cancel();
                                             grid.events.push(
                                                 volvoxgrid_engine::event::GridEventData::CellEditValidate {
+                                                    row_id: grid.get_row_id(row).unwrap_or_default(),
                                                     row,
                                                     col,
                                                     edit_text: committed.clone(),

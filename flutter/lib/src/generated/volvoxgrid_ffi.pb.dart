@@ -288,5 +288,11 @@ class VolvoxGridServiceFfi {
         .map((data) => GridEvent.fromBuffer(data));
   }
 
+  static Future<RowsResponse> GetRows(GetRowsRequest request) async {
+    final bytes = request.writeToBuffer();
+    final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/GetRows', bytes);
+    return RowsResponse.fromBuffer(resultBytes);
+  }
+
 }
 

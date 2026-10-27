@@ -82,7 +82,7 @@ fn demo_feature_not_enabled() -> String {
 #[derive(Clone, Debug)]
 enum PendingAction {
     BeginEdit {
-        row: i32,
+        target: volvoxgrid_engine::grid::RowTarget,
         col: i32,
         force: bool,
         seed_text: Option<String>,
@@ -90,13 +90,15 @@ enum PendingAction {
         reason: EditStartReason,
     },
     ValidateEdit {
-        row: i32,
+        target: volvoxgrid_engine::grid::RowTarget,
+        session_serial: u64,
+        state_version: u64,
         col: i32,
         old_text: String,
         committed_text: String,
     },
     ToggleCheckbox {
-        row: i32,
+        target: volvoxgrid_engine::grid::RowTarget,
         col: i32,
     },
     BeforeSort {
@@ -394,7 +396,9 @@ fn request_before_edit(
         PendingActionEntry {
             created_at: Instant::now(),
             action: PendingAction::BeginEdit {
-                row,
+                target: grid
+                    .capture_row_target(row)
+                    .expect("pending action has a live row"),
                 col,
                 force,
                 seed_text: seed_text.clone(),
@@ -403,7 +407,11 @@ fn request_before_edit(
             },
         },
     );
-    let event = volvoxgrid_engine::event::GridEventData::BeforeEdit { row, col };
+    let event = volvoxgrid_engine::event::GridEventData::BeforeEdit {
+        row,
+        col,
+        row_id: grid.get_row_id(row).unwrap_or_default(),
+    };
     grid.events.push_with_id(event_id, event.clone());
     queue_pending_decision_event(grid_id, event_id, event);
 }
@@ -420,7 +428,11 @@ fn request_before_checkbox_toggle(
 
     if !decision_channel_enabled(grid_id) {
         grid.events
-            .push(volvoxgrid_engine::event::GridEventData::BeforeEdit { row, col });
+            .push(volvoxgrid_engine::event::GridEventData::BeforeEdit {
+                row,
+                col,
+                row_id: grid.get_row_id(row).unwrap_or_default(),
+            });
         input::apply_checkbox_toggle_after_before_edit(grid, row, col);
         return true;
     }
@@ -430,10 +442,19 @@ fn request_before_checkbox_toggle(
         (grid_id, event_id),
         PendingActionEntry {
             created_at: Instant::now(),
-            action: PendingAction::ToggleCheckbox { row, col },
+            action: PendingAction::ToggleCheckbox {
+                target: grid
+                    .capture_row_target(row)
+                    .expect("pending action has a live row"),
+                col,
+            },
         },
     );
-    let event = volvoxgrid_engine::event::GridEventData::BeforeEdit { row, col };
+    let event = volvoxgrid_engine::event::GridEventData::BeforeEdit {
+        row,
+        col,
+        row_id: grid.get_row_id(row).unwrap_or_default(),
+    };
     grid.events.push_with_id(event_id, event.clone());
     queue_pending_decision_event(grid_id, event_id, event);
     true
@@ -470,6 +491,7 @@ fn request_validate_edit(
     if !decision_channel_enabled(grid_id) {
         grid.events
             .push(volvoxgrid_engine::event::GridEventData::CellEditValidate {
+                row_id: grid.get_row_id(row).unwrap_or_default(),
                 row,
                 col,
                 edit_text: committed_text.clone(),
@@ -487,7 +509,11 @@ fn request_validate_edit(
         PendingActionEntry {
             created_at: Instant::now(),
             action: PendingAction::ValidateEdit {
-                row,
+                session_serial: grid.edit.session_serial,
+                state_version: grid.edit.state_version,
+                target: grid
+                    .capture_row_target(row)
+                    .expect("pending action has a live row"),
                 col,
                 old_text,
                 committed_text: committed_text.clone(),
@@ -495,6 +521,7 @@ fn request_validate_edit(
         },
     );
     let event = volvoxgrid_engine::event::GridEventData::CellEditValidate {
+        row_id: grid.get_row_id(row).unwrap_or_default(),
         row,
         col,
         edit_text: committed_text,
@@ -740,34 +767,51 @@ fn request_before_scroll(
 fn apply_pending_action(grid_id: i64, action: PendingAction, cancel: bool) {
     let _ = wasm_with_grid(grid_id, |grid| match action {
         PendingAction::BeginEdit {
-            row,
+            target,
             col,
             force,
             seed_text,
             click_caret,
             reason,
         } => {
+            let Some(row) = grid.resolve_row_target(&target) else {
+                return;
+            };
             if cancel {
                 return;
             }
             begin_edit_session_after_before(grid, row, col, force, seed_text, click_caret, reason);
         }
         PendingAction::ValidateEdit {
-            row,
+            target,
+            session_serial,
+            state_version,
             col,
             old_text,
             committed_text,
         } => {
+            let Some(row) = grid.resolve_row_target(&target) else {
+                return;
+            };
+            if !grid.edit.is_active()
+                || grid.edit.session_serial != session_serial
+                || grid.edit.state_version != state_version
+                || grid.edit.edit_row != row
+                || grid.edit.edit_col != col
+            {
+                return;
+            }
             if cancel {
                 grid.mark_dirty();
                 return;
             }
-            if grid.edit.is_active() && grid.edit.edit_row == row && grid.edit.edit_col == col {
-                grid.edit.cancel();
-            }
+            grid.edit.cancel();
             shared::apply_committed_edit_text(grid, row, col, old_text, committed_text);
         }
-        PendingAction::ToggleCheckbox { row, col } => {
+        PendingAction::ToggleCheckbox { target, col } => {
+            let Some(row) = grid.resolve_row_target(&target) else {
+                return;
+            };
             if cancel {
                 return;
             }
@@ -5194,31 +5238,41 @@ fn engine_event_to_proto(
             col,
             target: Some(target.to_proto()),
         })),
-        E::BeforeEdit { row, col } => {
-            Some(grid_event::Event::BeforeEdit(BeforeEditEvent { row, col }))
+        E::BeforeEdit { row, col, row_id } => {
+            Some(grid_event::Event::BeforeEdit(BeforeEditEvent {
+                row,
+                col,
+                row_id,
+            }))
         }
-        E::StartEdit { row, col } => {
-            Some(grid_event::Event::StartEdit(StartEditEvent { row, col }))
-        }
+        E::StartEdit { row, col, row_id } => Some(grid_event::Event::StartEdit(StartEditEvent {
+            row,
+            col,
+            row_id,
+        })),
         E::AfterEdit {
             row,
             col,
             old_text,
             new_text,
+            row_id,
         } => Some(grid_event::Event::AfterEdit(AfterEditEvent {
             row,
             col,
             old_text,
             new_text,
+            row_id,
         })),
         E::CellEditValidate {
             row,
             col,
             edit_text,
+            row_id,
         } => Some(grid_event::Event::CellEditValidate(CellEditValidateEvent {
             row,
             col,
             edit_text,
+            row_id,
         })),
         E::CellEditChange { text } => {
             Some(grid_event::Event::CellEditChange(CellEditChangeEvent {
@@ -5844,7 +5898,7 @@ impl volvoxgrid_wasm::VolvoxGridServiceRuntime for WasmRuntime {
         let spec = shared::create_grid_spec(&request);
         let mgr = MANAGER.lock().unwrap();
         let mgr = mgr.as_ref().unwrap();
-        let id = mgr.create_grid(
+        let id = mgr.create_grid_with_row_ids(
             request.viewport_width,
             request.viewport_height,
             spec.rows,
@@ -5852,6 +5906,7 @@ impl volvoxgrid_wasm::VolvoxGridServiceRuntime for WasmRuntime {
             spec.fixed_rows,
             spec.fixed_cols,
             spec.scale,
+            request.row_ids_enabled,
         );
         if let Some(config) = &request.config {
             let _ = mgr.with_grid(id, |grid| grid.apply_config(config));
@@ -5913,8 +5968,12 @@ impl volvoxgrid_wasm::VolvoxGridServiceRuntime for WasmRuntime {
         wasm_with_grid(request.grid_id, |grid| grid.get_schema())
     }
 
+    fn get_rows(&self, request: GetRowsRequest) -> Result<RowsResponse, String> {
+        wasm_with_grid(request.grid_id, |grid| shared::get_rows(grid, &request))?
+    }
+
     fn define_rows(&self, request: DefineRowsRequest) -> Result<DefineRowsResponse, String> {
-        wasm_with_grid(request.grid_id, |grid| shared::define_rows(grid, &request))
+        wasm_with_grid(request.grid_id, |grid| shared::define_rows(grid, &request))?
     }
 
     fn insert_rows(&self, request: InsertRowsRequest) -> Result<InsertRowsResponse, String> {
@@ -5945,7 +6004,7 @@ impl volvoxgrid_wasm::VolvoxGridServiceRuntime for WasmRuntime {
     }
 
     fn load_table(&self, request: LoadTableRequest) -> Result<WriteResult, String> {
-        wasm_with_grid(request.grid_id, |grid| shared::load_table(grid, &request))
+        wasm_with_grid(request.grid_id, |grid| shared::load_table(grid, &request))?
     }
 
     fn load_data(&self, request: LoadDataRequest) -> Result<LoadDataResult, String> {
@@ -6061,6 +6120,7 @@ impl volvoxgrid_wasm::VolvoxGridServiceRuntime for WasmRuntime {
                                             grid.edit.cancel();
                                             grid.events.push(
                                                 volvoxgrid_engine::event::GridEventData::CellEditValidate {
+                                                    row_id: grid.get_row_id(row).unwrap_or_default(),
                                                     row,
                                                     col,
                                                     edit_text: committed.clone(),
@@ -6080,6 +6140,7 @@ impl volvoxgrid_wasm::VolvoxGridServiceRuntime for WasmRuntime {
                                             grid.edit.cancel();
                                             grid.events.push(
                                                 volvoxgrid_engine::event::GridEventData::CellEditValidate {
+                                                    row_id: grid.get_row_id(row).unwrap_or_default(),
                                                     row,
                                                     col,
                                                     edit_text: committed.clone(),

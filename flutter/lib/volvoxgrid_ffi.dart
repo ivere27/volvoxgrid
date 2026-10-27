@@ -683,6 +683,12 @@ class VolvoxGridService {
         SchemaResponse.fromBuffer,
       );
 
+  static Future<RowsResponse> GetRows(GetRowsRequest request) => _invokeUnary(
+        _serviceMethodPath('GetRows'),
+        request,
+        RowsResponse.fromBuffer,
+      );
+
   static Future<DefineRowsResponse> DefineRows(DefineRowsRequest request) =>
       _invokeUnary(
         _serviceMethodPath('DefineRows'),

@@ -75,6 +75,9 @@ pub fn copy(grid: &VolvoxGrid) -> (String, Vec<u8>) {
 /// Returns the same `(text, rich_data)` tuple as `copy`.
 pub fn cut(grid: &mut VolvoxGrid) -> (String, Vec<u8>) {
     if grid.edit.is_active() {
+        if grid.is_cell_read_only(grid.edit.edit_row, grid.edit.edit_col) {
+            return (String::new(), Vec::new());
+        }
         if active_readonly_dropdown_edit(grid) {
             return (String::new(), Vec::new());
         }
@@ -100,6 +103,9 @@ pub fn cut(grid: &mut VolvoxGrid) -> (String, Vec<u8>) {
 /// grid boundary (does not auto-extend rows/cols).
 pub fn paste(grid: &mut VolvoxGrid, text: &str) {
     if grid.edit.is_active() {
+        if grid.is_cell_read_only(grid.edit.edit_row, grid.edit.edit_col) {
+            return;
+        }
         if active_readonly_dropdown_edit(grid) {
             paste_into_readonly_dropdown(grid, text);
             return;
@@ -217,20 +223,59 @@ where
             if col >= grid.cols {
                 break;
             }
-            grid.cells.set_text(row, col, cell.to_string());
+            if !grid.is_cell_read_only(row, col) {
+                grid.set_edited_cell_text(row, col, cell.to_string());
+            }
         }
     }
 }
 
 /// Delete (clear) all cells within the current selection.
 pub fn delete_selection(grid: &mut VolvoxGrid) {
-    let ranges = grid.selection.all_ranges(grid.rows, grid.cols);
-    for (r1, c1, r2, c2) in ranges {
-        let r1 = r1.max(0).min(grid.rows - 1);
-        let c1 = c1.max(0).min(grid.cols - 1);
-        let r2 = r2.max(0).min(grid.rows - 1);
-        let c2 = c2.max(0).min(grid.cols - 1);
-        grid.cells.clear_range(r1, c1, r2, c2);
+    let ranges: Vec<_> = grid
+        .selection
+        .all_ranges(grid.rows, grid.cols)
+        .into_iter()
+        .map(|(r1, c1, r2, c2)| {
+            (
+                r1.max(0).min(grid.rows - 1),
+                c1.max(0).min(grid.cols - 1),
+                r2.max(0).min(grid.rows - 1),
+                c2.max(0).min(grid.cols - 1),
+            )
+        })
+        .collect();
+    let selected_count = ranges.iter().fold(0u64, |count, &(r1, c1, r2, c2)| {
+        count.saturating_add((r2 - r1 + 1) as u64 * (c2 - c1 + 1) as u64)
+    });
+    if grid.cells.len() > 0 {
+        if selected_count <= grid.cells.display_position_scan_len() as u64 {
+            // Small selections should not scan the entire populated table.
+            for &(r1, c1, r2, c2) in &ranges {
+                for row in r1..=r2 {
+                    for col in c1..=c2 {
+                        if !grid.is_cell_read_only(row, col) {
+                            grid.cells.remove(row, col);
+                        }
+                    }
+                }
+            }
+        } else {
+            // Large sparse selections visit stored cells only. Keep the maps
+            // intact so subsequent sorts still follow the same source rows.
+            let positions: Vec<_> =
+                grid.cells
+                    .display_positions()
+                    .filter(|&(row, col)| {
+                        ranges.iter().any(|&(r1, c1, r2, c2)| {
+                            row >= r1 && row <= r2 && col >= c1 && col <= c2
+                        }) && !grid.is_cell_read_only(row, col)
+                    })
+                    .collect();
+            for (row, col) in positions {
+                grid.cells.remove(row, col);
+            }
+        }
     }
     grid.recompute_barcode_presence();
     grid.mark_dirty();

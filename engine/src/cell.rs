@@ -446,7 +446,7 @@ impl CellStore {
     /// Collapse the row-map by physically remapping all cells so that
     /// storage keys match display rows, then clear the map.
     /// Called before structural operations (insert/remove/clear_range).
-    fn materialize_row_map(&mut self) {
+    pub(crate) fn materialize_row_map(&mut self) {
         if self.row_map.is_empty() {
             return;
         }
@@ -678,6 +678,38 @@ impl CellStore {
 
     pub fn iter(&self) -> impl Iterator<Item = (&(i32, i32), &CellData)> {
         self.cells.iter()
+    }
+
+    /// Work required to scan stored positions, including reversing active maps.
+    pub(crate) fn display_position_scan_len(&self) -> usize {
+        self.cells
+            .len()
+            .saturating_add(self.row_map.len())
+            .saturating_add(self.col_map.len())
+    }
+
+    /// Stored cell positions in display coordinates, without materializing or
+    /// changing the row/column maps. Unmapped storage inside a map is not visible.
+    pub(crate) fn display_positions(&self) -> impl Iterator<Item = (i32, i32)> + '_ {
+        let inverse = |map: &[i32]| -> HashMap<i32, i32> {
+            map.iter()
+                .enumerate()
+                .map(|(display, &storage)| (storage, display as i32))
+                .collect()
+        };
+        let rows = inverse(&self.row_map);
+        let cols = inverse(&self.col_map);
+        self.cells.keys().filter_map(move |&(row, col)| {
+            let display_row = rows
+                .get(&row)
+                .copied()
+                .or_else(|| self.row_map.get(row as usize).is_none().then_some(row))?;
+            let display_col = cols
+                .get(&col)
+                .copied()
+                .or_else(|| self.col_map.get(col as usize).is_none().then_some(col))?;
+            Some((display_row, display_col))
+        })
     }
 
     pub fn has_any_picture(&self) -> bool {

@@ -90,9 +90,63 @@ pub(crate) fn define_columns(
     DefineColumnsResponse {}
 }
 
-pub(crate) fn define_rows(grid: &mut Grid, request: &DefineRowsRequest) -> DefineRowsResponse {
+pub(crate) fn define_rows(
+    grid: &mut Grid,
+    request: &DefineRowsRequest,
+) -> Result<DefineRowsResponse, String> {
+    let assignments: Vec<_> = request
+        .rows
+        .iter()
+        .filter_map(|row| row.row_id.map(|id| (row.index, id)))
+        .collect();
+    // Reject the complete request before changing either IDs or row properties.
+    grid.set_row_ids(&assignments)?;
     grid.define_rows(&request.rows);
-    DefineRowsResponse {}
+    Ok(DefineRowsResponse {})
+}
+
+pub(crate) fn get_rows(grid: &Grid, request: &GetRowsRequest) -> Result<RowsResponse, String> {
+    if !grid.row_ids_enabled() {
+        return Err("row IDs are disabled; create the grid with row_ids_enabled=true".into());
+    }
+    if !request.row_ids.is_empty() {
+        if request.start_row != 0 || request.row_count != 0 {
+            return Err("GetRows: row_ids cannot be combined with a row range".into());
+        }
+        let mut seen = std::collections::HashSet::new();
+        for id in &request.row_ids {
+            if *id <= 0 || !seen.insert(id) {
+                return Err("GetRows: row_ids must be positive and unique".into());
+            }
+        }
+        return Ok(RowsResponse {
+            rows: request
+                .row_ids
+                .iter()
+                .filter_map(|id| {
+                    grid.find_row_by_id(*id)
+                        .map(|index| RowIdentity { index, row_id: *id })
+                })
+                .collect(),
+        });
+    }
+    let start = request.start_row;
+    let count = request.row_count;
+    if start < 0 || start > grid.rows || count < 0 || count > grid.rows - start {
+        return Err(format!(
+            "GetRows: invalid range start_row={start}, row_count={count} for {} rows",
+            grid.rows
+        ));
+    }
+    let end = if count == 0 { grid.rows } else { start + count };
+    Ok(RowsResponse {
+        rows: (start..end)
+            .map(|index| RowIdentity {
+                index,
+                row_id: grid.get_row_id(index).expect("every live row has an ID"),
+            })
+            .collect(),
+    })
 }
 
 pub(crate) fn insert_rows(grid: &mut Grid, request: &InsertRowsRequest) -> InsertRowsResponse {
@@ -167,8 +221,17 @@ pub(crate) fn get_cells(grid: &mut Grid, request: &GetCellsRequest) -> CellsResp
     }
 }
 
-pub(crate) fn load_table(grid: &mut Grid, request: &LoadTableRequest) -> WriteResult {
-    grid.load_table(request.rows, request.cols, &request.values, request.atomic)
+pub(crate) fn load_table(
+    grid: &mut Grid,
+    request: &LoadTableRequest,
+) -> Result<WriteResult, String> {
+    grid.load_table_with_row_ids(
+        request.rows,
+        request.cols,
+        &request.values,
+        request.atomic,
+        &request.row_ids,
+    )
 }
 
 pub(crate) fn load_data(grid: &mut Grid, request: &LoadDataRequest) -> LoadDataResult {
@@ -651,12 +714,20 @@ pub(crate) fn apply_committed_edit_text(
     old_text: String,
     committed: String,
 ) {
-    grid.cells.set_text(row, col, committed.clone());
+    // Permissions may change while a host validation decision is pending.
+    if grid.is_cell_read_only(row, col) {
+        if grid.edit.is_active() && grid.edit.edit_row == row && grid.edit.edit_col == col {
+            grid.cancel_edit();
+        }
+        return;
+    }
+    grid.set_edited_cell_text(row, col, committed.clone());
     grid.sync_explicit_progress_from_text(row, col);
 
     if old_text != committed {
         grid.events
             .push(volvoxgrid_engine::event::GridEventData::AfterEdit {
+                row_id: grid.get_row_id(row).unwrap_or_default(),
                 row,
                 col,
                 old_text: old_text.clone(),
@@ -711,7 +782,11 @@ pub(crate) fn begin_edit_session_core_opts(
     let has_dropdown = dropdown.is_some();
     if emit_before_event {
         grid.events
-            .push(volvoxgrid_engine::event::GridEventData::BeforeEdit { row, col });
+            .push(volvoxgrid_engine::event::GridEventData::BeforeEdit {
+                row,
+                col,
+                row_id: grid.get_row_id(row).unwrap_or_default(),
+            });
     }
 
     let stored_text = grid.cells.get_text(row, col).to_string();
@@ -725,6 +800,9 @@ pub(crate) fn begin_edit_session_core_opts(
         caret_position,
         formula_mode,
     );
+    grid.edit.edit_row_id = grid.get_row_id(row).unwrap_or_default();
+    grid.edit.edit_row_identity_token = grid.row_identity_token(row).unwrap_or_default();
+    grid.edit.edit_row_revision = grid.row_ids.revision();
     grid.edit.configure_compose(
         grid.effective_engine_compose_enabled(),
         grid.effective_compose_method(),
@@ -756,7 +834,11 @@ pub(crate) fn begin_edit_session_core_opts(
             .push(volvoxgrid_engine::event::GridEventData::DropdownOpened);
     }
     grid.events
-        .push(volvoxgrid_engine::event::GridEventData::StartEdit { row, col });
+        .push(volvoxgrid_engine::event::GridEventData::StartEdit {
+            row,
+            col,
+            row_id: grid.get_row_id(row).unwrap_or_default(),
+        });
     grid.mark_dirty();
 }
 
@@ -842,6 +924,7 @@ pub(crate) fn build_editor_session(grid: &Grid) -> EditorSession {
         composing: grid.edit.composing,
         preedit_text: grid.edit.preedit_text.clone(),
         validation_errors: grid.edit.validation_errors.clone(),
+        row_id: grid.edit.edit_row_id,
     }
 }
 
@@ -1251,6 +1334,7 @@ pub(crate) fn build_editor_started(
             composing: false,
             preedit_text: String::new(),
             validation_errors: Vec::new(),
+            row_id: grid.get_row_id(row).unwrap_or_default(),
         }),
     })
 }
@@ -1419,7 +1503,7 @@ pub(crate) fn editor_session_command_is_current(
     if session.state_version != grid.edit.state_version {
         return false;
     }
-    true
+    grid.is_edit_target_current()
 }
 
 pub(crate) fn expand_sort_request_columns(
@@ -1448,6 +1532,26 @@ pub(crate) fn expand_sort_request_columns(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pending_host_commit_cannot_bypass_new_read_only_permission() {
+        let mut grid = volvoxgrid_engine::grid::VolvoxGrid::new(1, 320, 200, 2, 1, 1, 0);
+        grid.cells.set_text(1, 0, "original".into());
+        grid.columns[0].editor = Some(EditorSpec {
+            custom_props: Some(StructValue {
+                fields: vec![StructField {
+                    key: "volvoxgrid.readOnly".into(),
+                    value: Some(ScalarValue {
+                        value: Some(scalar_value::Value::BoolValue(true)),
+                    }),
+                }],
+            }),
+            ..Default::default()
+        });
+        apply_committed_edit_text(&mut grid, 1, 0, "original".into(), "changed".into());
+        assert_eq!(grid.cells.get_text(1, 0), "original");
+        assert!(grid.events.drain().is_empty());
+    }
 
     fn number_editor(min: Option<f64>, max: Option<f64>) -> EditorSpec {
         EditorSpec {

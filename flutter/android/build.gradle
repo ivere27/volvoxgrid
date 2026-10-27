@@ -16,7 +16,6 @@ buildscript {
 rootProject.allprojects {
     repositories {
         google()
-        mavenLocal()
         mavenCentral()
     }
 }
@@ -25,26 +24,20 @@ apply plugin: "com.android.library"
 apply plugin: "kotlin-android"
 
 // ── VolvoxGrid Source Configuration ────────────────────────────────────────
-def repoRoot = new File(projectDir, "../..").canonicalFile
-def versionFile = new File(repoRoot, "VERSION")
-if (!versionFile.isFile()) {
-    throw new GradleException("VERSION file not found at ${versionFile}")
-}
-def defaultVolvoxgridVersion = versionFile.getText("UTF-8").trim()
-if (defaultVolvoxgridVersion.isEmpty()) {
-    throw new GradleException("VERSION file is empty: ${versionFile}")
-}
-def defaultSource = "maven"
-def rawVolvoxgridSource = project.findProperty("volvoxgridSource") ?: System.getenv("VOLVOXGRID_SOURCE") ?: defaultSource
-def volvoxgridSource = rawVolvoxgridSource
-if (!(volvoxgridSource in ["local", "maven"])) {
+apply from: new File(projectDir, "../native/config.gradle")
+def repoRoot = volvoxgridRepositoryRoot ?: new File(projectDir, "../..")
+def volvoxgridSource = volvoxgridNativeSource
+def volvoxgridVersion = volvoxgridNativeVersion
+if (volvoxgridSource == "local" && volvoxgridRepositoryRoot == null) {
     throw new GradleException(
-        "Invalid volvoxgridSource='${rawVolvoxgridSource}'. Expected 'maven' or 'local'."
+        "VolvoxGrid: Android local mode requires a monorepo checkout with Android helper sources. " +
+        "Use VOLVOXGRID_SOURCE=maven for pub packages, or a path dependency on the repository's flutter directory."
     )
 }
-def volvoxgridVersion = System.getenv("VOLVOXGRID_VERSION") ?: project.findProperty("volvoxgridVersion") ?: defaultVolvoxgridVersion
 
-def artifactName = "volvoxgrid-android"
+def volvoxgridVariant = System.getenv("VOLVOXGRID_VARIANT") ?: ""
+def artifactName = volvoxgridVariant == "lite" ? "volvoxgrid-android-lite" : "volvoxgrid-android"
+def nativeLibraryName = volvoxgridVariant == "lite" ? "libvolvoxgrid_lite.so" : "libvolvoxgrid.so"
 def isSnapshot = volvoxgridVersion.endsWith("-SNAPSHOT")
 def generatedJniLibsDir = new File(buildDir, "generated/jniLibs")
 def generatedLocalSourcesDir = new File(buildDir, "generated/source/volvoxgridLocal/main/kotlin")
@@ -54,6 +47,29 @@ def androidNativeWindowHelperSource = new File(
 )
 def localNativeHelperCmakePath = new File(repoRoot, "android/volvoxgrid-android/src/main/jni/CMakeLists.txt")
 def supportedAndroidAbis = ["arm64-v8a", "armeabi-v7a", "x86_64"]
+def flutterTargetAbis = [
+    "android-arm": "armeabi-v7a",
+    "android-arm64": "arm64-v8a",
+    "android-x64": "x86_64",
+    "android-x86": "x86",
+]
+def requestedAndroidAbis = (project.findProperty("target-platform") ?:
+    "android-arm,android-arm64,android-x64").toString().split(",").collect { target ->
+    def abi = flutterTargetAbis[target.trim()]
+    if (abi == null) throw new GradleException("VolvoxGrid: Unsupported Android target-platform '${target}'.")
+    abi
+}
+def checkRequestedAbis = { Collection<String> available ->
+    def missing = requestedAndroidAbis.findAll { !available.contains(it) }
+    if (!missing.isEmpty()) {
+        throw new GradleException(
+            "VolvoxGrid: Native library is missing requested Android ABI(s): ${missing.join(', ')}. " +
+            "Available ABI(s): ${available.join(', ')}. For ARM phones build with " +
+            "`flutter build apk --target-platform android-arm,android-arm64` " +
+            "(or android-arm64 only), or select/build a native artifact containing every requested ABI."
+        )
+    }
+}
 def abiToRustTarget = [
     "arm64-v8a"   : "aarch64-linux-android",
     "armeabi-v7a" : "armv7-linux-androideabi",
@@ -88,17 +104,19 @@ if (volvoxgridSource == "local") {
     tasks.register("prepareVolvoxGridJniLibs") {
         def soInputs = project.provider {
             supportedAndroidAbis.collectMany { abi ->
-                soCandidatesForAbi(abi, "libvolvoxgrid.so").findAll { it.isFile() }
+                soCandidatesForAbi(abi, nativeLibraryName).findAll { it.isFile() }
             }
         }
         inputs.files(soInputs).withPropertyName("volvoxgridLibrarySoInputs")
+        inputs.property("requestedAndroidAbis", requestedAndroidAbis)
+        inputs.property("nativeLibraryName", nativeLibraryName)
         outputs.dir(generatedJniLibsDir)
         doLast {
             delete(generatedJniLibsDir)
             List<String> copiedAbis = []
 
             for (String abi : supportedAndroidAbis) {
-                File librarySo = resolveSoForAbi(abi, "libvolvoxgrid.so")
+                File librarySo = resolveSoForAbi(abi, nativeLibraryName)
 
                 if (librarySo == null) {
                     continue
@@ -116,12 +134,13 @@ if (volvoxgridSource == "local") {
 
             if (copiedAbis.isEmpty()) {
                 throw new GradleException(
-                    "Unable to find libvolvoxgrid.so for any Android ABI. " +
+                    "Unable to find ${nativeLibraryName} for any Android ABI. " +
                     "Run `make android-library` (or `make android-library-release`) from the repo root " +
                     "before building Flutter."
                 )
             }
 
+            checkRequestedAbis(copiedAbis)
             logger.lifecycle("Prepared VolvoxGrid native library for ABIs: ${copiedAbis.join(', ')}")
         }
     }
@@ -201,6 +220,33 @@ if (volvoxgridSource == "local") {
         dependsOn("prepareVolvoxGridJniLibs")
         dependsOn("prepareVolvoxGridLocalKotlin")
     }
+}
+
+if (volvoxgridSource == "maven") {
+    // Resolve a single AAR early so missing published binaries produce guidance
+    // before the APK build can succeed with a runtime-only loading failure.
+    def nativeArtifact = configurations.create("volvoxgridNativeArtifact") {
+        transitive = false
+    }
+    dependencies.add(nativeArtifact.name, "io.github.ivere27:${artifactName}:${volvoxgridVersion}@aar")
+    tasks.register("verifyVolvoxGridNativeArtifact") {
+        doLast {
+            try {
+                def libraries = nativeArtifact.files.collectMany { aar ->
+                    zipTree(aar).matching { include "jni/**/${nativeLibraryName}" }.files.toList()
+                }
+                if (libraries.isEmpty()) throw new GradleException("The AAR contains no jni/*/${nativeLibraryName}.")
+                checkRequestedAbis(libraries.collect { it.parentFile.name }.toSet())
+            } catch (Exception error) {
+                throw new GradleException(
+                    "VolvoxGrid: Cannot obtain Android native library io.github.ivere27:${artifactName}:${volvoxgridVersion}. " +
+                    "Check Maven Central access and VOLVOXGRID_VERSION (defaults to package pubspec version). " +
+                    "For a source build use VOLVOXGRID_SOURCE=local with the monorepo checkout and build its Android native libraries first. " +
+                    "Cause: ${error.message}", error)
+            }
+        }
+    }
+    tasks.named("preBuild") { dependsOn("verifyVolvoxGridNativeArtifact") }
 }
 
 configurations.configureEach {
