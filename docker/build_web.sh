@@ -215,18 +215,108 @@ build_pages_dist() {
   cp -RL "${REPO_ROOT}/web/example/dist/." "${demo_dir}/"
   cp -RL "${REPO_ROOT}/web/example/wasm/." "${demo_dir}/wasm/"
   inject_firebase_analytics "${demo_dir}/index.html"
+
+  # Include sheet and sheet-lite demos
+  build_sheet_dist gpu
+  build_sheet_dist lite
+  mkdir -p "${pages_dir}/demos/sheet" "${pages_dir}/demos/sheet-lite"
+  cp -RL "${WEB_DIST_ROOT}/demos/sheet/." "${pages_dir}/demos/sheet/"
+  cp -RL "${WEB_DIST_ROOT}/demos/sheet-lite/." "${pages_dir}/demos/sheet-lite/"
+
   cat > "${pages_dir}/index.html" <<'EOF'
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="refresh" content="0;url=./demos/web/">
-  <title>VolvoxGrid Demo</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VolvoxGrid Demo Index</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      margin: 0;
+      background: #f7f8fa;
+      color: #1f2937;
+    }
+
+    main {
+      max-width: 720px;
+      margin: 40px auto;
+      padding: 0 16px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+    }
+
+    p {
+      margin: 0 0 20px;
+      color: #4b5563;
+    }
+
+    ul {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 12px;
+    }
+
+    li {
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+
+    a {
+      color: #0f4cde;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 18px;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .desc {
+      margin-top: 6px;
+      font-size: 14px;
+      color: #4b5563;
+    }
+  </style>
 </head>
-<body><a href="./demos/web/">Open the VolvoxGrid demo</a></body>
+<body>
+  <main>
+    <h1>VolvoxGrid Demos</h1>
+    <p>Simple entry page for VolvoxGrid demo apps.</p>
+
+    <ul>
+      <li>
+        <a href="./demos/web/">Web Demo</a>
+        <div class="desc">Grid showcase with runtime-selectable scenarios (stress, sales, hierarchy, and optional DOOM).</div>
+      </li>
+      <li>
+        <a href="./demos/sheet/">Sheet Demo</a>
+        <div class="desc">Spreadsheet-style demo built with VolvoxSheet and embedded font rendering.</div>
+      </li>
+      <li>
+        <a href="./demos/sheet-lite/">Sheet Lite Demo</a>
+        <div class="desc">Lightweight VolvoxSheet variant using browser font rendering.</div>
+      </li>
+    </ul>
+  </main>
+</body>
 </html>
 EOF
+  inject_firebase_analytics "${pages_dir}/index.html"
+  sed 's|href="./demos/|href="./|g' "${pages_dir}/index.html" > "${pages_dir}/demos/index.html"
+  inject_firebase_analytics "${pages_dir}/demos/index.html"
   printf '%s\n' "${VERSION}" > "${pages_dir}/VERSION"
   touch "${pages_dir}/.nojekyll"
   ensure_dir "${WEB_DIST_ROOT}"

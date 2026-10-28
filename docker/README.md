@@ -123,7 +123,8 @@ A typical release is `make docker_all` followed by `publish_maven`, `publish_git
 The Pages site is deployed from `volvoxgrid-demo-VERSION.zip` attached to a
 GitHub release. The ZIP contains the demo HTML, bundled JavaScript and matching
 WASM; the workflow downloads and deploys it without rebuilding or committing
-generated files. The root URL redirects to `demos/web/`.
+generated files. The root URL provides an entry index page linking to the Web,
+Sheet, and Sheet Lite demos.
 
 One-time setup: add `.github/workflows/pages.yml` to the repository's default
 branch (`main`) and select **GitHub Actions** under **Settings → Pages → Source**.
