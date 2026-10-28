@@ -9,7 +9,7 @@ The engine in `engine/` owns layout, selection, editing, sorting, scrolling, mer
 
 ## Screenshots
 
-Visual proof across the GUI, mobile, desktop, terminal, and compatibility hosts. Live WASM demo: <https://volvox-171cc.web.app/demos/web/>
+Visual proof across the GUI, mobile, desktop, terminal, and compatibility hosts. Live WASM demo: <https://ivere27.github.io/volvoxgrid/demos/web/>
 
 | Web / Wasm | ActiveX / Windows |
 |---|---|

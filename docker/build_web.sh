@@ -18,6 +18,7 @@ export WASM_PACK_OPT_FLAGS="${WASM_PACK_OPT_FLAGS-}"
 WASM_DIST_ROOT="${REPO_ROOT}/dist/wasm"
 WASM_LITE_DIST_ROOT="${REPO_ROOT}/dist/wasm-lite"
 WEB_DIST_ROOT="${REPO_ROOT}/dist/web"
+PAGES_BASE_PATH="${PAGES_BASE_PATH:-/volvoxgrid/}"
 CDN_BASE="https://cdn.jsdelivr.net/npm"
 WASM_CDN_URL="${CDN_BASE}/volvoxgrid@${VERSION}/wasm/volvoxgrid_wasm.js"
 WASM_LITE_CDN_URL="${CDN_BASE}/volvoxgrid-lite@${VERSION}/wasm/volvoxgrid_wasm.js"
@@ -195,6 +196,135 @@ build_web_dist() {
   echo "Built web dist: ${WEB_DIST_ROOT}/demos/web"
 }
 
+build_pages_dist() {
+  # Bundle the JS and WASM from this checkout so the released demo does not
+  # depend on the corresponding npm packages having propagated to a CDN.
+  make wasm
+  (
+    cd "${REPO_ROOT}/web/example"
+    npm ci
+    VITE_WASM_URL="${PAGES_BASE_PATH%/}/demos/web/wasm/volvoxgrid_wasm.js" \
+      VITE_VG_INITIAL_SCALE="${WEB_SCALE:-1.0}" \
+      VITE_VG_EXTERNAL=0 \
+      npm run build -- --base "${PAGES_BASE_PATH%/}/demos/web/"
+  )
+  local pages_dir="${TMP_ROOT}/pages"
+  local demo_dir="${pages_dir}/demos/web"
+  local zip_path="${WEB_DIST_ROOT}/volvoxgrid-demo-${VERSION}.zip"
+  mkdir -p "${demo_dir}/wasm"
+  cp -RL "${REPO_ROOT}/web/example/dist/." "${demo_dir}/"
+  cp -RL "${REPO_ROOT}/web/example/wasm/." "${demo_dir}/wasm/"
+  inject_firebase_analytics "${demo_dir}/index.html"
+
+  # Include sheet and sheet-lite demos
+  build_sheet_dist gpu
+  build_sheet_dist lite
+  mkdir -p "${pages_dir}/demos/sheet" "${pages_dir}/demos/sheet-lite"
+  cp -RL "${WEB_DIST_ROOT}/demos/sheet/." "${pages_dir}/demos/sheet/"
+  cp -RL "${WEB_DIST_ROOT}/demos/sheet-lite/." "${pages_dir}/demos/sheet-lite/"
+
+  cat > "${pages_dir}/index.html" <<'EOF'
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VolvoxGrid Demo Index</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      margin: 0;
+      background: #f7f8fa;
+      color: #1f2937;
+    }
+
+    main {
+      max-width: 720px;
+      margin: 40px auto;
+      padding: 0 16px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+    }
+
+    p {
+      margin: 0 0 20px;
+      color: #4b5563;
+    }
+
+    ul {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 12px;
+    }
+
+    li {
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+
+    a {
+      color: #0f4cde;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 18px;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .desc {
+      margin-top: 6px;
+      font-size: 14px;
+      color: #4b5563;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>VolvoxGrid Demos</h1>
+    <p>Simple entry page for VolvoxGrid demo apps.</p>
+
+    <ul>
+      <li>
+        <a href="./demos/web/">Web Demo</a>
+        <div class="desc">Grid showcase with runtime-selectable scenarios (stress, sales, hierarchy, and optional DOOM).</div>
+      </li>
+      <li>
+        <a href="./demos/sheet/">Sheet Demo</a>
+        <div class="desc">Spreadsheet-style demo built with VolvoxSheet and embedded font rendering.</div>
+      </li>
+      <li>
+        <a href="./demos/sheet-lite/">Sheet Lite Demo</a>
+        <div class="desc">Lightweight VolvoxSheet variant using browser font rendering.</div>
+      </li>
+    </ul>
+  </main>
+</body>
+</html>
+EOF
+  inject_firebase_analytics "${pages_dir}/index.html"
+  sed 's|href="./demos/|href="./|g' "${pages_dir}/index.html" > "${pages_dir}/demos/index.html"
+  inject_firebase_analytics "${pages_dir}/demos/index.html"
+  printf '%s\n' "${VERSION}" > "${pages_dir}/VERSION"
+  touch "${pages_dir}/.nojekyll"
+  ensure_dir "${WEB_DIST_ROOT}"
+  rm -f "${zip_path}"
+  (cd "${pages_dir}" && zip -qr "${zip_path}" .)
+  echo "Built Pages release demo: ${zip_path}"
+}
+
 build_sheet_dist() {
   local mode="${1:-gpu}" # gpu|lite
   local out_dir="${WEB_DIST_ROOT}/demos/sheet"
@@ -241,11 +371,11 @@ build_report_dist() {
 }
 
 case "${TARGET}" in
-  all|bundle|web|sheet|sheet-lite|report|wasm|wasm-lite|wasm-threaded)
+  all|bundle|web|pages|sheet|sheet-lite|report|wasm|wasm-lite|wasm-threaded)
     ;;
   *)
     echo "Error: unsupported WEB_DOCKER_TARGET='${TARGET}'." >&2
-    echo "Valid values: all, bundle, web, sheet, sheet-lite, report, wasm, wasm-lite, wasm-threaded" >&2
+    echo "Valid values: all, bundle, web, pages, sheet, sheet-lite, report, wasm, wasm-lite, wasm-threaded" >&2
     exit 1
     ;;
 esac
@@ -265,6 +395,9 @@ case "${TARGET}" in
   web)
     build_web_dist
     ;;
+  pages)
+    build_pages_dist
+    ;;
   sheet)
     build_sheet_dist gpu
     ;;
@@ -283,5 +416,6 @@ case "${TARGET}" in
     build_sheet_dist gpu
     build_sheet_dist lite
     build_report_dist
+    build_pages_dist
     ;;
 esac
