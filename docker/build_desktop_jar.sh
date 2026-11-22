@@ -34,6 +34,7 @@ BUILD_DOTNET="${BUILD_DOTNET:-0}"
 DOTNET_DIST_DIR="${DOTNET_DIST_DIR:-${REPO_ROOT}/dist/dotnet}"
 BUILD_DEBUG_SYMBOLS="${BUILD_DEBUG_SYMBOLS:-1}"
 DEBUG_SYMBOLS_DIR="${DEBUG_SYMBOLS_DIR:-${REPO_ROOT}/dist/symbols}"
+REQUIRE_ALL_TARGETS="${REQUIRE_ALL_TARGETS:-0}"
 
 detect_cpu_count() {
   if command -v nproc >/dev/null 2>&1; then
@@ -205,6 +206,16 @@ export CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER="x86_64-w64-mingw32-gcc"
 export CARGO_TARGET_X86_64_APPLE_DARWIN_LINKER="/opt/volvoxgrid/zig-cc-x86_64-macos.sh"
 export CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER="/opt/volvoxgrid/zig-cc-aarch64-macos.sh"
 
+require_or_skip() {
+  local label="$1"
+  local reason="$2"
+  if [[ "${REQUIRE_ALL_TARGETS}" == "1" ]]; then
+    echo "Error: required target ${label} skipped (${reason}) while REQUIRE_ALL_TARGETS=1" >&2
+    exit 1
+  fi
+  echo "SKIP: ${label} (${reason})"
+}
+
 # ── Cross-compile Rust library for each platform ────────────────────────────
 
 # linux-x86_64 (native)
@@ -222,7 +233,7 @@ if command -v i686-linux-gnu-gcc >/dev/null 2>&1; then
   cp "${CARGO_TARGET_DIR}/i686-unknown-linux-gnu/release/libvolvoxgrid.so" "${NATIVES_DIR}/linux-x86/"
   process_native_library "linux-x86" "${NATIVES_DIR}/linux-x86/libvolvoxgrid.so"
 else
-  echo "SKIP: linux-x86 (i686-linux-gnu-gcc not found)"
+  require_or_skip "linux-x86" "i686-linux-gnu-gcc not found"
 fi
 
 # linux-aarch64 (cross-compile)
@@ -233,7 +244,7 @@ if command -v aarch64-linux-gnu-gcc >/dev/null 2>&1; then
   cp "${CARGO_TARGET_DIR}/aarch64-unknown-linux-gnu/release/libvolvoxgrid.so" "${NATIVES_DIR}/linux-aarch64/"
   process_native_library "linux-aarch64" "${NATIVES_DIR}/linux-aarch64/libvolvoxgrid.so"
 else
-  echo "SKIP: linux-aarch64 (aarch64-linux-gnu-gcc not found)"
+  require_or_skip "linux-aarch64" "aarch64-linux-gnu-gcc not found"
 fi
 
 # linux-armv7 (cross-compile)
@@ -244,7 +255,7 @@ if command -v arm-linux-gnueabihf-gcc >/dev/null 2>&1; then
   cp "${CARGO_TARGET_DIR}/armv7-unknown-linux-gnueabihf/release/libvolvoxgrid.so" "${NATIVES_DIR}/linux-armv7/"
   process_native_library "linux-armv7" "${NATIVES_DIR}/linux-armv7/libvolvoxgrid.so"
 else
-  echo "SKIP: linux-armv7 (arm-linux-gnueabihf-gcc not found)"
+  require_or_skip "linux-armv7" "arm-linux-gnueabihf-gcc not found"
 fi
 
 # windows-x86 (MinGW cross-compile)
@@ -255,7 +266,7 @@ if command -v i686-w64-mingw32-gcc >/dev/null 2>&1; then
   cp "${CARGO_TARGET_DIR}/i686-pc-windows-gnu/release/volvoxgrid.dll" "${NATIVES_DIR}/windows-x86/"
   process_native_library "windows-x86" "${NATIVES_DIR}/windows-x86/volvoxgrid.dll"
 else
-  echo "SKIP: windows-x86 (i686-w64-mingw32-gcc not found)"
+  require_or_skip "windows-x86" "i686-w64-mingw32-gcc not found"
 fi
 
 # windows-x86_64 (MinGW cross-compile)
@@ -266,16 +277,16 @@ if command -v x86_64-w64-mingw32-gcc >/dev/null 2>&1; then
   cp "${CARGO_TARGET_DIR}/x86_64-pc-windows-gnu/release/volvoxgrid.dll" "${NATIVES_DIR}/windows-x86_64/"
   process_native_library "windows-x86_64" "${NATIVES_DIR}/windows-x86_64/volvoxgrid.dll"
 else
-  echo "SKIP: windows-x86_64 (x86_64-w64-mingw32-gcc not found)"
+  require_or_skip "windows-x86_64" "x86_64-w64-mingw32-gcc not found"
 fi
 
 # ActiveX OCX artifacts (release + release lite)
 if [[ "${BUILD_OCX}" == "0" ]]; then
   echo "SKIP: ActiveX OCX build (BUILD_OCX=0)"
 elif [[ ! -d "${VSFLEXGRID_MINGW_DIR}" ]]; then
-  echo "SKIP: ActiveX OCX build (missing ${VSFLEXGRID_MINGW_DIR})"
+  require_or_skip "ActiveX OCX" "missing ${VSFLEXGRID_MINGW_DIR}"
 elif ! command -v i686-w64-mingw32-gcc >/dev/null 2>&1 || ! command -v x86_64-w64-mingw32-gcc >/dev/null 2>&1; then
-  echo "SKIP: ActiveX OCX build (MinGW cross-compilers not found)"
+  require_or_skip "ActiveX OCX" "MinGW cross-compilers not found"
 else
   build_ocx_variant() {
     local flavor="$1"      # release or release-lite
@@ -325,7 +336,7 @@ if command -v zig >/dev/null 2>&1; then
   cp "${CARGO_TARGET_DIR}/aarch64-apple-darwin/release/libvolvoxgrid.dylib" "${NATIVES_DIR}/macos-aarch64/"
   process_native_library "macos-aarch64" "${NATIVES_DIR}/macos-aarch64/libvolvoxgrid.dylib"
 else
-  echo "SKIP: macos-x86_64, macos-aarch64 (zig not found)"
+  require_or_skip "macos-x86_64, macos-aarch64" "zig not found"
 fi
 
 # ── Build Java classes via Gradle ───────────────────────────────────────────

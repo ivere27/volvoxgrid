@@ -1,0 +1,923 @@
+name: Build, test, and release
+
+on:
+  push:
+    branches:
+      - 'main'
+      - 'master'
+    tags:
+      - 'v*'
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      release_nightly:
+        description: 'Update the rolling nightly pre-release after build (main/master branch only)'
+        type: boolean
+        default: false
+      stage_release:
+        description: 'Stage a verified draft GitHub Release for current VERSION (main, master, or release/* branch)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  RUST_VERSION: '1.97.0'
+  GO_VERSION: '1.24.x'
+  FLUTTER_VERSION: '3.47.7'
+  PYTHON_VERSION: '3.12'
+  NODE_VERSION: '22'
+  JAVA_VERSION: '17'
+  DOTNET_VERSION: '8.0.x'
+  PUPPETEER_SKIP_DOWNLOAD: 'true'
+  PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: 'true'
+
+jobs:
+  preflight:
+    name: Preflight & version parity
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+      source_date_epoch: ${{ steps.version.outputs.source_date_epoch }}
+      build_date: ${{ steps.version.outputs.build_date }}
+      git_commit: ${{ steps.version.outputs.git_commit }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+          cache: true
+
+      - name: Check version consistency and release tag metadata
+        id: version
+        env:
+          VOLVOXGRID_ALLOW_OLDER_RELEASE: ${{ vars.VOLVOXGRID_ALLOW_OLDER_RELEASE }}
+        run: |
+          python3 scripts/release.py check-versions
+          ver="$(python3 scripts/release.py print-version)"
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            if [[ "${{ inputs.release_nightly }}" == "true" && "${GITHUB_REF}" != "refs/heads/main" && "${GITHUB_REF}" != "refs/heads/master" ]]; then
+              echo "Error: release_nightly workflow_dispatch is only allowed on main or master (got ${GITHUB_REF})." >&2
+              exit 1
+            fi
+            if [[ "${{ inputs.stage_release }}" == "true" && "${GITHUB_REF}" != "refs/heads/main" && "${GITHUB_REF}" != "refs/heads/master" && "${GITHUB_REF}" != refs/heads/release/* ]]; then
+              echo "Error: stage_release workflow_dispatch is only allowed on main, master, or release/* branches (got ${GITHUB_REF})." >&2
+              exit 1
+            fi
+          fi
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            python3 scripts/release.py check-tag --tag "${GITHUB_REF_NAME}" --require-changelog
+          elif [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" && "${{ inputs.stage_release }}" == "true" ]]; then
+            python3 scripts/release.py check-tag --tag "v${ver}" --require-changelog
+          fi
+          python3 - <<'PY'
+          import os, sys
+          from pathlib import Path
+          sys.path.insert(0, str(Path("scripts").resolve()))
+          import release
+          release.parse_bool_flag(
+              os.environ.get("VOLVOXGRID_ALLOW_OLDER_RELEASE", ""),
+              name="VOLVOXGRID_ALLOW_OLDER_RELEASE",
+          )
+          PY
+          pre="$(python3 scripts/release.py print-prerelease)"
+          epoch="$(git log -1 --format=%ct)"
+          build_date="$(date -u -d "@${epoch}" +%Y-%m-%dT%H:%M:%SZ)"
+          short_sha="$(git rev-parse --short=12 HEAD)"
+          echo "version=${ver}" >> "$GITHUB_OUTPUT"
+          echo "prerelease=${pre}" >> "$GITHUB_OUTPUT"
+          echo "source_date_epoch=${epoch}" >> "$GITHUB_OUTPUT"
+          echo "build_date=${build_date}" >> "$GITHUB_OUTPUT"
+          echo "git_commit=${short_sha}" >> "$GITHUB_OUTPUT"
+
+      - name: Run release, Swift manifest, and Flutter native-resolution unit tests
+        run: |
+          python3 -m unittest discover -s scripts/tests -p 'test_*.py' -v
+          python3 scripts/test_swift_release.py -v
+          python3 flutter/tool/test_native_resolution.py -v
+
+      - name: Validate workflow YAML syntax
+        run: |
+          PY_YAML_BIN=""
+          if python3 -c 'import yaml' 2>/dev/null; then
+            PY_YAML_BIN="python3"
+          elif /usr/bin/python3 -c 'import yaml' 2>/dev/null; then
+            PY_YAML_BIN="/usr/bin/python3"
+          else
+            python3 -m pip install --quiet "PyYAML==6.0.2"
+            PY_YAML_BIN="python3"
+          fi
+          "${PY_YAML_BIN}" -c '
+          import yaml
+          for path in (".github/workflows/build.yml", ".github/workflows/pages.yml"):
+              with open(path, encoding="utf-8") as fh:
+                  yaml.safe_load(fh)
+          print("Workflow YAML syntax valid.")
+          '
+
+      - name: Analyze & dry-run Flutter pub package
+        run: |
+          (cd flutter && flutter pub get)
+          # Revert flutter pub get side effects on tracked files before pub publish validation.
+          git checkout -- flutter/analysis_options.yaml flutter/example
+          if [[ -n "$(git status --porcelain)" ]]; then
+            echo "Working tree is dirty before Flutter pub publish dry-run:" >&2
+            git status --short >&2
+            exit 1
+          fi
+          (cd flutter && dart analyze lib)
+          python3 scripts/release.py verify-flutter
+
+  check-draft:
+    name: Check reusable verified draft release
+    needs: [preflight]
+    if: >-
+      !cancelled() &&
+      needs.preflight.result == 'success' &&
+      github.event_name == 'push' &&
+      startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    outputs:
+      reusable_draft: ${{ steps.reusable.outputs.reusable_draft }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Check if an existing verified draft release can be promoted
+        id: reusable
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          reusable="$(python3 scripts/release.py check-reusable-draft \
+            --tag "${GITHUB_REF_NAME}" \
+            --sha "${GITHUB_SHA}" \
+            --repo "${GITHUB_REPOSITORY}")"
+          echo "reusable_draft=${reusable}" >> "$GITHUB_OUTPUT"
+
+  test-core:
+    name: Core tests & polyglot smoke suite
+    needs: [preflight, check-draft]
+    if: >-
+      !cancelled() &&
+      needs.preflight.result == 'success' &&
+      (needs.check-draft.result == 'success' || needs.check-draft.result == 'skipped') &&
+      needs.check-draft.outputs.reusable_draft != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: |
+            go/go.sum
+            adapters/bubbletea/go.sum
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+          cache: true
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # master
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          key: test-core-${{ runner.os }}
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-test-core-${{ runner.os }}-${{ hashFiles('java/**/build.gradle*', 'android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-test-core-${{ runner.os }}-
+
+      - name: Install system build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            protobuf-compiler \
+            libprotobuf-dev \
+            cmake \
+            build-essential \
+            pkg-config \
+            libvulkan1
+
+      - name: Run Rust engine unit & pixel regression tests
+        run: |
+          cargo test -p volvoxgrid-engine --features gpu
+          cargo test -p volvoxgrid-engine --features demo --test pixel_regression
+
+      - name: Build native library & run Rust FFI smoke test
+        run: make run
+
+      - name: Build C++ header-only TUI example
+        run: |
+          cmake -S cpp/examples/tui -B cpp/examples/tui/build
+          cmake --build cpp/examples/tui/build -j "$(nproc)"
+
+      - name: Run Go core, BubbleTea adapter tests, and Go TUI smoke test
+        run: |
+          (cd go && go vet ./... && go test ./...)
+          (cd adapters/bubbletea && go vet ./... && go test ./...)
+          make go-tui-smoke
+
+      - name: Build Web/JS + adapters & run codec tests
+        run: |
+          (cd web/js && npm install --no-audit --no-fund && npm run build && node --test test/row-id-codec.test.mjs)
+          (cd adapters/aggrid && npm install --no-audit --no-fund && npm run build)
+          (cd adapters/sheet && npm install --no-audit --no-fund && npm run build)
+
+      - name: Run .NET 8 TUI smoke test
+        run: make dotnet-tui-smoke
+
+      - name: Run Java desktop & TUI smoke tests
+        run: |
+          make java-desktop-smoke
+          make java-tui-smoke
+
+      - name: Run Flutter widget & native FFI tests
+        run: |
+          cd flutter
+          VOLVOXGRID_TEST_LIB="${GITHUB_WORKSPACE}/target/debug/libvolvoxgrid.so" flutter test --reporter=compact
+
+  build-android:
+    name: Build & verify Android AARs (full, lite, compose)
+    needs: [preflight, check-draft]
+    if: >-
+      !cancelled() &&
+      needs.preflight.result == 'success' &&
+      (needs.check-draft.result == 'success' || needs.check-draft.result == 'skipped') &&
+      needs.check-draft.outputs.reusable_draft != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Free runner disk space for Android cross-compile container
+        run: |
+          sudo rm -rf /usr/local/lib/android /opt/ghc /usr/share/dotnet /usr/share/swift || true
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Build Android AAR Docker image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: Dockerfile.android
+          tags: volvoxgrid-android-aar:ci
+          load: true
+          cache-from: type=gha,scope=volvoxgrid-android
+          cache-to: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 'type=gha,mode=max,scope=volvoxgrid-android' || '' }}
+
+      - name: Build Android full, lite, compose, and compose-lite AARs
+        env:
+          PROJECT_VERSION: ${{ needs.preflight.outputs.version }}
+          GIT_COMMIT: ${{ needs.preflight.outputs.git_commit }}
+          BUILD_DATE: ${{ needs.preflight.outputs.build_date }}
+        run: |
+          mkdir -p dist/maven dist/symbols /tmp/vg-cache/cargo /tmp/vg-cache/gradle
+          chmod -R a+rwx /tmp/vg-cache
+          for mode in full lite; do
+            artifact_id="volvoxgrid-android"
+            if [[ "$mode" == "lite" ]]; then
+              artifact_id="volvoxgrid-android-lite"
+            fi
+            docker run --rm \
+              -u "$(id -u):$(id -g)" \
+              -v "${GITHUB_WORKSPACE}:/workspace/volvoxgrid" \
+              -v "/tmp/vg-cache/cargo:/cache/cargo" \
+              -v "/tmp/vg-cache/gradle:/cache/gradle" \
+              -w /workspace/volvoxgrid \
+              -e HOME=/tmp \
+              -e CARGO_TARGET_DIR=/cache/cargo/target \
+              -e GRADLE_USER_HOME=/cache/gradle \
+              -e VERSION="${PROJECT_VERSION}" \
+              -e GROUP_ID=io.github.ivere27 \
+              -e ARTIFACT_ID="${artifact_id}" \
+              -e GIT_COMMIT="${GIT_COMMIT}" \
+              -e BUILD_DATE="${BUILD_DATE}" \
+              -e ANDROID_ABIS="arm64-v8a,armeabi-v7a" \
+              -e LIBRARY_BUILD_MODE="${mode}" \
+              -e BUILD_DEBUG_SYMBOLS=1 \
+              volvoxgrid-android-aar:ci
+          done
+          for pair in \
+            "volvoxgrid-android-compose:volvoxgrid-android" \
+            "volvoxgrid-android-compose-lite:volvoxgrid-android-lite"; do
+            artifact_id="${pair%%:*}"
+            parent_id="${pair#*:}"
+            docker run --rm \
+              --entrypoint /opt/volvoxgrid/build_android_compose_aar.sh \
+              -u "$(id -u):$(id -g)" \
+              -v "${GITHUB_WORKSPACE}:/workspace/volvoxgrid" \
+              -v "/tmp/vg-cache/gradle:/cache/gradle" \
+              -w /workspace/volvoxgrid \
+              -e HOME=/tmp \
+              -e GRADLE_USER_HOME=/cache/gradle \
+              -e VERSION="${PROJECT_VERSION}" \
+              -e GROUP_ID=io.github.ivere27 \
+              -e ARTIFACT_ID="${artifact_id}" \
+              -e PARENT_GROUP_ID=io.github.ivere27 \
+              -e PARENT_ARTIFACT_ID="${parent_id}" \
+              -e GIT_COMMIT="${GIT_COMMIT}" \
+              -e BUILD_DATE="${BUILD_DATE}" \
+              volvoxgrid-android-aar:ci
+          done
+
+      - name: Verify Android Maven AARs & debug symbols
+        env:
+          PROJECT_VERSION: ${{ needs.preflight.outputs.version }}
+        run: |
+          python3 scripts/release.py verify-maven --dist dist/maven --version "${PROJECT_VERSION}" --subset android
+          python3 scripts/release.py verify-symbols --dist dist/symbols --version "${PROJECT_VERSION}" --subset android
+
+      - name: Upload Android Maven artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-maven-dist
+          path: dist/maven/*
+          if-no-files-found: error
+
+      - name: Upload Android debug symbols
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-symbols-dist
+          path: dist/symbols/*
+          if-no-files-found: error
+
+  build-desktop:
+    name: Build & verify Desktop JARs, NuGet, WinForms & ActiveX
+    needs: [preflight, check-draft]
+    if: >-
+      !cancelled() &&
+      needs.preflight.result == 'success' &&
+      (needs.check-draft.result == 'success' || needs.check-draft.result == 'skipped') &&
+      needs.check-draft.outputs.reusable_draft != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Free runner disk space for Desktop cross-compile container
+        run: |
+          sudo rm -rf /usr/local/lib/android /opt/ghc /usr/share/swift || true
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Build Desktop JAR Docker image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: Dockerfile.desktop
+          tags: volvoxgrid-desktop-jar:ci
+          load: true
+          cache-from: type=gha,scope=volvoxgrid-desktop
+          cache-to: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 'type=gha,mode=max,scope=volvoxgrid-desktop' || '' }}
+
+      - name: Build Desktop full + lite JARs, ActiveX OCX, and .NET WinForms
+        env:
+          PROJECT_VERSION: ${{ needs.preflight.outputs.version }}
+          GIT_COMMIT: ${{ needs.preflight.outputs.git_commit }}
+          BUILD_DATE: ${{ needs.preflight.outputs.build_date }}
+        run: |
+          mkdir -p dist/maven dist/desktop/ocx dist/dotnet dist/symbols /tmp/vg-cache/cargo /tmp/vg-cache/gradle /tmp/vg-cache/nuget
+          chmod -R a+rwx /tmp/vg-cache
+          docker run --rm \
+            -u "$(id -u):$(id -g)" \
+            -v "${GITHUB_WORKSPACE}:/workspace/volvoxgrid" \
+            -v "/tmp/vg-cache/cargo:/cache/cargo" \
+            -v "/tmp/vg-cache/gradle:/cache/gradle" \
+            -v "/tmp/vg-cache/nuget:/cache/nuget" \
+            -w /workspace/volvoxgrid \
+            -e HOME=/tmp \
+            -e CARGO_TARGET_DIR=/cache/cargo/target \
+            -e GRADLE_USER_HOME=/cache/gradle \
+            -e NUGET_PACKAGES=/cache/nuget \
+            -e VERSION="${PROJECT_VERSION}" \
+            -e GROUP_ID=io.github.ivere27 \
+            -e ARTIFACT_ID=volvoxgrid-desktop \
+            -e GIT_COMMIT="${GIT_COMMIT}" \
+            -e BUILD_DATE="${BUILD_DATE}" \
+            -e LIBRARY_BUILD_MODE=full \
+            -e BUILD_OCX=1 \
+            -e BUILD_DOTNET=1 \
+            -e BUILD_DEBUG_SYMBOLS=1 \
+            -e REQUIRE_ALL_TARGETS=1 \
+            volvoxgrid-desktop-jar:ci
+          # Reclaim intermediate target artifacts before lite cross-compiles.
+          rm -rf /tmp/vg-cache/cargo/target target/dotnet/lite-cargo
+          docker run --rm \
+            -u "$(id -u):$(id -g)" \
+            -v "${GITHUB_WORKSPACE}:/workspace/volvoxgrid" \
+            -v "/tmp/vg-cache/cargo:/cache/cargo" \
+            -v "/tmp/vg-cache/gradle:/cache/gradle" \
+            -w /workspace/volvoxgrid \
+            -e HOME=/tmp \
+            -e CARGO_TARGET_DIR=/cache/cargo/target \
+            -e GRADLE_USER_HOME=/cache/gradle \
+            -e VERSION="${PROJECT_VERSION}" \
+            -e GROUP_ID=io.github.ivere27 \
+            -e ARTIFACT_ID=volvoxgrid-desktop-lite \
+            -e GIT_COMMIT="${GIT_COMMIT}" \
+            -e BUILD_DATE="${BUILD_DATE}" \
+            -e LIBRARY_BUILD_MODE=lite \
+            -e BUILD_OCX=0 \
+            -e BUILD_DOTNET=0 \
+            -e BUILD_DEBUG_SYMBOLS=1 \
+            -e REQUIRE_ALL_TARGETS=1 \
+            volvoxgrid-desktop-jar:ci
+
+      - name: Package & verify Desktop Maven JARs, NuGet .nupkg, WinForms, ActiveX, and symbols
+        env:
+          PROJECT_VERSION: ${{ needs.preflight.outputs.version }}
+          SOURCE_DATE_EPOCH: ${{ needs.preflight.outputs.source_date_epoch }}
+          NUGET_PACKAGES: /tmp/vg-cache/nuget
+        run: |
+          python3 scripts/release.py verify-maven --dist dist/maven --version "${PROJECT_VERSION}" --subset desktop
+          python3 scripts/release.py verify-symbols --dist dist/symbols --version "${PROJECT_VERSION}" --subset desktop
+          python3 scripts/release.py package-desktop-extras \
+            --version "${PROJECT_VERSION}" \
+            --ocx-dir dist/desktop/ocx \
+            --dotnet-dir dist/dotnet \
+            --out dist/desktop-extras
+          python3 scripts/release.py pack-nuget \
+            --version "${PROJECT_VERSION}" \
+            --maven-dir dist/maven \
+            --dotnet-dir dist/dotnet \
+            --out dist/nuget
+
+      - name: Upload Desktop Maven artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-maven-dist
+          path: dist/maven/*
+          if-no-files-found: error
+
+      - name: Upload NuGet packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-nuget-dist
+          path: dist/nuget/*.nupkg
+          if-no-files-found: error
+
+      - name: Upload Desktop extras (ActiveX OCX & .NET WinForms ZIPs)
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-extras-dist
+          path: dist/desktop-extras/*.zip
+          if-no-files-found: error
+
+      - name: Upload Desktop debug symbols
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-symbols-dist
+          path: dist/symbols/*
+          if-no-files-found: error
+
+  build-ios:
+    name: Build & verify iOS XCFrameworks (full & lite)
+    needs: [preflight, check-draft]
+    if: >-
+      !cancelled() &&
+      needs.preflight.result == 'success' &&
+      (needs.check-draft.result == 'success' || needs.check-draft.result == 'skipped') &&
+      needs.check-draft.outputs.reusable_draft != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Free runner disk space for iOS cross-compile container
+        run: |
+          sudo rm -rf /usr/local/lib/android /opt/ghc /usr/share/dotnet || true
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Build iOS Docker image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: Dockerfile.ios
+          tags: volvoxgrid-ios:ci
+          load: true
+          cache-from: type=gha,scope=volvoxgrid-ios
+          cache-to: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 'type=gha,mode=max,scope=volvoxgrid-ios' || '' }}
+
+      - name: Build iOS full & lite XCFrameworks inside container
+        env:
+          PROJECT_VERSION: ${{ needs.preflight.outputs.version }}
+          GIT_COMMIT: ${{ needs.preflight.outputs.git_commit }}
+          BUILD_DATE: ${{ needs.preflight.outputs.build_date }}
+        run: |
+          mkdir -p dist/ios dist/symbols /tmp/vg-cache/cargo
+          chmod -R a+rwx /tmp/vg-cache
+          for mode in full lite; do
+            docker run --rm \
+              -u "$(id -u):$(id -g)" \
+              -v "${GITHUB_WORKSPACE}:/workspace/volvoxgrid" \
+              -v "/tmp/vg-cache/cargo:/cache/cargo" \
+              -w /workspace/volvoxgrid \
+              -e HOME=/tmp \
+              -e CARGO_TARGET_DIR=/cache/cargo/target \
+              -e VERSION="${PROJECT_VERSION}" \
+              -e GIT_COMMIT="${GIT_COMMIT}" \
+              -e BUILD_DATE="${BUILD_DATE}" \
+              -e LIBRARY_BUILD_MODE="${mode}" \
+              -e BUILD_DEBUG_SYMBOLS=1 \
+              volvoxgrid-ios:ci
+          done
+
+      - name: Package deterministic XCFramework ZIPs & verify iOS artifacts
+        env:
+          PROJECT_VERSION: ${{ needs.preflight.outputs.version }}
+          SOURCE_DATE_EPOCH: ${{ needs.preflight.outputs.source_date_epoch }}
+        run: |
+          python3 scripts/release.py package-ios \
+            --ios-dir dist/ios \
+            --out dist/ios-zips \
+            --version "${PROJECT_VERSION}"
+          python3 scripts/release.py verify-symbols --dist dist/symbols --version "${PROJECT_VERSION}" --subset ios
+
+      - name: Upload iOS XCFramework ZIPs
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-dist
+          path: dist/ios-zips/*.zip
+          if-no-files-found: error
+
+      - name: Upload iOS debug symbols
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-symbols-dist
+          path: dist/symbols/*
+          if-no-files-found: error
+
+  build-web:
+    name: Build & verify Web/WASM bundles, Pages demo & npm tarballs
+    needs: [preflight, check-draft]
+    if: >-
+      !cancelled() &&
+      needs.preflight.result == 'success' &&
+      (needs.check-draft.result == 'success' || needs.check-draft.result == 'skipped') &&
+      needs.check-draft.outputs.reusable_draft != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Free runner disk space for Web/WASM container
+        run: |
+          sudo rm -rf /usr/local/lib/android /opt/ghc /usr/share/dotnet || true
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Build Web/WASM Docker image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: Dockerfile.web
+          tags: volvoxgrid-web:ci
+          load: true
+          cache-from: type=gha,scope=volvoxgrid-web
+          cache-to: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 'type=gha,mode=max,scope=volvoxgrid-web' || '' }}
+
+      - name: Build Web/WASM ZIPs, Pages demo ZIP, and all 4 npm tarballs
+        env:
+          PROJECT_VERSION: ${{ needs.preflight.outputs.version }}
+          GIT_COMMIT: ${{ needs.preflight.outputs.git_commit }}
+          BUILD_DATE: ${{ needs.preflight.outputs.build_date }}
+        run: |
+          mkdir -p dist/web dist/npm /tmp/vg-cache/cargo /tmp/vg-cache/npm
+          chmod -R a+rwx /tmp/vg-cache
+          docker run --rm \
+            -u "$(id -u):$(id -g)" \
+            -v "${GITHUB_WORKSPACE}:/workspace/volvoxgrid" \
+            -v "/tmp/vg-cache/cargo:/cache/cargo" \
+            -v "/tmp/vg-cache/npm:/cache/npm" \
+            -w /workspace/volvoxgrid \
+            -e HOME=/tmp \
+            -e npm_config_cache=/cache/npm \
+            -e CARGO_TARGET_DIR=/cache/cargo/target \
+            -e VOLVOXGRID_VERSION="${PROJECT_VERSION}" \
+            -e VOLVOXGRID_GIT_COMMIT="${GIT_COMMIT}" \
+            -e VOLVOXGRID_BUILD_DATE="${BUILD_DATE}" \
+            -e PAGES_BASE_PATH="/volvoxgrid/" \
+            -e WEB_DOCKER_TARGET=all \
+            volvoxgrid-web:ci
+
+      - name: Verify Web/Demo ZIPs & npm tarballs
+        env:
+          PROJECT_VERSION: ${{ needs.preflight.outputs.version }}
+        run: |
+          python3 scripts/release.py verify-web --dist dist/web --version "${PROJECT_VERSION}"
+          python3 scripts/release.py verify-npm --dist dist/npm --version "${PROJECT_VERSION}"
+
+      - name: Upload Web & Pages demo ZIPs
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: |
+            dist/web/volvoxgrid-web-*.zip
+            dist/web/volvoxgrid-web-lite-*.zip
+            dist/web/volvoxgrid-demo-*.zip
+          if-no-files-found: error
+
+      - name: Upload npm tarballs
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-dist
+          path: dist/npm/*.tgz
+          if-no-files-found: error
+
+  release-nightly:
+    name: Publish rolling nightly pre-release
+    needs: [preflight, test-core, build-android, build-desktop, build-ios, build-web]
+    concurrency:
+      group: ${{ github.workflow }}-release-nightly
+      cancel-in-progress: false
+    if: >-
+      !cancelled() &&
+      needs.preflight.result == 'success' &&
+      needs.test-core.result == 'success' &&
+      needs.build-android.result == 'success' &&
+      needs.build-desktop.result == 'success' &&
+      needs.build-ios.result == 'success' &&
+      needs.build-web.result == 'success' && (
+        (github.event_name == 'push' && github.repository == 'ivere27/volvoxgrid' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')) ||
+        (github.event_name == 'workflow_dispatch' && inputs.release_nightly == true && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'))
+      )
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      PROJECT_VERSION: ${{ needs.preflight.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-maven-dist
+          path: artifacts/maven-android
+      - uses: actions/download-artifact@v4
+        with:
+          name: desktop-maven-dist
+          path: artifacts/maven-desktop
+      - uses: actions/download-artifact@v4
+        with:
+          name: desktop-nuget-dist
+          path: artifacts/nuget
+      - uses: actions/download-artifact@v4
+        with:
+          name: desktop-extras-dist
+          path: artifacts/desktop-extras
+      - uses: actions/download-artifact@v4
+        with:
+          name: ios-dist
+          path: artifacts/ios
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: artifacts/web
+      - uses: actions/download-artifact@v4
+        with:
+          name: npm-dist
+          path: artifacts/npm
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-symbols-dist
+          path: artifacts/symbols-android
+      - uses: actions/download-artifact@v4
+        with:
+          name: desktop-symbols-dist
+          path: artifacts/symbols-desktop
+      - uses: actions/download-artifact@v4
+        with:
+          name: ios-symbols-dist
+          path: artifacts/symbols-ios
+      - name: Stage & verify complete nightly release bundle
+        run: |
+          python3 scripts/release.py stage-ci \
+            --out release-dist \
+            --maven-dir artifacts/maven-android \
+            --maven-dir artifacts/maven-desktop \
+            --nuget-dir artifacts/nuget \
+            --desktop-extras-dir artifacts/desktop-extras \
+            --ios-dir artifacts/ios \
+            --web-dir artifacts/web \
+            --npm-dir artifacts/npm \
+            --symbols-dir artifacts/symbols-android \
+            --symbols-dir artifacts/symbols-desktop \
+            --symbols-dir artifacts/symbols-ios \
+            --version "${PROJECT_VERSION}"
+      - name: Update rolling nightly GitHub pre-release
+        run: |
+          python3 scripts/release.py release-ci \
+            --channel nightly \
+            --dist release-dist \
+            --sha "${GITHUB_SHA}" \
+            --repo "${GITHUB_REPOSITORY}"
+
+  prepare-release:
+    name: Stage & verify draft GitHub Release
+    needs: [preflight, check-draft, test-core, build-android, build-desktop, build-ios, build-web]
+    concurrency:
+      group: ${{ github.workflow }}-release-v${{ needs.preflight.outputs.version }}
+      cancel-in-progress: false
+    if: >-
+      !cancelled() &&
+      needs.preflight.result == 'success' &&
+      (needs.check-draft.result == 'success' || needs.check-draft.result == 'skipped') &&
+      needs.check-draft.outputs.reusable_draft != 'true' &&
+      needs.test-core.result == 'success' &&
+      needs.build-android.result == 'success' &&
+      needs.build-desktop.result == 'success' &&
+      needs.build-ios.result == 'success' &&
+      needs.build-web.result == 'success' && (
+        (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+        (github.event_name == 'workflow_dispatch' && inputs.stage_release == true && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')))
+      )
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      PROJECT_VERSION: ${{ needs.preflight.outputs.version }}
+      VOLVOXGRID_ALLOW_OLDER_RELEASE: ${{ vars.VOLVOXGRID_ALLOW_OLDER_RELEASE }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-maven-dist
+          path: artifacts/maven-android
+      - uses: actions/download-artifact@v4
+        with:
+          name: desktop-maven-dist
+          path: artifacts/maven-desktop
+      - uses: actions/download-artifact@v4
+        with:
+          name: desktop-nuget-dist
+          path: artifacts/nuget
+      - uses: actions/download-artifact@v4
+        with:
+          name: desktop-extras-dist
+          path: artifacts/desktop-extras
+      - uses: actions/download-artifact@v4
+        with:
+          name: ios-dist
+          path: artifacts/ios
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: artifacts/web
+      - uses: actions/download-artifact@v4
+        with:
+          name: npm-dist
+          path: artifacts/npm
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-symbols-dist
+          path: artifacts/symbols-android
+      - uses: actions/download-artifact@v4
+        with:
+          name: desktop-symbols-dist
+          path: artifacts/symbols-desktop
+      - uses: actions/download-artifact@v4
+        with:
+          name: ios-symbols-dist
+          path: artifacts/symbols-ios
+      - name: Stage & verify release bundle
+        run: |
+          RELEASE_TAG="v${PROJECT_VERSION}"
+          python3 scripts/release.py stage-ci \
+            --out release-dist \
+            --maven-dir artifacts/maven-android \
+            --maven-dir artifacts/maven-desktop \
+            --nuget-dir artifacts/nuget \
+            --desktop-extras-dir artifacts/desktop-extras \
+            --ios-dir artifacts/ios \
+            --web-dir artifacts/web \
+            --npm-dir artifacts/npm \
+            --symbols-dir artifacts/symbols-android \
+            --symbols-dir artifacts/symbols-desktop \
+            --symbols-dir artifacts/symbols-ios \
+            --version "${PROJECT_VERSION}"
+          python3 scripts/release.py verify-ci --dist release-dist --tag "${RELEASE_TAG}"
+      - name: Create/update & checksum-verify Draft GitHub Release
+        run: |
+          RELEASE_TAG="v${PROJECT_VERSION}"
+          python3 scripts/release.py release-ci \
+            --channel draft-stable \
+            --dist release-dist \
+            --sha "${GITHUB_SHA}" \
+            --tag "${RELEASE_TAG}" \
+            --repo "${GITHUB_REPOSITORY}"
+      - name: Upload staged release bundle for finalize job
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: staged-release-dist
+          path: release-dist/*
+          if-no-files-found: error
+
+  finalize-release:
+    name: Verify Swift checksums & promote GitHub Release
+    needs: [preflight, check-draft, prepare-release]
+    concurrency:
+      group: ${{ github.workflow }}-release-v${{ needs.preflight.outputs.version }}
+      cancel-in-progress: false
+    if: >-
+      !cancelled() &&
+      needs.preflight.result == 'success' &&
+      needs.check-draft.result == 'success' &&
+      github.event_name == 'push' &&
+      startsWith(github.ref, 'refs/tags/v') && (
+        needs.check-draft.outputs.reusable_draft == 'true' ||
+        needs.prepare-release.result == 'success'
+      )
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      VOLVOXGRID_ALLOW_OLDER_RELEASE: ${{ vars.VOLVOXGRID_ALLOW_OLDER_RELEASE }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Download staged release bundle
+        if: needs.check-draft.outputs.reusable_draft != 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: staged-release-dist
+          path: release-dist
+      - name: Verify draft digests & Package.swift checksums, then promote release
+        run: |
+          if [[ "${{ needs.check-draft.outputs.reusable_draft }}" == "true" ]]; then
+            python3 scripts/release.py release-ci \
+              --channel finalize-stable \
+              --sha "${GITHUB_SHA}" \
+              --tag "${GITHUB_REF_NAME}" \
+              --repo "${GITHUB_REPOSITORY}"
+          else
+            python3 scripts/release.py release-ci \
+              --channel finalize-stable \
+              --dist release-dist \
+              --sha "${GITHUB_SHA}" \
+              --tag "${GITHUB_REF_NAME}" \
+              --repo "${GITHUB_REPOSITORY}"
+          fi

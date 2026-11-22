@@ -154,6 +154,93 @@ Use the smallest loop that proves your change works.
 
 Adapter tests (including visual comparisons against the original third-party APIs) live alongside each adapter under `adapters/`.
 
+## Releases & CI/CD
+
+> Full step-by-step release runbook, credential setup, and troubleshooting: **[docs/RELEASING.md](docs/RELEASING.md)**.
+
+All build verification and GitHub Release packaging runs transparently on GitHub Actions via [`.github/workflows/build.yml`](.github/workflows/build.yml) and [`scripts/release.py`](scripts/release.py):
+
+- **Pushes to `main`**: Run the full test suite and cross-compile all platform packages inside pinned Docker containers (`Dockerfile.android`, `Dockerfile.desktop`, `Dockerfile.ios`, `Dockerfile.web`), then update the rolling `nightly` GitHub pre-release with all 47 verified assets and `SHA256SUMS` (no external registry pushes).
+- **Pre-release tags (`vX.Y.Z-rc.N`, `-alpha.N`, `-beta.N`, `-dev.N`)**: Run all verification and artifact builds and publish only to GitHub Releases as a pre-release.
+- **Stable tags (`vX.Y.Z`) & staged releases (`make stage_release`)**:
+  - Verify version parity (`VERSION`, Cargo workspace/lockfiles, npm packages, `flutter/pubspec.yaml`, Go `adapters/bubbletea/go.mod`, `Package.swift`, `README.md`, `CHANGELOG.md`, `flutter/CHANGELOG.md`), build and deep-verify all artifacts:
+    - **Maven (`io.github.ivere27`)**: `volvoxgrid-android`, `volvoxgrid-android-lite`, `volvoxgrid-android-compose`, `volvoxgrid-android-compose-lite`, `volvoxgrid-desktop`, `volvoxgrid-desktop-lite` (`.aar`/`.jar`, `.pom`, `-sources.jar`, `-javadoc.jar`).
+    - **NuGet**: `VolvoxGrid.DotNet` and `VolvoxGrid.DotNet.Lite` `.nupkg` (all 6 native RIDs: `win-x64`, `win-x86`, `linux-x64`, `linux-arm64`, `osx-x64`, `osx-arm64`).
+    - **Windows / Desktop**: `volvoxgrid-activex-<ver>.zip` and `volvoxgrid-dotnet-winforms[-lite]-<ver>-{x64,x86}.zip`.
+    - **Apple / SwiftPM**: `VolvoxGrid.xcframework.zip` and `VolvoxGridLite.xcframework.zip`.
+    - **Web / npm**: `volvoxgrid-web[-lite]-<ver>.zip`, `volvoxgrid-demo-<ver>.zip`, and verified npm tarballs (`volvoxgrid-<ver>.tgz`, `volvoxgrid-lite-<ver>.tgz`, `volvoxgrid-ag-grid-<ver>.tgz`, `volvoxgrid-sheet-<ver>.tgz`).
+    - **Debug symbols**: all 7 `*-<ver>-debug-symbols.zip` archives plus `SHA256SUMS`.
+  - **No signing keys or external registry credentials live on GitHub.** Once GitHub Actions finishes building and checksum-verifying the GitHub Release, all downstream registries (Maven Central, npm, NuGet, Flutter/pub.dev, Go modules, GitHub Pages) are signed and published **locally** from the verified GitHub Release assets.
+
+### Recommended Release Flow (100% GitHub-built, including SwiftPM `Package.swift` checksums)
+
+Because Swift Package Manager consumers read `Package.swift` at tag `vX.Y.Z` (which embeds the SHA-256 checksums of `VolvoxGrid.xcframework.zip` and `VolvoxGridLite.xcframework.zip`), stage the release on GitHub Actions first, sync the CI-built XCFramework checksums into `Package.swift`, and then push tag `vX.Y.Z`:
+
+```bash
+# 1. Bump version across all manifests & changelogs, run local release unit tests, and push to main:
+make bump-version NEW_VERSION=X.Y.Z
+make check_versions test_release
+git commit -am "X.Y.Z"
+git push origin main
+
+# 2. Trigger GitHub Actions to build all platform artifacts and stage Draft Release vX.Y.Z:
+make stage_release
+
+# 3. Once the GitHub Actions workflow completes, pull the verified XCFramework SHA-256
+#    checksums from Draft Release vX.Y.Z into Package.swift, commit, and tag vX.Y.Z:
+make sync_swift_checksums TAG=vX.Y.Z
+git commit -m "Package.swift vX.Y.Z" Package.swift
+git tag -a vX.Y.Z -m vX.Y.Z
+git push origin main && git push origin vX.Y.Z
+```
+
+When `vX.Y.Z` is pushed after a `Package.swift`-only commit, `check-draft` (`scripts/release.py check-reusable-draft`) cryptographically verifies that only `Package.swift` changed since the draft build and that every draft asset's GitHub SHA-256 digest matches `SHA256SUMS` and `Package.swift`, then promotes the Draft GitHub Release directly to **Published** without rebuilding or mutating the XCFramework ZIP hashes.
+
+### Local Signing & Publishing from a Published GitHub Release
+
+After `vX.Y.Z` is published on GitHub Releases, sign and publish each package locally (no local Docker build required):
+
+```bash
+# 1. Maven Central (downloads 24 Maven files + SHA256SUMS, verifies digests/POMs/natives,
+#    signs with your local GPG keyring, uploads one atomic bundle via .maven-settings.xml,
+#    and polls Sonatype Central Portal until PUBLISHED):
+make publish_maven_release TAG=vX.Y.Z DRY_RUN=1
+make publish_maven_release TAG=vX.Y.Z
+
+# 2. npm (downloads 4 verified .tgz tarballs + SHA256SUMS from GitHub Release vX.Y.Z,
+#    checks npm registry sha512 integrity, and publishes volvoxgrid, volvoxgrid-lite,
+#    @volvoxgrid/ag-grid, and @volvoxgrid/sheet):
+make publish_npm_release TAG=vX.Y.Z DRY_RUN=1
+make publish_npm_release TAG=vX.Y.Z
+
+# 3. NuGet (downloads VolvoxGrid.DotNet + VolvoxGrid.DotNet.Lite .nupkg + SHA256SUMS,
+#    verifies all 6 native RIDs, optionally signs with NUGET_CERT_PATH, and pushes to nuget.org):
+make publish_nuget_release TAG=vX.Y.Z DRY_RUN=1
+make publish_nuget_release TAG=vX.Y.Z
+
+# 4. Go modules (tag & push go/vX.Y.Z first, then adapters/bubbletea/vX.Y.Z; see go/PUBLISHING.md):
+make publish_go CONFIRM_PUBLISH_GO=1
+make publish_go_bubbletea CONFIRM_PUBLISH_GO=1
+
+# 5. Flutter / pub.dev (exports a clean git archive of flutter/ at TAG=vX.Y.Z, verifies that
+#    GitHub Release XCFrameworks and Maven Central AAR/JARs are live, then runs flutter pub publish):
+make publish_flutter_release TAG=vX.Y.Z DRY_RUN=1
+make publish_flutter_release TAG=vX.Y.Z
+
+# 6. GitHub Pages release demo (deploys volvoxgrid-demo-X.Y.Z.zip from the GitHub Release):
+make publish_pages TAG=vX.Y.Z
+
+# Or run Maven + npm + NuGet + Flutter + Pages sequentially:
+make publish_release TAG=vX.Y.Z DRY_RUN=1
+make publish_release TAG=vX.Y.Z
+```
+
+Useful environment variables and Make overrides for local signing & publishing:
+- **Maven**: `.maven-settings.xml` (`<server><id>central</id>`) or `SONATYPE_USERNAME`/`SONATYPE_PASSWORD`, `MAVEN_SERVER_ID=central`, `MAVEN_GPG_KEY=<key-id>`, `MAVEN_GPG_PASSPHRASE` (prefer standard `gpg-agent` caching so pinentry prompts once across all 24 signatures).
+- **npm**: `NPM_OTP=<6-digit-code>` (or interactive `npm publish` prompt), `NPM_TAG=latest`.
+- **NuGet**: `NUGET_API_KEY` (or `~/.nuget-env`), optional local package signing via `NUGET_CERT_PATH=/path/to/cert.pfx`, `NUGET_CERT_PASSWORD`, and `NUGET_TIMESTAMPER=http://timestamp.digicert.com`.
+- **Backport releases**: By default `release-ci` rejects tags older than the highest published stable release. Set the GitHub Repository Variable `VOLVOXGRID_ALLOW_OLDER_RELEASE=1` (or pass `--allow-older`) for intentional maintenance backports on an older series.
+
 ## Questions
 
 - Open a GitHub Issue for bugs or feature requests.

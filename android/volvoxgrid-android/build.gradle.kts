@@ -164,7 +164,13 @@ tasks.matching { it.name.startsWith("generate") && it.name.contains("Proto") }.c
 }
 
 val copyFfiJava = tasks.register<Copy>("copyFfiJava") {
-    from("../../codegen/volvoxgrid_ffi.java")
+    val trackedFfiJava = file("src/generated/volvoxgrid_ffi.java")
+    if (!trackedFfiJava.isFile) {
+        throw GradleException(
+            "Missing generated Java FFI stub: ${trackedFfiJava.path} does not exist. Run `make codegen`."
+        )
+    }
+    from(trackedFfiJava)
     into(layout.buildDirectory.dir("generated/source/volvoxgridFfi/main/java/io/github/ivere27/volvoxgrid"))
     rename { "VolvoxGridServiceFfi.java" }
     // protoc-gen-synurang-ffi emits `package volvoxgrid.v1;` for Java FFI stubs.

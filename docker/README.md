@@ -108,15 +108,26 @@ This section matters if you've previously built against an external Synurang che
 
 ## Publishing pipeline
 
-Once `dist/` is populated, the `publish_*` targets push the artifacts to their respective registries. Run them from the repo root, with the appropriate credentials in your environment.
+> For the complete GitHub Actions CI/CD release runbook and local signing setup, see **[../docs/RELEASING.md](../docs/RELEASING.md)**.
 
-- `make publish_maven` — uploads Android, Android lite, Compose, Compose lite, Java desktop, and Java desktop lite.
-- `make publish_github` — uploads release artifacts, including debug-symbol zips from `dist/symbols/` when present.
+In standard releases, GitHub Actions ([`.github/workflows/build.yml`](../.github/workflows/build.yml)) builds, verifies, and checksum-stages all release artifacts inside the pinned Docker images (`Dockerfile.android`, `Dockerfile.desktop`, `Dockerfile.ios`, `Dockerfile.web`) and attaches them with `SHA256SUMS` to the GitHub Release. You then sign and publish to external registries locally from the verified GitHub Release without running a local Docker build:
+
+- `make stage_release` — triggers GitHub Actions (`stage_release=true`) to build and verify a draft release for `VERSION`.
+- `make sync_swift_checksums TAG=vX.Y.Z` — pulls the verified XCFramework SHA-256 digests from the GitHub Release into `Package.swift`.
+- `make publish_maven_release TAG=vX.Y.Z` — downloads all 24 Maven artifacts + `SHA256SUMS` from GitHub Release `vX.Y.Z`, verifies digests/POMs/natives, locally GPG-signs them, uploads one atomic bundle to Maven Central, and polls until `PUBLISHED`.
+- `make publish_npm_release TAG=vX.Y.Z` — downloads the 4 verified `.tgz` tarballs (`volvoxgrid`, `volvoxgrid-lite`, `@volvoxgrid/ag-grid`, `@volvoxgrid/sheet`) + `SHA256SUMS` from the GitHub Release and publishes them locally via `npm publish`.
+- `make publish_nuget_release TAG=vX.Y.Z` — downloads `VolvoxGrid.DotNet` and `VolvoxGrid.DotNet.Lite` `.nupkg` + `SHA256SUMS` from the GitHub Release, optionally signs them locally (`NUGET_CERT_PATH`), and pushes them to `nuget.org`.
+- `make publish_flutter_release TAG=vX.Y.Z` — exports the clean tagged `flutter/` directory, verifies upstream GitHub Release & Maven Central availability, and publishes locally to `pub.dev`.
+- `make publish_pages TAG=vX.Y.Z` — deploys `volvoxgrid-demo-X.Y.Z.zip` from the published GitHub Release to GitHub Pages.
+- `make publish_release TAG=vX.Y.Z` — runs the full local signing & publishing sequence above (`DRY_RUN=1` supported on all targets).
+
+If you instead built artifacts locally into `dist/` via `make docker_all`, the local-directory `publish_*` targets remain available:
+
+- `make publish_maven` — locally GPG-signs and uploads `dist/maven/` (Android, Android lite, Compose, Compose lite, Java desktop, and Java desktop lite) as one atomic bundle to Maven Central.
+- `make publish_github` — uploads local `dist/` artifacts, including debug-symbol zips from `dist/symbols/` when present.
 - `make publish_pages` — deploys the demo ZIP already uploaded to the matching GitHub release.
-- `make publish_nuget` — publishes both `VolvoxGrid.DotNet` and `VolvoxGrid.DotNet.Lite`.
-- `make publish_npm` — publishes `volvoxgrid`, `volvoxgrid-lite`, and adapter packages when their artifacts are present.
-
-A typical release is `make docker_all` followed by `publish_maven`, `publish_github`, `publish_nuget` and `publish_npm`. Run `publish_pages` after `publish_github` completes. If `.NET` was excluded (no `DESKTOP_BUILD_DOTNET=1`), skip `make publish_nuget`.
+- `make publish_nuget` — packs and publishes both `VolvoxGrid.DotNet` and `VolvoxGrid.DotNet.Lite` from local `dist/`.
+- `make publish_npm` — publishes `volvoxgrid`, `volvoxgrid-lite`, and adapter packages from local `dist/`.
 
 ## GitHub Pages release demo
 
