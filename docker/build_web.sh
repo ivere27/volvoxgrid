@@ -15,9 +15,12 @@ if [[ -z "${VERSION}" ]]; then
   exit 1
 fi
 export WASM_PACK_OPT_FLAGS="${WASM_PACK_OPT_FLAGS-}"
+export PUPPETEER_SKIP_DOWNLOAD=true
+export PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 WASM_DIST_ROOT="${REPO_ROOT}/dist/wasm"
 WASM_LITE_DIST_ROOT="${REPO_ROOT}/dist/wasm-lite"
 WEB_DIST_ROOT="${REPO_ROOT}/dist/web"
+NPM_DIST_ROOT="${REPO_ROOT}/dist/npm"
 PAGES_BASE_PATH="${PAGES_BASE_PATH:-/volvoxgrid/}"
 CDN_BASE="https://cdn.jsdelivr.net/npm"
 WASM_CDN_URL="${CDN_BASE}/volvoxgrid@${VERSION}/wasm/volvoxgrid_wasm.js"
@@ -46,12 +49,128 @@ snapshot_current_wasm() {
   copy_dir_clean "${REPO_ROOT}/web/example/wasm" "${dst}"
 }
 
+JS_BUILT=0
 build_js() {
+  if [[ "${JS_BUILT}" == "1" ]]; then
+    return 0
+  fi
   (
     cd "${REPO_ROOT}/web/js"
-    npm install
+    npm install --no-audit --no-fund
     npm run build
   )
+  JS_BUILT=1
+}
+
+build_aggrid() {
+  build_js
+  (
+    cd "${REPO_ROOT}/adapters/aggrid"
+    npm install --no-audit --no-fund
+    npm run build
+  )
+}
+
+build_sheet_pkg() {
+  build_js
+  (
+    cd "${REPO_ROOT}/adapters/sheet"
+    npm install --no-audit --no-fund
+    npm run build
+  )
+}
+
+pack_npm_tarballs() {
+  local wasm_gpu="${1:-${WASM_DIST_ROOT}}"
+  local wasm_lite="${2:-${WASM_LITE_DIST_ROOT}}"
+
+  if [[ ! -d "${wasm_gpu}" || ! -f "${wasm_gpu}/volvoxgrid_wasm_bg.wasm" ]]; then
+    make wasm
+    copy_dir_clean "${REPO_ROOT}/web/example/wasm" "${WASM_DIST_ROOT}"
+    wasm_gpu="${WASM_DIST_ROOT}"
+  fi
+  if [[ ! -d "${wasm_lite}" || ! -f "${wasm_lite}/volvoxgrid_wasm_bg.wasm" ]]; then
+    make wasm-lite
+    copy_dir_clean "${REPO_ROOT}/web/example/wasm" "${WASM_LITE_DIST_ROOT}"
+    wasm_lite="${WASM_LITE_DIST_ROOT}"
+  fi
+
+  build_js
+  (
+    cd "${REPO_ROOT}/web/js"
+    node --test test/row-id-codec.test.mjs
+  )
+  build_aggrid
+  build_sheet_pkg
+
+  rm -rf "${NPM_DIST_ROOT}"
+  mkdir -p "${NPM_DIST_ROOT}"
+
+  # 1. volvoxgrid (full JS + full WASM)
+  local pkg_full="${TMP_ROOT}/npm-full"
+  rm -rf "${pkg_full}"
+  mkdir -p "${pkg_full}/dist" "${pkg_full}/wasm"
+  cp -a "${REPO_ROOT}/web/js/dist/." "${pkg_full}/dist/"
+  cp -a "${wasm_gpu}/." "${pkg_full}/wasm/"
+  rm -f "${pkg_full}/wasm/package.json" "${pkg_full}/wasm/.gitignore"
+  cp "${REPO_ROOT}/web/js/package.json" "${pkg_full}/package.json"
+  if [[ -f "${REPO_ROOT}/web/js/README.md" ]]; then
+    cp "${REPO_ROOT}/web/js/README.md" "${pkg_full}/README.md"
+  fi
+  if [[ -f "${REPO_ROOT}/LICENSE" ]]; then
+    cp "${REPO_ROOT}/LICENSE" "${pkg_full}/LICENSE"
+  fi
+  (cd "${pkg_full}" && npm pack --ignore-scripts --pack-destination "${NPM_DIST_ROOT}")
+
+  # 2. volvoxgrid-lite (lite WASM only)
+  local pkg_lite="${TMP_ROOT}/npm-lite"
+  rm -rf "${pkg_lite}"
+  mkdir -p "${pkg_lite}/wasm"
+  cp -a "${wasm_lite}/." "${pkg_lite}/wasm/"
+  rm -f "${pkg_lite}/wasm/package.json" "${pkg_lite}/wasm/.gitignore"
+  cp "${REPO_ROOT}/web/js/package-lite.json" "${pkg_lite}/package.json"
+  if [[ -f "${REPO_ROOT}/web/js/README.md" ]]; then
+    cp "${REPO_ROOT}/web/js/README.md" "${pkg_lite}/README.md"
+  fi
+  if [[ -f "${REPO_ROOT}/LICENSE" ]]; then
+    cp "${REPO_ROOT}/LICENSE" "${pkg_lite}/LICENSE"
+  fi
+  (cd "${pkg_lite}" && npm pack --ignore-scripts --pack-destination "${NPM_DIST_ROOT}")
+
+  # 3. @volvoxgrid/ag-grid
+  local pkg_aggrid="${TMP_ROOT}/npm-aggrid"
+  rm -rf "${pkg_aggrid}"
+  mkdir -p "${pkg_aggrid}/dist"
+  cp -a "${REPO_ROOT}/adapters/aggrid/dist/." "${pkg_aggrid}/dist/"
+  cp "${REPO_ROOT}/adapters/aggrid/package.json" "${pkg_aggrid}/package.json"
+  if [[ -f "${REPO_ROOT}/adapters/aggrid/README.md" ]]; then
+    cp "${REPO_ROOT}/adapters/aggrid/README.md" "${pkg_aggrid}/README.md"
+  elif [[ -f "${REPO_ROOT}/web/js/README.md" ]]; then
+    cp "${REPO_ROOT}/web/js/README.md" "${pkg_aggrid}/README.md"
+  fi
+  if [[ -f "${REPO_ROOT}/LICENSE" ]]; then
+    cp "${REPO_ROOT}/LICENSE" "${pkg_aggrid}/LICENSE"
+  fi
+  (cd "${pkg_aggrid}" && npm pack --ignore-scripts --pack-destination "${NPM_DIST_ROOT}")
+
+  # 4. @volvoxgrid/sheet
+  local pkg_sheet="${TMP_ROOT}/npm-sheet"
+  rm -rf "${pkg_sheet}"
+  mkdir -p "${pkg_sheet}/dist"
+  cp -a "${REPO_ROOT}/adapters/sheet/dist/." "${pkg_sheet}/dist/"
+  cp "${REPO_ROOT}/adapters/sheet/package.json" "${pkg_sheet}/package.json"
+  if [[ -f "${REPO_ROOT}/adapters/sheet/README.md" ]]; then
+    cp "${REPO_ROOT}/adapters/sheet/README.md" "${pkg_sheet}/README.md"
+  elif [[ -f "${REPO_ROOT}/web/js/README.md" ]]; then
+    cp "${REPO_ROOT}/web/js/README.md" "${pkg_sheet}/README.md"
+  fi
+  if [[ -f "${REPO_ROOT}/LICENSE" ]]; then
+    cp "${REPO_ROOT}/LICENSE" "${pkg_sheet}/LICENSE"
+  fi
+  (cd "${pkg_sheet}" && npm pack --ignore-scripts --pack-destination "${NPM_DIST_ROOT}")
+
+  echo "Built npm tarballs:"
+  ls -1 "${NPM_DIST_ROOT}"/*.tgz
 }
 
 write_sheet_demo_index() {
@@ -371,11 +490,11 @@ build_report_dist() {
 }
 
 case "${TARGET}" in
-  all|bundle|web|pages|sheet|sheet-lite|report|wasm|wasm-lite|wasm-threaded)
+  all|bundle|npm|web|pages|sheet|sheet-lite|report|wasm|wasm-lite|wasm-threaded)
     ;;
   *)
     echo "Error: unsupported WEB_DOCKER_TARGET='${TARGET}'." >&2
-    echo "Valid values: all, bundle, web, pages, sheet, sheet-lite, report, wasm, wasm-lite, wasm-threaded" >&2
+    echo "Valid values: all, bundle, npm, web, pages, sheet, sheet-lite, report, wasm, wasm-lite, wasm-threaded" >&2
     exit 1
     ;;
 esac
@@ -410,8 +529,12 @@ case "${TARGET}" in
   bundle)
     build_bundles
     ;;
+  npm)
+    pack_npm_tarballs
+    ;;
   all)
     build_bundles
+    pack_npm_tarballs "${WASM_DIST_ROOT}" "${WASM_LITE_DIST_ROOT}"
     build_web_dist
     build_sheet_dist gpu
     build_sheet_dist lite

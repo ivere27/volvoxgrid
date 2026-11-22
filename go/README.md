@@ -8,7 +8,7 @@ This README walks you through the two ways you'll typically use the library: the
 
 Before you start, you'll need:
 
-- Go 1.24 or newer. The core module is pinned at `go 1.24` because transitive dependencies (`golang.org/x/sys v0.36.0` and `bubbletea v1.3.10`) require it.
+- Go 1.24 or newer. The core module is pinned at `go 1.24.0` because transitive dependencies (`golang.org/x/sys v0.36.0` and `bubbletea v1.3.10`) require it.
 - The native `volvoxgrid` shared library. Build it from the repo root with `make build` for a debug build or `make release` for an optimized one.
 
 Point your code at the resulting `libvolvoxgrid.{so,dylib,dll}` — pass the path to `volvoxgrid.NewClient(...)` directly, or read it from an environment variable. The Bubble Tea example below reads `VOLVOXGRID_LIB`; pick whichever convention fits your project.

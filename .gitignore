@@ -112,3 +112,5 @@ tmp/
 *.log
 .maven-settings.xml
 legacy/
+__pycache__/
+*.py[cod]

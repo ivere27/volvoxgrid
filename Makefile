@@ -254,6 +254,8 @@ endif
         docker_android_aar_image docker_android docker_desktop_image docker_desktop docker_desktop_lite \
         docker_web_image docker_web \
         docker_ios_image docker_ios docker_ios_lite update_swift_package_checksums verify_swift_package_checksums docker_all_image docker_all publish_maven \
+        publish_maven_release publish_npm_release publish_nuget_release publish_flutter_release publish_release \
+        stage_release sync_swift_checksums check_versions test_release \
         publish_local publish_github publish_web publish_pages publish_npm publish_nuget \
         publish_go publish_go_bubbletea \
         rust-gtk-run rust-gtk-run-release rust-gtk-bench \
@@ -366,13 +368,20 @@ help:
 	@echo "  verify_swift_package_checksums  Check existing ZIPs against Package.swift without rebuilding"
 	@echo "  docker_all_image          Build unified Docker image (all toolchains)"
 	@echo "  docker_all                Build all platform artifacts via unified Docker image (Android full+lite, desktop full+lite, iOS full+lite, .NET WinForms full+lite x64+x86)"
-	@echo "  publish_maven             Upload Android, Android lite, Compose, Compose lite AARs + desktop JARs to Maven Central"
+	@echo "  stage_release             Trigger GitHub Actions workflow_dispatch (stage_release=true) to build a draft release"
+	@echo "  sync_swift_checksums      Sync Package.swift binaryTarget checksums from GitHub Release TAG=vX.Y.Z"
+	@echo "  publish_maven_release     Download Maven artifacts from GitHub Release TAG=vX.Y.Z, locally GPG-sign, and upload to Maven Central"
+	@echo "  publish_npm_release       Download verified npm tarballs from GitHub Release TAG=vX.Y.Z and publish locally to npm"
+	@echo "  publish_nuget_release     Download verified NuGet .nupkg from GitHub Release TAG=vX.Y.Z, optionally sign locally, and push to nuget.org"
+	@echo "  publish_flutter_release   Export tagged flutter/ tree for TAG=vX.Y.Z, verify upstream artifacts, and publish locally to pub.dev"
+	@echo "  publish_release           Run local signing & publishing sequence for GitHub Release TAG=vX.Y.Z (Maven, npm, NuGet, Flutter, plus Pages for stable tags)"
+	@echo "  publish_maven             Upload local dist/maven Android + Compose AARs and desktop JARs to Maven Central"
 	@echo "  publish_github            Upload all artifacts (xcframework, AAR, JAR, .NET, ActiveX, web zips, debug symbols) to GitHub release"
 	@echo "  publish_local             Install built internal snapshot artifacts from dist/maven into ~/.m2/repository"
 	@echo "  publish_web               Copy dist/web -> public (clean), then run firebase deploy"
-	@echo "  publish_pages             Deploy the released demo ZIP to GitHub Pages (after publish_github)"
-	@echo "  publish_npm               Publish volvoxgrid + adapter npm packages from dist/web zip"
-	@echo "  publish_nuget             Publish VolvoxGrid.DotNet + VolvoxGrid.DotNet.Lite NuGet packages to nuget.org"
+	@echo "  publish_pages             Deploy the released demo ZIP to GitHub Pages (after GitHub Release is published)"
+	@echo "  publish_npm               Publish volvoxgrid + adapter npm packages from local dist/"
+	@echo "  publish_nuget             Publish VolvoxGrid.DotNet + VolvoxGrid.DotNet.Lite NuGet packages from local dist/ to nuget.org"
 	@echo "  publish_go                Tag + push 'go/vX.Y.Z' so the core Go module is fetchable via go get"
 	@echo "  publish_go_bubbletea      Tag + push 'adapters/bubbletea/vX.Y.Z' (requires publish_go to have shipped first)"
 	@echo ""
@@ -397,8 +406,12 @@ help:
 bump-version:
 	@python3 "$(ROOT_DIR)/scripts/bump_version.py" --version "$(NEW_VERSION)"
 
-check-version:
-	@python3 "$(ROOT_DIR)/scripts/bump_version.py" --check
+check-version check_versions:
+	python3 "$(ROOT_DIR)/scripts/release.py" check-versions
+
+test_release:
+	python3 -m unittest discover -s "$(ROOT_DIR)/scripts/tests" -p 'test_*.py' -v
+	python3 "$(ROOT_DIR)/scripts/test_swift_release.py" -v
 
 # =============================================================================
 # Build the VolvoxGrid native library
@@ -846,6 +859,8 @@ codegen: build_codegen_tool
 		$(PROTOC_GEN_SYNURANG_FFI_FLAG) \
 		--synurang-ffi_out=codegen --synurang-ffi_opt=lang=java \
 		proto/volvoxgrid.proto
+	@mkdir -p android/volvoxgrid-android/src/generated
+	@cp codegen/volvoxgrid_ffi.java android/volvoxgrid-android/src/generated/volvoxgrid_ffi.java
 	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
 		$(PROTOC_GEN_SYNURANG_FFI_FLAG) \
 		--synurang-ffi_out=codegen --synurang-ffi_opt=lang=dart \
@@ -1762,85 +1777,67 @@ docker_all: docker_all_image
 		echo "Skip publish_local: AAR_VERSION=$(AAR_VERSION), DESKTOP_VERSION=$(DESKTOP_VERSION) are not SNAPSHOT."; \
 	fi
 
+_RELEASE_BOOL_TRUE := 1 true yes TRUE YES True Yes
+_RELEASE_BOOL_FALSE := 0 false no FALSE NO False No
+_RELEASE_BOOL_FLAG = $(if $(strip $($(1))),$(if $(filter 1,$(words $(strip $($(1))))),$(if $(filter $(_RELEASE_BOOL_TRUE),$(strip $($(1)))),$(2),$(if $(filter $(_RELEASE_BOOL_FALSE),$(strip $($(1)))),,$(error Invalid $(1)='$(strip $($(1)))' (expected 1/true/yes or 0/false/no)))),$(error Invalid $(1)='$(strip $($(1)))' (expected 1/true/yes or 0/false/no))))
+
+stage_release:
+	@command -v gh >/dev/null 2>&1 || { echo "Error: gh (GitHub CLI) not found in PATH."; exit 1; }
+	@TARGET_REPO="$(if $(strip $(REPO)),$(strip $(REPO)),$(IOS_GITHUB_REPO))"; \
+	TARGET_REF="$(if $(strip $(REF)),$(strip $(REF)),$(PAGES_REF))"; \
+	case "$$TARGET_REF" in \
+		main|master|release/*|refs/heads/main|refs/heads/master|refs/heads/release/*) ;; \
+		*) \
+			echo "Error: stage_release REF='$$TARGET_REF' is not allowed (expected main, master, or release/*)." >&2; \
+			exit 1; \
+			;; \
+	esac; \
+	if [ -n "$(call _RELEASE_BOOL_FLAG,DRY_RUN,1)" ]; then \
+		echo "Dry run (stage_release): gh workflow run build.yml --repo $$TARGET_REPO --ref $$TARGET_REF -f stage_release=true"; \
+		exit 0; \
+	fi; \
+	gh workflow run build.yml --repo "$$TARGET_REPO" --ref "$$TARGET_REF" -f stage_release=true; \
+	echo "Release staging queued on GitHub Actions (ref=$$TARGET_REF). View progress: gh run list --repo $$TARGET_REPO --workflow build.yml"
+
+sync_swift_checksums:
+	python3 "$(CURRENT_DIR)/scripts/release.py" sync-swift-checksums \
+		--tag "$(if $(strip $(TAG)),$(strip $(TAG)),v$(VOLVOXGRID_VERSION))" \
+		$(if $(strip $(REPO)),--repo "$(strip $(REPO))") \
+		$(call _RELEASE_BOOL_FLAG,ALLOW_PRERELEASE,--allow-prerelease) \
+		$(call _RELEASE_BOOL_FLAG,DRY_RUN,--dry-run)
+
 publish_maven:
-	@if [ ! -f "$(MAVEN_SETTINGS)" ]; then \
-		echo "Error: Maven settings not found: $(MAVEN_SETTINGS)"; \
-		echo "Create .maven-settings.xml with your Sonatype Central credentials:"; \
-		echo "  <settings><servers><server>"; \
-		echo "    <username>YOUR_TOKEN</username>"; \
-		echo "    <password>YOUR_PASSWORD</password>"; \
-		echo "  </server></servers></settings>"; \
+	@if [ "$(strip $(AAR_VERSION))" != "$(strip $(DESKTOP_VERSION))" ]; then \
+		echo "Error: AAR_VERSION ($(AAR_VERSION)) != DESKTOP_VERSION ($(DESKTOP_VERSION))"; \
 		exit 1; \
 	fi
-	@MAVEN_USER=$$(sed -n 's|.*<username>\(.*\)</username>.*|\1|p' "$(MAVEN_SETTINGS)" | head -1); \
-	MAVEN_PASS=$$(sed -n 's|.*<password>\(.*\)</password>.*|\1|p' "$(MAVEN_SETTINGS)" | head -1); \
-	DIST="$(CURRENT_DIR)/dist/maven"; \
-	VERIFY_SCRIPT="$(CURRENT_DIR)/scripts/verify_embedded_version.sh"; \
-	if [ ! -f "$$VERIFY_SCRIPT" ]; then \
-		echo "Error: version verification script not found: $$VERIFY_SCRIPT"; \
+	python3 "$(CURRENT_DIR)/scripts/release.py" publish-maven-local \
+		--dist "$(CURRENT_DIR)/dist/maven" \
+		--version "$(strip $(AAR_VERSION))" \
+		$(if $(strip $(MAVEN_SETTINGS)),--settings "$(strip $(MAVEN_SETTINGS))") \
+		$(if $(strip $(MAVEN_SERVER_ID)),--server-id "$(strip $(MAVEN_SERVER_ID))") \
+		$(if $(strip $(MAVEN_REPO_URL)),--upload-url "$(strip $(MAVEN_REPO_URL))") \
+		$(if $(strip $(MAVEN_STATUS_URL)),--status-url "$(strip $(MAVEN_STATUS_URL))") \
+		$(if $(strip $(MAVEN_GPG_KEY)),--gpg-key "$(strip $(MAVEN_GPG_KEY))") \
+		$(call _RELEASE_BOOL_FLAG,ALLOW_PRERELEASE,--allow-prerelease) \
+		$(call _RELEASE_BOOL_FLAG,DRY_RUN,--dry-run)
+
+publish_maven_release:
+	@test -n "$(strip $(TAG))" || { \
+		echo "Error: TAG is required (for example: make publish_maven_release TAG=v$(VOLVOXGRID_VERSION))."; \
 		exit 1; \
-	fi; \
-	upload_bundle() { \
-		local ARTIFACT="$$1" VERSION="$$2" EXT="$$3" GROUP="$$4" VERIFY_MODE="$${5:-native}"; \
-		local FILE="$$DIST/$$ARTIFACT-$$VERSION.$$EXT"; \
-		local POM="$$DIST/$$ARTIFACT-$$VERSION.pom"; \
-		local GROUP_PATH=$$(echo "$$GROUP" | tr '.' '/'); \
-		local TOP_DIR=$$(echo "$$GROUP" | cut -d. -f1); \
-		if [ ! -f "$$FILE" ] || [ ! -f "$$POM" ]; then \
-			echo "Error: $$ARTIFACT-$$VERSION not found in $$DIST"; \
-			echo "Run 'make docker_android docker_desktop' first."; \
-			exit 1; \
-		fi; \
-		if [ "$$VERIFY_MODE" = "native" ]; then \
-			echo "Verifying embedded version for $$ARTIFACT-$$VERSION..."; \
-			bash "$$VERIFY_SCRIPT" "$$VERSION" "$$FILE" || exit 1; \
-		else \
-			echo "Skipping native embedded-version verification for $$ARTIFACT-$$VERSION ($$VERIFY_MODE)."; \
-		fi; \
-		echo "Creating bundle for $$ARTIFACT-$$VERSION..."; \
-		BUNDLE_DIR=$$(mktemp -d); \
-		BUNDLE_ZIP="/tmp/volvoxgrid-bundle-$$$$.zip"; \
-		rm -f "$$BUNDLE_ZIP"; \
-		TARGET="$$BUNDLE_DIR/$$GROUP_PATH/$$ARTIFACT/$$VERSION"; \
-		mkdir -p "$$TARGET"; \
-		cp "$$FILE" "$$TARGET/"; \
-		cp "$$POM" "$$TARGET/"; \
-		for CLASSIFIER in sources javadoc; do \
-			CFILE="$$DIST/$$ARTIFACT-$$VERSION-$$CLASSIFIER.jar"; \
-			if [ -f "$$CFILE" ]; then cp "$$CFILE" "$$TARGET/"; fi; \
-		done; \
-		for f in "$$TARGET"/*; do \
-			md5sum "$$f" | cut -d' ' -f1 > "$$f.md5"; \
-			sha1sum "$$f" | cut -d' ' -f1 > "$$f.sha1"; \
-			gpg -ab "$$f"; \
-		done; \
-		( cd "$$BUNDLE_DIR" && zip -qr "$$BUNDLE_ZIP" "$$TOP_DIR" ) || { echo "zip failed"; rm -rf "$$BUNDLE_DIR"; exit 1; }; \
-		rm -rf "$$BUNDLE_DIR"; \
-		echo "Uploading $$ARTIFACT-$$VERSION to Maven Central..."; \
-		RESPONSE=$$(curl -s -w "\n%{http_code}" \
-			-u "$$MAVEN_USER:$$MAVEN_PASS" \
-			-X POST "$(MAVEN_REPO_URL)" \
-			-F "bundle=@$$BUNDLE_ZIP" \
-			-F "name=$$ARTIFACT-$$VERSION" \
-			-F "publishingType=AUTOMATIC"); \
-		rm -f "$$BUNDLE_ZIP"; \
-		HTTP_CODE=$$(echo "$$RESPONSE" | tail -1); \
-		BODY=$$(echo "$$RESPONSE" | head -n -1); \
-		if [ "$$HTTP_CODE" -ge 200 ] && [ "$$HTTP_CODE" -lt 300 ]; then \
-			echo "Upload successful (HTTP $$HTTP_CODE): $$ARTIFACT-$$VERSION"; \
-			echo "$$BODY"; \
-		else \
-			echo "Upload failed (HTTP $$HTTP_CODE): $$ARTIFACT-$$VERSION"; \
-			echo "$$BODY"; \
-			exit 1; \
-		fi; \
-	}; \
-	upload_bundle "$(AAR_ARTIFACT_ID)" "$(AAR_VERSION)" "aar" "$(AAR_GROUP_ID)"; \
-	upload_bundle "$(AAR_LITE_ARTIFACT_ID)" "$(AAR_VERSION)" "aar" "$(AAR_LITE_GROUP_ID)"; \
-	upload_bundle "$(AAR_COMPOSE_ARTIFACT_ID)" "$(AAR_VERSION)" "aar" "$(AAR_COMPOSE_GROUP_ID)" "thin-aar"; \
-	upload_bundle "$(AAR_COMPOSE_LITE_ARTIFACT_ID)" "$(AAR_VERSION)" "aar" "$(AAR_COMPOSE_LITE_GROUP_ID)" "thin-aar"; \
-	upload_bundle "$(DESKTOP_ARTIFACT_ID)" "$(DESKTOP_VERSION)" "jar" "$(DESKTOP_GROUP_ID)"; \
-	upload_bundle "$(DESKTOP_LITE_ARTIFACT_ID)" "$(DESKTOP_VERSION)" "jar" "$(DESKTOP_LITE_GROUP_ID)"
+	}
+	python3 "$(CURRENT_DIR)/scripts/release.py" publish-maven-local \
+		--tag "$(strip $(TAG))" \
+		$(if $(strip $(REPO)),--repo "$(strip $(REPO))") \
+		$(if $(strip $(MAVEN_SETTINGS)),--settings "$(strip $(MAVEN_SETTINGS))") \
+		$(if $(strip $(MAVEN_SERVER_ID)),--server-id "$(strip $(MAVEN_SERVER_ID))") \
+		$(if $(strip $(MAVEN_REPO_URL)),--upload-url "$(strip $(MAVEN_REPO_URL))") \
+		$(if $(strip $(MAVEN_STATUS_URL)),--status-url "$(strip $(MAVEN_STATUS_URL))") \
+		$(if $(strip $(MAVEN_GPG_KEY)),--gpg-key "$(strip $(MAVEN_GPG_KEY))") \
+		$(call _RELEASE_BOOL_FLAG,ALLOW_PRERELEASE,--allow-prerelease) \
+		$(call _RELEASE_BOOL_FLAG,ALLOW_DRAFT,--allow-draft) \
+		$(call _RELEASE_BOOL_FLAG,DRY_RUN,--dry-run)
 
 publish_local:
 	@DIST="$(CURRENT_DIR)/dist/maven"; \
@@ -2055,14 +2052,72 @@ publish_github:
 	echo "All artifacts uploaded to $$TAG"
 
 publish_pages:
-	@command -v gh >/dev/null 2>&1 || { echo "Error: gh (GitHub CLI) not found in PATH."; exit 1; }
-	@gh release view "v$(VOLVOXGRID_VERSION)" --repo "$(IOS_GITHUB_REPO)" \
-		--json assets --jq '.assets[].name' | \
-		grep -Fx "volvoxgrid-demo-$(VOLVOXGRID_VERSION).zip" >/dev/null || \
-		{ echo "Error: release demo ZIP missing. Run make docker_all (or make docker_web WEB_DOCKER_TARGET=pages), then make publish_github."; exit 1; }
-	@gh workflow run pages.yml --repo "$(IOS_GITHUB_REPO)" --ref "$(PAGES_REF)" \
-		-f tag="v$(VOLVOXGRID_VERSION)"
-	@echo "Pages deployment queued. View progress: gh run list --repo $(IOS_GITHUB_REPO) --workflow pages.yml"
+	python3 "$(CURRENT_DIR)/scripts/release.py" publish-pages-local \
+		--tag "$(if $(strip $(TAG)),$(strip $(TAG)),v$(VOLVOXGRID_VERSION))" \
+		--ref "$(if $(strip $(REF)),$(strip $(REF)),$(PAGES_REF))" \
+		$(if $(strip $(REPO)),--repo "$(strip $(REPO))") \
+		$(call _RELEASE_BOOL_FLAG,ALLOW_DRAFT,--allow-draft) \
+		$(call _RELEASE_BOOL_FLAG,DRY_RUN,--dry-run)
+
+publish_npm_release:
+	@test -n "$(strip $(TAG))" || { \
+		echo "Error: TAG is required (for example: make publish_npm_release TAG=v$(VOLVOXGRID_VERSION))."; \
+		exit 1; \
+	}
+	python3 "$(CURRENT_DIR)/scripts/release.py" publish-npm-local \
+		--tag "$(strip $(TAG))" \
+		$(if $(strip $(REPO)),--repo "$(strip $(REPO))") \
+		$(if $(strip $(NPM_TAG)),--npm-tag "$(strip $(NPM_TAG))") \
+		$(if $(strip $(NPM_OTP)),--otp "$(strip $(NPM_OTP))") \
+		$(call _RELEASE_BOOL_FLAG,ALLOW_PRERELEASE,--allow-prerelease) \
+		$(call _RELEASE_BOOL_FLAG,ALLOW_DRAFT,--allow-draft) \
+		$(call _RELEASE_BOOL_FLAG,DRY_RUN,--dry-run)
+
+publish_nuget_release:
+	@test -n "$(strip $(TAG))" || { \
+		echo "Error: TAG is required (for example: make publish_nuget_release TAG=v$(VOLVOXGRID_VERSION))."; \
+		exit 1; \
+	}
+	python3 "$(CURRENT_DIR)/scripts/release.py" publish-nuget-local \
+		--tag "$(strip $(TAG))" \
+		$(if $(strip $(REPO)),--repo "$(strip $(REPO))") \
+		$(if $(strip $(NUGET_SOURCE)),--source "$(strip $(NUGET_SOURCE))") \
+		$(if $(strip $(NUGET_CERT_PATH)),--certificate-path "$(strip $(NUGET_CERT_PATH))") \
+		$(if $(strip $(NUGET_TIMESTAMPER)),--timestamper "$(strip $(NUGET_TIMESTAMPER))") \
+		$(call _RELEASE_BOOL_FLAG,ALLOW_PRERELEASE,--allow-prerelease) \
+		$(call _RELEASE_BOOL_FLAG,ALLOW_DRAFT,--allow-draft) \
+		$(call _RELEASE_BOOL_FLAG,DRY_RUN,--dry-run)
+
+publish_flutter_release:
+	@test -n "$(strip $(TAG))" || { \
+		echo "Error: TAG is required (for example: make publish_flutter_release TAG=v$(VOLVOXGRID_VERSION))."; \
+		exit 1; \
+	}
+	python3 "$(CURRENT_DIR)/scripts/release.py" publish-flutter-local \
+		--tag "$(strip $(TAG))" \
+		$(if $(strip $(REPO)),--repo "$(strip $(REPO))") \
+		$(if $(strip $(MAVEN_CENTRAL_REPO_URL)),--maven-repo-url "$(strip $(MAVEN_CENTRAL_REPO_URL))") \
+		$(if $(strip $(FLUTTER_UPSTREAM_POLL_INTERVAL)),--upstream-poll-interval "$(strip $(FLUTTER_UPSTREAM_POLL_INTERVAL))") \
+		$(if $(strip $(FLUTTER_UPSTREAM_POLL_TIMEOUT)),--upstream-poll-timeout "$(strip $(FLUTTER_UPSTREAM_POLL_TIMEOUT))") \
+		$(call _RELEASE_BOOL_FLAG,SKIP_UPSTREAM_CHECK,--skip-upstream-check) \
+		$(call _RELEASE_BOOL_FLAG,ALLOW_PRERELEASE,--allow-prerelease) \
+		$(call _RELEASE_BOOL_FLAG,ALLOW_DRAFT,--allow-draft) \
+		$(call _RELEASE_BOOL_FLAG,DRY_RUN,--dry-run)
+
+publish_release:
+	@test -n "$(strip $(TAG))" || { \
+		echo "Error: TAG is required (for example: make publish_release TAG=v$(VOLVOXGRID_VERSION))."; \
+		exit 1; \
+	}
+	@$(MAKE) publish_maven_release TAG="$(strip $(TAG))"
+	@$(MAKE) publish_npm_release TAG="$(strip $(TAG))"
+	@$(MAKE) publish_nuget_release TAG="$(strip $(TAG))"
+	@$(MAKE) publish_flutter_release TAG="$(strip $(TAG))"
+	@if python3 -c 'import sys; sys.path.insert(0, sys.argv[1]); import release; tag = sys.argv[2]; release.require(tag.startswith("v"), f"Release tag must start with v: {tag!r}"); sys.exit(0 if release.parse_semver(tag[1:]).is_prerelease else 1)' "$(CURRENT_DIR)/scripts" "$(strip $(TAG))"; then \
+		echo "Skip publish_pages: $(strip $(TAG)) is a prerelease tag (GitHub Pages requires a stable release)."; \
+	else \
+		$(MAKE) publish_pages TAG="$(strip $(TAG))"; \
+	fi
 
 publish_web:
 	@command -v firebase >/dev/null 2>&1 || { echo "Error: firebase CLI not found in PATH."; echo "Install with: npm install -g firebase-tools"; exit 1; }

@@ -260,8 +260,10 @@ files. To preview a bump, use
 The command promotes an `Unreleased` changelog section when present, preserves
 previous release notes and historical size measurements, and validates all
 inputs before writing. Run it as a separate step before building artifacts.
-The release build's `make update_swift_package_checksums` step computes the
-Swift binary checksums from the resulting XCFramework archives.
+The release build's `make stage_release` and `make sync_swift_checksums` steps
+compute and synchronize the Swift binary checksums from the CI-built XCFramework
+archives. For the complete GitHub Actions CI/CD and local signing/publishing
+runbook, see [docs/RELEASING.md](docs/RELEASING.md).
 
 ## Adapters
 
@@ -282,6 +284,7 @@ Compatibility layers in `adapters/` let you keep an existing API while running o
 - [BUILD_VARIANTS.md](BUILD_VARIANTS.md) — full vs lite features, artifact types, and binary size
 - [TEXT_RENDERING.md](TEXT_RENDERING.md) — full/lite text rendering and cache ownership
 - [ARCHITECTURE.md](ARCHITECTURE.md) — repo architecture and build workflow
+- [docs/RELEASING.md](docs/RELEASING.md) — GitHub Actions CI/CD, staging, and local signing/publishing guide
 - [CONTRIBUTING.md](CONTRIBUTING.md) — contribution guidelines and CLA
 - [CHANGELOG.md](CHANGELOG.md) — release notes
 - [android/README.md](android/README.md), [flutter/README.md](flutter/README.md), [java/README.md](java/README.md), [dotnet/README.md](dotnet/README.md), [go/README.md](go/README.md), [swift/README.md](swift/README.md), [web/js/README.md](web/js/README.md) — per-platform wrapper docs

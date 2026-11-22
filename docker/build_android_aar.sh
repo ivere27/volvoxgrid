@@ -170,7 +170,17 @@ prepare_android_local_properties() {
   printf 'sdk.dir=%s\n' "${ANDROID_SDK_ROOT}" > "${ANDROID_LOCAL_PROPERTIES}"
 }
 
-trap restore_android_local_properties EXIT
+cleanup() {
+  local dir
+  for dir in "${SYMBOLS_WORK_DIR:-}" "${JNI_STAGE_DIR:-}" "${MERGE_WORK_DIR:-}" "${WORK_DIR:-}"; do
+    if [[ -n "${dir}" ]]; then
+      rm -rf "${dir}"
+    fi
+  done
+  restore_android_local_properties
+}
+
+trap cleanup EXIT
 prepare_android_local_properties
 
 for required in \
@@ -447,8 +457,6 @@ POM
 
 # ── Generate placeholder sources.jar and javadoc.jar ────────────────────────
 WORK_DIR="$(mktemp -d /tmp/volvoxgrid-aar-XXXXXX)"
-cleanup() { rm -rf "${WORK_DIR}"; }
-trap cleanup EXIT
 
 SOURCES_OUT="${DIST_DIR}/${ARTIFACT_ID}-${VERSION}-sources.jar"
 JAVADOC_OUT="${DIST_DIR}/${ARTIFACT_ID}-${VERSION}-javadoc.jar"

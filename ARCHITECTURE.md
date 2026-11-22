@@ -186,4 +186,5 @@ Next: [CONTRIBUTING.md](CONTRIBUTING.md) for how to land changes.
 - [TUI.md](TUI.md) — if you're changing terminal rendering or host integration
 - [TEXT_RENDERING.md](TEXT_RENDERING.md) — if you're changing full/lite font fallback or text cache behavior
 - [BUILD_VARIANTS.md](BUILD_VARIANTS.md) — full vs lite features and artifact types
+- [docs/RELEASING.md](docs/RELEASING.md) — GitHub Actions CI/CD release pipeline and local signing/publishing runbook
 - [CONTRIBUTING.md](CONTRIBUTING.md) — CLA, PR flow, and code style
