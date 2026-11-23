@@ -62,12 +62,12 @@ let package = Package(
     targets: [
         .binaryTarget(
             name: "VolvoxGridXCFramework",
-            url: "https://github.com/ivere27/volvoxgrid/releases/download/v0.8.12/VolvoxGrid.xcframework.zip",
+            url: "https://github.com/ivere27/volvoxgrid/releases/download/v0.8.13/VolvoxGrid.xcframework.zip",
             checksum: "677ccfd838289c7a6ed762de3c3d4e3638f97c32281afdaf22f78515830aa02f"
         ),
         .binaryTarget(
             name: "VolvoxGridLiteXCFramework",
-            url: "https://github.com/ivere27/volvoxgrid/releases/download/v0.8.12/VolvoxGridLite.xcframework.zip",
+            url: "https://github.com/ivere27/volvoxgrid/releases/download/v0.8.13/VolvoxGridLite.xcframework.zip",
             checksum: "3d19e2377a2a69731d1455db3bc8e4fdc7a55503eb30a01a32856977e0af2dd3"
         ),
         .target(

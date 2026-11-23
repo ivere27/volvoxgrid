@@ -2,6 +2,13 @@
 
 All notable changes to VolvoxGrid are documented here. Per-package changelogs may have additional detail (e.g. [flutter/CHANGELOG.md](flutter/CHANGELOG.md)).
 
+## 0.8.13
+
+- Added transparent GitHub Actions CI/CD workflows (`.github/workflows/build.yml`, `scripts/release.py`, `docs/RELEASING.md`) to test, build inside pinned Docker containers, verify archives and `SHA256SUMS` digests, and stage GitHub Releases without storing external registry credentials on GitHub.
+- Added local signing and registry publishing targets (`make stage_release`, `make sync_swift_checksums`, `make publish_*_release`, `make publish_release`) with deterministic packaging, GPG/NuGet local signing, and `Package.swift` checksum synchronization.
+- Added `sheet` and `sheet-lite` demos plus a multi-demo landing index page to the GitHub Pages release demo bundle (`volvoxgrid-demo-<ver>.zip`).
+- Committed generated Android Java FFI bindings (`android/volvoxgrid-android/src/generated/volvoxgrid_ffi.java`) for clean-checkout builds and normalized Go module `go.mod` directives to `go 1.24.0`.
+
 ## 0.8.12
 
 - Added native row IDs independent of row positions, with application-supplied or engine-generated positive `int64` IDs, lookup support and row identity in edit events. Zero is reserved; existing index-based APIs remain available. Generated bindings preserve the full ID range, including JavaScript `bigint` and Dart protobuf `Int64` values.

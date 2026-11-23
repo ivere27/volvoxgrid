@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.13
+
+- Bumped iOS, macOS, Linux, Windows, and Android native artifact resolution to the v0.8.13 release (`VolvoxGrid.xcframework` / `VolvoxGridLite.xcframework` from GitHub Releases and `volvoxgrid-desktop-0.8.13.jar` / `volvoxgrid-android:0.8.13` from Maven Central).
+- No Dart-side API changes. Refreshed `pubspec.lock` transitive dependencies and added CI verification plus `pub.dev` upstream reachability checks (`make publish_flutter_release`) — see the [top-level CHANGELOG](../CHANGELOG.md) for full detail.
+
 ## 0.8.12
 
 - Fixed native version resolution for package-only installs. Explicit overrides take priority over the package version, with a recognized monorepo `VERSION` as a fallback. Source selection consistently honors `VOLVOXGRID_SOURCE=local/maven`.
